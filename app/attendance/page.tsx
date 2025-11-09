@@ -124,6 +124,9 @@ export default function AttendancePage() {
     }>
   >([])
 
+  const [aiAnalytics, setAiAnalytics] = useState<any>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
+
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -131,11 +134,14 @@ export default function AttendancePage() {
 
   useEffect(() => {
     loadData()
+    loadAIAnalytics()
     getGeolocation()
 
     // Refresh every 30 seconds
     const interval = setInterval(() => {
       loadData()
+      // Refresh AI analytics as well
+      loadAIAnalytics()
     }, 30000)
 
     return () => clearInterval(interval)
@@ -154,6 +160,21 @@ export default function AttendancePage() {
           console.log("[v0] Geolocation error:", error)
         },
       )
+    }
+  }
+
+  const loadAIAnalytics = async () => {
+    setAnalyticsLoading(true)
+    try {
+      const response = await fetch(`/api/attendance/analytics?days=30&type=all`)
+      if (!response.ok) throw new Error("Failed to fetch analytics")
+
+      const data = await response.json()
+      setAiAnalytics(data)
+    } catch (error) {
+      console.error("[v0] Error loading AI analytics:", error)
+    } finally {
+      setAnalyticsLoading(false)
     }
   }
 
@@ -961,118 +982,304 @@ export default function AttendancePage() {
 
         {/* AI Insights Tab */}
         <TabsContent value="ai-insights" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
+          {analyticsLoading ? (
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Brain className="h-5 w-5 text-purple-500" />
-                  Predictive Analytics
-                </CardTitle>
-                <CardDescription>AI-powered attendance insights</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Absenteeism Trend</span>
-                    <Badge
-                      variant={
-                        aiInsights.absenteeismTrend === "up"
-                          ? "destructive"
-                          : aiInsights.absenteeismTrend === "down"
-                            ? "default"
-                            : "secondary"
-                      }
-                    >
-                      {aiInsights.absenteeismTrend === "up"
-                        ? "↑ Increasing"
-                        : aiInsights.absenteeismTrend === "down"
-                          ? "↓ Decreasing"
-                          : "→ Stable"}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Predicted Absences Tomorrow</span>
-                    <span className="font-bold">{aiInsights.predictedAbsences}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Fatigue Alerts</span>
-                    <Badge variant="destructive">{aiInsights.fatigueAlerts}</Badge>
-                  </div>
+              <CardContent className="py-12">
+                <div className="flex items-center justify-center">
+                  <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="ml-3 text-muted-foreground">Loading AI analytics...</p>
                 </div>
               </CardContent>
             </Card>
+          ) : aiAnalytics ? (
+            <>
+              <div className="grid gap-4 md:grid-cols-3">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Brain className="h-5 w-5 text-purple-500" />
+                      Absenteeism Trends
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Trend</span>
+                      <Badge
+                        variant={
+                          aiAnalytics.absenteeismTrends.trend === "increasing"
+                            ? "destructive"
+                            : aiAnalytics.absenteeismTrends.trend === "decreasing"
+                              ? "default"
+                              : "secondary"
+                        }
+                      >
+                        {aiAnalytics.absenteeismTrends.trend}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Weekly Rate</span>
+                      <span className="font-bold">{aiAnalytics.absenteeismTrends.weeklyRate}%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Monthly Rate</span>
+                      <span className="font-bold">{aiAnalytics.absenteeismTrends.monthlyRate}%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Change</span>
+                      <Badge
+                        variant={
+                          Number.parseFloat(aiAnalytics.absenteeismTrends.change) > 0 ? "destructive" : "default"
+                        }
+                      >
+                        {aiAnalytics.absenteeismTrends.change}%
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-amber-500" />
-                  Risk Employees
-                </CardTitle>
-                <CardDescription>Employees requiring attention</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {aiInsights.riskEmployees.map((empId) => {
-                    const employee = employees.find((e) => e.id === empId)
-                    const record = attendanceRecords.find((r) => r.employee_id === empId)
-                    return (
-                      <div key={empId} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                          <p className="font-medium">{employee?.full_name || "Unknown"}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {record?.overtime_hours ? `${record.overtime_hours.toFixed(1)}h overtime` : "Absent"}
-                          </p>
-                        </div>
-                        <Button variant="outline" size="sm">
-                          Contact
-                        </Button>
-                      </div>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-amber-500" />
+                      Predictive Analysis
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Tomorrow</span>
+                      <Badge variant="secondary">{aiAnalytics.predictiveAbsences.tomorrow} absences</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Next Week</span>
+                      <Badge variant="secondary">{aiAnalytics.predictiveAbsences.nextWeek} absences</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Confidence</span>
+                      <span className="font-bold">{aiAnalytics.predictiveAbsences.confidence.toFixed(0)}%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Pattern</span>
+                      <Badge>{aiAnalytics.predictiveAbsences.pattern}</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Recommendations</CardTitle>
-              <CardDescription>AI-generated action items</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 border rounded-lg">
-                  <Zap className="h-5 w-5 text-amber-500 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="font-medium">Schedule wellness check-ins</p>
-                    <p className="text-sm text-muted-foreground">
-                      {aiInsights.fatigueAlerts} employees showing signs of fatigue. Consider scheduling wellness
-                      conversations.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 border rounded-lg">
-                  <Zap className="h-5 w-5 text-blue-500 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="font-medium">Review overtime policies</p>
-                    <p className="text-sm text-muted-foreground">
-                      Average overtime is trending upward. Consider hiring additional support or redistributing
-                      workload.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 border rounded-lg">
-                  <Zap className="h-5 w-5 text-green-500 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="font-medium">Optimize shift schedules</p>
-                    <p className="text-sm text-muted-foreground">
-                      Analysis suggests flexible work hours could improve attendance by 12%.
-                    </p>
-                  </div>
-                </div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5 text-red-500" />
+                      Fatigue Analysis
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">High Risk</span>
+                      <Badge variant="destructive">{aiAnalytics.fatigueAnalysis.highRisk.length}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Medium Risk</span>
+                      <Badge variant="secondary">{aiAnalytics.fatigueAnalysis.mediumRisk.length}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Low Risk</span>
+                      <Badge variant="default">{aiAnalytics.fatigueAnalysis.lowRisk.length}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Total At Risk</span>
+                      <span className="font-bold">{aiAnalytics.fatigueAnalysis.totalAtRisk}</span>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
+
+              {/* Department Patterns */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Department Performance</CardTitle>
+                  <CardDescription>Attendance metrics by department</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Department</TableHead>
+                        <TableHead>Attendance Rate</TableHead>
+                        <TableHead>Avg Hours</TableHead>
+                        <TableHead>Total Overtime</TableHead>
+                        <TableHead>Employees</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {aiAnalytics.departmentPatterns.map((dept: any) => (
+                        <TableRow key={dept.department}>
+                          <TableCell className="font-medium">{dept.department}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                Number.parseFloat(dept.attendanceRate) > 90
+                                  ? "default"
+                                  : Number.parseFloat(dept.attendanceRate) > 80
+                                    ? "secondary"
+                                    : "destructive"
+                              }
+                            >
+                              {dept.attendanceRate}%
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{dept.avgHours}h</TableCell>
+                          <TableCell>{dept.totalOvertime}h</TableCell>
+                          <TableCell>{dept.employeeCount}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              {/* Risk Employees */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Risk Employees</CardTitle>
+                  <CardDescription>Employees requiring attention based on AI analysis</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {aiAnalytics.riskEmployees.slice(0, 8).map((risk: any) => {
+                      const employee = employees.find((e) => e.id === risk.employeeId)
+                      return (
+                        <div key={risk.employeeId} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex-1">
+                            <p className="font-medium">{employee?.full_name || "Unknown Employee"}</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {risk.reasons.map((reason: string, idx: number) => (
+                                <Badge key={idx} variant="outline" className="text-xs">
+                                  {reason}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Badge
+                              variant={
+                                risk.riskScore > 7 ? "destructive" : risk.riskScore > 4 ? "secondary" : "default"
+                              }
+                            >
+                              Risk: {risk.riskScore}
+                            </Badge>
+                            <Button variant="outline" size="sm">
+                              Contact
+                            </Button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* AI Recommendations */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>AI Recommendations</CardTitle>
+                  <CardDescription>Actionable insights based on attendance patterns</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {aiAnalytics.recommendations.map((rec: any, idx: number) => (
+                      <div key={idx} className="border rounded-lg p-4 space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-3">
+                            <Zap
+                              className={cn(
+                                "h-5 w-5 mt-0.5",
+                                rec.priority === "high"
+                                  ? "text-red-500"
+                                  : rec.priority === "medium"
+                                    ? "text-amber-500"
+                                    : "text-green-500",
+                              )}
+                            />
+                            <div>
+                              <h4 className="font-semibold">{rec.title}</h4>
+                              <p className="text-sm text-muted-foreground mt-1">{rec.description}</p>
+                            </div>
+                          </div>
+                          <Badge
+                            variant={
+                              rec.priority === "high"
+                                ? "destructive"
+                                : rec.priority === "medium"
+                                  ? "secondary"
+                                  : "default"
+                            }
+                          >
+                            {rec.priority}
+                          </Badge>
+                        </div>
+                        <div className="ml-8 space-y-1">
+                          <p className="text-sm font-medium">Suggested Actions:</p>
+                          <ul className="text-sm text-muted-foreground space-y-1">
+                            {rec.actions.map((action: string, actionIdx: number) => (
+                              <li key={actionIdx} className="flex items-start gap-2">
+                                <CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                                {action}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Overtime Patterns */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Overtime Analysis</CardTitle>
+                  <CardDescription>Overtime trends and patterns</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Total Overtime</Label>
+                      <p className="text-2xl font-bold">{aiAnalytics.overtimePatterns.totalOvertime}h</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Daily Average</Label>
+                      <p className="text-2xl font-bold">{aiAnalytics.overtimePatterns.avgDailyOvertime}h</p>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Top Overtime Employees</Label>
+                    <div className="mt-2 space-y-2">
+                      {aiAnalytics.overtimePatterns.topEmployees.map((emp: any) => {
+                        const employee = employees.find((e) => e.id === emp.employeeId)
+                        return (
+                          <div key={emp.employeeId} className="flex items-center justify-between p-2 border rounded">
+                            <span className="text-sm font-medium">{employee?.full_name || "Unknown"}</span>
+                            <div className="flex items-center gap-3 text-sm">
+                              <span>{emp.totalOT.toFixed(1)}h total</span>
+                              <Badge variant="secondary">{emp.frequency} days</Badge>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">No Analytics Data</h3>
+                <p className="text-sm text-muted-foreground mb-4">Load data to generate AI insights</p>
+                <Button onClick={loadAIAnalytics}>Generate Analytics</Button>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Shifts Tab */}
