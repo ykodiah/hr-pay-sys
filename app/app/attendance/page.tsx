@@ -322,6 +322,87 @@ interface WellnessNudge {
 
 type EnrichedWellnessNudge = WellnessNudge & { acknowledged: boolean }
 
+interface SupabaseWellnessSnapshot {
+  id: string
+  employee_id: string | null
+  period_start: string | null
+  period_end: string | null
+  employee_hris_id?: string | null
+  recovery_score: number | null
+  stress_score: number | null
+  engagement_score: number | null
+  fatigue_index: number | null
+  hydration_score: number | null
+  sleep_hours: number | null
+  last_check_in: string | null
+  notes: string | null
+  employees?: {
+    employee_id: string | null
+  } | null
+}
+
+interface WellnessSnapshot {
+  employeeId: string
+  periodStart: string
+  periodEnd: string
+  recoveryScore: number
+  stressScore: number
+  engagementScore: number
+  fatigueIndex: number
+  hydrationScore: number
+  sleepHours: number
+  lastCheckIn: string
+  notes?: string
+  sourceEmployeeKey?: string | null
+}
+
+const calculateSnapshotWellbeingScore = (snapshot: WellnessSnapshot) => {
+  const stress = clamp(snapshot.stressScore, 0, 100)
+  const recovery = clamp(snapshot.recoveryScore, 0, 100)
+  const engagement = clamp(snapshot.engagementScore, 0, 100)
+  const fatigue = clamp(snapshot.fatigueIndex, 0, 100)
+  const hydration = clamp(snapshot.hydrationScore, 0, 100)
+  const sleepScore = clamp((snapshot.sleepHours / 8) * 100, 0, 115)
+
+  const aggregate =
+    recovery * 0.25 +
+    (100 - stress) * 0.2 +
+    engagement * 0.2 +
+    (100 - fatigue) * 0.15 +
+    hydration * 0.1 +
+    sleepScore * 0.1
+
+  return clamp(Math.round(aggregate), 0, 100)
+}
+
+const normalizeWellnessSnapshot = (row: SupabaseWellnessSnapshot): WellnessSnapshot => {
+  const fallbackDate = new Date().toISOString()
+  const safeSleep = typeof row.sleep_hours === "number" && !Number.isNaN(row.sleep_hours) ? row.sleep_hours : 7
+
+  const employeeIdentifier =
+    row.employee_hris_id ??
+    row.employees?.employee_id ??
+    (row.employee_id ? row.employee_id : row.id)
+
+  return {
+    employeeId: employeeIdentifier,
+    periodStart: row.period_start ?? fallbackDate,
+    periodEnd: row.period_end ?? fallbackDate,
+    recoveryScore:
+      typeof row.recovery_score === "number" && !Number.isNaN(row.recovery_score) ? row.recovery_score : 60,
+    stressScore: typeof row.stress_score === "number" && !Number.isNaN(row.stress_score) ? row.stress_score : 55,
+    engagementScore:
+      typeof row.engagement_score === "number" && !Number.isNaN(row.engagement_score) ? row.engagement_score : 70,
+    fatigueIndex: typeof row.fatigue_index === "number" && !Number.isNaN(row.fatigue_index) ? row.fatigue_index : 45,
+    hydrationScore:
+      typeof row.hydration_score === "number" && !Number.isNaN(row.hydration_score) ? row.hydration_score : 65,
+    sleepHours: Number.isFinite(safeSleep) ? Number(safeSleep.toFixed(1)) : 7,
+    lastCheckIn: row.last_check_in ?? row.period_end ?? fallbackDate,
+    notes: row.notes ?? undefined,
+    sourceEmployeeKey: row.employee_id ?? row.employee_hris_id ?? null,
+  }
+}
+
 interface AttendancePolicy {
   id: string
   name: string
@@ -424,7 +505,9 @@ const calculateHoursFromTimes = (clockIn: string | null, clockOut: string | null
   return Number((diffInMinutes / 60).toFixed(2))
 }
 
-const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max)
+}
 
 const mapStatusFromSupabase = (status: string | null): AttendanceStatus => {
   switch (status) {
@@ -848,6 +931,51 @@ const initialBiometricDevices: BiometricDevice[] = [
   },
 ]
 
+const initialWellnessSnapshots: WellnessSnapshot[] = [
+  {
+    employeeId: "EMP-001",
+    periodStart: formatDateByOffset(-7),
+    periodEnd: formatDateByOffset(0),
+    recoveryScore: 74,
+    stressScore: 52,
+    engagementScore: 83,
+    fatigueIndex: 39,
+    hydrationScore: 71,
+    sleepHours: 6.5,
+    lastCheckIn: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    notes: "Month-end reporting spike noted. Encouraged active recovery day.",
+    sourceEmployeeKey: null,
+  },
+  {
+    employeeId: "EMP-004",
+    periodStart: formatDateByOffset(-7),
+    periodEnd: formatDateByOffset(0),
+    recoveryScore: 62,
+    stressScore: 67,
+    engagementScore: 76,
+    fatigueIndex: 58,
+    hydrationScore: 64,
+    sleepHours: 5.9,
+    lastCheckIn: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    notes: "Night shift rotations reducing sleep quality. Monitor transport allowance delays.",
+    sourceEmployeeKey: null,
+  },
+  {
+    employeeId: "EMP-005",
+    periodStart: formatDateByOffset(-7),
+    periodEnd: formatDateByOffset(0),
+    recoveryScore: 81,
+    stressScore: 44,
+    engagementScore: 78,
+    fatigueIndex: 33,
+    hydrationScore: 69,
+    sleepHours: 7.1,
+    lastCheckIn: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    notes: "High client interaction but positive wellbeing. Keep rotating weekend cover.",
+    sourceEmployeeKey: null,
+  },
+]
+
 const initialOvertimeRequests: OvertimeRequest[] = [
   {
     id: "OT-001",
@@ -959,6 +1087,11 @@ export default function AttendancePage() {
   const { toast } = useToast()
 
   const demoModeRef = useRef<boolean>(getInitialDemoMode())
+  const supabaseClientRef = useRef<any | null>(null)
+  if (!supabaseClientRef.current) {
+    supabaseClientRef.current = createClient()
+  }
+  const supabaseClient = supabaseClientRef.current
 
   const [isDemoData, setIsDemoData] = useState(demoModeRef.current)
   const [isLoadingData, setIsLoadingData] = useState(!demoModeRef.current)
@@ -1038,6 +1171,7 @@ export default function AttendancePage() {
       size: "8 KB",
     },
   ])
+  const [wellnessSnapshots, setWellnessSnapshots] = useState<WellnessSnapshot[]>(initialWellnessSnapshots)
   const [acknowledgedWellnessNudges, setAcknowledgedWellnessNudges] = useState<string[]>([])
 
   const [searchTerm, setSearchTerm] = useState("")
@@ -1215,6 +1349,7 @@ export default function AttendancePage() {
   const [communicationChannels, setCommunicationChannels] = useState<CommunicationChannel[]>([])
   const [subsidiaryOptions, setSubsidiaryOptions] = useState<SupabaseSubsidiary[]>([])
   const offlineAlertedDevicesRef = useRef<Set<string>>(new Set())
+  const defaultCommunicationChannelId = "channel-ops"
 
   const formatDeliveryChannel = useCallback((channel: AlertSettings["deliveryChannel"]) => {
     if (channel === "sms") return "SMS"
@@ -1238,13 +1373,31 @@ export default function AttendancePage() {
       setLoadError(null)
 
       try {
-        const supabase: any = createClient()
+        const supabase: any = supabaseClientRef.current
+
+        if (!supabase) {
+          if (!isMounted) return
+          demoModeRef.current = true
+          setIsDemoData(true)
+          setAttendanceRecords(initialAttendanceRecords)
+          setWellnessSnapshots(initialWellnessSnapshots)
+          setAcknowledgedWellnessNudges([])
+          setIsLoadingData(false)
+          setLoadError("Supabase client unavailable. Showing sample attendance data.")
+          toast({
+            title: "Demo data in use",
+            description: "Supabase client was not initialised. Showing sample attendance records.",
+          })
+          return
+        }
 
         if (supabase?.__isMock) {
           if (!isMounted) return
           demoModeRef.current = true
           setIsDemoData(true)
           setAttendanceRecords(initialAttendanceRecords)
+          setWellnessSnapshots(initialWellnessSnapshots)
+          setAcknowledgedWellnessNudges([])
           setIsLoadingData(false)
           setLoadError("Supabase credentials missing. Showing sample attendance data.")
           toast({
@@ -1254,7 +1407,8 @@ export default function AttendancePage() {
           return
         }
 
-        const [attendanceResponse, employeesResponse, subsidiariesResponse] = await Promise.all([
+        const [attendanceResponse, employeesResponse, subsidiariesResponse, wellnessResponse, wellnessActionsResponse] =
+          await Promise.all([
           supabase
             .from("attendance_records")
             .select(
@@ -1264,7 +1418,33 @@ export default function AttendancePage() {
             .limit(200),
           supabase.from("employees").select("id, employee_id, full_name, department, division, location, subsidiary_id"),
           supabase.from("subsidiaries").select("id, name"),
-        ])
+            supabase
+              .from("employee_wellbeing_snapshots")
+              .select(
+                `
+                id,
+                employee_id,
+                employee_hris_id,
+                period_start,
+                period_end,
+                recovery_score,
+                stress_score,
+                engagement_score,
+                fatigue_index,
+                hydration_score,
+                sleep_hours,
+                last_check_in,
+                notes,
+                employees:employees ( employee_id )
+              `,
+              )
+              .order("period_end", { ascending: false })
+              .limit(200),
+            supabase
+              .from("wellness_nudge_actions")
+              .select("nudge_id, action_type, performed_at")
+              .gte("performed_at", new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString()),
+          ])
 
         if (!isMounted) return
 
@@ -1294,6 +1474,28 @@ export default function AttendancePage() {
         setAttendanceRecords(normalizedRecords)
         setSubsidiaryOptions(Array.from(subsidiariesMap.values()))
         setIsDemoData(false)
+        if (!wellnessResponse.error) {
+          const normalizedSnapshots = (wellnessResponse.data ?? []).map((snapshot: SupabaseWellnessSnapshot) =>
+            normalizeWellnessSnapshot(snapshot),
+          )
+          setWellnessSnapshots(normalizedSnapshots)
+        } else {
+          console.warn("[attendance] wellness snapshots query error:", wellnessResponse.error?.message)
+          setWellnessSnapshots(initialWellnessSnapshots)
+        }
+
+        if (!wellnessActionsResponse.error) {
+          const acknowledged =
+            wellnessActionsResponse.data
+              ?.filter((action: { nudge_id: string | null; action_type: string | null }) => action.action_type === "acknowledged")
+              .map((action: { nudge_id: string | null }) => action.nudge_id)
+              .filter((id): id is string => Boolean(id)) ?? []
+          setAcknowledgedWellnessNudges(acknowledged)
+        } else {
+          console.warn("[attendance] wellness actions query error:", wellnessActionsResponse.error?.message)
+          setAcknowledgedWellnessNudges([])
+        }
+
         setIsLoadingData(false)
 
         if (normalizedRecords.length === 0) {
@@ -1306,6 +1508,8 @@ export default function AttendancePage() {
         demoModeRef.current = true
         setIsDemoData(true)
         setAttendanceRecords(initialAttendanceRecords)
+        setWellnessSnapshots(initialWellnessSnapshots)
+        setAcknowledgedWellnessNudges([])
         setIsLoadingData(false)
         toast({
           title: "Using sample attendance data",
@@ -1321,6 +1525,98 @@ export default function AttendancePage() {
       isMounted = false
     }
   }, [toast])
+
+  useEffect(() => {
+    if (isDemoData) {
+      return
+    }
+
+    const supabase = supabaseClientRef.current
+    if (!supabase || supabase.__isMock) {
+      return
+    }
+
+    const wellnessChannel = supabase
+      .channel("attendance-wellness-stream")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "employee_wellbeing_snapshots" },
+        (payload) => {
+          if (payload.eventType === "DELETE") {
+            const oldRow = (payload.old ?? {}) as SupabaseWellnessSnapshot
+            const removalKey = oldRow.employee_id ?? oldRow.employee_hris_id ?? null
+            setWellnessSnapshots((previous) =>
+              previous.filter(
+                (snapshot) =>
+                  snapshot.sourceEmployeeKey !== removalKey && snapshot.employeeId !== (oldRow.employee_hris_id ?? ""),
+              ),
+            )
+            return
+          }
+
+          const rawSnapshot = (payload.new ?? {}) as SupabaseWellnessSnapshot
+          if (!rawSnapshot) {
+            return
+          }
+
+          setWellnessSnapshots((previous) => {
+            const normalized = normalizeWellnessSnapshot(rawSnapshot)
+            const fallbackEmployeeId =
+              normalized.employeeId && normalized.employeeId !== normalized.sourceEmployeeKey
+                ? normalized.employeeId
+                : previous.find(
+                    (snapshot) => snapshot.sourceEmployeeKey && snapshot.sourceEmployeeKey === normalized.sourceEmployeeKey,
+                  )?.employeeId ??
+                  rawSnapshot.employee_hris_id ??
+                  normalized.employeeId
+
+            const mergedSnapshot: WellnessSnapshot = {
+              ...normalized,
+              employeeId: fallbackEmployeeId,
+            }
+
+            const existingIndex = previous.findIndex(
+              (snapshot) =>
+                (snapshot.sourceEmployeeKey && snapshot.sourceEmployeeKey === mergedSnapshot.sourceEmployeeKey) ||
+                snapshot.employeeId === mergedSnapshot.employeeId,
+            )
+
+            if (existingIndex >= 0) {
+              const next = [...previous]
+              next[existingIndex] = { ...next[existingIndex], ...mergedSnapshot }
+              return next
+            }
+
+            return [mergedSnapshot, ...previous]
+          })
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "wellness_nudge_actions" },
+        (payload) => {
+          if (payload.eventType === "DELETE") {
+            const oldAction = (payload.old ?? {}) as { nudge_id?: string | null; action_type?: string | null }
+            if (oldAction?.action_type === "acknowledged" && oldAction.nudge_id) {
+              setAcknowledgedWellnessNudges((previous) => previous.filter((id) => id !== oldAction.nudge_id))
+            }
+            return
+          }
+
+          const newAction = (payload.new ?? {}) as { nudge_id?: string | null; action_type?: string | null }
+          if (newAction?.action_type === "acknowledged" && newAction.nudge_id) {
+            setAcknowledgedWellnessNudges((previous) =>
+              previous.includes(newAction.nudge_id!) ? previous : [...previous, newAction.nudge_id!],
+            )
+          }
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(wellnessChannel)
+    }
+  }, [isDemoData])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1786,6 +2082,48 @@ export default function AttendancePage() {
     })
   }
 
+  const recordWellnessAction = useCallback(
+    async (action: {
+      nudgeId: string
+      employeeId: string
+      actionType: "scheduled" | "acknowledged"
+      metadata?: Record<string, unknown>
+    }) => {
+      const supabase = supabaseClientRef.current
+      if (!supabase || supabase.__isMock) {
+        return
+      }
+
+      try {
+        const matchedSnapshot = wellnessSnapshots.find(
+          (snapshot) =>
+            snapshot.employeeId === action.employeeId || snapshot.sourceEmployeeKey === action.employeeId,
+        )
+        const possibleEmployeeKey = matchedSnapshot?.sourceEmployeeKey ?? null
+        const employeeUuid =
+          possibleEmployeeKey && /^[0-9a-fA-F-]{8}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{4}-[0-9a-fA-F-]{12}$/.test(possibleEmployeeKey)
+            ? possibleEmployeeKey
+            : null
+
+        const { error } = await supabase.from("wellness_nudge_actions").insert({
+          nudge_id: action.nudgeId,
+          employee_id: employeeUuid,
+          employee_hris_id: action.employeeId,
+          action_type: action.actionType,
+          metadata: action.metadata ?? null,
+          performed_at: new Date().toISOString(),
+        })
+
+        if (error) {
+          console.warn("[attendance] wellness action insert error:", error.message)
+        }
+      } catch (error) {
+        console.warn("[attendance] wellness action insert exception:", error)
+      }
+    },
+    [wellnessSnapshots],
+  )
+
   const getBurnoutBadgeClass = (score: number) => {
     if (score >= 85) {
       return "bg-rose-100 text-rose-700"
@@ -1806,26 +2144,95 @@ export default function AttendancePage() {
     return "Healthy balance"
   }
 
-  const handleScheduleWellnessCheckIn = (nudge: WellnessNudge) => {
-    toast({
-      title: "Wellness check-in queued",
-      description: `1:1 session for ${nudge.employeeName} added to the wellbeing pipeline.`,
-    })
-  }
+  const handleScheduleWellnessCheckIn = useCallback(
+    async (nudge: EnrichedWellnessNudge) => {
+      const wellnessChannel =
+        communicationChannels.find((channel) => channel.name?.toLowerCase().includes("wellness")) ??
+        communicationChannels.find((channel) => channel.name?.toLowerCase().includes("people")) ??
+        communicationChannels.find((channel) => channel.id === alertSettings.communicationChannelId)
 
-  const handleAcknowledgeWellnessNudge = (nudge: WellnessNudge) => {
-    setAcknowledgedWellnessNudges((previous) => {
-      if (previous.includes(nudge.id)) {
-        return previous
+      const channelId = wellnessChannel?.id ?? alertSettings.communicationChannelId ?? defaultCommunicationChannelId
+      const channelLabel = wellnessChannel?.name ?? channelId
+      const deliveryLabel = formatDeliveryChannel(alertSettings.deliveryChannel)
+
+      const messageId =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `wellness-msg-${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+      const message: CommunicationMessage = {
+        id: messageId,
+        channelId,
+        author: "Wellness Coach Automation",
+        authorRole: "Employee Care",
+        content: `Wellness coaching scheduled for ${nudge.employeeName} • Burnout ${nudge.burnoutIndex}% • Recommendation: ${
+          nudge.recommendation
+        }. Follow-up: ${nudge.followUp}. Delivery via ${deliveryLabel}.`,
+        sentAt: new Date().toISOString(),
+        priority: nudge.burnoutIndex >= 85 ? "critical" : "high",
+        requiresAck: true,
+        acknowledgedBy: [],
+        tags: ["wellness", "attendance", "burnout-alert"],
       }
-      return [...previous, nudge.id]
-    })
 
-    toast({
-      title: "Nudge acknowledged",
-      description: `${nudge.employeeName}'s wellbeing plan recorded.`,
-    })
-  }
+      try {
+        await sendCommunicationMessage(message)
+      } catch (error) {
+        console.error("[attendance] sendWellnessCoachingMessage error", error)
+      }
+
+      void recordWellnessAction({
+        nudgeId: nudge.id,
+        employeeId: nudge.employeeId,
+        actionType: "scheduled",
+        metadata: {
+          burnoutIndex: nudge.burnoutIndex,
+          recommendation: nudge.recommendation,
+          followUp: nudge.followUp,
+          channelId,
+        },
+      })
+
+      toast({
+        title: "Wellness check-in queued",
+        description: `1:1 session for ${nudge.employeeName} posted to ${channelLabel}.`,
+      })
+    },
+    [
+      alertSettings.communicationChannelId,
+      alertSettings.deliveryChannel,
+      communicationChannels,
+      defaultCommunicationChannelId,
+      formatDeliveryChannel,
+      recordWellnessAction,
+      sendCommunicationMessage,
+      toast,
+    ],
+  )
+
+  const handleAcknowledgeWellnessNudge = useCallback(
+    (nudge: EnrichedWellnessNudge) => {
+      setAcknowledgedWellnessNudges((previous) => {
+        if (previous.includes(nudge.id)) {
+          return previous
+        }
+        return [...previous, nudge.id]
+      })
+
+      void recordWellnessAction({
+        nudgeId: nudge.id,
+        employeeId: nudge.employeeId,
+        actionType: "acknowledged",
+        metadata: { burnoutIndex: nudge.burnoutIndex },
+      })
+
+      toast({
+        title: "Nudge acknowledged",
+        description: `${nudge.employeeName}'s wellbeing plan recorded.`,
+      })
+    },
+    [recordWellnessAction, toast],
+  )
 
   const getStageBadgeClass = (status: ApprovalStageStatus) => {
     switch (status) {
@@ -2056,8 +2463,6 @@ export default function AttendancePage() {
       description: `Filtered attendance report queued for download (${filteredRecords.length} records).`,
     })
   }
-
-  const defaultCommunicationChannelId = "channel-ops"
 
   const sendAttendanceAlert = useCallback(
     async (record: AttendanceRecord, context: { kind: "reminder" | "status"; status?: AttendanceStatus }) => {
@@ -3064,6 +3469,17 @@ export default function AttendancePage() {
     ]
     }, [attendanceRecords, complianceDevices, isWithinSelectedRange, policyAppliedLookup, slaBreaches])
 
+  const wellnessSnapshotMap = useMemo(() => {
+    const map = new Map<string, WellnessSnapshot>()
+    wellnessSnapshots.forEach((snapshot) => {
+      map.set(snapshot.employeeId, snapshot)
+      if (snapshot.sourceEmployeeKey) {
+        map.set(snapshot.sourceEmployeeKey, snapshot)
+      }
+    })
+    return map
+  }, [wellnessSnapshots])
+
   const wellnessInsights = useMemo(() => {
     const scopedRecords = attendanceRecords.filter((record) => isWithinSelectedRange(record.date))
 
@@ -3148,7 +3564,7 @@ export default function AttendancePage() {
       const attendancePressure = ((entry.lateDays + entry.absenceDays) / entry.totalRecords) * 100
       const remoteReliabilityEmployee = entry.remoteDays ? (entry.remotePresent / entry.remoteDays) * 100 : null
       const aiRiskAverage = entry.aiRiskSum / entry.totalRecords
-      const burnoutIndex = clamp(
+      const attendanceBurnout = clamp(
         overtimeAverage * 18 +
           attendancePressure * 0.4 +
           aiRiskAverage * 60 +
@@ -3157,29 +3573,49 @@ export default function AttendancePage() {
         100,
       )
 
+      const snapshot =
+        wellnessSnapshotMap.get(entry.employeeId) ??
+        wellnessSnapshotMap.get(entry.employeeId?.toLowerCase().trim() ?? "")
+      const snapshotScore = snapshot ? calculateSnapshotWellbeingScore(snapshot) : null
+      const wellbeingPenalty = snapshotScore !== null ? (100 - snapshotScore) * 0.6 : 0
+      const combinedBurnout = clamp(attendanceBurnout + wellbeingPenalty, 0, 100)
+
       const recommendation =
-        burnoutIndex >= 85
+        combinedBurnout >= 85
           ? "Book wellness day and alert HR wellbeing partner."
-          : burnoutIndex >= 70
+          : combinedBurnout >= 70
             ? "Line manager to schedule focused coaching and encourage PTO."
+            : snapshot && snapshot.stressScore > 65
+              ? "Deploy stress management toolkit and workload audit."
             : "Send positive reinforcement with micro-break reminders."
 
       const followUp =
-        burnoutIndex >= 80
+        combinedBurnout >= 80
           ? "Schedule 1:1 wellbeing check-in."
+          : snapshot && snapshot.sleepHours < 6
+            ? "Address sleep hygiene and adjust shift rotations."
           : remoteReliabilityEmployee !== null && remoteReliabilityEmployee < 75
             ? "Reinforce hybrid routines & geo compliance."
             : "Share mindfulness resources and hydration prompts."
+
+      const wellbeingSummary = snapshot
+        ? [
+            remoteReliabilityEmployee !== null ? `Remote ${remoteReliabilityEmployee.toFixed(0)}%` : "Onsite cohort",
+            `Wellbeing ${snapshotScore !== null ? snapshotScore.toFixed(0) : "n/a"}`,
+            `Stress ${Math.round(snapshot.stressScore)}`,
+            `Sleep ${snapshot.sleepHours.toFixed(1)}h`,
+          ].join(" • ")
+        : remoteReliabilityEmployee !== null
+          ? `Remote reliability ${remoteReliabilityEmployee.toFixed(0)}%`
+          : "Onsite cohort"
 
       return {
         id: `wellness-${entry.employeeId}`,
         employeeId: entry.employeeId,
         employeeName: entry.employeeName,
-        burnoutIndex: Number(burnoutIndex.toFixed(1)),
+        burnoutIndex: Number(combinedBurnout.toFixed(1)),
         attendanceSummary: `${entry.lateDays} late • ${entry.absenceDays} absent • OT ${overtimeAverage.toFixed(1)}h`,
-        wellbeingSummary: `Avg hours ${(entry.totalHours / entry.totalRecords).toFixed(1)}h • ${
-          remoteReliabilityEmployee !== null ? `Remote reliability ${remoteReliabilityEmployee.toFixed(0)}%` : "Onsite cohort"
-        }`,
+        wellbeingSummary,
         recommendation,
         followUp,
         remoteReliability: remoteReliabilityEmployee,
@@ -3194,9 +3630,13 @@ export default function AttendancePage() {
       .slice(0, 4)
 
     const burnoutHotspots = sortedNudges.filter((nudge) => nudge.burnoutIndex >= 70).length
-    const wellbeingScoreRaw = employeeNudges.length
-      ? 100 - employeeNudges.reduce((sum, nudge) => sum + nudge.burnoutIndex, 0) / employeeNudges.length
-      : 100
+    const snapshotScores = wellnessSnapshots.map((snapshot) => calculateSnapshotWellbeingScore(snapshot))
+    const wellbeingScoreRaw =
+      snapshotScores.length > 0
+        ? snapshotScores.reduce((sum, score) => sum + score, 0) / snapshotScores.length
+        : employeeNudges.length
+          ? 100 - employeeNudges.reduce((sum, nudge) => sum + nudge.burnoutIndex, 0) / employeeNudges.length
+          : 100
     const wellbeingScore = clamp(wellbeingScoreRaw, 0, 100)
 
     const digest: WellnessDigest = {
@@ -3208,7 +3648,7 @@ export default function AttendancePage() {
     }
 
     return { digest, nudges: sortedNudges }
-  }, [attendanceRecords, isWithinSelectedRange])
+  }, [attendanceRecords, isWithinSelectedRange, wellnessSnapshotMap, wellnessSnapshots])
 
   const wellnessNudges = useMemo<EnrichedWellnessNudge[]>(() => {
     return wellnessInsights.nudges.map((nudge) => ({
@@ -5218,14 +5658,14 @@ export default function AttendancePage() {
                                   size="sm"
                                   variant="outline"
                                   className="h-7 text-[11px]"
-                                  onClick={() => handleScheduleWellnessCheckIn(nudge)}
+                                  onClick={() => void handleScheduleWellnessCheckIn(nudge)}
                                 >
                                   Schedule check-in
                                 </Button>
                                 <Button
                                   size="sm"
                                   className="h-7 text-[11px]"
-                                  onClick={() => handleAcknowledgeWellnessNudge(nudge)}
+                                  onClick={() => void handleAcknowledgeWellnessNudge(nudge)}
                                   disabled={nudge.acknowledged}
                                 >
                                   {nudge.acknowledged ? "Acknowledged" : "Acknowledge"}
