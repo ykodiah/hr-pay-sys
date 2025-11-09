@@ -834,7 +834,9 @@ export default function AttendancePage() {
   const [holidays, setHolidays] = useState(initialHolidays)
 
   const [searchTerm, setSearchTerm] = useState("")
-  const [dateFilter, setDateFilter] = useState("today")
+  const [dateFilter, setDateFilter] = useState<"today" | "yesterday" | "this-week" | "this-month" | "custom">("this-week")
+  const [customStartDate, setCustomStartDate] = useState<string>("")
+  const [customEndDate, setCustomEndDate] = useState<string>("")
   const [filters, setFilters] = useState({
     location: "all",
     department: "all",
@@ -843,6 +845,58 @@ export default function AttendancePage() {
     status: "all",
     method: "all",
   })
+
+  const isWithinSelectedRange = useCallback(
+    (value: string | Date) => {
+      const date = typeof value === "string" ? new Date(value) : new Date(value)
+      if (Number.isNaN(date.getTime())) {
+        return false
+      }
+
+      if (dateFilter === "custom") {
+        if (customStartDate && customEndDate) {
+          const start = new Date(customStartDate)
+          const end = new Date(customEndDate)
+          if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+            start.setHours(0, 0, 0, 0)
+            end.setHours(23, 59, 59, 999)
+            return date >= start && date <= end
+          }
+        }
+        return true
+      }
+
+      const today = new Date()
+      switch (dateFilter) {
+        case "today":
+          return date.toDateString() === today.toDateString()
+        case "yesterday": {
+          const yesterday = new Date(today)
+          yesterday.setDate(today.getDate() - 1)
+          return date.toDateString() === yesterday.toDateString()
+        }
+        case "this-week": {
+          const startOfWeek = getWeekStart(today)
+          const endOfWeek = new Date(startOfWeek)
+          endOfWeek.setDate(startOfWeek.getDate() + 6)
+          endOfWeek.setHours(23, 59, 59, 999)
+          return date >= startOfWeek && date <= endOfWeek
+        }
+        case "this-month":
+          return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear()
+        default:
+          return true
+      }
+    },
+    [customEndDate, customStartDate, dateFilter],
+  )
+
+  useEffect(() => {
+    if (dateFilter !== "custom") {
+      setCustomStartDate("")
+      setCustomEndDate("")
+    }
+  }, [dateFilter])
 
   const [showClockInDialog, setShowClockInDialog] = useState(false)
   const [shiftDialogOpen, setShiftDialogOpen] = useState(false)
@@ -1292,37 +1346,6 @@ export default function AttendancePage() {
   }, [policyForm.scope_reference, policyForm.scope_type, scopeReferenceOptions])
 
   const filteredRecords = useMemo(() => {
-    const today = new Date()
-
-    const matchesDate = (dateValue: string) => {
-      const recordDate = new Date(dateValue)
-
-      switch (dateFilter) {
-        case "today":
-          return recordDate.toDateString() === today.toDateString()
-        case "yesterday": {
-          const yesterday = new Date(today)
-          yesterday.setDate(today.getDate() - 1)
-          return recordDate.toDateString() === yesterday.toDateString()
-        }
-        case "this-week": {
-          const startOfWeek = new Date(today)
-          const day = startOfWeek.getDay()
-          const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1)
-          startOfWeek.setDate(diff)
-          startOfWeek.setHours(0, 0, 0, 0)
-          const endOfWeek = new Date(startOfWeek)
-          endOfWeek.setDate(startOfWeek.getDate() + 6)
-          endOfWeek.setHours(23, 59, 59, 999)
-          return recordDate >= startOfWeek && recordDate <= endOfWeek
-        }
-        case "this-month":
-          return recordDate.getMonth() === today.getMonth() && recordDate.getFullYear() === today.getFullYear()
-        default:
-          return true
-      }
-    }
-
     return attendanceRecords.filter((record) => {
       const matchesSearch =
         record.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1336,9 +1359,9 @@ export default function AttendancePage() {
         (filters.status === "all" || record.status === filters.status) &&
         (filters.method === "all" || record.method === filters.method)
 
-      return matchesSearch && matchesFilters && matchesDate(record.date)
+      return matchesSearch && matchesFilters && isWithinSelectedRange(record.date)
     })
-  }, [attendanceRecords, dateFilter, filters, searchTerm])
+  }, [attendanceRecords, filters, isWithinSelectedRange, searchTerm])
 
   const stats = useMemo(() => {
     const total = attendanceRecords.length || 1
@@ -1440,7 +1463,9 @@ export default function AttendancePage() {
 
   const handleResetFilters = () => {
     setFilters({ location: "all", department: "all", division: "all", subsidiary: "all", status: "all", method: "all" })
-    setDateFilter("today")
+    setDateFilter("this-week")
+    setCustomStartDate("")
+    setCustomEndDate("")
     setSearchTerm("")
   }
 
@@ -2356,7 +2381,20 @@ export default function AttendancePage() {
       })
     })
 
-    return windows.map((window) => {
+    return windows
+      .filter((window) => {
+        if (dateFilter === "custom" && customStartDate && customEndDate) {
+          const start = new Date(customStartDate)
+          const end = new Date(customEndDate)
+          if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+            start.setHours(0, 0, 0, 0)
+            end.setHours(23, 59, 59, 999)
+            return window.start <= end && window.end >= start
+          }
+        }
+        return isWithinSelectedRange(window.start) || isWithinSelectedRange(window.end)
+      })
+      .map((window) => {
       const { total, present, late, absent, overtime } = window
       return {
         label: window.label,
@@ -2365,17 +2403,20 @@ export default function AttendancePage() {
         absenceRate: total ? (absent / total) * 100 : 0,
         averageOvertime: total ? overtime / total : 0,
       }
-    })
-  }, [attendanceRecords])
+      })
+  }, [attendanceRecords, customEndDate, customStartDate, dateFilter, isWithinSelectedRange])
 
   const benchmarkComparisons = useMemo(() => {
-    const totalRecords = attendanceRecords.length || 1
-    const presentCount = attendanceRecords.filter((record) => record.status === "present").length
-    const lateCount = attendanceRecords.filter((record) => record.status === "late").length
-    const absentCount = attendanceRecords.filter((record) => record.status === "absent").length
+    const scopedRecords = attendanceRecords.filter((record) => isWithinSelectedRange(record.date))
+    const totalRecords = scopedRecords.length || 1
+    const presentCount = scopedRecords.filter((record) => record.status === "present").length
+    const lateCount = scopedRecords.filter((record) => record.status === "late").length
+    const absentCount = scopedRecords.filter((record) => record.status === "absent").length
 
-    const automationCoverage = totalRecords ? (policyAppliedLookup.size / totalRecords) * 100 : 0
-    const highRiskRecords = attendanceRecords.filter((record) => record.aiRiskScore >= 0.6)
+    const automationCoverage = scopedRecords.length
+      ? (scopedRecords.filter((record) => policyAppliedLookup.has(record.id)).length / scopedRecords.length) * 100
+      : 0
+    const highRiskRecords = scopedRecords.filter((record) => record.aiRiskScore >= 0.6)
     const highRiskWithPolicy = highRiskRecords.filter((record) => policyAppliedLookup.has(record.id))
     const highRiskCoverage = highRiskRecords.length ? (highRiskWithPolicy.length / highRiskRecords.length) * 100 : 0
     const slaBreachRate = complianceDevices.length ? (slaBreaches.length / complianceDevices.length) * 100 : 0
@@ -2418,17 +2459,18 @@ export default function AttendancePage() {
         bestInClass: 5,
       },
     ]
-  }, [attendanceRecords, complianceDevices, policyAppliedLookup, slaBreaches])
+    }, [attendanceRecords, complianceDevices, isWithinSelectedRange, policyAppliedLookup, slaBreaches])
 
   const crossModuleSignals = useMemo(() => {
-    const highRiskRecords = attendanceRecords.filter((record) => record.aiRiskScore >= 0.6)
+    const scopedRecords = attendanceRecords.filter((record) => isWithinSelectedRange(record.date))
+    const highRiskRecords = scopedRecords.filter((record) => record.aiRiskScore >= 0.6)
     const highRiskWithPolicy = highRiskRecords.filter((record) => policyAppliedLookup.has(record.id))
     const highRiskCoverage = highRiskRecords.length ? (highRiskWithPolicy.length / highRiskRecords.length) * 100 : 0
 
     const healthyDevices = complianceDevices.length - slaBreaches.length
     const slaHealthyRate = complianceDevices.length ? (healthyDevices / complianceDevices.length) * 100 : 100
 
-    const remoteRecords = attendanceRecords.filter((record) => record.workingArrangement !== "onsite")
+    const remoteRecords = scopedRecords.filter((record) => record.workingArrangement !== "onsite")
     const remoteOnTime = remoteRecords.filter((record) => record.status === "present").length
     const remoteReliability = remoteRecords.length ? (remoteOnTime / remoteRecords.length) * 100 : 100
 
@@ -2454,7 +2496,7 @@ export default function AttendancePage() {
         description: "Hybrid cohorts correlated with geo-fence and timesheet variance data.",
       },
     ]
-  }, [attendanceRecords, complianceDevices, policyAppliedLookup, slaBreaches])
+    }, [attendanceRecords, complianceDevices, isWithinSelectedRange, policyAppliedLookup, slaBreaches])
 
   return (
     <div className="p-6 space-y-6">
@@ -2702,8 +2744,34 @@ export default function AttendancePage() {
                     <SelectItem value="yesterday">Yesterday</SelectItem>
                     <SelectItem value="this-week">This week</SelectItem>
                     <SelectItem value="this-month">This month</SelectItem>
+            <SelectItem value="custom">Custom range</SelectItem>
                   </SelectContent>
                 </Select>
+                {dateFilter === "custom" && (
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <Input
+                      type="date"
+                      value={customStartDate}
+                      max={customEndDate || undefined}
+                      onChange={(event) => {
+                        setCustomStartDate(event.target.value)
+                        setDateFilter("custom")
+                      }}
+                      className="w-fit min-w-[140px]"
+                    />
+                    <span>to</span>
+                    <Input
+                      type="date"
+                      value={customEndDate}
+                      min={customStartDate || undefined}
+                      onChange={(event) => {
+                        setCustomEndDate(event.target.value)
+                        setDateFilter("custom")
+                      }}
+                      className="w-fit min-w-[140px]"
+                    />
+                  </div>
+                )}
                 <Button variant="outline" onClick={handleResetFilters}>
                   Reset filters
                 </Button>
