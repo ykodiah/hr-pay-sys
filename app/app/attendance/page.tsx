@@ -20,6 +20,7 @@ import {
   Plus,
   RefreshCw,
   Settings,
+  ArrowUpDown,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
@@ -31,11 +32,11 @@ import {
   getBiometricDevices,
   syncBiometricDevice,
   addBiometricDevice,
-  getShifts, // Import getShifts
-  createShift, // Import createShift
-  approveOvertimeRequest, // Import approveOvertimeRequest
-  rejectOvertimeRequest, // Import rejectOvertimeRequest
-  getEmployeeAttendanceStatus, // Import getEmployeeAttendanceStatus
+  getShifts,
+  createShift,
+  approveOvertimeRequest,
+  rejectOvertimeRequest,
+  getEmployeeAttendanceStatus,
 } from "@/app/actions/attendance"
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
@@ -43,6 +44,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+
+type SortConfig = {
+  key: string
+  direction: "asc" | "desc"
+}
 
 export default function AttendancePage() {
   const [records, setRecords] = useState<any[]>([])
@@ -52,6 +58,8 @@ export default function AttendancePage() {
   const { toast } = useToast()
 
   const [currentTime, setCurrentTime] = useState(new Date())
+
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: "date", direction: "desc" })
 
   // Date filters
   const [dateFilter, setDateFilter] = useState("today")
@@ -509,6 +517,72 @@ export default function AttendancePage() {
     checkAttendanceStatus()
   }
 
+  const handleSort = (key: string) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
+    }))
+  }
+
+  const getSortedRecords = () => {
+    const sorted = [...records].sort((a, b) => {
+      let aValue = a[sortConfig.key]
+      let bValue = b[sortConfig.key]
+
+      // Handle nested employee properties
+      if (sortConfig.key === "employee") {
+        aValue = a.employee?.full_name || ""
+        bValue = b.employee?.full_name || ""
+      } else if (sortConfig.key === "department") {
+        aValue = a.employee?.department || ""
+        bValue = b.employee?.department || ""
+      } else if (sortConfig.key === "division") {
+        aValue = a.employee?.division || ""
+        bValue = b.employee?.division || ""
+      } else if (sortConfig.key === "location") {
+        aValue = a.employee?.location || ""
+        bValue = b.employee?.location || ""
+      }
+
+      // Handle date conversion
+      if (sortConfig.key === "date") {
+        aValue = aValue ? new Date(aValue).getTime() : 0
+        bValue = bValue ? new Date(bValue).getTime() : 0
+      }
+
+      // Handle time conversion
+      if (sortConfig.key === "clock_in" || sortConfig.key === "clock_out") {
+        aValue = aValue ? new Date(`2000-01-01T${aValue}`).getTime() : 0
+        bValue = bValue ? new Date(`2000-01-01T${bValue}`).getTime() : 0
+      }
+
+      // Handle numeric values
+      if (sortConfig.key === "total_hours" || sortConfig.key === "overtime_hours") {
+        aValue = aValue || 0
+        bValue = bValue || 0
+      }
+
+      // Compare values
+      if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1
+      if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1
+      return 0
+    })
+
+    return sorted
+  }
+
+  const SortableHeader = ({ column, label }: { column: string; label: string }) => (
+    <th className="text-left p-2">
+      <button
+        onClick={() => handleSort(column)}
+        className="flex items-center gap-1 hover:text-primary transition-colors"
+      >
+        {label}
+        <ArrowUpDown className="h-4 w-4" />
+      </button>
+    </th>
+  )
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-start">
@@ -786,24 +860,24 @@ export default function AttendancePage() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b">
-                        <th className="text-left p-2">Employee</th>
-                        <th className="text-left p-2">Department</th>
-                        <th className="text-left p-2">Division</th>
-                        <th className="text-left p-2">Location</th>
-                        <th className="text-left p-2">Date</th>
-                        <th className="text-left p-2">Clock In</th>
+                        <SortableHeader column="employee" label="Employee" />
+                        <SortableHeader column="department" label="Department" />
+                        <SortableHeader column="division" label="Division" />
+                        <SortableHeader column="location" label="Location" />
+                        <SortableHeader column="date" label="Date" />
+                        <SortableHeader column="clock_in" label="Clock In" />
                         <th className="text-left p-2">In Method</th>
-                        <th className="text-left p-2">Clock Out</th>
+                        <SortableHeader column="clock_out" label="Clock Out" />
                         <th className="text-left p-2">Out Method</th>
-                        <th className="text-left p-2">Hours</th>
-                        <th className="text-left p-2">Overtime</th>
+                        <SortableHeader column="total_hours" label="Hours" />
+                        <SortableHeader column="overtime_hours" label="Overtime" />
                         <th className="text-left p-2">GPS</th>
-                        <th className="text-left p-2">Status</th>
+                        <SortableHeader column="status" label="Status" />
                         <th className="text-left p-2">AI Insights</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {records.map((record) => {
+                      {getSortedRecords().map((record) => {
                         const overtimeHours = record.total_hours > 8 ? record.total_hours - 8 : 0
                         return (
                           <tr key={record.id} className="border-b hover:bg-muted/50">
