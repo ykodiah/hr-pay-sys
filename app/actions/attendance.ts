@@ -7,6 +7,12 @@ import { revalidatePath } from "next/cache"
 export async function clockIn(employeeId: string, latitude?: number, longitude?: number) {
   const supabase = await createClient()
 
+  const { data: employee } = await supabase.from("employees").select("company_id").eq("id", employeeId).single()
+
+  if (!employee) {
+    return { success: false, error: "Employee not found" }
+  }
+
   // Check if user already clocked in today without clocking out
   const today = new Date().toISOString().split("T")[0]
   const { data: existing } = await supabase
@@ -195,9 +201,16 @@ export async function createOvertimeRequest(data: {
 }) {
   const supabase = await createClient()
 
+  const { data: employee } = await supabase.from("employees").select("company_id").eq("id", data.employeeId).single()
+
+  if (!employee) {
+    return { success: false, error: "Employee not found" }
+  }
+
   const { data: overtime, error } = await supabase
     .from("overtime_requests")
     .insert({
+      company_id: employee.company_id,
       employee_id: data.employeeId,
       date: data.date,
       hours_requested: data.hours,
@@ -350,10 +363,20 @@ export async function addBiometricDevice(device: {
 }) {
   const supabase = await createClient()
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: "Not authenticated" }
+
+  const { data: profile } = await supabase.from("user_profiles").select("company_id").eq("id", user.id).single()
+
+  if (!profile) return { success: false, error: "User profile not found" }
+
   const { data, error } = await supabase
     .from("biometric_devices")
     .insert({
       ...device,
+      company_id: profile.company_id,
       status: "online",
       last_sync: new Date().toISOString(),
       uptime_percentage: 100,
@@ -362,6 +385,7 @@ export async function addBiometricDevice(device: {
     .single()
 
   if (error) {
+    console.log("[v0] Add device error:", error)
     return { success: false, error: error.message }
   }
 
@@ -389,17 +413,39 @@ export async function createShift(shift: {
   break_duration_minutes: number
   grace_period_minutes: number
   working_days: string[]
+  department?: string
+  division?: string
+  location?: string
 }) {
   const supabase = await createClient()
 
-  const { data, error } = await supabase.from("shifts").insert(shift).select().single()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: "Not authenticated" }
+
+  const { data: profile } = await supabase.from("user_profiles").select("company_id").eq("id", user.id).single()
+
+  if (!profile) return { success: false, error: "User profile not found" }
+
+  const { data: insertedShift, error } = await supabase
+    .from("shifts")
+    .insert({
+      ...shift,
+      department: shift.department === "none" ? undefined : shift.department,
+      division: shift.division === "none" ? undefined : shift.division,
+      location: shift.location === "none" ? undefined : shift.location,
+      company_id: profile.company_id,
+    })
+    .select()
+    .single()
 
   if (error) {
     return { success: false, error: error.message }
   }
 
   revalidatePath("/app/attendance")
-  return { success: true, data }
+  return { success: true, data: insertedShift }
 }
 
 export async function updateShift(id: string, updates: any) {

@@ -76,6 +76,12 @@ export default function AttendancePage() {
   const [showShiftDialog, setShowShiftDialog] = useState(false)
   const [editingShift, setEditingShift] = useState<any>(null)
 
+  const [deviceType, setDeviceType] = useState("")
+
+  const [shiftDepartment, setShiftDepartment] = useState("")
+  const [shiftDivision, setShiftDivision] = useState("")
+  const [shiftLocation, setShiftLocation] = useState("")
+
   // Stats
   const [stats, setStats] = useState({
     present: 0,
@@ -326,10 +332,6 @@ export default function AttendancePage() {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
 
-    // Get the device type from the state or hidden input
-    const deviceTypeInput = e.currentTarget.querySelector('[name="type"]') as HTMLInputElement
-    const deviceType = deviceTypeInput?.value
-
     if (!deviceType) {
       toast({ title: "Error", description: "Please select a device type", variant: "destructive" })
       return
@@ -346,6 +348,7 @@ export default function AttendancePage() {
     if (result.success) {
       toast({ title: "Success", description: "Device added successfully" })
       setShowDeviceDialog(false)
+      setDeviceType("") // Reset device type
       loadBiometricDevices()
       e.currentTarget.reset()
     } else {
@@ -373,11 +376,17 @@ export default function AttendancePage() {
       break_duration_minutes: Number.parseInt(formData.get("break_duration") as string) || 0,
       grace_period_minutes: Number.parseInt(formData.get("grace_period") as string) || 0,
       working_days: workingDays,
+      department: shiftDepartment === "none" ? undefined : shiftDepartment,
+      division: shiftDivision === "none" ? undefined : shiftDivision,
+      location: shiftLocation === "none" ? undefined : shiftLocation,
     })
 
     if (result.success) {
       toast({ title: "Success", description: "Shift created successfully" })
       setShowShiftDialog(false)
+      setShiftDepartment("")
+      setShiftDivision("")
+      setShiftLocation("")
       loadShifts()
       e.currentTarget.reset()
     } else {
@@ -881,7 +890,7 @@ export default function AttendancePage() {
                   </div>
                   <div>
                     <Label htmlFor="type">Device Type</Label>
-                    <Select name="type" required defaultValue="">
+                    <Select value={deviceType} onValueChange={setDeviceType} required>
                       <SelectTrigger>
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
@@ -892,7 +901,6 @@ export default function AttendancePage() {
                         <SelectItem value="iris">Iris Scanner</SelectItem>
                       </SelectContent>
                     </Select>
-                    <input type="hidden" name="type" id="type-hidden" />
                   </div>
                   <div>
                     <Label htmlFor="location">Location</Label>
@@ -987,13 +995,16 @@ export default function AttendancePage() {
         </Card>
       )}
 
-      {/* Shift Management Tab */}
       {activeTab === "shift" && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Shift Management</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">Create and manage work shifts for employees</p>
+              <p className="text-xs text-blue-600 mt-2">
+                💡 When employees clock in/out during shift hours, their attendance is automatically matched to their
+                assigned shift. Late arrivals are calculated based on the shift's grace period.
+              </p>
             </div>
             <Dialog open={showShiftDialog} onOpenChange={setShowShiftDialog}>
               <DialogTrigger asChild>
@@ -1037,6 +1048,56 @@ export default function AttendancePage() {
                       />
                     </div>
                   </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="shift_department">Department (Optional)</Label>
+                      <Select value={shiftDepartment} onValueChange={setShiftDepartment}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select department" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">All Departments</SelectItem>
+                          {departments.map((dept) => (
+                            <SelectItem key={dept} value={dept}>
+                              {dept}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="shift_division">Division (Optional)</Label>
+                      <Select value={shiftDivision} onValueChange={setShiftDivision}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select division" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">All Divisions</SelectItem>
+                          {divisions.map((div) => (
+                            <SelectItem key={div} value={div}>
+                              {div}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="shift_location">Location (Optional)</Label>
+                      <Select value={shiftLocation} onValueChange={setShiftLocation}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select location" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">All Locations</SelectItem>
+                          {locations.map((loc) => (
+                            <SelectItem key={loc} value={loc}>
+                              {loc}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                   <div>
                     <Label>Working Days</Label>
                     <div className="grid grid-cols-7 gap-2 mt-2">
@@ -1073,6 +1134,12 @@ export default function AttendancePage() {
                       <p className="text-sm text-muted-foreground">
                         Grace period: {shift.grace_period_minutes} minutes
                       </p>
+                      {(shift.department || shift.division || shift.location) && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          Applies to: {shift.department || "All depts"} / {shift.division || "All divs"} /{" "}
+                          {shift.location || "All locations"}
+                        </p>
+                      )}
                       <p className="text-xs text-muted-foreground mt-1">
                         Working days: {shift.working_days?.join(", ") || "Not set"}
                       </p>
