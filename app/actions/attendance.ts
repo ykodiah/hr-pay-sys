@@ -247,3 +247,86 @@ export async function getCompanyInfo() {
 
   return { company, subsidiary }
 }
+
+export async function getOvertimeRequests() {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from("overtime_requests")
+    .select(`
+      *,
+      employee:employees(
+        id,
+        full_name,
+        employee_id,
+        department
+      )
+    `)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    return { success: false, error: error.message, data: [] }
+  }
+
+  return { success: true, data: data || [] }
+}
+
+export async function getBiometricDevices() {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase.from("biometric_devices").select("*").order("name")
+
+  if (error) {
+    return { success: false, error: error.message, data: [] }
+  }
+
+  return { success: true, data: data || [] }
+}
+
+export async function syncBiometricDevice(deviceId: string) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from("biometric_devices")
+    .update({
+      last_sync: new Date().toISOString(),
+    })
+    .eq("id", deviceId)
+    .select()
+    .single()
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath("/app/attendance")
+  return { success: true, data }
+}
+
+export async function addBiometricDevice(device: {
+  name: string
+  type: string
+  location: string
+  ip_address?: string
+  serial_number?: string
+}) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from("biometric_devices")
+    .insert({
+      ...device,
+      status: "online",
+      last_sync: new Date().toISOString(),
+      uptime_percentage: 100,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath("/app/attendance")
+  return { success: true, data }
+}
