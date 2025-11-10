@@ -64,6 +64,8 @@
     "geist": "latest",
     "groq-sdk": "latest",
     "input-otp": "1.4.1",
+    "jspdf": "latest",
+    "jspdf-autotable": "latest",
     "lucide-react": "^0.454.0",
     "mammoth": "latest",
     "next": "15.2.4",

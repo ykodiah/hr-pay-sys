@@ -17,10 +17,13 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { CalendarIcon } from "lucide-react"
+import { Calendar } from "@/components/ui/calendar"
+import { format } from "date-fns"
 import {
   Clock,
   Users,
-  Calendar,
   AlertCircle,
   Plus,
   Search,
@@ -39,71 +42,109 @@ import {
   Settings,
   Eye,
   Edit,
+  Filter,
+  MapPinned,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+  clockIn,
+  clockOut,
+  getFilteredAttendance,
+  getCompanyDetails,
+  getOvertimeRequests,
+  approveOvertimeRequest,
+  rejectOvertimeRequest,
+  getShifts,
+  createShift,
+  updateShift,
+  getBiometricDevices,
+  syncBiometricDevice,
+  updateDeviceStatus,
+} from "@/app/actions/attendance"
+import { generateAttendancePDF, downloadPDF } from "@/lib/attendance/pdf-generator"
 
-interface AttendanceRecord {
-  id: string
-  employeeId: string
-  employeeName: string
-  date: string
-  clockIn: string
-  clockOut: string
-  totalHours: number
-  overtimeHours: number
-  status: "present" | "late" | "absent" | "early-departure"
-  location: string
-  method: "biometric" | "manual" | "mobile"
-  aiScore?: number
-  hasMissingPunch?: boolean
-}
+// interface AttendanceRecord {
+//   id: string
+//   employeeId: string
+//   employeeName: string
+//   date: string
+//   clockIn: string
+//   clockOut: string
+//   totalHours: number
+//   overtimeHours: number
+//   status: "present" | "late" | "absent" | "early-departure"
+//   location: string
+//   method: "biometric" | "manual" | "mobile"
+//   aiScore?: number
+//   hasMissingPunch?: boolean
+// }
 
-interface Shift {
-  id: string
-  name: string
-  startTime: string
-  endTime: string
-  breakDuration: number
-  employees: string[]
-  isActive: boolean
-}
+// interface Shift {
+//   id: string
+//   name: string
+//   startTime: string
+//   endTime: string
+//   breakDuration: number
+//   employees: string[]
+//   isActive: boolean
+// }
 
-interface BiometricDevice {
-  id: string
-  name: string
-  type: "fingerprint" | "facial" | "card"
-  location: string
-  status: "online" | "offline"
-  lastSync: string
-  uptime?: number
-}
+// interface BiometricDevice {
+//   id: string
+//   name: string
+//   type: "fingerprint" | "facial" | "card"
+//   location: string
+//   status: "online" | "offline"
+//   lastSync: string
+//   uptime?: number
+// }
 
-interface OvertimeRequest {
-  id: string
-  employeeId: string
-  employeeName: string
-  hours: number
-  date: string
-  reason: string
-  status: "pending" | "approved" | "rejected"
-  submittedAt: string
-}
+// interface OvertimeRequest {
+//   id: string
+//   employeeId: string
+//   employeeName: string
+//   hours: number
+//   date: string
+//   reason: string
+//   status: "pending" | "approved" | "rejected"
+//   submittedAt: string
+// }
 
 export default function AttendancePage() {
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState("overview")
   const [searchTerm, setSearchTerm] = useState("")
   const [dateFilter, setDateFilter] = useState("today")
+  const [customStartDate, setCustomStartDate] = useState<Date>()
+  const [customEndDate, setCustomEndDate] = useState<Date>()
   const [statusFilter, setStatusFilter] = useState("all")
+  const [departmentFilter, setDepartmentFilter] = useState("all")
+  const [divisionFilter, setDivisionFilter] = useState("all")
+  const [locationFilter, setLocationFilter] = useState("all")
   const [showClockInDialog, setShowClockInDialog] = useState(false)
   const [showShiftDialog, setShowShiftDialog] = useState(false)
   const [showOvertimeDialog, setShowOvertimeDialog] = useState(false)
   const [showDeviceDialog, setShowDeviceDialog] = useState(false)
+  const [showCustomDateDialog, setShowCustomDateDialog] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [selectedEmployee, setSelectedEmployee] = useState<string>("")
   const [clockInMethod, setClockInMethod] = useState<string>("")
   const [isProcessing, setIsProcessing] = useState(false)
+  const [geolocation, setGeolocation] = useState<{ latitude: number; longitude: number } | null>(null)
+  const [locationError, setLocationError] = useState<string | null>(null)
+
+  const [isLoading, setIsLoading] = useState(true)
+  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([])
+  const [shifts, setShifts] = useState<any[]>([])
+  const [biometricDevices, setBiometricDevices] = useState<any[]>([])
+  const [overtimeRequests, setOvertimeRequests] = useState<any[]>([])
+  const [companyInfo, setCompanyInfo] = useState<any>(null)
+  const [departments, setDepartments] = useState<string[]>([])
+  const [divisions, setDivisions] = useState<string[]>([])
+  const [locations, setLocations] = useState<string[]>([])
+
+  const [selectedRecords, setSelectedRecords] = useState<string[]>([])
 
   const [newShift, setNewShift] = useState({
     name: "",
@@ -113,137 +154,24 @@ export default function AttendancePage() {
     employees: [] as string[],
   })
 
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([
-    {
-      id: "ATT001",
-      employeeId: "EMP001",
-      employeeName: "Kwame Asante",
-      date: "2024-02-15",
-      clockIn: "08:00",
-      clockOut: "17:30",
-      totalHours: 8.5,
-      overtimeHours: 0.5,
-      status: "present",
-      location: "Main Office",
-      method: "biometric",
-      aiScore: 98,
-    },
-    {
-      id: "ATT002",
-      employeeId: "EMP002",
-      employeeName: "Ama Osei",
-      date: "2024-02-15",
-      clockIn: "08:15",
-      clockOut: "17:00",
-      totalHours: 7.75,
-      overtimeHours: 0,
-      status: "late",
-      location: "Main Office",
-      method: "biometric",
-      aiScore: 85,
-    },
-    {
-      id: "ATT003",
-      employeeId: "EMP003",
-      employeeName: "Kofi Mensah",
-      date: "2024-02-15",
-      clockIn: "",
-      clockOut: "",
-      totalHours: 0,
-      overtimeHours: 0,
-      status: "absent",
-      location: "",
-      method: "manual",
-      aiScore: 0,
-      hasMissingPunch: true,
-    },
-  ])
-
-  const [shifts, setShifts] = useState<Shift[]>([
-    {
-      id: "SH001",
-      name: "Day Shift",
-      startTime: "08:00",
-      endTime: "17:00",
-      breakDuration: 60,
-      employees: ["EMP001", "EMP002", "EMP003"],
-      isActive: true,
-    },
-    {
-      id: "SH002",
-      name: "Night Shift",
-      startTime: "20:00",
-      endTime: "06:00",
-      breakDuration: 60,
-      employees: ["EMP004", "EMP005"],
-      isActive: true,
-    },
-  ])
-
-  const [biometricDevices, setBiometricDevices] = useState<BiometricDevice[]>([
-    {
-      id: "DEV001",
-      name: "Main Entrance Scanner",
-      type: "fingerprint",
-      location: "Main Office Entrance",
-      status: "online",
-      lastSync: "2024-02-15 09:30",
-      uptime: 99.8,
-    },
-    {
-      id: "DEV002",
-      name: "Facial Recognition Camera",
-      type: "facial",
-      location: "Reception Area",
-      status: "online",
-      lastSync: "2024-02-15 09:25",
-      uptime: 98.5,
-    },
-    {
-      id: "DEV003",
-      name: "Card Reader - Floor 2",
-      type: "card",
-      location: "Second Floor",
-      status: "offline",
-      lastSync: "2024-02-14 18:00",
-      uptime: 75.3,
-    },
-  ])
-
-  const [overtimeRequests, setOvertimeRequests] = useState<OvertimeRequest[]>([
-    {
-      id: "OT001",
-      employeeId: "EMP001",
-      employeeName: "Kwame Asante",
-      hours: 2.5,
-      date: "2024-02-15",
-      reason: "Project deadline completion",
-      status: "pending",
-      submittedAt: "2024-02-15 17:30",
-    },
-    {
-      id: "OT002",
-      employeeId: "EMP002",
-      employeeName: "Ama Osei",
-      hours: 1.5,
-      date: "2024-02-14",
-      reason: "Emergency client support",
-      status: "approved",
-      submittedAt: "2024-02-14 17:00",
-    },
-    {
-      id: "OT003",
-      employeeId: "EMP004",
-      employeeName: "John Doe",
-      hours: 4.0,
-      date: "2024-02-15",
-      reason: "System maintenance",
-      status: "pending",
-      submittedAt: "2024-02-15 18:00",
-    },
-  ])
-
-  const [selectedRecords, setSelectedRecords] = useState<string[]>([])
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setGeolocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          })
+        },
+        (error) => {
+          console.error("Geolocation error:", error)
+          setLocationError("Unable to get location. Clock-in will proceed without GPS data.")
+        },
+      )
+    } else {
+      setLocationError("Geolocation not supported by browser")
+    }
+  }, [])
 
   // Update current time every second
   useEffect(() => {
@@ -251,18 +179,114 @@ export default function AttendancePage() {
     return () => clearInterval(timer)
   }, [])
 
+  useEffect(() => {
+    loadAttendanceData()
+  }, [dateFilter, customStartDate, customEndDate, statusFilter, departmentFilter, divisionFilter, locationFilter])
+
+  useEffect(() => {
+    loadOtherData()
+  }, [])
+
+  const loadAttendanceData = async () => {
+    try {
+      setIsLoading(true)
+
+      // Calculate date range based on filter
+      let startDate: string | undefined
+      let endDate: string | undefined
+      const today = new Date()
+
+      if (dateFilter === "today") {
+        startDate = endDate = format(today, "yyyy-MM-dd")
+      } else if (dateFilter === "yesterday") {
+        const yesterday = new Date(today)
+        yesterday.setDate(yesterday.getDate() - 1)
+        startDate = endDate = format(yesterday, "yyyy-MM-dd")
+      } else if (dateFilter === "this-week") {
+        const weekStart = new Date(today)
+        weekStart.setDate(today.getDay() === 0 ? today.getDate() - 6 : today.getDate() - today.getDay()) // Adjust for Sunday start
+        startDate = format(weekStart, "yyyy-MM-dd")
+        endDate = format(today, "yyyy-MM-dd")
+      } else if (dateFilter === "this-month") {
+        startDate = format(new Date(today.getFullYear(), today.getMonth(), 1), "yyyy-MM-dd")
+        endDate = format(today, "yyyy-MM-dd")
+      } else if (dateFilter === "custom" && customStartDate && customEndDate) {
+        startDate = format(customStartDate, "yyyy-MM-dd")
+        endDate = format(customEndDate, "yyyy-MM-dd")
+      }
+
+      const data = await getFilteredAttendance({
+        startDate,
+        endDate,
+        status: statusFilter !== "all" ? statusFilter : undefined,
+        department: departmentFilter !== "all" ? departmentFilter : undefined,
+        division: divisionFilter !== "all" ? divisionFilter : undefined,
+        location: locationFilter !== "all" ? locationFilter : undefined,
+      })
+
+      setAttendanceRecords(data || [])
+
+      // Extract unique departments, divisions, and locations
+      const uniqueDepts = new Set<string>()
+      const uniqueDivs = new Set<string>()
+      const uniqueLocs = new Set<string>()
+
+      data?.forEach((record: any) => {
+        if (record.employee?.department) uniqueDepts.add(record.employee.department)
+        if (record.employee?.division) uniqueDivs.add(record.employee.division)
+        if (record.employee?.subsidiaries?.location) uniqueLocs.add(record.employee.subsidiaries.location)
+      })
+
+      setDepartments(Array.from(uniqueDepts))
+      setDivisions(Array.from(uniqueDivs))
+      setLocations(Array.from(uniqueLocs))
+    } catch (error) {
+      console.error("Error loading attendance:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load attendance data",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const loadOtherData = async () => {
+    try {
+      const [shiftsData, devicesData, overtimeData, companyData] = await Promise.all([
+        getShifts(),
+        getBiometricDevices(),
+        getOvertimeRequests({ status: undefined }),
+        getCompanyDetails(),
+      ])
+
+      setShifts(shiftsData || [])
+      setBiometricDevices(devicesData || [])
+      setOvertimeRequests(overtimeData || [])
+      setCompanyInfo(companyData)
+    } catch (error) {
+      console.error("Error loading data:", error)
+    }
+  }
+
   const stats = {
     presentToday: attendanceRecords.filter((r) => r.status === "present" || r.status === "late").length,
-    lateArrivals: attendanceRecords.filter((r) => r.status === "late").length,
+    lateArrivals: attendanceRecords.filter((r) => r.is_late || r.status === "late").length,
     absent: attendanceRecords.filter((r) => r.status === "absent").length,
-    totalOvertimeHours: overtimeRequests.filter((r) => r.status === "pending").reduce((sum, r) => sum + r.hours, 0),
-    devicesOnline: biometricDevices.filter((d) => d.status === "online").length,
+    totalOvertimeHours: overtimeRequests
+      .filter((r) => r.status === "pending")
+      .reduce((sum, r) => sum + (r.hours_requested || 0), 0),
+    devicesOnline: biometricDevices.filter((d) => d.is_online).length,
     totalDevices: biometricDevices.length,
-    attendanceRate: Math.round(
-      (attendanceRecords.filter((r) => r.status === "present" || r.status === "late").length /
-        attendanceRecords.length) *
-        100,
-    ),
+    attendanceRate:
+      attendanceRecords.length > 0
+        ? Math.round(
+            (attendanceRecords.filter((r) => r.status === "present" || r.status === "late").length /
+              attendanceRecords.length) *
+              100,
+          )
+        : 0,
   }
 
   const getStatusColor = (status: string) => {
@@ -299,45 +323,54 @@ export default function AttendancePage() {
 
   const filteredRecords = attendanceRecords.filter((record) => {
     const matchesSearch =
-      record.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.employeeId.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || record.status === statusFilter
-    return matchesSearch && matchesStatus
+      record.employee?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.employee?.employee_id?.toLowerCase().includes(searchTerm.toLowerCase())
+    return matchesSearch
   })
 
-  const handleBiometricClockIn = async (method: string) => {
+  const handleBiometricClockIn = async (method: string, isClockOut = false) => {
+    if (!selectedEmployee) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter an employee ID",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsProcessing(true)
     setClockInMethod(method)
 
-    // Simulate biometric authentication
-    setTimeout(() => {
-      const newRecord: AttendanceRecord = {
-        id: `ATT${Date.now()}`,
-        employeeId: selectedEmployee || "EMP999",
-        employeeName: "New Employee",
-        date: new Date().toISOString().split("T")[0],
-        clockIn: currentTime.toLocaleTimeString("en-GB", { hour12: false, hour: "2-digit", minute: "2-digit" }),
-        clockOut: "",
-        totalHours: 0,
-        overtimeHours: 0,
-        status: "present",
-        location: "Main Office",
-        method: method as "biometric" | "manual" | "mobile",
-        aiScore: 100,
+    try {
+      if (isClockOut) {
+        await clockOut(selectedEmployee, geolocation || undefined)
+        toast({
+          title: "Clock-out successful",
+          description: `Employee clocked out at ${currentTime.toLocaleTimeString("en-GB", { hour12: false })}`,
+        })
+      } else {
+        await clockIn(selectedEmployee, geolocation || undefined)
+        toast({
+          title: "Clock-in successful",
+          description: `${method} authentication completed at ${currentTime.toLocaleTimeString("en-GB", { hour12: false })}${geolocation ? " with GPS location" : ""}`,
+        })
       }
 
-      setAttendanceRecords((prev) => [newRecord, ...prev])
-      setIsProcessing(false)
+      await loadAttendanceData()
       setShowClockInDialog(false)
-
+      setSelectedEmployee("")
+    } catch (error: any) {
       toast({
-        title: "Clock-in successful",
-        description: `${method} authentication completed at ${newRecord.clockIn}`,
+        title: "Error",
+        description: error.message || "Failed to process clock in/out",
+        variant: "destructive",
       })
-    }, 2000)
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
-  const handleCreateShift = () => {
+  const handleCreateShift = async () => {
     if (!newShift.name || !newShift.startTime || !newShift.endTime) {
       toast({
         title: "Validation Error",
@@ -347,106 +380,198 @@ export default function AttendancePage() {
       return
     }
 
-    const shift: Shift = {
-      id: `SH${Date.now()}`,
-      name: newShift.name,
-      startTime: newShift.startTime,
-      endTime: newShift.endTime,
-      breakDuration: newShift.breakDuration,
-      employees: newShift.employees,
-      isActive: true,
-    }
+    try {
+      await createShift({
+        shift_name: newShift.name,
+        shift_code: newShift.name.toUpperCase().replace(/\s/g, "_"),
+        start_time: newShift.startTime,
+        end_time: newShift.endTime,
+        break_duration_minutes: newShift.breakDuration,
+        grace_period_minutes: 15,
+        days_of_week: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+        is_active: true,
+        company_id: "", // This should be fetched or passed
+      })
 
-    setShifts((prev) => [...prev, shift])
-    setShowShiftDialog(false)
-    setNewShift({
-      name: "",
-      startTime: "",
-      endTime: "",
-      breakDuration: 60,
-      employees: [],
-    })
+      await loadOtherData()
+      setShowShiftDialog(false)
+      setNewShift({
+        name: "",
+        startTime: "",
+        endTime: "",
+        breakDuration: 60,
+        employees: [],
+      })
 
-    toast({
-      title: "Shift Created",
-      description: `${shift.name} has been created successfully`,
-    })
-  }
-
-  const toggleShiftStatus = (shiftId: string) => {
-    setShifts((prev) => prev.map((shift) => (shift.id === shiftId ? { ...shift, isActive: !shift.isActive } : shift)))
-
-    const shift = shifts.find((s) => s.id === shiftId)
-    toast({
-      title: shift?.isActive ? "Shift Deactivated" : "Shift Activated",
-      description: `${shift?.name} has been ${shift?.isActive ? "deactivated" : "activated"}`,
-    })
-  }
-
-  const handleOvertimeAction = (requestId: string, action: "approved" | "rejected") => {
-    setOvertimeRequests((prev) =>
-      prev.map((request) => (request.id === requestId ? { ...request, status: action } : request)),
-    )
-
-    const request = overtimeRequests.find((r) => r.id === requestId)
-    toast({
-      title: action === "approved" ? "Overtime Approved" : "Overtime Rejected",
-      description: `${request?.employeeName}'s ${request?.hours}h overtime request has been ${action}`,
-    })
-  }
-
-  const handleDeviceSync = (deviceId: string) => {
-    setBiometricDevices((prev) =>
-      prev.map((device) =>
-        device.id === deviceId
-          ? {
-              ...device,
-              lastSync: new Date().toLocaleString("en-GB", {
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit",
-              }),
-            }
-          : device,
-      ),
-    )
-
-    const device = biometricDevices.find((d) => d.id === deviceId)
-    toast({
-      title: "Device Synced",
-      description: `${device?.name} has been synchronized`,
-    })
-  }
-
-  const toggleDeviceStatus = (deviceId: string) => {
-    setBiometricDevices((prev) =>
-      prev.map((device) =>
-        device.id === deviceId ? { ...device, status: device.status === "online" ? "offline" : "online" } : device,
-      ),
-    )
-
-    const device = biometricDevices.find((d) => d.id === deviceId)
-    toast({
-      title: "Device Status Updated",
-      description: `${device?.name} is now ${device?.status === "online" ? "offline" : "online"}`,
-    })
-  }
-
-  const handleExportReport = (reportType: string) => {
-    toast({
-      title: "Report Generated",
-      description: `${reportType} is being prepared for download`,
-    })
-
-    // Simulate download
-    setTimeout(() => {
       toast({
-        title: "Download Ready",
+        title: "Shift Created",
+        description: `${newShift.name} has been created successfully`,
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create shift",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const toggleShiftStatus = async (shiftId: string) => {
+    try {
+      const shift = shifts.find((s) => s.id === shiftId)
+      await updateShift(shiftId, { is_active: !shift?.is_active })
+      await loadOtherData()
+
+      toast({
+        title: shift?.is_active ? "Shift Deactivated" : "Shift Activated",
+        description: `${shift?.shift_name} has been ${shift?.is_active ? "deactivated" : "activated"}`,
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update shift",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleOvertimeAction = async (requestId: string, action: "approved" | "rejected") => {
+    try {
+      if (action === "approved") {
+        await approveOvertimeRequest(requestId)
+      } else {
+        await rejectOvertimeRequest(requestId, "Not approved by manager") // Consider adding a reason field if needed
+      }
+
+      await loadOtherData()
+
+      const request = overtimeRequests.find((r) => r.id === requestId)
+      toast({
+        title: action === "approved" ? "Overtime Approved" : "Overtime Rejected",
+        description: `${request?.employee?.full_name}'s ${request?.hours_requested}h overtime request has been ${action}`,
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to process overtime request",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeviceSync = async (deviceId: string) => {
+    try {
+      await syncBiometricDevice(deviceId)
+      await loadOtherData()
+
+      const device = biometricDevices.find((d) => d.id === deviceId)
+      toast({
+        title: "Device Synced",
+        description: `${device?.device_name} has been synchronized`,
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to sync device",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const toggleDeviceStatus = async (deviceId: string) => {
+    try {
+      const device = biometricDevices.find((d) => d.id === deviceId)
+      const newStatus = device?.is_online ? "inactive" : "active"
+      await updateDeviceStatus(deviceId, newStatus)
+      await loadOtherData()
+
+      toast({
+        title: "Device Status Updated",
+        description: `${device?.device_name} is now ${newStatus}`,
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update device",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleExportReport = async (reportType: string) => {
+    try {
+      toast({
+        title: "Generating Report",
+        description: `${reportType} is being prepared...`,
+      })
+
+      // Prepare data for PDF
+      const reportData = filteredRecords.map((record) => ({
+        employeeName: record.employee?.full_name || "Unknown",
+        employeeId: record.employee?.employee_id || "N/A",
+        department: record.employee?.department || "N/A",
+        division: record.employee?.division || "N/A",
+        location: record.employee?.subsidiaries?.location || "N/A",
+        date: record.date,
+        clockIn: record.clock_in ? format(new Date(record.clock_in), "HH:mm") : "-",
+        clockOut: record.clock_out ? format(new Date(record.clock_out), "HH:mm") : "-",
+        totalHours: record.total_hours || 0,
+        overtimeHours: record.overtime_hours || 0,
+        status: record.status,
+      }))
+
+      // Generate PDF
+      const pdf = await generateAttendancePDF(
+        reportType,
+        reportData,
+        {
+          company_name: companyInfo?.company_name || "Company Name",
+          address: companyInfo?.address || "",
+          subsidiaries: companyInfo?.subsidiaries || [],
+        },
+        undefined, // Can add more parameters if generateAttendancePDF supports them
+        customStartDate && customEndDate
+          ? {
+              startDate: format(customStartDate, "yyyy-MM-dd"),
+              endDate: format(customEndDate, "yyyy-MM-dd"),
+            }
+          : dateFilter === "today"
+            ? { startDate: format(new Date(), "yyyy-MM-dd"), endDate: format(new Date(), "yyyy-MM-dd") }
+            : dateFilter === "yesterday"
+              ? {
+                  startDate: format(new Date(new Date().setDate(new Date().getDate() - 1)), "yyyy-MM-dd"),
+                  endDate: format(new Date(new Date().setDate(new Date().getDate() - 1)), "yyyy-MM-dd"),
+                }
+              : dateFilter === "this-week"
+                ? {
+                    startDate: format(
+                      new Date(new Date().setDate(new Date().getDate() - new Date().getDay())),
+                      "yyyy-MM-dd",
+                    ),
+                    endDate: format(new Date(), "yyyy-MM-dd"),
+                  }
+                : dateFilter === "this-month"
+                  ? {
+                      startDate: format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), "yyyy-MM-dd"),
+                      endDate: format(new Date(), "yyyy-MM-dd"),
+                    }
+                  : undefined,
+      )
+
+      downloadPDF(pdf, reportType.replace(/\s/g, "_"))
+
+      toast({
+        title: "Report Downloaded",
         description: `${reportType} has been downloaded successfully`,
       })
-    }, 2000)
+    } catch (error: any) {
+      console.error("Error generating report:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate report",
+        variant: "destructive",
+      })
+    }
   }
 
   const toggleRecordSelection = (recordId: string) => {
@@ -473,7 +598,7 @@ export default function AttendancePage() {
     const record = attendanceRecords.find((r) => r.id === recordId)
     toast({
       title: "Reminder Sent",
-      description: `Attendance reminder sent to ${record?.employeeName}`,
+      description: `Attendance reminder sent to ${record?.employee?.full_name}`,
     })
   }
 
@@ -502,11 +627,25 @@ export default function AttendancePage() {
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>Employee Clock In/Out</DialogTitle>
-                <DialogDescription>Choose your preferred authentication method</DialogDescription>
+                <DialogDescription>
+                  Choose your preferred authentication method
+                  {geolocation && (
+                    <div className="flex items-center mt-2 text-xs text-emerald-600">
+                      <MapPinned className="w-3 h-3 mr-1" />
+                      GPS location detected
+                    </div>
+                  )}
+                  {locationError && (
+                    <div className="flex items-center mt-2 text-xs text-amber-600">
+                      <AlertCircle className="w-3 h-3 mr-1" />
+                      {locationError}
+                    </div>
+                  )}
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="employee">Employee ID (Optional)</Label>
+                  <Label htmlFor="employee">Employee ID *</Label>
                   <Input
                     id="employee"
                     placeholder="Enter employee ID"
@@ -518,29 +657,29 @@ export default function AttendancePage() {
                   <Button
                     variant="outline"
                     className="h-16 flex flex-col items-center justify-center space-y-2 bg-transparent"
-                    onClick={() => handleBiometricClockIn("fingerprint")}
+                    onClick={() => handleBiometricClockIn("fingerprint", false)}
                     disabled={isProcessing}
                   >
                     <Fingerprint className="w-6 h-6 text-emerald-600" />
-                    <span>Fingerprint Scanner</span>
+                    <span>Clock In - Fingerprint</span>
                   </Button>
                   <Button
                     variant="outline"
                     className="h-16 flex flex-col items-center justify-center space-y-2 bg-transparent"
-                    onClick={() => handleBiometricClockIn("facial")}
+                    onClick={() => handleBiometricClockIn("facial", false)}
                     disabled={isProcessing}
                   >
                     <Camera className="w-6 h-6 text-blue-600" />
-                    <span>Facial Recognition</span>
+                    <span>Clock In - Facial Recognition</span>
                   </Button>
                   <Button
                     variant="outline"
-                    className="h-16 flex flex-col items-center justify-center space-y-2 bg-transparent"
-                    onClick={() => handleBiometricClockIn("manual")}
+                    className="h-16 flex flex-col items-center justify-center space-y-2 bg-transparent border-orange-300"
+                    onClick={() => handleBiometricClockIn("manual", true)} // Assuming manual is for Clock Out
                     disabled={isProcessing}
                   >
                     <Timer className="w-6 h-6 text-orange-600" />
-                    <span>Manual Entry</span>
+                    <span>Clock Out</span>
                   </Button>
                 </div>
                 {isProcessing && (
@@ -592,7 +731,8 @@ export default function AttendancePage() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.absent}</div>
             <p className="text-xs text-muted-foreground">
-              {((stats.absent / attendanceRecords.length) * 100).toFixed(1)}% absence rate
+              {attendanceRecords.length > 0 ? ((stats.absent / attendanceRecords.length) * 100).toFixed(1) : 0}% absence
+              rate
             </p>
           </CardContent>
         </Card>
@@ -641,8 +781,8 @@ export default function AttendancePage() {
 
         <TabsContent value="overview" className="space-y-6">
           {/* Search and Filter */}
-          <div className="flex space-x-4">
-            <div className="flex-1">
+          <div className="flex flex-wrap gap-4">
+            <div className="flex-1 min-w-[200px]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
@@ -665,18 +805,133 @@ export default function AttendancePage() {
                 <SelectItem value="early-departure">Early Departure</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={dateFilter} onValueChange={setDateFilter}>
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
               <SelectTrigger className="w-48">
-                <Calendar className="w-4 h-4 mr-2" />
-                <SelectValue />
+                <Filter className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="All Departments" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="yesterday">Yesterday</SelectItem>
-                <SelectItem value="this-week">This Week</SelectItem>
-                <SelectItem value="this-month">This Month</SelectItem>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.map((dept) => (
+                  <SelectItem key={dept} value={dept}>
+                    {dept}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            <Select value={divisionFilter} onValueChange={setDivisionFilter}>
+              <SelectTrigger className="w-48">
+                <Filter className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="All Divisions" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Divisions</SelectItem>
+                {divisions.map((div) => (
+                  <SelectItem key={div} value={div}>
+                    {div}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={locationFilter} onValueChange={setLocationFilter}>
+              <SelectTrigger className="w-48">
+                <MapPin className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="All Locations" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Locations</SelectItem>
+                {locations.map((loc) => (
+                  <SelectItem key={loc} value={loc}>
+                    {loc}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-64 bg-transparent">
+                  <CalendarIcon className="w-4 h-4 mr-2" />
+                  {dateFilter === "custom" && customStartDate && customEndDate
+                    ? `${format(customStartDate, "MMM dd")} - ${format(customEndDate, "MMM dd")}`
+                    : dateFilter === "today"
+                      ? "Today"
+                      : dateFilter === "yesterday"
+                        ? "Yesterday"
+                        : dateFilter === "this-week"
+                          ? "This Week"
+                          : "This Month"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <div className="p-3 space-y-2 border-b">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      setDateFilter("today")
+                      setCustomStartDate(undefined)
+                      setCustomEndDate(undefined)
+                    }}
+                  >
+                    Today
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      setDateFilter("yesterday")
+                      setCustomStartDate(undefined)
+                      setCustomEndDate(undefined)
+                    }}
+                  >
+                    Yesterday
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      setDateFilter("this-week")
+                      setCustomStartDate(undefined)
+                      setCustomEndDate(undefined)
+                    }}
+                  >
+                    This Week
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      setDateFilter("this-month")
+                      setCustomStartDate(undefined)
+                      setCustomEndDate(undefined)
+                    }}
+                  >
+                    This Month
+                  </Button>
+                </div>
+                <div className="p-3">
+                  <Label className="text-xs font-medium mb-2 block">Custom Range</Label>
+                  <div className="space-y-2">
+                    <Calendar
+                      mode="range"
+                      selected={{
+                        from: customStartDate,
+                        to: customEndDate,
+                      }}
+                      onSelect={(range) => {
+                        if (range?.from) setCustomStartDate(range.from)
+                        if (range?.to) {
+                          setCustomEndDate(range.to)
+                          setDateFilter("custom")
+                        }
+                      }}
+                      numberOfMonths={2}
+                      className="rounded-md border"
+                    />
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
             <Button variant="outline" onClick={() => handleExportReport("Daily Attendance Report")}>
               <Download className="w-4 h-4 mr-2" />
               Export
@@ -712,7 +967,7 @@ export default function AttendancePage() {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <div>
-                  <CardTitle>Today's Attendance</CardTitle>
+                  <CardTitle>Attendance Records</CardTitle>
                   <CardDescription>Real-time attendance tracking for all employees</CardDescription>
                 </div>
                 <Button variant="outline" size="sm" onClick={toggleSelectAll}>
@@ -722,71 +977,96 @@ export default function AttendancePage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {filteredRecords.map((record) => (
-                  <div
-                    key={record.id}
-                    className={`flex items-center justify-between p-4 border rounded-lg ${
-                      selectedRecords.includes(record.id) ? "bg-blue-50 border-blue-300" : ""
-                    }`}
-                  >
-                    <div className="flex items-center space-x-4">
-                      <Checkbox
-                        checked={selectedRecords.includes(record.id)}
-                        onCheckedChange={() => toggleRecordSelection(record.id)}
-                      />
-                      <div>
-                        <p className="font-medium">{record.employeeName}</p>
-                        <div className="flex items-center space-x-2 text-sm text-gray-600">
-                          <span>ID: {record.employeeId}</span>
-                          {record.aiScore && (
-                            <Badge variant="outline" className="text-xs">
-                              AI Score: {record.aiScore}%
-                            </Badge>
-                          )}
-                          {record.hasMissingPunch && (
-                            <Badge variant="outline" className="text-xs text-red-600 border-red-300">
-                              Missing Punch
-                            </Badge>
+              {isLoading ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">Loading attendance records...</p>
+                </div>
+              ) : filteredRecords.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No attendance records found</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredRecords.map((record) => (
+                    <div
+                      key={record.id}
+                      className={`flex items-center justify-between p-4 border rounded-lg ${
+                        selectedRecords.includes(record.id) ? "bg-blue-50 border-blue-300" : ""
+                      }`}
+                    >
+                      <div className="flex items-center space-x-4">
+                        <Checkbox
+                          checked={selectedRecords.includes(record.id)}
+                          onCheckedChange={() => toggleRecordSelection(record.id)}
+                        />
+                        <div>
+                          <p className="font-medium">{record.employee?.full_name || "Unknown"}</p>
+                          <div className="flex items-center space-x-2 text-sm text-gray-600">
+                            <span>ID: {record.employee?.employee_id || "N/A"}</span>
+                            <span>•</span>
+                            <span>{record.employee?.department || "N/A"}</span>
+                            {record.employee?.division && (
+                              <>
+                                <span>•</span>
+                                <span>{record.employee.division}</span>
+                              </>
+                            )}
+                            {record.gps_clock_in && (
+                              <Badge variant="outline" className="text-xs">
+                                <MapPinned className="w-3 h-3 mr-1" />
+                                GPS
+                              </Badge>
+                            )}
+                            {record.ai_anomaly_score && (
+                              <Badge variant="outline" className="text-xs">
+                                AI Score: {record.ai_anomaly_score}%
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-6 text-sm">
+                        <div className="text-center">
+                          <p className="font-medium text-gray-600">Clock In</p>
+                          <p>{record.clock_in ? format(new Date(record.clock_in), "HH:mm") : "—"}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="font-medium text-gray-600">Clock Out</p>
+                          <p>{record.clock_out ? format(new Date(record.clock_out), "HH:mm") : "—"}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="font-medium text-gray-600">Total Hours</p>
+                          <p>{record.total_hours?.toFixed(2) || "0.00"}h</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="font-medium text-gray-600">Overtime</p>
+                          <p>{record.overtime_hours?.toFixed(2) || "0.00"}h</p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge
+                            className={
+                              record.status === "present"
+                                ? "bg-green-100 text-green-800"
+                                : record.status === "late"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : record.status === "absent"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-orange-100 text-orange-800"
+                            }
+                          >
+                            {record.status?.toUpperCase()}
+                          </Badge>
+                          {record.status === "absent" && (
+                            <Button size="sm" variant="outline" onClick={() => sendAbsentReminder(record.id)}>
+                              <Bell className="w-3 h-3" />
+                            </Button>
                           )}
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-6 text-sm">
-                      <div className="text-center">
-                        <p className="font-medium text-gray-600">Clock In</p>
-                        <p>{record.clockIn || "—"}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="font-medium text-gray-600">Clock Out</p>
-                        <p>{record.clockOut || "—"}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="font-medium text-gray-600">Total Hours</p>
-                        <p>{record.totalHours}h</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="font-medium text-gray-600">Overtime</p>
-                        <p>{record.overtimeHours}h</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="font-medium text-gray-600">Method</p>
-                        <p className="capitalize">{record.method}</p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge className={getStatusColor(record.status)}>
-                          {record.status.replace("-", " ").toUpperCase()}
-                        </Badge>
-                        {record.status === "absent" && (
-                          <Button size="sm" variant="outline" onClick={() => sendAbsentReminder(record.id)}>
-                            <Bell className="w-3 h-3" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -885,13 +1165,13 @@ export default function AttendancePage() {
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div>
-                      <CardTitle className="text-lg">{shift.name}</CardTitle>
+                      <CardTitle className="text-lg">{shift.shift_name}</CardTitle>
                       <CardDescription>
-                        {shift.startTime} - {shift.endTime} • {shift.breakDuration}min break
+                        {shift.start_time} - {shift.end_time} • {shift.break_duration_minutes}min break
                       </CardDescription>
                     </div>
-                    <Badge className={shift.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
-                      {shift.isActive ? "Active" : "Inactive"}
+                    <Badge className={shift.is_active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
+                      {shift.is_active ? "Active" : "Inactive"}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -899,7 +1179,7 @@ export default function AttendancePage() {
                   <div className="space-y-3">
                     <div>
                       <p className="text-sm font-medium text-gray-600">Assigned Employees</p>
-                      <p className="text-sm">{shift.employees.length} employees assigned</p>
+                      <p className="text-sm">{shift.employees?.length || 0} employees assigned</p>
                     </div>
                     <div className="flex space-x-2">
                       <Button variant="outline" size="sm">
@@ -907,7 +1187,7 @@ export default function AttendancePage() {
                         Edit Shift
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => toggleShiftStatus(shift.id)}>
-                        {shift.isActive ? "Deactivate" : "Activate"}
+                        {shift.is_active ? "Deactivate" : "Activate"}
                       </Button>
                       <Button variant="outline" size="sm">
                         <Eye className="w-3 h-3 mr-1" />
@@ -932,15 +1212,17 @@ export default function AttendancePage() {
                 {overtimeRequests.map((request) => (
                   <div key={request.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div>
-                      <p className="font-medium">{request.employeeName}</p>
+                      <p className="font-medium">{request.employee?.full_name}</p>
                       <p className="text-sm text-gray-600">
-                        {request.hours} hours overtime • {request.date}
+                        {request.hours_requested} hours overtime • {request.date}
                       </p>
                       <p className="text-sm text-gray-500 mt-1">Reason: {request.reason}</p>
-                      <p className="text-xs text-gray-400 mt-1">Submitted: {request.submittedAt}</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Submitted: {new Date(request.submitted_at).toLocaleString()}
+                      </p>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Badge className={getOvertimeStatusColor(request.status)}>{request.status.toUpperCase()}</Badge>
+                      <Badge className={getOvertimeStatusColor(request.status)}>{request.status?.toUpperCase()}</Badge>
                       {request.status === "pending" && (
                         <>
                           <Button
@@ -1001,27 +1283,31 @@ export default function AttendancePage() {
                         {device.type === "card" && <ClockIcon className="w-6 h-6 text-orange-600" />}
                       </div>
                       <div>
-                        <p className="font-medium">{device.name}</p>
+                        <p className="font-medium">{device.device_name}</p>
                         <p className="text-sm text-gray-600">{device.location}</p>
                         <div className="flex items-center space-x-2 mt-1">
-                          <p className="text-xs text-gray-500">Last sync: {device.lastSync}</p>
-                          {device.uptime && (
+                          <p className="text-xs text-gray-500">
+                            Last sync: {device.last_sync ? new Date(device.last_sync).toLocaleString() : "Never"}
+                          </p>
+                          {device.uptime_percentage !== undefined && (
                             <Badge variant="outline" className="text-xs">
-                              Uptime: {device.uptime}%
+                              Uptime: {device.uptime_percentage}%
                             </Badge>
                           )}
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Badge className={getDeviceStatusColor(device.status)}>{device.status.toUpperCase()}</Badge>
+                      <Badge className={getDeviceStatusColor(device.is_online ? "online" : "offline")}>
+                        {device.is_online ? "ONLINE" : "OFFLINE"}
+                      </Badge>
                       <Button size="sm" variant="outline" onClick={() => handleDeviceSync(device.id)}>
                         <RefreshCw className="w-4 h-4 mr-1" />
                         Sync Data
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => toggleDeviceStatus(device.id)}>
                         <Settings className="w-4 h-4 mr-1" />
-                        {device.status === "online" ? "Disable" : "Enable"}
+                        {device.is_online ? "Disable" : "Enable"}
                       </Button>
                     </div>
                   </div>
@@ -1036,7 +1322,7 @@ export default function AttendancePage() {
             <Card>
               <CardHeader>
                 <CardTitle>Attendance Reports</CardTitle>
-                <CardDescription>Generate comprehensive attendance reports</CardDescription>
+                <CardDescription>Generate comprehensive attendance reports with company details</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <Button
@@ -1045,7 +1331,7 @@ export default function AttendancePage() {
                   onClick={() => handleExportReport("Daily Attendance Report")}
                 >
                   <Download className="w-4 h-4 mr-2" />
-                  Daily Attendance Report
+                  Daily Attendance Report (PDF)
                 </Button>
                 <Button
                   variant="outline"
@@ -1053,7 +1339,7 @@ export default function AttendancePage() {
                   onClick={() => handleExportReport("Monthly Attendance Summary")}
                 >
                   <Download className="w-4 h-4 mr-2" />
-                  Monthly Attendance Summary
+                  Monthly Attendance Summary (PDF)
                 </Button>
                 <Button
                   variant="outline"
@@ -1061,7 +1347,7 @@ export default function AttendancePage() {
                   onClick={() => handleExportReport("Overtime Report")}
                 >
                   <Download className="w-4 h-4 mr-2" />
-                  Overtime Report
+                  Overtime Report (PDF)
                 </Button>
                 <Button
                   variant="outline"
@@ -1069,7 +1355,7 @@ export default function AttendancePage() {
                   onClick={() => handleExportReport("Late Arrivals Report")}
                 >
                   <Download className="w-4 h-4 mr-2" />
-                  Late Arrivals Report
+                  Late Arrivals Report (PDF)
                 </Button>
                 <Button
                   variant="outline"
@@ -1077,7 +1363,15 @@ export default function AttendancePage() {
                   onClick={() => handleExportReport("Absenteeism Report")}
                 >
                   <Download className="w-4 h-4 mr-2" />
-                  Absenteeism Report
+                  Absenteeism Report (PDF)
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start bg-transparent"
+                  onClick={() => handleExportReport("Department Attendance Analysis")}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Department Analysis (PDF)
                 </Button>
               </CardContent>
             </Card>
@@ -1090,22 +1384,28 @@ export default function AttendancePage() {
                 <div className="p-4 bg-emerald-50 rounded-lg">
                   <p className="text-sm font-medium text-emerald-800">Average Attendance Rate</p>
                   <p className="text-2xl font-bold text-emerald-600">{stats.attendanceRate}%</p>
-                  <p className="text-xs text-emerald-700 mt-1">+2.3% from last month</p>
+                  <p className="text-xs text-emerald-700 mt-1">Based on current filters</p>
                 </div>
                 <div className="p-4 bg-blue-50 rounded-lg">
-                  <p className="text-sm font-medium text-blue-800">Average Daily Hours</p>
-                  <p className="text-2xl font-bold text-blue-600">8.2h</p>
-                  <p className="text-xs text-blue-700 mt-1">Within expected range</p>
+                  <p className="text-sm font-medium text-blue-800">Total Records</p>
+                  <p className="text-2xl font-bold text-blue-600">{attendanceRecords.length}</p>
+                  <p className="text-xs text-blue-700 mt-1">In selected period</p>
                 </div>
                 <div className="p-4 bg-orange-50 rounded-lg">
-                  <p className="text-sm font-medium text-orange-800">Monthly Overtime</p>
-                  <p className="text-2xl font-bold text-orange-600">156h</p>
-                  <p className="text-xs text-orange-700 mt-1">12 employees involved</p>
+                  <p className="text-sm font-medium text-orange-800">Pending Overtime</p>
+                  <p className="text-2xl font-bold text-orange-600">{stats.totalOvertimeHours.toFixed(1)}h</p>
+                  <p className="text-xs text-orange-700 mt-1">
+                    {overtimeRequests.filter((r) => r.status === "pending").length} requests pending
+                  </p>
                 </div>
                 <div className="p-4 bg-purple-50 rounded-lg">
                   <p className="text-sm font-medium text-purple-800">Device Reliability</p>
-                  <p className="text-2xl font-bold text-purple-600">91.2%</p>
-                  <p className="text-xs text-purple-700 mt-1">1 device needs attention</p>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {stats.totalDevices > 0 ? ((stats.devicesOnline / stats.totalDevices) * 100).toFixed(1) : 0}%
+                  </p>
+                  <p className="text-xs text-purple-700 mt-1">
+                    {stats.devicesOnline} of {stats.totalDevices} devices online
+                  </p>
                 </div>
               </CardContent>
             </Card>

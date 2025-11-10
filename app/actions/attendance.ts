@@ -21,6 +21,8 @@ export interface AttendanceRecord {
   late_minutes?: number
   notes?: string
   company_id: string
+  gps_clock_in?: string
+  gps_clock_out?: string
 }
 
 export interface Shift {
@@ -164,6 +166,94 @@ export async function bulkUpdateAttendanceStatus(ids: string[], status: string) 
 
   revalidatePath("/app/attendance")
   return { success: true, count: ids.length }
+}
+
+export async function clockIn(employeeId: string, geolocation?: { latitude: number; longitude: number }) {
+  const supabase = await createClient()
+  const companyId = await getCurrentCompanyId()
+  const today = new Date().toISOString().split("T")[0]
+
+  // Check if employee already clocked in today
+  const { data: existingRecord } = await supabase
+    .from("attendance_records")
+    .select("*")
+    .eq("employee_id", employeeId)
+    .eq("date", today)
+    .single()
+
+  if (existingRecord && existingRecord.clock_in && !existingRecord.clock_out) {
+    throw new Error("Employee has already clocked in and not clocked out yet")
+  }
+
+  if (existingRecord && existingRecord.clock_in && existingRecord.clock_out) {
+    throw new Error("Employee has already completed attendance for today")
+  }
+
+  const currentTime = new Date().toISOString()
+
+  const { data, error } = await supabase
+    .from("attendance_records")
+    .insert({
+      employee_id: employeeId,
+      company_id: companyId,
+      date: today,
+      clock_in: currentTime,
+      gps_clock_in: geolocation ? `POINT(${geolocation.longitude} ${geolocation.latitude})` : null,
+      status: "present",
+    })
+    .select()
+    .single()
+
+  if (error) throw error
+
+  revalidatePath("/app/attendance")
+  revalidatePath("/self-service/attendance")
+  return data
+}
+
+export async function clockOut(employeeId: string, geolocation?: { latitude: number; longitude: number }) {
+  const supabase = await createClient()
+  const today = new Date().toISOString().split("T")[0]
+
+  // Find today's attendance record
+  const { data: existingRecord } = await supabase
+    .from("attendance_records")
+    .select("*")
+    .eq("employee_id", employeeId)
+    .eq("date", today)
+    .single()
+
+  if (!existingRecord) {
+    throw new Error("No clock-in record found for today. Please clock in first.")
+  }
+
+  if (existingRecord.clock_out) {
+    throw new Error("Employee has already clocked out today")
+  }
+
+  const currentTime = new Date().toISOString()
+
+  // Calculate total hours
+  const clockInTime = new Date(existingRecord.clock_in)
+  const clockOutTime = new Date(currentTime)
+  const totalHours = (clockOutTime.getTime() - clockInTime.getTime()) / (1000 * 60 * 60)
+
+  const { data, error } = await supabase
+    .from("attendance_records")
+    .update({
+      clock_out: currentTime,
+      gps_clock_out: geolocation ? `POINT(${geolocation.longitude} ${geolocation.latitude})` : null,
+      total_hours: totalHours,
+    })
+    .eq("id", existingRecord.id)
+    .select()
+    .single()
+
+  if (error) throw error
+
+  revalidatePath("/app/attendance")
+  revalidatePath("/self-service/attendance")
+  return data
 }
 
 // ===== Shifts Actions =====
@@ -455,4 +545,87 @@ export async function getAttendanceTrends(days = 30) {
   }, {})
 
   return Object.values(trends)
+}
+
+export async function getFilteredAttendance(filters?: {
+  startDate?: string
+  endDate?: string
+  employeeId?: string
+  status?: string
+  department?: string
+  division?: string
+  location?: string
+  limit?: number
+}) {
+  const supabase = await createClient()
+  const companyId = await getCurrentCompanyId()
+
+  let query = supabase
+    .from("attendance_records")
+    .select(`
+      *,
+      employee:employees!inner(
+        id, 
+        full_name, 
+        employee_id, 
+        department, 
+        division,
+        position,
+        subsidiary_id,
+        subsidiaries(id, name, location)
+      ),
+      shift:attendance_shifts(shift_name, shift_code, color_code)
+    `)
+    .eq("company_id", companyId)
+    .order("date", { ascending: false })
+
+  if (filters?.startDate) {
+    query = query.gte("date", filters.startDate)
+  }
+
+  if (filters?.endDate) {
+    query = query.lte("date", filters.endDate)
+  }
+
+  if (filters?.employeeId) {
+    query = query.eq("employee_id", filters.employeeId)
+  }
+
+  if (filters?.status) {
+    query = query.eq("status", filters.status)
+  }
+
+  if (filters?.department) {
+    query = query.eq("employee.department", filters.department)
+  }
+
+  if (filters?.division) {
+    query = query.eq("employee.division", filters.division)
+  }
+
+  if (filters?.limit) {
+    query = query.limit(filters.limit)
+  }
+
+  const { data, error } = await query
+
+  if (error) throw error
+  return data
+}
+
+export async function getCompanyDetails() {
+  const supabase = await createClient()
+  const companyId = await getCurrentCompanyId()
+
+  const { data: company, error: companyError } = await supabase
+    .from("companies")
+    .select(`
+      *,
+      subsidiaries(id, name, location, subsidiary_code)
+    `)
+    .eq("id", companyId)
+    .single()
+
+  if (companyError) throw companyError
+  return company
 }
