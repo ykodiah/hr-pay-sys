@@ -93,7 +93,57 @@ export async function getMyOvertimeRequests() {
   return data
 }
 
-// Submit overtime request
+// Get employee's shift schedule
+export async function getMyShiftSchedule() {
+  const supabase = await createClient()
+  const employeeId = await getCurrentEmployeeId()
+
+  const { data, error } = await supabase
+    .from("employee_shifts")
+    .select(`
+      *,
+      shift:attendance_shifts(*)
+    `)
+    .eq("employee_id", employeeId)
+    .eq("is_active", true)
+
+  if (error) throw error
+  return data
+}
+
+// Create overtime request - Used by employee self-service portal
+export async function createOvertimeRequest(params: {
+  employeeId: string
+  date: string
+  hoursRequested: number
+  reason: string
+  companyId: string
+}) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from("overtime_requests")
+    .insert({
+      employee_id: params.employeeId,
+      company_id: params.companyId,
+      request_date: params.date,
+      hours_requested: params.hoursRequested,
+      overtime_type: "regular",
+      reason: params.reason,
+      status: "pending",
+      requested_by: params.employeeId,
+    })
+    .select()
+    .single()
+
+  if (error) throw error
+
+  revalidatePath("/self-service/attendance")
+  revalidatePath("/app/my-attendance")
+  return data
+}
+
+// Submit overtime request - Legacy function with different signature
 export async function submitOvertimeRequest(request: {
   request_date: string
   start_time: string
@@ -137,7 +187,7 @@ export async function submitOvertimeRequest(request: {
   return data
 }
 
-// Create attendance dispute
+// Create attendance dispute - Used by employee self-service portal
 export async function createAttendanceDispute(params: {
   attendanceRecordId: string
   employeeId: string
@@ -169,56 +219,6 @@ export async function createAttendanceDispute(params: {
       proposed_clock_in: params.proposedClockIn,
       proposed_clock_out: params.proposedClockOut,
       status: "pending",
-    })
-    .select()
-    .single()
-
-  if (error) throw error
-
-  revalidatePath("/self-service/attendance")
-  revalidatePath("/app/my-attendance")
-  return data
-}
-
-// Get employee's shift schedule
-export async function getMyShiftSchedule() {
-  const supabase = await createClient()
-  const employeeId = await getCurrentEmployeeId()
-
-  const { data, error } = await supabase
-    .from("employee_shifts")
-    .select(`
-      *,
-      shift:attendance_shifts(*)
-    `)
-    .eq("employee_id", employeeId)
-    .eq("is_active", true)
-
-  if (error) throw error
-  return data
-}
-
-// Create overtime request
-export async function createOvertimeRequest(params: {
-  employeeId: string
-  date: string
-  hoursRequested: number
-  reason: string
-  companyId: string
-}) {
-  const supabase = await createClient()
-
-  const { data, error } = await supabase
-    .from("overtime_requests")
-    .insert({
-      employee_id: params.employeeId,
-      company_id: params.companyId,
-      request_date: params.date,
-      hours_requested: params.hoursRequested,
-      overtime_type: "regular",
-      reason: params.reason,
-      status: "pending",
-      requested_by: params.employeeId,
     })
     .select()
     .single()
