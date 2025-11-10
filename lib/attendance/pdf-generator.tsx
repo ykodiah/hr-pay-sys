@@ -1,90 +1,94 @@
+import jsPDF from "jspdf"
+import autoTable from "jspdf-autotable"
+
 export async function generateAttendancePDF(
   records: any[],
   reportType: string,
   companyInfo: { company: any; subsidiary: any | null },
   filters: { startDate?: string; endDate?: string; department?: string; division?: string; location?: string },
 ) {
-  // Create HTML for PDF generation
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
-        .company-name { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
-        .subsidiary { font-size: 16px; color: #666; margin-bottom: 5px; }
-        .report-title { font-size: 20px; margin-top: 10px; }
-        .filters { margin: 20px 0; padding: 10px; background: #f5f5f5; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #4CAF50; color: white; }
-        tr:nth-child(even) { background-color: #f2f2f2; }
-        .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #666; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div class="company-name">${companyInfo.company?.name || "Company Name"}</div>
-        ${companyInfo.subsidiary ? `<div class="subsidiary">${companyInfo.subsidiary.name}</div>` : ""}
-        <div class="report-title">${reportType}</div>
-      </div>
-      
-      <div class="filters">
-        <strong>Filters Applied:</strong><br/>
-        ${filters.startDate ? `Start Date: ${filters.startDate}<br/>` : ""}
-        ${filters.endDate ? `End Date: ${filters.endDate}<br/>` : ""}
-        ${filters.department ? `Department: ${filters.department}<br/>` : ""}
-        ${filters.division ? `Division: ${filters.division}<br/>` : ""}
-        ${filters.location ? `Location: ${filters.location}<br/>` : ""}
-      </div>
+  const doc = new jsPDF()
 
-      <table>
-        <thead>
-          <tr>
-            <th>Employee ID</th>
-            <th>Name</th>
-            <th>Department</th>
-            <th>Division</th>
-            <th>Location</th>
-            <th>Date</th>
-            <th>Clock In</th>
-            <th>Clock Out</th>
-            <th>Hours</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${records
-            .map(
-              (record) => `
-            <tr>
-              <td>${record.employee?.employee_id || "N/A"}</td>
-              <td>${record.employee?.full_name || "N/A"}</td>
-              <td>${record.employee?.department || "N/A"}</td>
-              <td>${record.employee?.division || "N/A"}</td>
-              <td>${record.employee?.location || "N/A"}</td>
-              <td>${new Date(record.clock_in).toLocaleDateString()}</td>
-              <td>${new Date(record.clock_in).toLocaleTimeString()}</td>
-              <td>${record.clock_out ? new Date(record.clock_out).toLocaleTimeString() : "-"}</td>
-              <td>${record.total_hours?.toFixed(2) || "-"}</td>
-              <td>${record.status}</td>
-            </tr>
-          `,
-            )
-            .join("")}
-        </tbody>
-      </table>
+  // Add company header
+  doc.setFontSize(20)
+  doc.setFont("helvetica", "bold")
+  doc.text(companyInfo.company?.name || "Company Name", 105, 20, { align: "center" })
 
-      <div class="footer">
-        Generated on ${new Date().toLocaleString()}<br/>
-        Total Records: ${records.length}
-      </div>
-    </body>
-    </html>
-  `
+  if (companyInfo.subsidiary) {
+    doc.setFontSize(14)
+    doc.setFont("helvetica", "normal")
+    doc.text(companyInfo.subsidiary.name, 105, 28, { align: "center" })
+  }
 
-  // Convert HTML to PDF using browser's print functionality
-  const blob = new Blob([html], { type: "text/html" })
-  return blob
+  // Add report title
+  doc.setFontSize(16)
+  doc.setFont("helvetica", "bold")
+  doc.text(reportType, 105, companyInfo.subsidiary ? 36 : 28, { align: "center" })
+
+  // Add filters section
+  let yPos = companyInfo.subsidiary ? 45 : 37
+  doc.setFontSize(10)
+  doc.setFont("helvetica", "normal")
+
+  if (filters.startDate || filters.endDate || filters.department || filters.division || filters.location) {
+    doc.setFont("helvetica", "bold")
+    doc.text("Filters Applied:", 14, yPos)
+    doc.setFont("helvetica", "normal")
+    yPos += 5
+
+    if (filters.startDate) {
+      doc.text(`Start Date: ${new Date(filters.startDate).toLocaleDateString()}`, 14, yPos)
+      yPos += 5
+    }
+    if (filters.endDate) {
+      doc.text(`End Date: ${new Date(filters.endDate).toLocaleDateString()}`, 14, yPos)
+      yPos += 5
+    }
+    if (filters.department && filters.department !== "all") {
+      doc.text(`Department: ${filters.department}`, 14, yPos)
+      yPos += 5
+    }
+    if (filters.division && filters.division !== "all") {
+      doc.text(`Division: ${filters.division}`, 14, yPos)
+      yPos += 5
+    }
+    if (filters.location && filters.location !== "all") {
+      doc.text(`Location: ${filters.location}`, 14, yPos)
+      yPos += 5
+    }
+    yPos += 5
+  }
+
+  // Prepare table data
+  const tableData = records.map((record) => [
+    record.employee?.employee_id || "N/A",
+    record.employee?.full_name || "N/A",
+    record.employee?.department || "N/A",
+    record.employee?.division || "N/A",
+    record.employee?.location || "N/A",
+    new Date(record.clock_in).toLocaleDateString(),
+    new Date(record.clock_in).toLocaleTimeString(),
+    record.clock_out ? new Date(record.clock_out).toLocaleTimeString() : "-",
+    record.total_hours?.toFixed(2) || "-",
+    record.status || "N/A",
+  ])
+
+  // Add table
+  autoTable(doc, {
+    head: [["ID", "Name", "Dept", "Division", "Location", "Date", "Clock In", "Clock Out", "Hours", "Status"]],
+    body: tableData,
+    startY: yPos,
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [76, 175, 80], textColor: 255, fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [245, 245, 245] },
+  })
+
+  // Add footer
+  const finalY = (doc as any).lastAutoTable.finalY || yPos + 10
+  doc.setFontSize(9)
+  doc.setTextColor(100)
+  doc.text(`Generated on ${new Date().toLocaleString()}`, 14, finalY + 10)
+  doc.text(`Total Records: ${records.length}`, 14, finalY + 15)
+
+  return doc.output("blob")
 }

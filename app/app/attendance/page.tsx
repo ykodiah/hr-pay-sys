@@ -32,6 +32,10 @@ import {
   getBiometricDevices,
   syncBiometricDevice,
   addBiometricDevice,
+  getShifts, // Import getShifts
+  createShift, // Import createShift
+  approveOvertimeRequest, // Import approveOvertimeRequest
+  rejectOvertimeRequest, // Import rejectOvertimeRequest
 } from "@/app/actions/attendance"
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
@@ -67,6 +71,11 @@ export default function AttendancePage() {
   const [showDeviceDialog, setShowDeviceDialog] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
 
+  // Shift management
+  const [shifts, setShifts] = useState<any[]>([])
+  const [showShiftDialog, setShowShiftDialog] = useState(false)
+  const [editingShift, setEditingShift] = useState<any>(null)
+
   // Stats
   const [stats, setStats] = useState({
     present: 0,
@@ -78,6 +87,12 @@ export default function AttendancePage() {
     devicesOnline: 0,
     devicesTotal: 0,
   })
+
+  // AI Insights
+  const [showAIInsights, setShowAIInsights] = useState(false)
+  const [aiInsights, setAIInsights] = useState<any>(null)
+  const [loadingAI, setLoadingAI] = useState(false)
+  const [selectedEmployeeForAI, setSelectedEmployeeForAI] = useState<string | null>(null)
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -93,6 +108,8 @@ export default function AttendancePage() {
     loadFilterOptions()
     loadOvertimeRequests()
     loadBiometricDevices()
+    // Load shifts
+    loadShifts()
   }, [])
 
   useEffect(() => {
@@ -305,9 +322,18 @@ export default function AttendancePage() {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
 
+    // Get the device type from the state or hidden input
+    const deviceTypeInput = e.currentTarget.querySelector('[name="type"]') as HTMLInputElement
+    const deviceType = deviceTypeInput?.value
+
+    if (!deviceType) {
+      toast({ title: "Error", description: "Please select a device type", variant: "destructive" })
+      return
+    }
+
     const result = await addBiometricDevice({
       name: formData.get("name") as string,
-      type: formData.get("type") as string,
+      type: deviceType,
       location: formData.get("location") as string,
       ip_address: formData.get("ip_address") as string,
       serial_number: formData.get("serial_number") as string,
@@ -317,8 +343,72 @@ export default function AttendancePage() {
       toast({ title: "Success", description: "Device added successfully" })
       setShowDeviceDialog(false)
       loadBiometricDevices()
+      e.currentTarget.reset()
     } else {
       toast({ title: "Error", description: result.error || "Failed to add device", variant: "destructive" })
+    }
+  }
+
+  async function handleAddShift(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+
+    const workingDays = []
+    if (formData.get("monday")) workingDays.push("monday")
+    if (formData.get("tuesday")) workingDays.push("tuesday")
+    if (formData.get("wednesday")) workingDays.push("wednesday")
+    if (formData.get("thursday")) workingDays.push("thursday")
+    if (formData.get("friday")) workingDays.push("friday")
+    if (formData.get("saturday")) workingDays.push("saturday")
+    if (formData.get("sunday")) workingDays.push("sunday")
+
+    const result = await createShift({
+      name: formData.get("name") as string,
+      start_time: formData.get("start_time") as string,
+      end_time: formData.get("end_time") as string,
+      break_duration_minutes: Number.parseInt(formData.get("break_duration") as string) || 0,
+      grace_period_minutes: Number.parseInt(formData.get("grace_period") as string) || 0,
+      working_days: workingDays,
+    })
+
+    if (result.success) {
+      toast({ title: "Success", description: "Shift created successfully" })
+      setShowShiftDialog(false)
+      loadShifts()
+      e.currentTarget.reset()
+    } else {
+      toast({ title: "Error", description: result.error || "Failed to create shift", variant: "destructive" })
+    }
+  }
+
+  async function handleApproveOvertime(id: string) {
+    const request = overtimeRequests.find((r) => r.id === id)
+    if (!request) return
+
+    const result = await approveOvertimeRequest(id, request.hours_requested)
+    if (result.success) {
+      toast({ title: "Success", description: "Overtime approved" })
+      loadOvertimeRequests()
+      loadAttendanceData()
+    } else {
+      toast({ title: "Error", description: result.error || "Failed to approve", variant: "destructive" })
+    }
+  }
+
+  async function handleRejectOvertime(id: string) {
+    const result = await rejectOvertimeRequest(id, "Rejected by manager")
+    if (result.success) {
+      toast({ title: "Success", description: "Overtime rejected" })
+      loadOvertimeRequests()
+    } else {
+      toast({ title: "Error", description: result.error || "Failed to reject", variant: "destructive" })
+    }
+  }
+
+  async function loadShifts() {
+    const result = await getShifts()
+    if (result.success) {
+      setShifts(result.data)
     }
   }
 
@@ -352,6 +442,30 @@ export default function AttendancePage() {
       toast({ title: "Error", description: "Failed to download report", variant: "destructive" })
     }
     setLoading(false)
+  }
+
+  async function loadAIInsights(employeeId: string, employeeName: string) {
+    setLoadingAI(true)
+    setSelectedEmployeeForAI(employeeName)
+    setShowAIInsights(true)
+
+    try {
+      const response = await fetch("/api/attendance/ai-insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeId }),
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        setAIInsights(data)
+      } else {
+        toast({ title: "Error", description: "Failed to generate AI insights", variant: "destructive" })
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to load AI insights", variant: "destructive" })
+    }
+    setLoadingAI(false)
   }
 
   return (
@@ -638,6 +752,7 @@ export default function AttendancePage() {
                         <th className="text-left p-2">Overtime</th>
                         <th className="text-left p-2">GPS</th>
                         <th className="text-left p-2">Status</th>
+                        <th className="text-left p-2">AI Insights</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -690,6 +805,19 @@ export default function AttendancePage() {
                                 {record.status}
                               </span>
                             </td>
+                            <td className="p-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 hover:from-purple-600 hover:to-pink-600"
+                                onClick={() =>
+                                  loadAIInsights(record.employee_id, record.employee?.full_name || "Employee")
+                                }
+                              >
+                                <TrendingUp className="h-3 w-3" />
+                                Analyze
+                              </Button>
+                            </td>
                           </tr>
                         )
                       })}
@@ -727,7 +855,7 @@ export default function AttendancePage() {
                   </div>
                   <div>
                     <Label htmlFor="type">Device Type</Label>
-                    <Select name="type" required>
+                    <Select name="type" required defaultValue="">
                       <SelectTrigger>
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
@@ -738,6 +866,7 @@ export default function AttendancePage() {
                         <SelectItem value="iris">Iris Scanner</SelectItem>
                       </SelectContent>
                     </Select>
+                    <input type="hidden" name="type" id="type-hidden" />
                   </div>
                   <div>
                     <Label htmlFor="location">Location</Label>
@@ -832,21 +961,144 @@ export default function AttendancePage() {
         </Card>
       )}
 
-      {/* Placeholder for Shift Management and Overtime tabs - implement as needed */}
+      {/* Shift Management Tab */}
       {activeTab === "shift" && (
         <Card>
-          <CardHeader>
-            <CardTitle>Shift Management</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Shift Management</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">Create and manage work shifts for employees</p>
+            </div>
+            <Dialog open={showShiftDialog} onOpenChange={setShowShiftDialog}>
+              <DialogTrigger asChild>
+                <Button className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Shift
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Create New Shift</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleAddShift} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="shift-name">Shift Name</Label>
+                      <Input id="shift-name" name="name" required placeholder="e.g., Morning Shift" />
+                    </div>
+                    <div>
+                      <Label htmlFor="grace_period">Grace Period (minutes)</Label>
+                      <Input id="grace_period" name="grace_period" type="number" defaultValue="15" placeholder="15" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="start_time">Start Time</Label>
+                      <Input id="start_time" name="start_time" type="time" required defaultValue="09:00" />
+                    </div>
+                    <div>
+                      <Label htmlFor="end_time">End Time</Label>
+                      <Input id="end_time" name="end_time" type="time" required defaultValue="17:00" />
+                    </div>
+                    <div>
+                      <Label htmlFor="break_duration">Break Duration (min)</Label>
+                      <Input
+                        id="break_duration"
+                        name="break_duration"
+                        type="number"
+                        defaultValue="60"
+                        placeholder="60"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Working Days</Label>
+                    <div className="grid grid-cols-7 gap-2 mt-2">
+                      {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
+                        <label key={day} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            name={day.toLowerCase()}
+                            className="rounded"
+                            defaultChecked={day !== "Saturday" && day !== "Sunday"}
+                          />
+                          <span className="text-sm">{day.substring(0, 3)}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <Button type="submit" className="w-full">
+                    Create Shift
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-8 text-muted-foreground">Shift management features coming soon.</div>
+            <div className="space-y-4">
+              {shifts.map((shift) => (
+                <div key={shift.id} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-lg">{shift.name}</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {shift.start_time} - {shift.end_time} ({shift.break_duration_minutes}min break)
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Grace period: {shift.grace_period_minutes} minutes
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Working days: {shift.working_days?.join(", ") || "Not set"}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm">
+                        Edit
+                      </Button>
+                      <Button variant="outline" size="sm" className="text-red-600 bg-transparent">
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {shifts.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  No shifts configured. Click "Add Shift" to create one.
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
+      {/* Overtime Tab */}
       {activeTab === "overtime" && (
         <Card>
           <CardHeader>
-            <CardTitle>Overtime Requests</CardTitle>
+            <CardTitle>Overtime Management</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              <strong>How it works:</strong> Employees work beyond their 8-hour shift, and overtime is automatically
+              calculated. They can also submit formal overtime requests which require manager approval before being
+              counted.
+            </p>
+            <div className="mt-3 p-3 bg-blue-50 rounded-lg text-sm space-y-1">
+              <p>
+                <strong className="text-blue-900">• Automatic Overtime:</strong> System automatically tracks hours
+                worked beyond 8 hours per day
+              </p>
+              <p>
+                <strong className="text-blue-900">• Request Overtime:</strong> Employees submit requests via their
+                portal for planned overtime work
+              </p>
+              <p>
+                <strong className="text-blue-900">• Approval:</strong> Managers/HR review and approve or reject overtime
+                requests
+              </p>
+              <p>
+                <strong className="text-blue-900">• Calculation:</strong> Approved overtime is added to payroll
+                calculations
+              </p>
+            </div>
           </CardHeader>
           <CardContent>
             {overtimeRequests.length === 0 ? (
@@ -869,7 +1121,7 @@ export default function AttendancePage() {
                       <tr key={request.id} className="border-b hover:bg-muted/50">
                         <td className="p-2">{request.employee?.full_name || "-"}</td>
                         <td className="p-2">{new Date(request.date).toLocaleDateString()}</td>
-                        <td className="p-2">{request.requested_hours.toFixed(2)}h</td>
+                        <td className="p-2">{request.hours_requested?.toFixed(2)}h</td>
                         <td className="p-2">{request.reason}</td>
                         <td className="p-2">
                           <Badge
@@ -889,9 +1141,7 @@ export default function AttendancePage() {
                             <div className="flex gap-2">
                               <Button
                                 size="sm"
-                                onClick={() => {
-                                  /* TODO: Handle Approve */
-                                }}
+                                onClick={() => handleApproveOvertime(request.id)}
                                 className="bg-green-600 hover:bg-green-700"
                               >
                                 Approve
@@ -899,9 +1149,7 @@ export default function AttendancePage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => {
-                                  /* TODO: Handle Reject */
-                                }}
+                                onClick={() => handleRejectOvertime(request.id)}
                                 className="text-red-600 border-red-600 hover:bg-red-100"
                               >
                                 Reject
@@ -918,6 +1166,163 @@ export default function AttendancePage() {
           </CardContent>
         </Card>
       )}
+
+      {/* AI Insights Dialog */}
+      <Dialog open={showAIInsights} onOpenChange={setShowAIInsights}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500">
+                <TrendingUp className="h-5 w-5 text-white" />
+              </div>
+              AI Insights: {selectedEmployeeForAI}
+            </DialogTitle>
+          </DialogHeader>
+
+          {loadingAI ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+              <span className="ml-3 text-muted-foreground">Analyzing attendance data with AI...</span>
+            </div>
+          ) : aiInsights ? (
+            <div className="space-y-6">
+              {/* Performance Score */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm text-muted-foreground">Overall Performance</div>
+                      <div className="text-3xl font-bold mt-1">{aiInsights.insights.rating}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-4xl font-bold text-purple-600">{aiInsights.insights.score}/100</div>
+                      <div className="text-sm text-muted-foreground">AI Score</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Statistics */}
+              <div className="grid grid-cols-3 gap-4">
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="text-sm text-muted-foreground">Attendance Rate</div>
+                    <div className="text-2xl font-bold">
+                      {((aiInsights.stats.presentDays / aiInsights.stats.totalDays) * 100).toFixed(1)}%
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="text-sm text-muted-foreground">Avg Hours/Day</div>
+                    <div className="text-2xl font-bold">{aiInsights.stats.avgHours.toFixed(2)}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4">
+                    <div className="text-sm text-muted-foreground">Total Overtime</div>
+                    <div className="text-2xl font-bold text-orange-600">
+                      {aiInsights.stats.totalOvertime.toFixed(1)}h
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Risk Assessment */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Risk Assessment</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Burnout Risk</span>
+                    <Badge
+                      className={
+                        aiInsights.insights.risks.burnout === "High"
+                          ? "bg-red-500"
+                          : aiInsights.insights.risks.burnout === "Medium"
+                            ? "bg-yellow-500"
+                            : "bg-green-500"
+                      }
+                    >
+                      {aiInsights.insights.risks.burnout}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Absenteeism Risk</span>
+                    <Badge
+                      className={
+                        aiInsights.insights.risks.absenteeism === "High"
+                          ? "bg-red-500"
+                          : aiInsights.insights.risks.absenteeism === "Medium"
+                            ? "bg-yellow-500"
+                            : "bg-green-500"
+                      }
+                    >
+                      {aiInsights.insights.risks.absenteeism}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Time Theft Risk</span>
+                    <Badge
+                      className={
+                        aiInsights.insights.risks.timeTheft === "High"
+                          ? "bg-red-500"
+                          : aiInsights.insights.risks.timeTheft === "Medium"
+                            ? "bg-yellow-500"
+                            : "bg-green-500"
+                      }
+                    >
+                      {aiInsights.insights.risks.timeTheft}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Patterns */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Detected Patterns</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    {aiInsights.insights.patterns.map((pattern: string, idx: number) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <AlertCircle className="h-4 w-4 text-blue-500 mt-0.5" />
+                        <span className="text-sm">{pattern}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+
+              {/* Recommendations */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">AI Recommendations</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    {aiInsights.insights.recommendations.map((rec: string, idx: number) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <TrendingUp className="h-4 w-4 text-green-500 mt-0.5" />
+                        <span className="text-sm">{rec}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+
+              {/* Summary */}
+              <Card className="bg-gradient-to-r from-purple-50 to-pink-50">
+                <CardContent className="pt-6">
+                  <p className="text-sm leading-relaxed">{aiInsights.insights.summary}</p>
+                </CardContent>
+              </Card>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

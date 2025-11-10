@@ -119,10 +119,12 @@ export async function getAttendanceRecords(filters: {
     .order("clock_in", { ascending: false })
 
   if (filters.startDate) {
-    query = query.gte("clock_in", filters.startDate)
+    const startDate = new Date(filters.startDate).toISOString().split("T")[0]
+    query = query.gte("date", startDate)
   }
   if (filters.endDate) {
-    query = query.lte("clock_in", filters.endDate)
+    const endDate = new Date(filters.endDate).toISOString().split("T")[0]
+    query = query.lte("date", endDate)
   }
   if (filters.employeeId) {
     query = query.eq("employee_id", filters.employeeId)
@@ -131,18 +133,19 @@ export async function getAttendanceRecords(filters: {
   const { data, error } = await query
 
   if (error) {
+    console.log("[v0] Error fetching attendance records:", error)
     return { success: false, error: error.message, data: [] }
   }
 
   // Filter by department/division/location if provided
   let filtered = data || []
-  if (filters.department) {
+  if (filters.department && filters.department !== "all") {
     filtered = filtered.filter((r) => r.employee?.department === filters.department)
   }
-  if (filters.division) {
+  if (filters.division && filters.division !== "all") {
     filtered = filtered.filter((r) => r.employee?.division === filters.division)
   }
-  if (filters.location) {
+  if (filters.location && filters.location !== "all") {
     filtered = filtered.filter((r) => r.employee?.location === filters.location)
   }
 
@@ -329,4 +332,63 @@ export async function addBiometricDevice(device: {
 
   revalidatePath("/app/attendance")
   return { success: true, data }
+}
+
+export async function getShifts() {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase.from("shifts").select("*").order("name")
+
+  if (error) {
+    console.log("[v0] Error fetching shifts:", error)
+    return { success: false, error: error.message, data: [] }
+  }
+
+  return { success: true, data: data || [] }
+}
+
+export async function createShift(shift: {
+  name: string
+  start_time: string
+  end_time: string
+  break_duration_minutes: number
+  grace_period_minutes: number
+  working_days: string[]
+}) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase.from("shifts").insert(shift).select().single()
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath("/app/attendance")
+  return { success: true, data }
+}
+
+export async function updateShift(id: string, updates: any) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase.from("shifts").update(updates).eq("id", id).select().single()
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath("/app/attendance")
+  return { success: true, data }
+}
+
+export async function deleteShift(id: string) {
+  const supabase = await createClient()
+
+  const { error } = await supabase.from("shifts").delete().eq("id", id)
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath("/app/attendance")
+  return { success: true }
 }
