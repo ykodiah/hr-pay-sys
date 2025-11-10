@@ -6,11 +6,14 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Clock, MapPin, Download, Filter } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Clock, MapPin, Download, Filter, Brain, TrendingUp, AlertTriangle, Sparkles } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { clockIn, clockOut, getAttendanceRecords, getCompanyInfo } from "@/app/actions/attendance"
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
+import { calculateAIAttendanceScore } from "@/lib/attendance/ml-engine"
+import { useRouter } from "next/navigation"
 
 export default function AttendancePage() {
   const [records, setRecords] = useState<any[]>([])
@@ -18,6 +21,12 @@ export default function AttendancePage() {
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [companyInfo, setCompanyInfo] = useState<any>(null)
   const { toast } = useToast()
+  const router = useRouter()
+
+  const [aiInsightsLoading, setAiInsightsLoading] = useState(false)
+  const [showAIInsights, setShowAIInsights] = useState(false)
+  const [selectedRecordForAI, setSelectedRecordForAI] = useState<any>(null)
+  const [aiPredictions, setAiPredictions] = useState<any>(null)
 
   // Date filters
   const [dateFilter, setDateFilter] = useState("today")
@@ -46,6 +55,7 @@ export default function AttendancePage() {
     loadCompanyInfo()
     loadAttendanceData()
     loadFilterOptions()
+    loadAIPredictions()
   }, [])
 
   useEffect(() => {
@@ -124,8 +134,12 @@ export default function AttendancePage() {
     })
 
     if (result.success) {
-      setRecords(result.data)
-      calculateStats(result.data)
+      const recordsWithAI = result.data.map((record: any) => ({
+        ...record,
+        aiScore: calculateAIAttendanceScore(record),
+      }))
+      setRecords(recordsWithAI)
+      calculateStats(recordsWithAI)
     }
 
     setLoading(false)
@@ -139,6 +153,57 @@ export default function AttendancePage() {
     const overtime = data.filter((r) => r.overtime_hours && r.overtime_hours > 0).length
 
     setStats({ present, absent, late, overtime, totalHours })
+  }
+
+  async function loadAIPredictions() {
+    setAiInsightsLoading(true)
+    try {
+      const response = await fetch("/api/attendance/ai-insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "burnout-risks" }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setAiPredictions(data)
+      }
+    } catch (error) {
+      console.error("[v0] Failed to load AI predictions:", error)
+    } finally {
+      setAiInsightsLoading(false)
+    }
+  }
+
+  async function analyzeEmployee(employeeId: string) {
+    setAiInsightsLoading(true)
+    try {
+      const response = await fetch("/api/attendance/ai-insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "predict-risk", employeeId }),
+      })
+
+      if (response.ok) {
+        const insights = await response.json()
+        setSelectedRecordForAI(insights)
+        setShowAIInsights(true)
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to analyze employee",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to generate AI insights",
+        variant: "destructive",
+      })
+    } finally {
+      setAiInsightsLoading(false)
+    }
   }
 
   async function handleClockIn() {
@@ -251,6 +316,13 @@ export default function AttendancePage() {
     setLoading(false)
   }
 
+  function getAIScoreBadge(score: number) {
+    if (score >= 90) return <Badge className="bg-green-500">Excellent</Badge>
+    if (score >= 75) return <Badge className="bg-blue-500">Good</Badge>
+    if (score >= 60) return <Badge className="bg-yellow-500">Fair</Badge>
+    return <Badge variant="destructive">Poor</Badge>
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header with Clock In/Out */}
@@ -260,6 +332,14 @@ export default function AttendancePage() {
           <p className="text-muted-foreground">Track and manage employee attendance</p>
         </div>
         <div className="flex gap-2">
+          <Button
+            onClick={() => router.push("/app/attendance/ai-insights")}
+            variant="outline"
+            className="gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 border-0"
+          >
+            <Brain className="h-4 w-4" />
+            AI Insights
+          </Button>
           <Button onClick={handleClockIn} className="gap-2">
             <Clock className="h-4 w-4" />
             Clock In
@@ -270,6 +350,33 @@ export default function AttendancePage() {
           </Button>
         </div>
       </div>
+
+      {aiPredictions && aiPredictions.employees && aiPredictions.employees.length > 0 && (
+        <Card className="border-orange-200 bg-orange-50">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-orange-900 mb-1">
+                  AI Alert: {aiPredictions.employees.length} Employee(s) at Risk of Burnout
+                </h3>
+                <p className="text-sm text-orange-800">
+                  ML analysis detected excessive overtime patterns. Review recommended for:{" "}
+                  {aiPredictions.employees.map((e: any) => e.name).join(", ")}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => router.push("/app/attendance/ai-insights")}
+                className="border-orange-300"
+              >
+                View Details
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats Dashboard */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -479,8 +586,10 @@ export default function AttendancePage() {
                     <th className="text-left p-2">Clock In</th>
                     <th className="text-left p-2">Clock Out</th>
                     <th className="text-left p-2">Hours</th>
-                    <th className="text-left p-2">Location</th>
+                    <th className="text-left p-2">GPS</th>
+                    <th className="text-left p-2">AI Score</th>
                     <th className="text-left p-2">Status</th>
+                    <th className="text-left p-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -512,6 +621,12 @@ export default function AttendancePage() {
                         )}
                       </td>
                       <td className="p-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-mono">{record.aiScore}</span>
+                          {getAIScoreBadge(record.aiScore)}
+                        </div>
+                      </td>
+                      <td className="p-2">
                         <span
                           className={`px-2 py-1 rounded text-xs ${
                             record.status === "present"
@@ -524,6 +639,18 @@ export default function AttendancePage() {
                           {record.status}
                         </span>
                       </td>
+                      <td className="p-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => analyzeEmployee(record.employee_id)}
+                          disabled={aiInsightsLoading}
+                          className="gap-1"
+                        >
+                          <Sparkles className="h-3 w-3" />
+                          Analyze
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -532,6 +659,120 @@ export default function AttendancePage() {
           )}
         </CardContent>
       </Card>
+
+      {showAIInsights && selectedRecordForAI && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="max-w-2xl w-full max-h-[80vh] overflow-auto">
+            <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="h-5 w-5" />
+                AI-Powered Employee Analysis
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-4">
+              {/* Risk Level */}
+              <div>
+                <h4 className="font-semibold mb-2">Risk Assessment</h4>
+                <Badge
+                  className={
+                    selectedRecordForAI.riskLevel === "critical"
+                      ? "bg-red-600"
+                      : selectedRecordForAI.riskLevel === "high"
+                        ? "bg-orange-600"
+                        : selectedRecordForAI.riskLevel === "medium"
+                          ? "bg-yellow-600"
+                          : "bg-green-600"
+                  }
+                >
+                  {selectedRecordForAI.riskLevel?.toUpperCase()}
+                </Badge>
+              </div>
+
+              {/* Risk Factors */}
+              {selectedRecordForAI.riskFactors && selectedRecordForAI.riskFactors.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-2">Risk Factors</h4>
+                  <ul className="list-disc list-inside space-y-1">
+                    {selectedRecordForAI.riskFactors.map((factor: string, idx: number) => (
+                      <li key={idx} className="text-sm text-muted-foreground">
+                        {factor}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Predictions */}
+              {selectedRecordForAI.predictions && (
+                <div>
+                  <h4 className="font-semibold mb-2">ML Predictions</h4>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="p-3 rounded-lg bg-orange-50 border border-orange-200">
+                      <div className="text-xs text-muted-foreground mb-1">Absenteeism Risk</div>
+                      <div className="text-lg font-bold text-orange-600">
+                        {selectedRecordForAI.predictions.absenteeismRisk}%
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+                      <div className="text-xs text-muted-foreground mb-1">Burnout Risk</div>
+                      <div className="text-lg font-bold text-red-600">
+                        {selectedRecordForAI.predictions.burnoutRisk}%
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-lg bg-purple-50 border border-purple-200">
+                      <div className="text-xs text-muted-foreground mb-1">Time Theft Risk</div>
+                      <div className="text-lg font-bold text-purple-600">
+                        {selectedRecordForAI.predictions.timeTheftRisk}%
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Recommendations */}
+              {selectedRecordForAI.recommendations && selectedRecordForAI.recommendations.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-2">AI Recommendations</h4>
+                  <div className="space-y-2">
+                    {selectedRecordForAI.recommendations.map((rec: any, idx: number) => (
+                      <div key={idx} className="p-3 rounded-lg border bg-blue-50 border-blue-200">
+                        <div className="flex items-start gap-2">
+                          <Badge variant={rec.priority === "high" ? "destructive" : "secondary"}>{rec.priority}</Badge>
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">{rec.action}</div>
+                            <div className="text-xs text-muted-foreground mt-1">{rec.expectedImpact}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Trend Analysis */}
+              {selectedRecordForAI.trendAnalysis && (
+                <div>
+                  <h4 className="font-semibold mb-2 flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Trend Analysis
+                  </h4>
+                  <div className="p-3 rounded-lg bg-gradient-to-r from-green-50 to-blue-50 border">
+                    <Badge className="mb-2">{selectedRecordForAI.trendAnalysis.direction}</Badge>
+                    <p className="text-sm">{selectedRecordForAI.trendAnalysis.summary}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => setShowAIInsights(false)}>
+                  Close
+                </Button>
+                <Button onClick={() => router.push("/app/attendance/ai-insights")}>View Full AI Dashboard</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
