@@ -13,8 +13,7 @@ export async function clockIn(employeeId: string, latitude?: number, longitude?:
     .from("attendance_records")
     .select("*")
     .eq("employee_id", employeeId)
-    .gte("clock_in", `${today}T00:00:00`)
-    .lt("clock_in", `${today}T23:59:59`)
+    .eq("date", today)
     .is("clock_out", null)
     .single()
 
@@ -25,19 +24,23 @@ export async function clockIn(employeeId: string, latitude?: number, longitude?:
     }
   }
 
+  const now = new Date()
+  const timeOnly = now.toTimeString().split(" ")[0] // Format: HH:MM:SS
+
   const { data, error } = await supabase
     .from("attendance_records")
     .insert({
       employee_id: employeeId,
-      clock_in: new Date().toISOString(),
-      clock_in_latitude: latitude,
-      clock_in_longitude: longitude,
+      date: today,
+      clock_in: timeOnly,
       status: "present",
+      // Note: GPS columns need to be added to the schema or stored in metadata
     })
     .select()
     .single()
 
   if (error) {
+    console.log("[v0] Clock in error:", error)
     return { success: false, error: error.message }
   }
 
@@ -55,8 +58,7 @@ export async function clockOut(employeeId: string, latitude?: number, longitude?
     .from("attendance_records")
     .select("*")
     .eq("employee_id", employeeId)
-    .gte("clock_in", `${today}T00:00:00`)
-    .lt("clock_in", `${today}T23:59:59`)
+    .eq("date", today)
     .is("clock_out", null)
     .single()
 
@@ -67,23 +69,34 @@ export async function clockOut(employeeId: string, latitude?: number, longitude?
     }
   }
 
-  const clockOut = new Date()
-  const clockIn = new Date(record.clock_in)
-  const hoursWorked = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60)
+  const now = new Date()
+  const timeOnly = now.toTimeString().split(" ")[0]
+
+  const [clockInHours, clockInMinutes, clockInSeconds] = record.clock_in.split(":").map(Number)
+  const [clockOutHours, clockOutMinutes, clockOutSeconds] = timeOnly.split(":").map(Number)
+
+  const clockInDate = new Date()
+  clockInDate.setHours(clockInHours, clockInMinutes, clockInSeconds)
+
+  const clockOutDate = new Date()
+  clockOutDate.setHours(clockOutHours, clockOutMinutes, clockOutSeconds)
+
+  const hoursWorked = (clockOutDate.getTime() - clockInDate.getTime()) / (1000 * 60 * 60)
+  const overtimeHours = Math.max(0, hoursWorked - 8)
 
   const { data, error } = await supabase
     .from("attendance_records")
     .update({
-      clock_out: clockOut.toISOString(),
-      clock_out_latitude: latitude,
-      clock_out_longitude: longitude,
+      clock_out: timeOnly,
       total_hours: hoursWorked,
+      overtime_hours: overtimeHours,
     })
     .eq("id", record.id)
     .select()
     .single()
 
   if (error) {
+    console.log("[v0] Clock out error:", error)
     return { success: false, error: error.message }
   }
 
@@ -116,7 +129,7 @@ export async function getAttendanceRecords(filters: {
         subsidiary:subsidiaries(name)
       )
     `)
-    .order("clock_in", { ascending: false })
+    .order("date", { ascending: false })
 
   if (filters.startDate) {
     const startDate = new Date(filters.startDate).toISOString().split("T")[0]
@@ -150,6 +163,28 @@ export async function getAttendanceRecords(filters: {
   }
 
   return { success: true, data: filtered }
+}
+
+export async function getEmployeeAttendanceStatus(employeeId: string) {
+  const supabase = await createClient()
+  const today = new Date().toISOString().split("T")[0]
+
+  const { data: record } = await supabase
+    .from("attendance_records")
+    .select("*")
+    .eq("employee_id", employeeId)
+    .eq("date", today)
+    .single()
+
+  if (!record) {
+    return { success: true, status: "not_clocked_in", record: null }
+  }
+
+  if (record.clock_out) {
+    return { success: true, status: "clocked_out", record }
+  }
+
+  return { success: true, status: "clocked_in", record }
 }
 
 export async function createOvertimeRequest(data: {

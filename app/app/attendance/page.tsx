@@ -10,7 +10,6 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
   Clock,
-  MapPin,
   Download,
   Filter,
   Users,
@@ -36,6 +35,7 @@ import {
   createShift, // Import createShift
   approveOvertimeRequest, // Import approveOvertimeRequest
   rejectOvertimeRequest, // Import rejectOvertimeRequest
+  getEmployeeAttendanceStatus, // Import getEmployeeAttendanceStatus
 } from "@/app/actions/attendance"
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
@@ -94,6 +94,10 @@ export default function AttendancePage() {
   const [loadingAI, setLoadingAI] = useState(false)
   const [selectedEmployeeForAI, setSelectedEmployeeForAI] = useState<string | null>(null)
 
+  const [attendanceStatus, setAttendanceStatus] = useState<"not_clocked_in" | "clocked_in" | "clocked_out">(
+    "not_clocked_in",
+  )
+
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date())
@@ -108,8 +112,8 @@ export default function AttendancePage() {
     loadFilterOptions()
     loadOvertimeRequests()
     loadBiometricDevices()
-    // Load shifts
     loadShifts()
+    checkAttendanceStatus()
   }, [])
 
   useEffect(() => {
@@ -468,6 +472,34 @@ export default function AttendancePage() {
     setLoadingAI(false)
   }
 
+  async function checkAttendanceStatus() {
+    if (!currentUser?.employee) return
+
+    const result = await getEmployeeAttendanceStatus(currentUser.employee.id)
+    if (result.success) {
+      setAttendanceStatus(result.status)
+    }
+  }
+
+  async function handleQuickClockInOut() {
+    if (!currentUser?.employee) {
+      toast({ title: "Error", description: "Employee profile not found", variant: "destructive" })
+      return
+    }
+
+    // Determine action based on current status
+    if (attendanceStatus === "not_clocked_in" || attendanceStatus === "clocked_out") {
+      await handleClockIn()
+      setAttendanceStatus("clocked_in")
+    } else if (attendanceStatus === "clocked_in") {
+      await handleClockOut()
+      setAttendanceStatus("clocked_out")
+    }
+
+    // Refresh status
+    checkAttendanceStatus()
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-start">
@@ -482,9 +514,13 @@ export default function AttendancePage() {
               {currentTime.toLocaleTimeString("en-US", { hour12: false })}
             </div>
           </div>
-          <Button onClick={handleClockIn} size="lg" className="gap-2 bg-green-600 hover:bg-green-700">
+          <Button
+            onClick={handleQuickClockInOut}
+            size="lg"
+            className={`gap-2 ${attendanceStatus === "clocked_in" ? "bg-orange-600 hover:bg-orange-700" : "bg-green-600 hover:bg-green-700"}`}
+          >
             <Clock className="h-5 w-5" />
-            Quick Clock In/Out
+            {attendanceStatus === "clocked_in" ? "Clock Out" : "Clock In"}
           </Button>
         </div>
       </div>
@@ -764,34 +800,24 @@ export default function AttendancePage() {
                             <td className="p-2">{record.employee?.department || "-"}</td>
                             <td className="p-2">{record.employee?.division || "-"}</td>
                             <td className="p-2">{record.employee?.location || "-"}</td>
-                            <td className="p-2">{new Date(record.clock_in).toLocaleDateString()}</td>
-                            <td className="p-2">{new Date(record.clock_in).toLocaleTimeString()}</td>
+                            <td className="p-2">{record.date ? new Date(record.date).toLocaleDateString() : "-"}</td>
+                            <td className="p-2">
+                              {record.clock_in ? new Date(record.clock_in).toLocaleTimeString() : "-"}
+                            </td>
                             <td className="p-2">
                               {record.clock_out ? new Date(record.clock_out).toLocaleTimeString() : "-"}
                             </td>
                             <td className="p-2">{record.total_hours?.toFixed(2) || "-"}</td>
                             <td className="p-2">
-                              {overtimeHours > 0 ? (
-                                <span className="text-orange-600 font-medium">+{overtimeHours.toFixed(2)}h</span>
+                              {record.overtime_hours && record.overtime_hours > 0 ? (
+                                <span className="text-orange-600 font-medium">
+                                  +{record.overtime_hours.toFixed(2)}h
+                                </span>
                               ) : (
                                 "-"
                               )}
                             </td>
-                            <td className="p-2">
-                              {record.clock_in_latitude && record.clock_in_longitude ? (
-                                <a
-                                  href={`https://www.google.com/maps?q=${record.clock_in_latitude},${record.clock_in_longitude}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-1 text-blue-600 hover:underline"
-                                >
-                                  <MapPin className="h-4 w-4" />
-                                  View
-                                </a>
-                              ) : (
-                                "-"
-                              )}
-                            </td>
+                            <td className="p-2">-</td>
                             <td className="p-2">
                               <span
                                 className={`px-2 py-1 rounded text-xs ${
@@ -1120,7 +1146,7 @@ export default function AttendancePage() {
                     {overtimeRequests.map((request) => (
                       <tr key={request.id} className="border-b hover:bg-muted/50">
                         <td className="p-2">{request.employee?.full_name || "-"}</td>
-                        <td className="p-2">{new Date(request.date).toLocaleDateString()}</td>
+                        <td className="p-2">{request.date ? new Date(request.date).toLocaleDateString() : "-"}</td>
                         <td className="p-2">{request.hours_requested?.toFixed(2)}h</td>
                         <td className="p-2">{request.reason}</td>
                         <td className="p-2">
