@@ -357,8 +357,10 @@ export default function AttendancePage() {
       toast({ title: "Success", description: "Device added successfully" })
       setShowDeviceDialog(false)
       setDeviceType("") // Reset device type
-      loadBiometricDevices()
       e.currentTarget.reset()
+
+      await loadBiometricDevices()
+      await loadAttendanceData() // Refresh to update dashboard stats
     } else {
       toast({ title: "Error", description: result.error || "Failed to add device", variant: "destructive" })
     }
@@ -395,8 +397,10 @@ export default function AttendancePage() {
       setShiftDepartment("")
       setShiftDivision("")
       setShiftLocation("")
-      loadShifts()
       e.currentTarget.reset()
+
+      await loadShifts()
+      setActiveTab("shift") // Ensure we stay on the shift tab
     } else {
       toast({ title: "Error", description: result.error || "Failed to create shift", variant: "destructive" })
     }
