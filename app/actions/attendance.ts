@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
 // Prevent multiple clock-ins/outs for the same employee on the same day
-export async function clockIn(employeeId: string, latitude?: number, longitude?: number) {
+export async function clockIn(employeeId: string, latitude?: number, longitude?: number, method = "web_portal") {
   const supabase = await createClient()
 
   const { data: employee } = await supabase.from("employees").select("company_id").eq("id", employeeId).single()
@@ -13,7 +13,6 @@ export async function clockIn(employeeId: string, latitude?: number, longitude?:
     return { success: false, error: "Employee not found" }
   }
 
-  // Check if user already clocked in today without clocking out
   const today = new Date().toISOString().split("T")[0]
   const { data: existing } = await supabase
     .from("attendance_records")
@@ -40,7 +39,9 @@ export async function clockIn(employeeId: string, latitude?: number, longitude?:
       date: today,
       clock_in: timeOnly,
       status: "present",
-      // Note: GPS columns need to be added to the schema or stored in metadata
+      clock_in_method: method,
+      clock_in_gps_lat: latitude,
+      clock_in_gps_lng: longitude,
     })
     .select()
     .single()
@@ -55,7 +56,7 @@ export async function clockIn(employeeId: string, latitude?: number, longitude?:
   return { success: true, data }
 }
 
-export async function clockOut(employeeId: string, latitude?: number, longitude?: number) {
+export async function clockOut(employeeId: string, latitude?: number, longitude?: number, method = "web_portal") {
   const supabase = await createClient()
 
   // Find today's clock-in record without clock-out
@@ -96,6 +97,9 @@ export async function clockOut(employeeId: string, latitude?: number, longitude?
       clock_out: timeOnly,
       total_hours: hoursWorked,
       overtime_hours: overtimeHours,
+      clock_out_method: method,
+      clock_out_gps_lat: latitude,
+      clock_out_gps_lng: longitude,
     })
     .eq("id", record.id)
     .select()

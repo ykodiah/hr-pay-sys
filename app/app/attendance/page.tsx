@@ -792,7 +792,9 @@ export default function AttendancePage() {
                         <th className="text-left p-2">Location</th>
                         <th className="text-left p-2">Date</th>
                         <th className="text-left p-2">Clock In</th>
+                        <th className="text-left p-2">In Method</th>
                         <th className="text-left p-2">Clock Out</th>
+                        <th className="text-left p-2">Out Method</th>
                         <th className="text-left p-2">Hours</th>
                         <th className="text-left p-2">Overtime</th>
                         <th className="text-left p-2">GPS</th>
@@ -811,10 +813,24 @@ export default function AttendancePage() {
                             <td className="p-2">{record.employee?.location || "-"}</td>
                             <td className="p-2">{record.date ? new Date(record.date).toLocaleDateString() : "-"}</td>
                             <td className="p-2">
-                              {record.clock_in ? new Date(record.clock_in).toLocaleTimeString() : "-"}
+                              {record.clock_in ? new Date(`2000-01-01T${record.clock_in}`).toLocaleTimeString() : "-"}
                             </td>
                             <td className="p-2">
-                              {record.clock_out ? new Date(record.clock_out).toLocaleTimeString() : "-"}
+                              <Badge variant="outline" className="text-xs">
+                                {record.clock_in_method || "manual"}
+                              </Badge>
+                            </td>
+                            <td className="p-2">
+                              {record.clock_out ? new Date(`2000-01-01T${record.clock_out}`).toLocaleTimeString() : "-"}
+                            </td>
+                            <td className="p-2">
+                              {record.clock_out ? (
+                                <Badge variant="outline" className="text-xs">
+                                  {record.clock_out_method || "manual"}
+                                </Badge>
+                              ) : (
+                                "-"
+                              )}
                             </td>
                             <td className="p-2">{record.total_hours?.toFixed(2) || "-"}</td>
                             <td className="p-2">
@@ -826,7 +842,20 @@ export default function AttendancePage() {
                                 "-"
                               )}
                             </td>
-                            <td className="p-2">-</td>
+                            <td className="p-2">
+                              {record.clock_in_gps_lat && record.clock_in_gps_lng ? (
+                                <a
+                                  href={`https://www.google.com/maps?q=${record.clock_in_gps_lat},${record.clock_in_gps_lng}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline text-xs"
+                                >
+                                  View Map
+                                </a>
+                              ) : (
+                                "-"
+                              )}
+                            </td>
                             <td className="p-2">
                               <span
                                 className={`px-2 py-1 rounded text-xs ${
