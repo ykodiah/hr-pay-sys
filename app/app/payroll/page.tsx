@@ -38,24 +38,15 @@ import {
   Clock,
   Bell,
 } from "lucide-react"
-import {
-  GRA_2025_PAYE_BANDS,
-  GRA_2025_SSNIT,
-  applyPayeBands,
-} from "@/lib/ghana-tax/engine"
-
-/**
- * ── Tax calculation helpers ──────────────────────────────────────────────
- * These wrappers delegate to the GRA 2025 Ghana Tax Engine (Phase 1).
- * They keep the same signature as the old local functions so nothing
- * else in this file needs to change, while ensuring the numbers are
- * correct and consistent with the engine used everywhere else.
- */
 
 const calculateSSNIT = (basicSalary: number) => {
-  const employee = Math.round(basicSalary * (GRA_2025_SSNIT.employee_rate / 100))
-  const employer = Math.round(basicSalary * (GRA_2025_SSNIT.employer_rate / 100))
-  return { employee, employer, total: employee + employer }
+  const maxSSNITSalary = 4500 // Maximum SSNIT salary ceiling
+  const ssnitSalary = Math.min(basicSalary, maxSSNITSalary)
+  return {
+    employee: Math.round(ssnitSalary * 0.055), // 5.5% on basic salary
+    employer: Math.round(ssnitSalary * 0.13), // 13% on basic salary
+    total: Math.round(ssnitSalary * 0.185),
+  }
 }
 
 const calculateTier3 = (basicSalary: number, contributionRate = 0.05) => {
@@ -66,14 +57,38 @@ const calculatePAYE = (
   basicSalary: number,
   allowances: number,
   ssnitEmployee: number,
-  _tier3Employee: number,
-  _tier3Employer: number,
+  tier3Employee: number,
+  tier3Employer: number,
 ) => {
-  // Annual taxable income = (basic + allowances - SSNIT employee) × 12
-  // then divide annual PAYE by 12 for the monthly figure.
-  const annualTaxable = Math.max(0, (basicSalary + allowances - ssnitEmployee) * 12)
-  const { totalTax } = applyPayeBands(annualTaxable, GRA_2025_PAYE_BANDS)
-  return Math.round(totalTax / 12)
+  // Calculate taxable income: (basic + allowances) - SSNIT Employee - Tier3 (both employee and employer)
+  const taxableIncome = Math.max(0, basicSalary + allowances - ssnitEmployee - tier3Employee - tier3Employer)
+
+  const taxBands = [
+    { min: 0, max: 490, rate: 0 }, // First GH₵ 490: 0%
+    { min: 490, max: 600, rate: 0.05 }, // Next GH₵ 110: 5%
+    { min: 600, max: 730, rate: 0.1 }, // Next GH₵ 130: 10%
+    { min: 730, max: 3896.67, rate: 0.175 }, // Next GH₵ 3,166.67: 17.5%
+    { min: 3896.67, max: 19896.67, rate: 0.25 }, // Next GH₵ 16,000: 25%
+    { min: 19896.67, max: 50416.67, rate: 0.3 }, // Next GH₵ 30,520: 30%
+    { min: 50416.67, max: Number.POSITIVE_INFINITY, rate: 0.35 }, // Exceeding GH₵ 50,416.67: 35%
+  ]
+
+  let tax = 0
+  let remainingIncome = taxableIncome
+
+  for (const band of taxBands) {
+    if (remainingIncome <= 0) break
+
+    const bandWidth = band.max - band.min
+    const taxableInBand = Math.min(remainingIncome, bandWidth)
+
+    if (taxableInBand > 0) {
+      tax += taxableInBand * band.rate
+      remainingIncome -= taxableInBand
+    }
+  }
+
+  return Math.round(tax)
 }
 
 type TransferType = "permanent" | "temporary"
@@ -973,11 +988,7 @@ export default function PayrollPage() {
               <DialogHeader>
                 <DialogTitle>Process Payroll for {selectedPeriod}</DialogTitle>
               </DialogHeader>
-              <PayrollProcessDialog
-                period={selectedPeriod}
-                onClose={() => setIsProcessDialogOpen(false)}
-                employeePayroll={employeePayroll}
-              />
+              <PayrollProcessDialog period={selectedPeriod} onClose={() => setIsProcessDialogOpen(false)} />
             </DialogContent>
           </Dialog>
         </div>
@@ -1604,15 +1615,7 @@ export default function PayrollPage() {
   )
 }
 
-function PayrollProcessDialog({
-  period,
-  onClose,
-  employeePayroll = [],
-}: {
-  period: string
-  onClose: () => void
-  employeePayroll?: any[]
-}) {
+function PayrollProcessDialog({ period, onClose }: { period: string; onClose: () => void }) {
   const [step, setStep] = useState(1)
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingStep, setProcessingStep] = useState(0)
@@ -1628,84 +1631,28 @@ function PayrollProcessDialog({
     "Finalizing payroll",
   ]
 
-  const handleProcess = async () => {
+  const handleProcess = () => {
     setIsProcessing(true)
     setProcessingStep(0)
 
-    // Animate through steps while the real API call runs
-    let step = 0
-    const stepInterval = setInterval(() => {
-      step = Math.min(step + 1, processingSteps.length - 2)
-      setProcessingStep(step)
-    }, 600)
-
-    try {
-      // Build the payroll run payload from current employee data
-      const employees = employeePayroll.map((emp) => ({
-        employee_id: emp.id.toString(),
-        monthly_basic: emp.basicSalary,
-        monthly_allowances: {
-          transport: emp.allowances?.transport ?? 0,
-          housing:   emp.allowances?.housing   ?? 0,
-          medical:   emp.allowances?.medical   ?? 0,
-        },
-        loan_deduction: emp.deductions?.loans   ?? 0,
-        advance_deduction: emp.deductions?.advances ?? 0,
-        other_deductions: emp.deductions?.other    ?? 0,
-        tier2_applicable: true,
-        tier3_applicable: (emp.tier3?.employeeRate ?? 0) > 0,
-      }))
-
-      // Derive a fake payroll_run_id from the period since this page still
-      // uses hardcoded run data (will be replaced when payroll_runs table is wired)
-      const fakeRunId = `demo-run-${period.replace(/\s+/g, "-").toLowerCase()}`
-
-      const now = new Date()
-      const payPeriodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
-      const payPeriodEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
-
-      const response = await fetch("/api/payroll/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          company_id: "demo-company",
-          payroll_run_id: fakeRunId,
-          pay_period: period,
-          pay_period_start: payPeriodStart,
-          pay_period_end: payPeriodEnd,
-          pay_date: payPeriodEnd,
-          issue: true,
-          employees,
-        }),
+    // Simulate processing steps
+    const interval = setInterval(() => {
+      setProcessingStep((prev) => {
+        if (prev >= processingSteps.length - 1) {
+          clearInterval(interval)
+          setTimeout(() => {
+            setIsProcessing(false)
+            onClose()
+            toast({
+              title: "Payroll Processed",
+              description: `Successfully processed payroll for ${period}.`,
+            })
+          }, 1000)
+          return prev
+        }
+        return prev + 1
       })
-
-      clearInterval(stepInterval)
-      setProcessingStep(processingSteps.length - 1)
-
-      if (!response.ok) {
-        const err = await response.json()
-        throw new Error(err.error ?? "Payroll run failed")
-      }
-
-      const result = await response.json()
-
-      setTimeout(() => {
-        setIsProcessing(false)
-        onClose()
-        toast({
-          title: "Payroll Processed",
-          description: `Processed ${result.summary?.successful ?? employees.length} payslips for ${period}. Payslips are now available to employees.`,
-        })
-      }, 800)
-    } catch (err) {
-      clearInterval(stepInterval)
-      setIsProcessing(false)
-      toast({
-        title: "Processing Failed",
-        description: err instanceof Error ? err.message : "An error occurred. Please try again.",
-        variant: "destructive",
-      })
-    }
+    }, 800)
   }
 
   return (

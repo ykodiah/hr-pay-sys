@@ -29,11 +29,16 @@
  */
 
 import { NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 import { calculateEmployeeTax } from "@/lib/ghana-tax/tax-config-service"
 import { createPayslip, issuePayrollRunPayslips } from "@/lib/services/payslip-service"
 
 export async function POST(request: Request) {
   try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
     const body = await request.json()
 
     const {
@@ -82,6 +87,22 @@ export async function POST(request: Request) {
         { status: 400 }
       )
     }
+
+    // Upsert the payroll_runs row so payslips can FK-reference it
+    const payrollRunPayload = {
+      id:               payroll_run_id,
+      company_id,
+      pay_period_start: pay_period_start ?? null,
+      pay_period_end:   pay_period_end   ?? null,
+      pay_date:         pay_date         ?? null,
+      status:           "processing",
+      created_by:       user.id,
+      updated_at:       new Date().toISOString(),
+    }
+
+    await supabase
+      .from("payroll_runs")
+      .upsert(payrollRunPayload, { onConflict: "id" })
 
     const results: { employee_id: string; payslip_id: string | null; error: string | null }[] = []
 
@@ -141,6 +162,38 @@ export async function POST(request: Request) {
     const successful = results.filter((r) => r.payslip_id && !r.error).length
     const failed     = results.filter((r) => r.error).length
 
+    // Update payroll_run totals and mark completed
+    const payslipsForTotals = results.filter((r) => r.payslip_id)
+    if (payslipsForTotals.length > 0) {
+      const { data: totalsRows } = await supabase
+        .from("payslips")
+        .select("gross_pay, total_deductions, net_pay, total_employer_cost")
+        .eq("payroll_run_id", payroll_run_id)
+
+      if (totalsRows && totalsRows.length > 0) {
+        const totals = totalsRows.reduce(
+          (acc, r) => ({
+            gross:        acc.gross        + Number(r.gross_pay          ?? 0),
+            deductions:   acc.deductions   + Number(r.total_deductions   ?? 0),
+            net:          acc.net          + Number(r.net_pay            ?? 0),
+            employer_cost:acc.employer_cost+ Number(r.total_employer_cost?? 0),
+          }),
+          { gross: 0, deductions: 0, net: 0, employer_cost: 0 }
+        )
+        await supabase
+          .from("payroll_runs")
+          .update({
+            status:               failed === 0 ? "completed" : "partial",
+            total_gross_pay:      totals.gross,
+            total_deductions:     totals.deductions,
+            total_net_pay:        totals.net,
+            total_employer_cost:  totals.employer_cost,
+            updated_at:           new Date().toISOString(),
+          })
+          .eq("id", payroll_run_id)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       summary: {
@@ -167,6 +220,10 @@ import { getPayrollRunPayslips } from "@/lib/services/payslip-service"
 
 export async function GET(request: Request) {
   try {
+    const client = await createClient()
+    const { data: { user } } = await client.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
     const { searchParams } = new URL(request.url)
     const payrollRunId = searchParams.get("payroll_run_id")
 

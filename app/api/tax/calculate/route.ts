@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 import { calculateEmployeeTax } from "@/lib/ghana-tax/tax-config-service"
 import type { EmployeePayInput } from "@/lib/ghana-tax/engine"
 
@@ -17,6 +18,10 @@ import type { EmployeePayInput } from "@/lib/ghana-tax/engine"
  */
 export async function POST(request: Request) {
   try {
+    const client = await createClient()
+    const { data: { user } } = await client.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
     const body = await request.json()
     const { company_id, employee_id, tax_year, input } = body as {
       company_id: string
