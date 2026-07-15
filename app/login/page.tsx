@@ -13,6 +13,7 @@ import { Eye, EyeOff, Mail, Lock, ArrowRight, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -21,47 +22,55 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const router = useRouter()
-
-  const demoCredentials = {
-    admin: {
-      email: "admin@demo.akwaabahr.com",
-      password: "Demo123!@#",
-      redirectTo: "/app",
-    },
-    employee: {
-      email: "employee@demo.akwaabahr.com",
-      password: "Employee123!",
-      redirectTo: "/self-service",
-    },
-  }
+  const supabase = createClient()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError("")
 
-    // Simulate loading delay
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    // Check demo credentials
-    if (email === demoCredentials.admin.email && password === demoCredentials.admin.password) {
-      console.log("[v0] Admin login successful, redirecting to admin dashboard")
-      router.push(demoCredentials.admin.redirectTo)
-    } else if (email === demoCredentials.employee.email && password === demoCredentials.employee.password) {
-      console.log("[v0] Employee login successful, redirecting to self-service portal")
-      router.push(demoCredentials.employee.redirectTo)
-    } else {
-      setError("Invalid email or password. Please use the demo credentials provided.")
+      if (signInError) {
+        setError(signInError.message || "Failed to sign in. Please check your email and password.")
+        return
+      }
+
+      if (data.user) {
+        // Get user's employee profile to determine role and redirect
+        const { data: profile } = await supabase
+          .from("employee_profiles")
+          .select(
+            `
+            *,
+            employee:employees(
+              special_role,
+              company_id,
+              id
+            )
+          `
+          )
+          .eq("id", data.user.id)
+          .single()
+
+        if (profile?.employee) {
+          const isHR = profile.employee.special_role && ["HR", "Admin"].includes(profile.employee.special_role)
+          router.push(isHR ? "/app" : "/self-service")
+        } else {
+          // No employee profile, redirect to setup
+          router.push("/auth/setup-profile")
+        }
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred"
+      setError(errorMessage)
+    } finally {
+      setIsLoading(false)
     }
-
-    setIsLoading(false)
-  }
-
-  const handleDemoLogin = (type: "admin" | "employee") => {
-    const creds = demoCredentials[type]
-    setEmail(creds.email)
-    setPassword(creds.password)
-    setError("")
   }
 
   return (
@@ -84,30 +93,6 @@ export default function LoginPage() {
             <p className="text-center text-gray-600">Enter your credentials to access your HR dashboard</p>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="bg-blue-50 p-4 rounded-lg space-y-3">
-              <p className="text-sm font-medium text-blue-800">Demo Access:</p>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDemoLogin("admin")}
-                  className="text-xs bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
-                >
-                  Admin Demo
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDemoLogin("employee")}
-                  className="text-xs bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
-                >
-                  Employee Demo
-                </Button>
-              </div>
-            </div>
-
             {error && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
