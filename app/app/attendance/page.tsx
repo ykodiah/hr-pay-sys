@@ -1,13 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
+import { Progress } from "@/components/ui/progress"
 import {
   Dialog,
   DialogContent,
@@ -15,499 +18,1997 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
-  Clock,
-  Users,
-  Calendar,
   AlertCircle,
-  Plus,
-  Search,
+  BarChart3,
+  BellRing,
+  Camera,
+  Clock,
+  Clock4,
   Download,
   Fingerprint,
-  Camera,
+  Globe,
+  Link as LinkIcon,
+  MapPin,
+  Plus,
+  RefreshCw,
+  Search,
+  Settings2,
+  Sparkles,
   Timer,
-  ClockIcon,
   UserCheck,
   TrendingUp,
   MapPin,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  Settings,
+  Edit,
+  Wifi,
+  MapPinned,
+  Navigation,
+  Smartphone,
+  Monitor,
+  ArrowUpDown,
+  Loader2,
+  Filter,
+  CreditCard,
+  Trash2,
+  MoreHorizontal,
+  Brain,
+  Sparkles,
 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Textarea } from "@/components/ui/textarea"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  getAttendanceRecords,
+  getShifts,
+  getBiometricDevices,
+  getOvertimeRequests,
+  getAttendanceStats,
+  getClockStatus,
+  clockIn,
+  clockOut,
+  createShift,
+  updateShift,
+  deleteShift,
+  createBiometricDevice,
+  syncBiometricDevice,
+  toggleDeviceStatus,
+  createOvertimeRequest,
+  updateOvertimeRequest,
+  generateAttendanceReport,
+  type AttendanceRecord,
+  type Shift,
+  type BiometricDevice,
+  type OvertimeRequest,
+} from "@/app/actions/attendance"
 
-interface AttendanceRecord {
-  id: string
-  employeeId: string
-  employeeName: string
-  date: string
-  clockIn: string
-  clockOut: string
-  totalHours: number
-  overtimeHours: number
-  status: "present" | "late" | "absent" | "early-departure"
-  location: string
-  method: "biometric" | "manual" | "mobile"
+interface AlertSettings {
+  enabled: boolean
+  time: string
+  channel: "email" | "sms" | "push"
+  escalateToManagers: boolean
+  includeContractors: boolean
 }
 
-interface Shift {
+interface AiInsight {
   id: string
-  name: string
-  startTime: string
-  endTime: string
-  breakDuration: number
-  employees: string[]
-  isActive: boolean
+  title: string
+  description: string
+  confidence: number
+  tags: string[]
 }
 
-interface BiometricDevice {
-  id: string
-  name: string
-  type: "fingerprint" | "facial" | "card"
-  location: string
-  status: "online" | "offline"
-  lastSync: string
+interface AiForecast {
+  label: string
+  value: string
+  delta: string
+  trend: "up" | "down" | "steady"
 }
+
+const initialAttendanceRecords: AttendanceRecord[] = [
+  {
+    id: "ATT-001",
+    employeeId: "EMP-001",
+    employeeName: "Kwame Asante",
+    date: formatDateByOffset(0),
+    clockIn: "08:02",
+    clockOut: "17:45",
+    totalHours: 8.7,
+    overtimeHours: 0.7,
+    expectedHours: 8,
+    status: "present",
+    location: "Accra HQ",
+    department: "Finance",
+    division: "Corporate Services",
+    subsidiary: "Core Group",
+    team: "Payroll",
+    shift: "Day Shift",
+    method: "fingerprint",
+    workingArrangement: "onsite",
+    productivityScore: 92,
+    aiRiskScore: 0.08,
+    predictedTrend: "on-track",
+  },
+  {
+    id: "ATT-002",
+    employeeId: "EMP-002",
+    employeeName: "Ama Osei",
+    date: formatDateByOffset(0),
+    clockIn: "08:21",
+    clockOut: "17:05",
+    totalHours: 7.6,
+    overtimeHours: 0,
+    expectedHours: 8,
+    status: "late",
+    location: "Accra HQ",
+    department: "Finance",
+    division: "Corporate Services",
+    subsidiary: "Core Group",
+    team: "Tax",
+    shift: "Day Shift",
+    method: "facial",
+    workingArrangement: "onsite",
+    productivityScore: 84,
+    aiRiskScore: 0.34,
+    predictedTrend: "late-risk",
+  },
+  {
+    id: "ATT-003",
+    employeeId: "EMP-003",
+    employeeName: "Kofi Mensah",
+    date: formatDateByOffset(0),
+    clockIn: "",
+    clockOut: "",
+    totalHours: 0,
+    overtimeHours: 0,
+    expectedHours: 8,
+    status: "absent",
+    location: "",
+    department: "Engineering",
+    division: "Platform",
+    subsidiary: "Digital Ventures",
+    team: "DevOps",
+    shift: "Day Shift",
+    method: "mobile",
+    workingArrangement: "remote",
+    productivityScore: 0,
+    aiRiskScore: 0.73,
+    predictedTrend: "absence-risk",
+  },
+  {
+    id: "ATT-004",
+    employeeId: "EMP-004",
+    employeeName: "Akosua Boateng",
+    date: formatDateByOffset(-1),
+    clockIn: "19:55",
+    clockOut: "06:05",
+    totalHours: 9.1,
+    overtimeHours: 1.1,
+    expectedHours: 9,
+    status: "present",
+    location: "Tema Plant",
+    department: "Operations",
+    division: "Manufacturing",
+    subsidiary: "Core Group",
+    team: "Night Ops",
+    shift: "Night Shift",
+    method: "card",
+    workingArrangement: "onsite",
+    productivityScore: 88,
+    aiRiskScore: 0.19,
+    predictedTrend: "on-track",
+  },
+  {
+    id: "ATT-005",
+    employeeId: "EMP-005",
+    employeeName: "Yaw Frimpong",
+    date: formatDateByOffset(-2),
+    clockIn: "08:05",
+    clockOut: "17:10",
+    totalHours: 8.2,
+    overtimeHours: 0.2,
+    expectedHours: 8,
+    status: "present",
+    location: "Kumasi Hub",
+    department: "Customer Success",
+    division: "Growth",
+    subsidiary: "Regional",
+    team: "Support",
+    shift: "Day Shift",
+    method: "mobile",
+    workingArrangement: "hybrid",
+    productivityScore: 76,
+    aiRiskScore: 0.42,
+    predictedTrend: "late-risk",
+  },
+  {
+    id: "ATT-006",
+    employeeId: "EMP-006",
+    employeeName: "Esi Dapaah",
+    date: formatDateByOffset(0),
+    clockIn: "07:45",
+    clockOut: "16:30",
+    totalHours: 8,
+    overtimeHours: 0,
+    expectedHours: 8,
+    status: "present",
+    location: "Remote",
+    department: "People Operations",
+    division: "HR",
+    subsidiary: "Core Group",
+    team: "Talent",
+    shift: "Flexible",
+    method: "manual",
+    workingArrangement: "remote",
+    productivityScore: 95,
+    aiRiskScore: 0.05,
+    predictedTrend: "on-track",
+  },
+]
+
+const initialShifts: Shift[] = [
+  {
+    id: "SHIFT-01",
+    name: "Day Shift",
+    startTime: "08:00",
+    endTime: "17:00",
+    breakDuration: 60,
+    employees: ["EMP-001", "EMP-002", "EMP-003", "EMP-006"],
+    isActive: true,
+    location: "Accra HQ",
+    department: "Finance",
+    notes: "Covers corporate teams with staggered breaks",
+  },
+  {
+    id: "SHIFT-02",
+    name: "Night Shift",
+    startTime: "20:00",
+    endTime: "06:00",
+    breakDuration: 45,
+    employees: ["EMP-004"],
+    isActive: true,
+    location: "Tema Plant",
+    department: "Operations",
+    notes: "Includes production warm-up window",
+  },
+  {
+    id: "SHIFT-03",
+    name: "Weekend Support",
+    startTime: "10:00",
+    endTime: "16:00",
+    breakDuration: 30,
+    employees: ["EMP-005"],
+    isActive: false,
+    location: "Hybrid",
+    department: "Customer Success",
+    notes: "Activates during campaign periods",
+  },
+]
+
+const initialBiometricDevices: BiometricDevice[] = [
+  {
+    id: "DEV-001",
+    name: "ZKTeco Pro 4G",
+    type: "fingerprint",
+    location: "Accra HQ - Main Lobby",
+    status: "online",
+    lastSync: "Today • 08:55",
+    integration: "REST",
+    provider: "ZKTeco",
+    reference: "https://api.hr-suite.dev/integrations/zkteco",
+  },
+  {
+    id: "DEV-002",
+    name: "VisionX FaceID",
+    type: "facial",
+    location: "Accra HQ - Executive Floor",
+    status: "syncing",
+    lastSync: "Today • 09:10",
+    integration: "SDK",
+    provider: "VisionX",
+  },
+  {
+    id: "DEV-003",
+    name: "RFID Turnstile",
+    type: "card",
+    location: "Tema Plant - Warehouse",
+    status: "offline",
+    lastSync: "Yesterday • 18:02",
+    integration: "CSV",
+    provider: "Gallagher",
+  },
+]
+
+const initialOvertimeRequests: OvertimeRequest[] = [
+  {
+    id: "OT-001",
+    employeeId: "EMP-001",
+    employeeName: "Kwame Asante",
+    date: formatDateByOffset(-1),
+    hoursRequested: 2.5,
+    status: "pending",
+    justification: "Quarter-end reconciliations",
+    department: "Finance",
+  },
+  {
+    id: "OT-002",
+    employeeId: "EMP-004",
+    employeeName: "Akosua Boateng",
+    date: formatDateByOffset(-2),
+    hoursRequested: 1.5,
+    status: "approved",
+    justification: "Late shift machine reset",
+    department: "Operations",
+  },
+  {
+    id: "OT-003",
+    employeeId: "EMP-005",
+    employeeName: "Yaw Frimpong",
+    date: formatDateByOffset(-3),
+    hoursRequested: 3,
+    status: "pending",
+    justification: "Customer migration weekend",
+    department: "Customer Success",
+  },
+]
+
+const initialHolidays: Holiday[] = [
+  {
+    id: "HOL-001",
+    name: "Founder's Day",
+    date: formatDateByOffset(12),
+    scope: "company",
+    scopeReference: "All employees",
+    isPaid: true,
+    notes: "Company-wide celebration",
+  },
+  {
+    id: "HOL-002",
+    name: "Tema Plant Maintenance",
+    date: formatDateByOffset(3),
+    scope: "subsidiary",
+    scopeReference: "Core Group",
+    isPaid: false,
+    notes: "Operations-only shutdown",
+  },
+]
 
 export default function AttendancePage() {
+  const { toast } = useToast()
   const [activeTab, setActiveTab] = useState("overview")
+  const [attendanceRecords, setAttendanceRecords] = useState(initialAttendanceRecords)
+  const [shifts, setShifts] = useState(initialShifts)
+  const [biometricDevices, setBiometricDevices] = useState(initialBiometricDevices)
+  const [overtimeRequests, setOvertimeRequests] = useState(initialOvertimeRequests)
+  const [holidays, setHolidays] = useState(initialHolidays)
+
   const [searchTerm, setSearchTerm] = useState("")
   const [dateFilter, setDateFilter] = useState("today")
-  const [showClockInDialog, setShowClockInDialog] = useState(false)
-  const [showShiftDialog, setShowShiftDialog] = useState(false)
-  const [currentTime, setCurrentTime] = useState(new Date())
+  const [filters, setFilters] = useState({
+    location: "all",
+    department: "all",
+    division: "all",
+    subsidiary: "all",
+    status: "all",
+    method: "all",
+  })
 
-  // Update current time every second
+  const [showClockInDialog, setShowClockInDialog] = useState(false)
+  const [shiftDialogOpen, setShiftDialogOpen] = useState(false)
+  const [holidayDialogOpen, setHolidayDialogOpen] = useState(false)
+  const [deviceDialogOpen, setDeviceDialogOpen] = useState(false)
+
+  const [currentTime, setCurrentTime] = useState(new Date())
+  const [alertTriggeredToday, setAlertTriggeredToday] = useState(false)
+  const [insightSeed, setInsightSeed] = useState(() => Date.now())
+  const [geoCapture, setGeoCapture] = useState<GeoCapture | null>(null)
+  const [isCapturingLocation, setIsCapturingLocation] = useState(false)
+
+  const [shiftForm, setShiftForm] = useState({
+    id: "",
+    name: "",
+    startTime: "08:00",
+    endTime: "17:00",
+    breakDuration: 60,
+    employees: "",
+    location: "",
+    department: "",
+    notes: "",
+  })
+
+  const [holidayForm, setHolidayForm] = useState({
+    name: "",
+    date: formatDateByOffset(1),
+    scope: "company" as Holiday["scope"],
+    scopeReference: "",
+    isPaid: true,
+    notes: "",
+  })
+
+  const [deviceForm, setDeviceForm] = useState({
+    name: "",
+    type: "fingerprint" as BiometricDevice["type"],
+    location: "",
+    integration: "REST" as BiometricDevice["integration"],
+    provider: "",
+    reference: "",
+  })
+
+  const [alertSettings, setAlertSettings] = useState<AlertSettings>({
+    enabled: true,
+    time: "10:30",
+    channel: "email",
+    escalateToManagers: true,
+    includeContractors: false,
+  })
+
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+    const timer = setInterval(() => {
+      setCurrentTime(new Date())
+    }, 1000)
     return () => clearInterval(timer)
   }, [])
 
-  // Mock data
-  const attendanceRecords: AttendanceRecord[] = [
-    {
-      id: "ATT001",
-      employeeId: "EMP001",
-      employeeName: "Kwame Asante",
-      date: "2024-02-15",
-      clockIn: "08:00",
-      clockOut: "17:30",
-      totalHours: 8.5,
-      overtimeHours: 0.5,
-      status: "present",
-      location: "Main Office",
-      method: "biometric",
-    },
-    {
-      id: "ATT002",
-      employeeId: "EMP002",
-      employeeName: "Ama Osei",
-      date: "2024-02-15",
-      clockIn: "08:15",
-      clockOut: "17:00",
-      totalHours: 7.75,
-      overtimeHours: 0,
-      status: "late",
-      location: "Main Office",
-      method: "fingerprint",
-    },
-    {
-      id: "ATT003",
-      employeeId: "EMP003",
-      employeeName: "Kofi Mensah",
-      date: "2024-02-15",
-      clockIn: "",
-      clockOut: "",
-      totalHours: 0,
-      overtimeHours: 0,
-      status: "absent",
-      location: "",
-      method: "manual",
-    },
-  ]
+  const currentDayKey = `${currentTime.getFullYear()}-${currentTime.getMonth()}-${currentTime.getDate()}`
 
-  const shifts: Shift[] = [
-    {
-      id: "SH001",
-      name: "Day Shift",
+  useEffect(() => {
+    setAlertTriggeredToday(false)
+  }, [currentDayKey, alertSettings.time])
+
+  useEffect(() => {
+    if (!alertSettings.enabled || !alertSettings.time || alertTriggeredToday) {
+      return
+    }
+
+    const [hours, minutes] = alertSettings.time.split(":").map(Number)
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+      return
+    }
+
+    const alertMoment = new Date(currentTime)
+    alertMoment.setHours(hours, minutes, 0, 0)
+
+    if (currentTime >= alertMoment) {
+      const missed = attendanceRecords.filter((record) => record.status === "absent" || !record.clockIn)
+      if (missed.length > 0) {
+        toast({
+          title: "Missed attendance alert ready",
+          description: `${missed.length} employee${missed.length > 1 ? "s" : ""} have not clocked in. Alert sent via ${alertSettings.channel}.`,
+        })
+        setAlertTriggeredToday(true)
+      }
+    }
+  }, [alertSettings, alertTriggeredToday, attendanceRecords, currentTime, toast])
+
+  const uniqueValues = useMemo(() => {
+    const unique = {
+      location: new Set<string>(),
+      department: new Set<string>(),
+      division: new Set<string>(),
+      subsidiary: new Set<string>(),
+      method: new Set<string>(),
+    }
+
+    attendanceRecords.forEach((record) => {
+      if (record.location) unique.location.add(record.location)
+      unique.department.add(record.department)
+      unique.division.add(record.division)
+      unique.subsidiary.add(record.subsidiary)
+      unique.method.add(record.method)
+    })
+
+    return {
+      location: Array.from(unique.location),
+      department: Array.from(unique.department),
+      division: Array.from(unique.division),
+      subsidiary: Array.from(unique.subsidiary),
+      method: Array.from(unique.method),
+    }
+  }, [attendanceRecords])
+
+  const filteredRecords = useMemo(() => {
+    const today = new Date()
+
+    const matchesDate = (dateValue: string) => {
+      const recordDate = new Date(dateValue)
+
+      switch (dateFilter) {
+        case "today":
+          return recordDate.toDateString() === today.toDateString()
+        case "yesterday": {
+          const yesterday = new Date(today)
+          yesterday.setDate(today.getDate() - 1)
+          return recordDate.toDateString() === yesterday.toDateString()
+        }
+        case "this-week": {
+          const startOfWeek = new Date(today)
+          const day = startOfWeek.getDay()
+          const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1)
+          startOfWeek.setDate(diff)
+          startOfWeek.setHours(0, 0, 0, 0)
+          const endOfWeek = new Date(startOfWeek)
+          endOfWeek.setDate(startOfWeek.getDate() + 6)
+          endOfWeek.setHours(23, 59, 59, 999)
+          return recordDate >= startOfWeek && recordDate <= endOfWeek
+        }
+        case "this-month":
+          return recordDate.getMonth() === today.getMonth() && recordDate.getFullYear() === today.getFullYear()
+        default:
+          return true
+      }
+    }
+
+    return attendanceRecords.filter((record) => {
+      const matchesSearch =
+        record.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        record.employeeId.toLowerCase().includes(searchTerm.toLowerCase())
+
+      const matchesFilters =
+        (filters.location === "all" || record.location === filters.location) &&
+        (filters.department === "all" || record.department === filters.department) &&
+        (filters.division === "all" || record.division === filters.division) &&
+        (filters.subsidiary === "all" || record.subsidiary === filters.subsidiary) &&
+        (filters.status === "all" || record.status === filters.status) &&
+        (filters.method === "all" || record.method === filters.method)
+
+      return matchesSearch && matchesFilters && matchesDate(record.date)
+    })
+  }, [attendanceRecords, dateFilter, filters, searchTerm])
+
+  const stats = useMemo(() => {
+    const total = attendanceRecords.length || 1
+    const presentCount = attendanceRecords.filter((record) => record.status === "present").length
+    const lateCount = attendanceRecords.filter((record) => record.status === "late").length
+    const absentCount = attendanceRecords.filter((record) => record.status === "absent").length
+    const overtimeHours = attendanceRecords.reduce((sum, record) => sum + record.overtimeHours, 0)
+    const attendanceRate = ((total - absentCount) / total) * 100
+    const devicesOnline = biometricDevices.filter((device) => device.status === "online").length
+
+    return {
+      presentCount,
+      attendanceRate,
+      lateCount,
+      absentCount,
+      overtimeHours,
+      devicesOnline,
+      totalDevices: biometricDevices.length,
+    }
+  }, [attendanceRecords, biometricDevices])
+
+  const aiForecasts: AiForecast[] = useMemo(() => {
+    const pendingOvertime = overtimeRequests
+      .filter((request) => request.status === "pending")
+      .reduce((sum, request) => sum + request.hoursRequested, 0)
+    const highRiskEmployees = attendanceRecords.filter((record) => record.aiRiskScore >= 0.6)
+    const remoteAttendance = attendanceRecords.filter((record) => record.workingArrangement === "remote")
+    const remotePresent = remoteAttendance.filter((record) => record.status === "present").length
+
+    return [
+      {
+        label: "Projected overtime (72h)",
+        value: `${pendingOvertime.toFixed(1)}h`,
+        delta: "+12% vs last week",
+        trend: "up",
+      },
+      {
+        label: "High-risk absenteeism",
+        value: `${highRiskEmployees.length} team${highRiskEmployees.length !== 1 ? "s" : ""}`,
+        delta: "Focus: Engineering",
+        trend: highRiskEmployees.length > 0 ? "up" : "steady",
+      },
+      {
+        label: "Remote compliance",
+        value: remoteAttendance.length
+          ? `${Math.round((remotePresent / remoteAttendance.length) * 100)}%`
+          : "100%",
+        delta: "Confidence 92%",
+        trend: "steady",
+      },
+    ]
+  }, [attendanceRecords, overtimeRequests])
+
+  const aiInsights: AiInsight[] = useMemo(() => {
+    const riskLeaders = attendanceRecords
+      .filter((record) => record.aiRiskScore >= 0.4)
+      .slice(0, 3)
+      .map((record) => ({
+        id: `${record.id}-risk-${insightSeed}`,
+        title: `${record.employeeName} requires check-in`,
+        description: `${record.department} • Risk ${Math.round(record.aiRiskScore * 100)}% • ${
+          record.predictedTrend === "absence-risk" ? "Likely to miss next shift" : "Likely to arrive late"
+        }.`,
+        confidence: Math.min(0.45 + record.aiRiskScore / 2, 0.95),
+        tags: [record.predictedTrend.replace("-", " "), record.department],
+      }))
+
+    const overtimeHotspot = overtimeRequests
+      .filter((request) => request.status === "pending")
+      .sort((a, b) => b.hoursRequested - a.hoursRequested)
+      .slice(0, 1)
+      .map((request) => ({
+        id: `${request.id}-ot-${insightSeed}`,
+        title: `${request.department} overtime spike`,
+        description: `${request.hoursRequested.toFixed(1)} hours pending approval. Consider redistribution to reduce burnout.`,
+        confidence: 0.88,
+        tags: ["Overtime", request.department],
+      }))
+
+    const hybridTrend = attendanceRecords.filter((record) => record.workingArrangement === "hybrid")
+    const hybridInsight: AiInsight | null = hybridTrend.length
+      ? {
+          id: `hybrid-${insightSeed}`,
+          title: "Hybrid team adherence",
+          description: `${Math.round(
+            (hybridTrend.filter((record) => record.status === "present").length / hybridTrend.length) * 100,
+          )}% adherence recorded this week. Keep nudging flexible check-ins by 08:30.`,
+          confidence: 0.76,
+          tags: ["Hybrid", "Engagement"],
+        }
+      : null
+
+    return [...riskLeaders, ...overtimeHotspot, ...(hybridInsight ? [hybridInsight] : [])]
+  }, [attendanceRecords, overtimeRequests, insightSeed])
+
+  const handleFilterChange = (key: keyof typeof filters, value: string) => {
+    setFilters((previous) => ({ ...previous, [key]: value }))
+  }
+
+  const handleResetFilters = () => {
+    setFilters({ location: "all", department: "all", division: "all", subsidiary: "all", status: "all", method: "all" })
+    setDateFilter("today")
+    setSearchTerm("")
+  }
+
+  const handleBiometricClockIn = (method: AttendanceMethod) => {
+    setShowClockInDialog(false)
+    toast({
+      title: "Clock-in initiated",
+      description: `Secure authentication via ${method} in progress...`,
+    })
+
+    setTimeout(() => {
+      toast({
+        title: "Clock-in successful",
+        description: `Attendance data stored via ${method} feed.`,
+      })
+    }, 1600)
+  }
+
+  const handleExport = (type: string) => {
+    toast({
+      title: `${type} ready`,
+      description: `Filtered attendance report queued for download (${filteredRecords.length} records).`,
+    })
+  }
+
+  const handleUpdateAttendanceStatus = (id: string, status: AttendanceStatus) => {
+    setAttendanceRecords((previous) =>
+      previous.map((record) => (record.id === id ? { ...record, status, clockIn: record.clockIn || "08:30" } : record)),
+    )
+    toast({
+      title: "Attendance updated",
+      description: `Status flagged as ${status.replace("-", " ")}.`,
+    })
+  }
+
+  const handleSendReminder = (record: AttendanceRecord) => {
+    toast({
+      title: "Reminder queued",
+      description: `Notification sent to ${record.employeeName} via AI nudges and ${alertSettings.channel}.`,
+    })
+  }
+
+  const handleToggleShiftActive = (id: string) => {
+    setShifts((previous) => previous.map((shift) => (shift.id === id ? { ...shift, isActive: !shift.isActive } : shift)))
+  }
+
+  const resetShiftForm = () => {
+    setShiftForm({
+      id: "",
+      name: "",
       startTime: "08:00",
       endTime: "17:00",
       breakDuration: 60,
-      employees: ["EMP001", "EMP002", "EMP003"],
-      isActive: true,
-    },
-    {
-      id: "SH002",
-      name: "Night Shift",
-      startTime: "20:00",
-      endTime: "06:00",
-      breakDuration: 60,
-      employees: ["EMP004", "EMP005"],
-      isActive: true,
-    },
-  ]
+      employees: "",
+      location: "",
+      department: "",
+      notes: "",
+    })
+  }
 
-  const biometricDevices: BiometricDevice[] = [
-    {
-      id: "DEV001",
-      name: "Main Entrance Scanner",
-      type: "fingerprint",
-      location: "Main Office Entrance",
-      status: "online",
-      lastSync: "2024-02-15 09:30",
-    },
-    {
-      id: "DEV002",
-      name: "Facial Recognition Camera",
-      type: "facial",
-      location: "Reception Area",
-      status: "online",
-      lastSync: "2024-02-15 09:25",
-    },
-    {
-      id: "DEV003",
-      name: "Card Reader - Floor 2",
-      type: "card",
-      location: "Second Floor",
-      status: "offline",
-      lastSync: "2024-02-14 18:00",
-    },
-  ]
+  const handleOpenNewShiftDialog = () => {
+    resetShiftForm()
+    setShiftDialogOpen(true)
+  }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "present":
-        return "bg-green-100 text-green-800"
-      case "late":
-        return "bg-yellow-100 text-yellow-800"
-      case "absent":
-        return "bg-red-100 text-red-800"
-      case "early-departure":
-        return "bg-orange-100 text-orange-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+  const handleEditShift = (shift: Shift) => {
+    setShiftForm({
+      id: shift.id,
+      name: shift.name,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+      breakDuration: shift.breakDuration,
+      employees: shift.employees.join(", "),
+      location: shift.location,
+      department: shift.department,
+      notes: shift.notes ?? "",
+    })
+    setShiftDialogOpen(true)
+  }
+
+  const handleShiftSubmit = () => {
+    const employees = shiftForm.employees
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean)
+
+    if (!shiftForm.name || !shiftForm.startTime || !shiftForm.endTime) {
+      toast({ title: "Missing details", description: "Provide shift name and time window." })
+      return
+    }
+
+    const payload: Shift = {
+      id: shiftForm.id || `SHIFT-${Date.now()}`,
+      name: shiftForm.name,
+      startTime: shiftForm.startTime,
+      endTime: shiftForm.endTime,
+      breakDuration: Number(shiftForm.breakDuration) || 0,
+      employees,
+      isActive: true,
+      location: shiftForm.location || "",
+      department: shiftForm.department || "",
+      notes: shiftForm.notes,
+    }
+
+    setShifts((previous) => {
+      const exists = previous.some((shift) => shift.id === payload.id)
+      if (exists) {
+        return previous.map((shift) => (shift.id === payload.id ? payload : shift))
+      }
+      return [payload, ...previous]
+    })
+
+    toast({
+      title: shiftForm.id ? "Shift updated" : "Shift created",
+      description: `${payload.name} now scheduled with ${payload.employees.length} assignee(s).`,
+    })
+
+    setShiftDialogOpen(false)
+    resetShiftForm()
+  }
+
+  const handleApproveOvertime = (id: string, status: OvertimeStatus) => {
+    setOvertimeRequests((previous) => previous.map((request) => (request.id === id ? { ...request, status } : request)))
+    toast({ title: `Overtime ${status}`, description: `Request ${id} marked as ${status}.` })
+  }
+
+  const handleSyncDevice = (id: string) => {
+    setBiometricDevices((previous) =>
+      previous.map((device) =>
+        device.id === id
+          ? { ...device, status: "syncing", lastSync: "Syncing..." }
+          : device,
+      ),
+    )
+
+    setTimeout(() => {
+      setBiometricDevices((previous) =>
+        previous.map((device) =>
+          device.id === id
+            ? {
+                ...device,
+                status: "online",
+                lastSync: `Today • ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+              }
+            : device,
+        ),
+      )
+      toast({ title: "Device synced", description: "Attendance events imported successfully." })
+    }, 1500)
+  }
+
+  const handleDeviceStatusToggle = (device: BiometricDevice) => {
+    setBiometricDevices((previous) =>
+      previous.map((current) =>
+        current.id === device.id
+          ? { ...current, status: current.status === "online" ? "offline" : "online" }
+          : current,
+      ),
+    )
+  }
+
+  const handleAddDevice = () => {
+    if (!deviceForm.name || !deviceForm.provider) {
+      toast({ title: "Incomplete details", description: "Provide device name and provider." })
+      return
+    }
+
+    setBiometricDevices((previous) => [
+      {
+        id: `DEV-${Date.now()}`,
+        name: deviceForm.name,
+        type: deviceForm.type,
+        location: deviceForm.location || "Custom integration",
+        status: "online",
+        lastSync: "Awaiting first sync",
+        integration: deviceForm.integration,
+        provider: deviceForm.provider,
+        reference: deviceForm.reference,
+      },
+      ...previous,
+    ])
+
+    toast({
+      title: "Integration connected",
+      description: `${deviceForm.provider} feed active via ${deviceForm.integration}.`,
+    })
+
+    setDeviceDialogOpen(false)
+    setDeviceForm({ name: "", type: "fingerprint", location: "", integration: "REST", provider: "", reference: "" })
+  }
+
+  const handleAddHoliday = () => {
+    if (!holidayForm.name || !holidayForm.date) {
+      toast({ title: "Missing information", description: "Provide holiday name and date." })
+      return
+    }
+
+    setHolidays((previous) => [
+      {
+        id: `HOL-${Date.now()}`,
+        name: holidayForm.name,
+        date: holidayForm.date,
+        scope: holidayForm.scope,
+        scopeReference: holidayForm.scopeReference || "",
+        isPaid: holidayForm.isPaid,
+        notes: holidayForm.notes,
+      },
+      ...previous,
+    ])
+
+    toast({ title: "Holiday scheduled", description: `${holidayForm.name} added to company calendar.` })
+    setHolidayDialogOpen(false)
+    setHolidayForm({ name: "", date: formatDateByOffset(1), scope: "company", scopeReference: "", isPaid: true, notes: "" })
+  }
+
+  const handleRemoveHoliday = (id: string) => {
+    setHolidays((previous) => previous.filter((holiday) => holiday.id !== id))
+    toast({ title: "Holiday removed", description: "Schedule updated." })
+  }
+
+  const handleSaveAlertSettings = () => {
+    toast({ title: "Alert preferences saved", description: `Alerts ${alertSettings.enabled ? "enabled" : "disabled"} for ${alertSettings.time}.` })
+  }
+
+  const handleRefreshInsights = () => {
+    setInsightSeed(Date.now())
+    toast({ title: "Insights refreshed", description: "AI models recalibrated using the latest data." })
+  }
+
+  const handleCaptureLocation = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      toast({ title: "Location unavailable", description: "Browser blocked geolocation access." })
+      return
+    }
+
+    setIsCapturingLocation(true)
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude, accuracy } = position.coords
+        setGeoCapture({
+          coordinates: `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
+          accuracy: accuracy ? `${Math.round(accuracy)}m` : undefined,
+          capturedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        })
+        toast({ title: "Location captured", description: "Attendance will be verified against geo-fence." })
+        setIsCapturingLocation(false)
+      },
+      () => {
+        toast({ title: "Location denied", description: "Unable to capture device coordinates." })
+        setIsCapturingLocation(false)
+      },
+      { enableHighAccuracy: true, timeout: 8000 },
+    )
+  }
+
+  const getStatusColor = (status: AttendanceStatus) => {
+  // Load data
+  const loadData = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const [recordsRes, shiftsRes, devicesRes, overtimeRes, statsRes, statusRes] = await Promise.all([
+        getAttendanceRecords({
+          dateRange: dateFilter,
+          department: departmentFilter !== "all" ? departmentFilter : undefined,
+          division: divisionFilter !== "all" ? divisionFilter : undefined,
+          location: locationFilter !== "all" ? locationFilter : undefined,
+          status: statusFilter !== "all" ? statusFilter : undefined,
+          search: searchTerm || undefined,
+        }),
+        getShifts(),
+        getBiometricDevices(),
+        getOvertimeRequests(),
+        getAttendanceStats(),
+        getClockStatus(),
+      ])
+
+      setAttendanceRecords(recordsRes.data || [])
+      setShifts(shiftsRes.data || [])
+      setBiometricDevices(devicesRes.data || [])
+      setOvertimeRequests(overtimeRes.data || [])
+      if (statsRes) setStats(statsRes)
+      setClockStatus(statusRes)
+    } catch (error) {
+      console.error("Error loading data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load attendance data",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [dateFilter, departmentFilter, divisionFilter, locationFilter, statusFilter, searchTerm, toast])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  // Get GPS location
+  const getGPSLocation = useCallback(() => {
+    setIsGettingLocation(true)
+    setGpsError(null)
+
+    if (!navigator.geolocation) {
+      setGpsError("Geolocation is not supported by your browser")
+      setIsGettingLocation(false)
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setGpsLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        })
+        setIsGettingLocation(false)
+      },
+      (error) => {
+        setGpsError(error.message)
+        setIsGettingLocation(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    )
+  }, [])
+
+  // Clock In/Out handlers
+  const handleClockIn = async (method: string) => {
+    setIsProcessing(true)
+    try {
+      const result = await clockIn({
+        method,
+        latitude: gpsLocation?.lat,
+        longitude: gpsLocation?.lng,
+      })
+
+      if (result.success) {
+        toast({
+          title: "Clocked In Successfully",
+          description: `You clocked in at ${result.time} via ${method}${gpsLocation ? " with GPS" : ""}`,
+        })
+        setShowClockDialog(false)
+        loadData()
+      } else {
+        toast({
+          title: "Clock In Failed",
+          description: result.error,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to clock in",
+        variant: "destructive",
+      })
+    } finally {
+      setIsProcessing(false)
     }
   }
 
-  const getDeviceStatusColor = (status: string) => {
-    return status === "online" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+  const handleClockOut = async (method: string) => {
+    setIsProcessing(true)
+    try {
+      const result = await clockOut({
+        method,
+        latitude: gpsLocation?.lat,
+        longitude: gpsLocation?.lng,
+      })
+
+      if (result.success) {
+        toast({
+          title: "Clocked Out Successfully",
+          description: `You clocked out at ${result.time}. Total: ${result.totalHours}h, Overtime: ${result.overtimeHours}h`,
+        })
+        setShowClockDialog(false)
+        loadData()
+      } else {
+        toast({
+          title: "Clock Out Failed",
+          description: result.error,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to clock out",
+        variant: "destructive",
+      })
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
-  const filteredRecords = attendanceRecords.filter((record) => {
-    const matchesSearch =
-      record.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.employeeId.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesSearch
+  // Shift handlers
+  const handleCreateShift = async () => {
+    if (!newShift.name || !newShift.start_time || !newShift.end_time) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      const result = await createShift({
+        name: newShift.name,
+        start_time: newShift.start_time,
+        end_time: newShift.end_time,
+        break_duration_minutes: newShift.break_duration_minutes,
+        grace_period_minutes: newShift.grace_period_minutes,
+        working_days: newShift.working_days,
+        department: newShift.department || undefined,
+        division: newShift.division || undefined,
+        location: newShift.location || undefined,
+      })
+
+      if (result.success) {
+        toast({
+          title: "Shift Created",
+          description: `${newShift.name} has been created successfully`,
+        })
+        setShowShiftDialog(false)
+        setNewShift({
+          name: "",
+          start_time: "09:00",
+          end_time: "17:00",
+          break_duration_minutes: 60,
+          grace_period_minutes: 15,
+          working_days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+          department: "",
+          division: "",
+          location: "",
+        })
+        loadData()
+      } else {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        })
+      }
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleToggleShift = async (shift: Shift) => {
+    const result = await updateShift(shift.id, { is_active: !shift.is_active })
+    if (result.success) {
+      toast({
+        title: shift.is_active ? "Shift Deactivated" : "Shift Activated",
+        description: `${shift.name} has been ${shift.is_active ? "deactivated" : "activated"}`,
+      })
+      loadData()
+    }
+  }
+
+  const handleDeleteShift = async (shift: Shift) => {
+    const result = await deleteShift(shift.id)
+    if (result.success) {
+      toast({
+        title: "Shift Deleted",
+        description: `${shift.name} has been deleted`,
+      })
+      loadData()
+    }
+  }
+
+  // Device handlers
+  const handleCreateDevice = async () => {
+    if (!newDevice.name || !newDevice.type || !newDevice.location) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      const result = await createBiometricDevice({
+        name: newDevice.name,
+        type: newDevice.type,
+        location: newDevice.location,
+        ip_address: newDevice.ip_address || undefined,
+        serial_number: newDevice.serial_number || undefined,
+      })
+
+      if (result.success) {
+        toast({
+          title: "Device Added",
+          description: `${newDevice.name} has been added successfully`,
+        })
+        setShowDeviceDialog(false)
+        setNewDevice({
+          name: "",
+          type: "fingerprint",
+          location: "",
+          ip_address: "",
+          serial_number: "",
+        })
+        loadData()
+      } else {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        })
+      }
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleSyncDevice = async (device: BiometricDevice) => {
+    const result = await syncBiometricDevice(device.id)
+    if (result.success) {
+      toast({
+        title: "Device Synced",
+        description: `${device.name} has been synchronized`,
+      })
+      loadData()
+    }
+  }
+
+  const handleToggleDevice = async (device: BiometricDevice) => {
+    const newStatus = device.status === "online" ? "offline" : "online"
+    const result = await toggleDeviceStatus(device.id, newStatus)
+    if (result.success) {
+      toast({
+        title: "Device Status Updated",
+        description: `${device.name} is now ${newStatus}`,
+      })
+      loadData()
+    }
+  }
+
+  // Overtime handlers
+  const handleCreateOvertime = async () => {
+    if (!newOvertime.reason) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a reason for overtime",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      const result = await createOvertimeRequest(newOvertime)
+
+      if (result.success) {
+        toast({
+          title: "Overtime Request Submitted",
+          description: `Request for ${newOvertime.hours_requested}h overtime has been submitted`,
+        })
+        setShowOvertimeDialog(false)
+        setNewOvertime({
+          date: new Date().toISOString().split("T")[0],
+          hours_requested: 2,
+          reason: "",
+        })
+        loadData()
+      } else {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        })
+      }
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleOvertimeAction = async (request: OvertimeRequest, action: "approved" | "rejected") => {
+    const result = await updateOvertimeRequest(request.id, action, {
+      hours_approved: action === "approved" ? request.hours_requested : undefined,
+    })
+
+    if (result.success) {
+      toast({
+        title: action === "approved" ? "Overtime Approved" : "Overtime Rejected",
+        description: `${request.employee?.full_name}'s request has been ${action}`,
+      })
+      loadData()
+    }
+  }
+
+  // Report handler
+  const handleGenerateReport = async (type: string) => {
+    toast({
+      title: "Generating Report",
+      description: `${type} is being prepared...`,
+    })
+
+    const result = await generateAttendanceReport(type.toLowerCase().replace(" ", "-"))
+
+    if (result.success && result.data) {
+      // Create CSV content
+      const records = result.data.records
+      const csvContent = [
+        [
+          "Employee",
+          "Employee ID",
+          "Department",
+          "Date",
+          "Clock In",
+          "Clock Out",
+          "In Method",
+          "Out Method",
+          "Hours",
+          "Overtime",
+          "Status",
+        ],
+        ...records.map((r: AttendanceRecord) => [
+          r.employee?.full_name || "",
+          r.employee?.employee_id || "",
+          r.employee?.department || "",
+          r.date,
+          r.clock_in || "",
+          r.clock_out || "",
+          r.clock_in_method || "",
+          r.clock_out_method || "",
+          r.total_hours || 0,
+          r.overtime_hours || 0,
+          r.status,
+        ]),
+      ]
+        .map((row) => row.join(","))
+        .join("\n")
+
+      // Download CSV
+      const blob = new Blob([csvContent], { type: "text/csv" })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `attendance-${type.toLowerCase()}-${new Date().toISOString().split("T")[0]}.csv`
+      a.click()
+
+      toast({
+        title: "Report Downloaded",
+        description: `${type} has been downloaded successfully`,
+      })
+    }
+  }
+
+  // Sorting
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
+    } else {
+      setSortColumn(column)
+      setSortDirection("asc")
+    }
+  }
+
+  const sortedRecords = [...attendanceRecords].sort((a, b) => {
+    let aVal: string | number | null = null
+    let bVal: string | number | null = null
+
+    switch (sortColumn) {
+      case "employee":
+        aVal = a.employee?.full_name || ""
+        bVal = b.employee?.full_name || ""
+        break
+      case "department":
+        aVal = a.employee?.department || ""
+        bVal = b.employee?.department || ""
+        break
+      case "date":
+        aVal = a.date
+        bVal = b.date
+        break
+      case "clock_in":
+        aVal = a.clock_in || ""
+        bVal = b.clock_in || ""
+        break
+      case "clock_out":
+        aVal = a.clock_out || ""
+        bVal = b.clock_out || ""
+        break
+      case "hours":
+        aVal = a.total_hours || 0
+        bVal = b.total_hours || 0
+        break
+      case "overtime":
+        aVal = a.overtime_hours || 0
+        bVal = b.overtime_hours || 0
+        break
+      case "status":
+        aVal = a.status
+        bVal = b.status
+        break
+      default:
+        return 0
+    }
+
+    if (typeof aVal === "number" && typeof bVal === "number") {
+      return sortDirection === "asc" ? aVal - bVal : bVal - aVal
+    }
+
+    return sortDirection === "asc" ? String(aVal).localeCompare(String(bVal)) : String(bVal).localeCompare(String(aVal))
   })
 
-  const handleBiometricClockIn = (method: string) => {
-    console.log(`[v0] Biometric clock-in initiated with method: ${method}`)
-    // Simulate biometric authentication
-    setTimeout(() => {
-      alert(`Clock-in successful using ${method}!`)
-      setShowClockInDialog(false)
-    }, 2000)
+  // Helper functions
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "present":
+        return "bg-emerald-100 text-emerald-800"
+      case "late":
+        return "bg-yellow-100 text-yellow-800"
+      case "early-departure":
+        return "bg-orange-100 text-orange-800"
+      case "absent":
+        return "bg-red-100 text-red-800"
+      default:
+        return "bg-slate-100 text-slate-800"
+    }
   }
+
+  const getPredictedTrendColor = (trend: PredictedTrend) => {
+    switch (trend) {
+      case "on-track":
+        return "bg-emerald-50 text-emerald-700"
+      case "late-risk":
+        return "bg-amber-50 text-amber-700"
+      case "absence-risk":
+        return "bg-rose-50 text-rose-700"
+      default:
+        return "bg-slate-50 text-slate-700"
+    }
+  }
+
+  const getMethodLabel = (method: AttendanceMethod) => {
+    switch (method) {
+      case "fingerprint":
+        return "Fingerprint"
+      case "facial":
+        return "Facial"
+      case "manual":
+        return "Manual"
+      case "mobile":
+        return "Mobile"
+      case "card":
+        return "RFID Card"
+      default:
+        return method
+    }
+  }
+
+  const pendingOvertimeCount = overtimeRequests.filter((r) => r.status === "pending").length
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Time & Attendance</h1>
-          <p className="text-gray-600">Manage employee time tracking and attendance</p>
+          <h1 className="text-2xl font-semibold text-slate-900">AI-Driven Time & Attendance</h1>
+          <p className="text-sm text-slate-600">
+            Unified attendance insights across locations, predictive risk detection, and automated compliance controls.
+          </p>
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center gap-4">
           <div className="text-right">
-            <p className="text-sm text-gray-600">Current Time</p>
-            <p className="text-lg font-bold text-emerald-600">
-              {currentTime.toLocaleTimeString("en-GB", { hour12: false })}
+            <p className="text-xs uppercase text-slate-500">Current time</p>
+            <p className="text-lg font-semibold text-emerald-600">
+              {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
             </p>
           </div>
-          <Dialog open={showClockInDialog} onOpenChange={setShowClockInDialog}>
+          <Dialog open={showClockDialog} onOpenChange={setShowClockDialog}>
             <DialogTrigger asChild>
               <Button className="bg-emerald-600 hover:bg-emerald-700">
-                <Clock className="w-4 h-4 mr-2" />
-                Quick Clock In/Out
+                <Clock className="mr-2 h-4 w-4" /> Quick Clock In/Out
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>Employee Clock In/Out</DialogTitle>
-                <DialogDescription>Choose your preferred authentication method</DialogDescription>
+                <DialogTitle>Secure clock in/out</DialogTitle>
+                <DialogDescription>Pick a verification channel. AI cross-checks with device health and geo-fence.</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-3">
-                  <Button
-                    variant="outline"
-                    className="h-16 flex flex-col items-center justify-center space-y-2 bg-transparent"
-                    onClick={() => handleBiometricClockIn("fingerprint")}
-                  >
-                    <Fingerprint className="w-6 h-6 text-emerald-600" />
-                    <span>Fingerprint Scanner</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-16 flex flex-col items-center justify-center space-y-2 bg-transparent"
-                    onClick={() => handleBiometricClockIn("facial")}
-                  >
-                    <Camera className="w-6 h-6 text-blue-600" />
-                    <span>Facial Recognition</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-16 flex flex-col items-center justify-center space-y-2 bg-transparent"
-                    onClick={() => handleBiometricClockIn("manual")}
-                  >
-                    <Timer className="w-6 h-6 text-orange-600" />
-                    <span>Manual Entry</span>
-                  </Button>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm text-gray-500">
-                    Current Time: {currentTime.toLocaleTimeString("en-GB", { hour12: false })}
-                  </p>
-                </div>
+              <div className="grid gap-3">
+                <Button variant="outline" className="h-16 justify-start gap-3" onClick={() => handleBiometricClockIn("fingerprint")}>
+                  <Fingerprint className="h-5 w-5 text-emerald-600" /> Fingerprint scanner
+                </Button>
+                <Button variant="outline" className="h-16 justify-start gap-3" onClick={() => handleBiometricClockIn("facial")}>
+                  <Camera className="h-5 w-5 text-blue-500" /> Facial recognition kiosk
+                </Button>
+                <Button variant="outline" className="h-16 justify-start gap-3" onClick={() => handleBiometricClockIn("mobile")}>
+                  <Globe className="h-5 w-5 text-violet-500" /> Mobile geo-fence check-in
+                </Button>
+                <Button variant="outline" className="h-16 justify-start gap-3" onClick={() => handleBiometricClockIn("manual")}>
+                  <Timer className="h-5 w-5 text-amber-500" /> Manual override (supervisor)
+                </Button>
               </div>
+              <p className="text-center text-xs text-slate-500">Last sync • {biometricDevices[0]?.lastSync ?? "No devices"}</p>
             </DialogContent>
           </Dialog>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Present Today</CardTitle>
-            <UserCheck className="h-4 w-4 text-muted-foreground" />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <Card className="border-emerald-100 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle className="text-sm font-medium">Present today</CardTitle>
+              <CardDescription>Real-time headcount</CardDescription>
+            </div>
+            <UserCheck className="h-5 w-5 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">142</div>
-            <p className="text-xs text-muted-foreground">94.7% attendance rate</p>
+            <p className="text-3xl font-semibold">{stats.presentCount}</p>
+            <p className="text-xs text-slate-500">{stats.attendanceRate.toFixed(1)}% attendance rate</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Late Arrivals</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle className="text-sm font-medium">Late arrivals</CardTitle>
+              <CardDescription>AI monitors over 15 min late</CardDescription>
+            </div>
+            <AlertCircle className="h-5 w-5 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8</div>
-            <p className="text-xs text-muted-foreground">5.3% of present employees</p>
+            <p className="text-3xl font-semibold">{stats.lateCount}</p>
+            <p className="text-xs text-slate-500">Proactive nudges sent at 09:15</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Absent</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle className="text-sm font-medium">Absences flagged</CardTitle>
+              <CardDescription>Across subsidiaries</CardDescription>
+            </div>
+            <Users className="h-5 w-5 text-rose-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8</div>
-            <p className="text-xs text-muted-foreground">5.3% absence rate</p>
+            <p className="text-3xl font-semibold">{stats.absentCount}</p>
+            <p className="text-xs text-slate-500">Escalations at {alertSettings.time}</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Overtime Hours</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle className="text-sm font-medium">Total overtime</CardTitle>
+              <CardDescription>Awaiting approvals</CardDescription>
+            </div>
+            <Clock4 className="h-5 w-5 text-sky-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">24.5</div>
-            <p className="text-xs text-muted-foreground">Pending approval</p>
+            <p className="text-3xl font-semibold">{stats.overtimeHours.toFixed(1)}h</p>
+            <p className="text-xs text-slate-500">Aligned with fatigue guardrails</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Devices Online</CardTitle>
-            <MapPin className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle className="text-sm font-medium">Devices online</CardTitle>
+              <CardDescription>Geo-fenced sites</CardDescription>
+            </div>
+            <MapPin className="h-5 w-5 text-indigo-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">2/3</div>
-            <p className="text-xs text-muted-foreground">1 device offline</p>
+            <p className="text-3xl font-semibold">
+              {stats.devicesOnline}/{stats.totalDevices}
+            </p>
+            <p className="text-xs text-slate-500">Auto heal enabled</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="insights">AI Insights</TabsTrigger>
           <TabsTrigger value="shifts">Shift Management</TabsTrigger>
           <TabsTrigger value="overtime">Overtime</TabsTrigger>
-          <TabsTrigger value="devices">Biometric Devices</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsTrigger value="devices">Integrations</TabsTrigger>
+          <TabsTrigger value="automation">Automation</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          {/* Search and Filter */}
-          <div className="flex space-x-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  placeholder="Search by employee name or ID..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            <Select value={dateFilter} onValueChange={setDateFilter}>
-              <SelectTrigger className="w-48">
-                <Calendar className="w-4 h-4 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="yesterday">Yesterday</SelectItem>
-                <SelectItem value="this-week">This Week</SelectItem>
-                <SelectItem value="this-month">This Month</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline">
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </Button>
-          </div>
-
-          {/* Attendance Records */}
           <Card>
-            <CardHeader>
-              <CardTitle>Today's Attendance</CardTitle>
-              <CardDescription>Real-time attendance tracking for all employees</CardDescription>
+            <CardHeader className="space-y-4">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      value={searchTerm}
+                      onChange={(event) => setSearchTerm(event.target.value)}
+                      placeholder="Search by employee, ID, or team"
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-3 text-sm text-slate-500">
+                  <span>Filtered results: {filteredRecords.length}</span>
+                  <span>•</span>
+                  <span>Date range: {dateFilter.replace("-", " ")}</span>
+                </div>
+              </div>
+
+              <div className="grid gap-3 lg:grid-cols-3 xl:grid-cols-6">
+                <Select value={filters.location} onValueChange={(value) => handleFilterChange("location", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Locations" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All locations</SelectItem>
+                    {uniqueValues.location.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={filters.department} onValueChange={(value) => handleFilterChange("department", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All departments</SelectItem>
+                    {uniqueValues.department.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={filters.division} onValueChange={(value) => handleFilterChange("division", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Division" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All divisions</SelectItem>
+                    {uniqueValues.division.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={filters.subsidiary} onValueChange={(value) => handleFilterChange("subsidiary", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Subsidiary" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All subsidiaries</SelectItem>
+                    {uniqueValues.subsidiary.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={filters.status} onValueChange={(value) => handleFilterChange("status", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All statuses</SelectItem>
+                    <SelectItem value="present">Present</SelectItem>
+                    <SelectItem value="late">Late</SelectItem>
+                    <SelectItem value="absent">Absent</SelectItem>
+                    <SelectItem value="early-departure">Early departure</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={filters.method} onValueChange={(value) => handleFilterChange("method", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All capture methods</SelectItem>
+                    {uniqueValues.method.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {getMethodLabel(value as AttendanceMethod)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <Select value={dateFilter} onValueChange={setDateFilter}>
+                  <SelectTrigger className="w-fit min-w-[150px]">
+                    <SelectValue placeholder="Date range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="yesterday">Yesterday</SelectItem>
+                    <SelectItem value="this-week">This week</SelectItem>
+                    <SelectItem value="this-month">This month</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" onClick={handleResetFilters}>
+                  Reset filters
+                </Button>
+                <Button variant="outline" onClick={() => handleExport("Attendance export")}>
+                  <Download className="mr-2 h-4 w-4" /> Export
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {filteredRecords.map((record) => (
-                  <div key={record.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div>
-                        <p className="font-medium">{record.employeeName}</p>
-                        <p className="text-sm text-gray-600">ID: {record.employeeId}</p>
+              <div className="flex flex-col gap-4 xl:flex-row">
+                <div className="flex-1 space-y-4">
+                  {filteredRecords.map((record) => (
+                    <div key={record.id} className="rounded-lg border bg-white p-4 shadow-sm">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-3">
+                            <h3 className="text-base font-semibold text-slate-900">{record.employeeName}</h3>
+                            <Badge variant="secondary" className="bg-slate-100 text-slate-700">
+                              {record.employeeId}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+                            <span>{record.department}</span>
+                            <span>•</span>
+                            <span>{record.subsidiary}</span>
+                            <span>•</span>
+                            <span>{record.shift}</span>
+                            {record.location && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" /> {record.location}
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid gap-2 sm:grid-cols-4">
+                            <div>
+                              <p className="text-xs uppercase text-slate-500">Clock in</p>
+                              <p className="text-sm font-medium text-slate-800">{record.clockIn || "—"}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase text-slate-500">Clock out</p>
+                              <p className="text-sm font-medium text-slate-800">{record.clockOut || "—"}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase text-slate-500">Hours</p>
+                              <p className="text-sm font-medium text-slate-800">
+                                {record.totalHours.toFixed(1)}h / {record.expectedHours}h
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase text-slate-500">Overtime</p>
+                              <p className="text-sm font-medium text-emerald-600">{record.overtimeHours.toFixed(1)}h</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-start gap-2 text-sm md:items-end">
+                          <div className="flex flex-wrap gap-2">
+                            <Badge className={getStatusColor(record.status)}>{record.status.replace("-", " ")}</Badge>
+                            <Badge className={getPredictedTrendColor(record.predictedTrend)}>
+                              Predicted: {record.predictedTrend.replace("-", " ")}
+                            </Badge>
+                            <Badge variant="secondary" className="bg-slate-100 text-slate-700">
+                              {getMethodLabel(record.method)}
+                            </Badge>
+                          </div>
+                          <div className="flex w-full flex-col gap-1">
+                            <div className="flex items-center justify-between text-xs text-slate-500">
+                              <span>Productivity</span>
+                              <span>{record.productivityScore}%</span>
+                            </div>
+                            <Progress value={record.productivityScore} className="h-2" />
+                            <div className="flex items-center justify-between text-xs text-slate-500">
+                              <span>Risk</span>
+                              <span>{Math.round(record.aiRiskScore * 100)}%</span>
+                            </div>
+                            <Progress value={Math.round(record.aiRiskScore * 100)} className="h-2" />
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {record.status !== "present" && (
+                              <Button size="sm" onClick={() => handleUpdateAttendanceStatus(record.id, "present")}>
+                                Mark present
+                              </Button>
+                            )}
+                            <Button size="sm" variant="outline" onClick={() => handleSendReminder(record)}>
+                              Send reminder
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-6 text-sm">
-                      <div className="text-center">
-                        <p className="font-medium text-gray-600">Clock In</p>
-                        <p>{record.clockIn || "—"}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="font-medium text-gray-600">Clock Out</p>
-                        <p>{record.clockOut || "—"}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="font-medium text-gray-600">Total Hours</p>
-                        <p>{record.totalHours}h</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="font-medium text-gray-600">Overtime</p>
-                        <p>{record.overtimeHours}h</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="font-medium text-gray-600">Method</p>
-                        <p className="capitalize">{record.method}</p>
-                      </div>
-                      <Badge className={getStatusColor(record.status)}>
-                        {record.status.replace("-", " ").toUpperCase()}
-                      </Badge>
+                  ))}
+                  {!filteredRecords.length && (
+                    <div className="rounded-lg border border-dashed p-8 text-center text-sm text-slate-500">
+                      No attendance records match the current filters.
                     </div>
-                  </div>
-                ))}
+                  )}
+                </div>
+                <div className="w-full space-y-4 xl:w-80">
+                  <Card className="bg-slate-50">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                        <Sparkles className="h-4 w-4 text-purple-500" /> Predictive summary
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {aiForecasts.map((forecast) => (
+                        <div key={forecast.label} className="rounded-lg border border-slate-200 bg-white p-3">
+                          <div className="flex items-center justify-between text-xs text-slate-500">
+                            <span>{forecast.label}</span>
+                            <span className="text-slate-400">{forecast.delta}</span>
+                          </div>
+                          <p className="text-lg font-semibold text-slate-900">{forecast.value}</p>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                        <Globe className="h-4 w-4 text-emerald-500" /> Geolocation check
+                      </CardTitle>
+                      <CardDescription>Verify location before approving mobile check-ins.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <Button onClick={handleCaptureLocation} disabled={isCapturingLocation} className="w-full">
+                        {isCapturingLocation ? "Capturing..." : "Use current device location"}
+                      </Button>
+                      {geoCapture ? (
+                        <div className="rounded-lg border bg-slate-50 p-3 text-xs text-slate-600">
+                          <p>Coordinates: {geoCapture.coordinates}</p>
+                          {geoCapture.accuracy && <p>Accuracy: {geoCapture.accuracy}</p>}
+                          <p>Captured at: {geoCapture.capturedAt}</p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-500">Geo-tag unlocks dynamic geo-fence scoring before finalizing attendance.</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                        <BellRing className="h-4 w-4 text-amber-500" /> Missed check-in alert
+                      </CardTitle>
+                      <CardDescription>Upcoming alert at {alertSettings.time}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-xs text-slate-600">
+                      <p>{alertSettings.enabled ? "Alerts enabled" : "Alerts paused"} • Channel {alertSettings.channel.toUpperCase()}</p>
+                      <p>{alertTriggeredToday ? "Today's alert already processed." : "System will auto-escalate if absentees remain."}</p>
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="shifts" className="space-y-6">
-          <div className="flex justify-between items-center">
+        <TabsContent value="insights" className="space-y-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h3 className="text-lg font-semibold">Shift Management</h3>
-              <p className="text-gray-600">Manage work shifts and employee assignments</p>
+              <h2 className="text-lg font-semibold text-slate-900">AI attendance copilots</h2>
+              <p className="text-sm text-slate-500">Machine learning surfaces emerging risk clusters, coverage gaps, and optimization tips.</p>
             </div>
-            <Dialog open={showShiftDialog} onOpenChange={setShowShiftDialog}>
-              <DialogTrigger asChild>
-                <Button className="bg-emerald-600 hover:bg-emerald-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Shift
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Create New Shift</DialogTitle>
-                  <DialogDescription>Set up a new work shift schedule</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="shiftName">Shift Name</Label>
-                      <Input placeholder="e.g., Morning Shift" />
-                    </div>
-                    <div>
-                      <Label htmlFor="breakDuration">Break Duration (minutes)</Label>
-                      <Input type="number" placeholder="60" />
-                    </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => handleExport("Insights digest")}>
+                <Download className="mr-2 h-4 w-4" /> Export digest
+              </Button>
+              <Button onClick={handleRefreshInsights}>
+                <RefreshCw className="mr-2 h-4 w-4" /> Refresh insights
+              </Button>
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {aiInsights.map((insight) => (
+              <Card key={insight.id} className="border border-purple-100">
+                <CardHeader className="space-y-1">
+                  <CardTitle className="flex items-start gap-2 text-base">
+                    <Sparkles className="mt-1 h-4 w-4 text-purple-500" /> {insight.title}
+                  </CardTitle>
+                  <CardDescription className="text-slate-600">{insight.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex items-center justify-between">
+                  <div className="flex flex-wrap gap-2">
+                    {insight.tags.map((tag) => (
+                      <Badge key={tag} variant="secondary" className="bg-purple-50 text-purple-700">
+                        {tag}
+                      </Badge>
+                    ))}
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="startTime">Start Time</Label>
-                      <Input type="time" />
-                    </div>
-                    <div>
-                      <Label htmlFor="endTime">End Time</Label>
-                      <Input type="time" />
-                    </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="employees">Assign Employees</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select employees" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="emp1">Kwame Asante</SelectItem>
-                        <SelectItem value="emp2">Ama Osei</SelectItem>
-                        <SelectItem value="emp3">Kofi Mensah</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex justify-end space-x-2">
-                    <Button variant="outline" onClick={() => setShowShiftDialog(false)}>
-                      Cancel
-                    </Button>
-                    <Button className="bg-emerald-600 hover:bg-emerald-700">Create Shift</Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+                  <span className="text-xs text-slate-500">Confidence {(insight.confidence * 100).toFixed(0)}%</span>
+                </CardContent>
+              </Card>
+            ))}
+            {!aiInsights.length && (
+              <Card className="border-dashed">
+                <CardContent className="p-8 text-center text-sm text-slate-500">
+                  No insights yet. Refresh after collecting attendance data.
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="shifts" className="space-y-6">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Shift orchestration</h2>
+              <p className="text-sm text-slate-500">Align shifts with demand forecasts. AI suggests resourcing based on overtime signals.</p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => handleExport("Shift roster")}>
+                <Download className="mr-2 h-4 w-4" /> Export roster
+              </Button>
+              <Button onClick={handleOpenNewShiftDialog} className="bg-emerald-600 hover:bg-emerald-700">
+                <Plus className="mr-2 h-4 w-4" /> Create shift
+              </Button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Dialog open={shiftDialogOpen} onOpenChange={setShiftDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>{shiftForm.id ? "Edit shift" : "Create shift"}</DialogTitle>
+                <DialogDescription>Configure shift properties, assignments, and AI guardrails.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="shift-name">Shift name</Label>
+                    <Input
+                      id="shift-name"
+                      value={shiftForm.name}
+                      onChange={(event) => setShiftForm((previous) => ({ ...previous, name: event.target.value }))}
+                      placeholder="e.g., Morning Shift"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="shift-department">Department</Label>
+                    <Input
+                      id="shift-department"
+                      value={shiftForm.department}
+                      onChange={(event) => setShiftForm((previous) => ({ ...previous, department: event.target.value }))}
+                      placeholder="Finance"
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="shift-start">Start time</Label>
+                    <Input
+                      id="shift-start"
+                      type="time"
+                      value={shiftForm.startTime}
+                      onChange={(event) => setShiftForm((previous) => ({ ...previous, startTime: event.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="shift-end">End time</Label>
+                    <Input
+                      id="shift-end"
+                      type="time"
+                      value={shiftForm.endTime}
+                      onChange={(event) => setShiftForm((previous) => ({ ...previous, endTime: event.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div>
+                    <Label htmlFor="shift-break">Break (minutes)</Label>
+                    <Input
+                      id="shift-break"
+                      type="number"
+                      value={shiftForm.breakDuration}
+                      onChange={(event) => setShiftForm((previous) => ({ ...previous, breakDuration: Number(event.target.value) }))}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label htmlFor="shift-location">Location</Label>
+                    <Input
+                      id="shift-location"
+                      value={shiftForm.location}
+                      onChange={(event) => setShiftForm((previous) => ({ ...previous, location: event.target.value }))}
+                      placeholder="Accra HQ"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="shift-employees">Employees (IDs)</Label>
+                  <Input
+                    id="shift-employees"
+                    value={shiftForm.employees}
+                    onChange={(event) => setShiftForm((previous) => ({ ...previous, employees: event.target.value }))}
+                    placeholder="EMP-001, EMP-002"
+                  />
+                  <p className="mt-1 text-xs text-slate-500">Multiple IDs separated by comma. AI can auto-assign from talent pool.</p>
+                </div>
+                <div>
+                  <Label htmlFor="shift-notes">Notes</Label>
+                  <Textarea
+                    id="shift-notes"
+                    value={shiftForm.notes}
+                    onChange={(event) => setShiftForm((previous) => ({ ...previous, notes: event.target.value }))}
+                    placeholder="Talent handover, coverage warnings, etc."
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setShiftDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleShiftSubmit}>{shiftForm.id ? "Update shift" : "Create shift"}</Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {shifts.map((shift) => (
-              <Card key={shift.id}>
-                <CardHeader>
-                  <div className="flex justify-between items-start">
+              <Card key={shift.id} className="relative">
+                <CardHeader className="space-y-2">
+                  <div className="flex items-start justify-between gap-2">
                     <div>
-                      <CardTitle className="text-lg">{shift.name}</CardTitle>
+                      <CardTitle className="text-base font-semibold text-slate-900">{shift.name}</CardTitle>
                       <CardDescription>
-                        {shift.startTime} - {shift.endTime} • {shift.breakDuration}min break
+                        {shift.startTime} - {shift.endTime} • {shift.breakDuration} min break
                       </CardDescription>
                     </div>
-                    <Badge className={shift.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
+                    <Badge className={shift.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}>
                       {shift.isActive ? "Active" : "Inactive"}
                     </Badge>
                   </div>
+                  <p className="text-sm text-slate-600">{shift.department} • {shift.location || "Location TBD"}</p>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Assigned Employees</p>
-                      <p className="text-sm">{shift.employees.length} employees assigned</p>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">
-                        Edit Shift
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        View Schedule
-                      </Button>
-                    </div>
+                <CardContent className="space-y-4">
+                  <div className="space-y-1 text-sm text-slate-600">
+                    <p>
+                      Assigned employees: <span className="font-medium text-slate-900">{shift.employees.length}</span>
+                    </p>
+                    {shift.notes && <p className="text-xs text-slate-500">{shift.notes}</p>}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => handleEditShift(shift)}>
+                      Edit shift
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => toast({ title: "Schedule view", description: "Integration with roster builder coming soon." })}>
+                      View schedule
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleToggleShiftActive(shift.id)}>
+                      {shift.isActive ? "Pause shift" : "Activate shift"}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -516,131 +2017,412 @@ export default function AttendancePage() {
         </TabsContent>
 
         <TabsContent value="overtime" className="space-y-6">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Overtime governance</h2>
+              <p className="text-sm text-slate-500">Approve or reroute overtime with AI fatigue guardrails.</p>
+            </div>
+            <Button variant="outline" onClick={() => handleExport("Overtime ledger")}>
+              <Download className="mr-2 h-4 w-4" /> Export overtime
+            </Button>
+          </div>
+
           <Card>
             <CardHeader>
-              <CardTitle>Overtime Management</CardTitle>
-              <CardDescription>Review and approve overtime requests</CardDescription>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <BarChart3 className="h-4 w-4 text-sky-500" /> Pending approvals
+              </CardTitle>
+              <CardDescription>AI highlights risk of burnout by role and department.</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">Kwame Asante</p>
-                    <p className="text-sm text-gray-600">2.5 hours overtime • Feb 15, 2024</p>
+            <CardContent className="space-y-4">
+              {overtimeRequests.map((request) => (
+                <div
+                  key={request.id}
+                  className="flex flex-col gap-4 rounded-lg border p-4 md:flex-row md:items-center md:justify-between"
+                >
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-slate-900">{request.employeeName}</p>
+                    <p className="text-xs text-slate-500">
+                      {request.department} • {new Date(request.date).toLocaleDateString()}
+                    </p>
+                    <p className="text-sm text-slate-600">{request.justification}</p>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge className="bg-yellow-100 text-yellow-800">Pending Approval</Badge>
-                    <Button size="sm" variant="outline">
-                      Approve
-                    </Button>
-                    <Button size="sm" variant="outline">
-                      Reject
-                    </Button>
+                  <div className="flex flex-col items-start gap-2 md:items-end">
+                    <Badge
+                      className={
+                        request.status === "approved"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : request.status === "pending"
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-rose-100 text-rose-700"
+                      }
+                    >
+                      {request.status.toUpperCase()}
+                    </Badge>
+                    <p className="text-sm font-medium text-slate-900">{request.hoursRequested.toFixed(1)} hours</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleApproveOvertime(request.id, "approved")}
+                        disabled={request.status === "approved"}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleApproveOvertime(request.id, "rejected")}
+                        disabled={request.status === "rejected"}
+                      >
+                        Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => toast({ title: "Sent to analytics", description: "Detailed timesheet opened in payroll workspace." })}
+                      >
+                        View details
+                      </Button>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">Ama Osei</p>
-                    <p className="text-sm text-gray-600">1.5 hours overtime • Feb 14, 2024</p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge className="bg-green-100 text-green-800">Approved</Badge>
-                    <Button size="sm" variant="outline">
-                      View Details
-                    </Button>
-                  </div>
-                </div>
-              </div>
+              ))}
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="devices" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Biometric Devices</CardTitle>
-              <CardDescription>Monitor and manage biometric attendance devices</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {biometricDevices.map((device) => (
-                  <div key={device.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-2 bg-gray-100 rounded-lg">
-                        {device.type === "fingerprint" && <Fingerprint className="w-6 h-6 text-emerald-600" />}
-                        {device.type === "facial" && <Camera className="w-6 h-6 text-blue-600" />}
-                        {device.type === "card" && <ClockIcon className="w-6 h-6 text-orange-600" />}
-                      </div>
-                      <div>
-                        <p className="font-medium">{device.name}</p>
-                        <p className="text-sm text-gray-600">
-                          {device.location} • Last sync: {device.lastSync}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge className={getDeviceStatusColor(device.status)}>{device.status.toUpperCase()}</Badge>
-                      <Button size="sm" variant="outline">
-                        Configure
-                      </Button>
-                      <Button size="sm" variant="outline">
-                        Sync Data
-                      </Button>
-                    </div>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Biometric & attendance integrations</h2>
+              <p className="text-sm text-slate-500">Connect biometric terminals, mobile apps, or third-party attendance APIs in minutes.</p>
+            </div>
+            <Button onClick={() => setDeviceDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-700">
+              <Plus className="mr-2 h-4 w-4" /> Connect device
+            </Button>
+          </div>
+
+          <Dialog open={deviceDialogOpen} onOpenChange={setDeviceDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Connect a biometric device or external feed</DialogTitle>
+                <DialogDescription>Use vendor SDKs, REST webhooks, or CSV imports. We normalize data for you.</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="device-name">Device name</Label>
+                    <Input
+                      id="device-name"
+                      value={deviceForm.name}
+                      onChange={(event) => setDeviceForm((previous) => ({ ...previous, name: event.target.value }))}
+                      placeholder="e.g., HQ FaceID"
+                    />
                   </div>
-                ))}
+                  <div>
+                    <Label htmlFor="device-provider">Provider / Vendor</Label>
+                    <Input
+                      id="device-provider"
+                      value={deviceForm.provider}
+                      onChange={(event) => setDeviceForm((previous) => ({ ...previous, provider: event.target.value }))}
+                      placeholder="VisionX"
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div>
+                    <Label>Capture type</Label>
+                    <Select value={deviceForm.type} onValueChange={(value) => setDeviceForm((previous) => ({ ...previous, type: value as BiometricDevice["type"] }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="fingerprint">Fingerprint</SelectItem>
+                        <SelectItem value="facial">Facial recognition</SelectItem>
+                        <SelectItem value="card">RFID / card</SelectItem>
+                        <SelectItem value="mobile">Mobile app</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Integration mode</Label>
+                    <Select
+                      value={deviceForm.integration}
+                      onValueChange={(value) => setDeviceForm((previous) => ({ ...previous, integration: value as BiometricDevice["integration"] }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Mode" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="REST">REST webhook</SelectItem>
+                        <SelectItem value="SDK">Vendor SDK</SelectItem>
+                        <SelectItem value="CSV">CSV / SFTP</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="device-location">Location</Label>
+                    <Input
+                      id="device-location"
+                      value={deviceForm.location}
+                      onChange={(event) => setDeviceForm((previous) => ({ ...previous, location: event.target.value }))}
+                      placeholder="Accra HQ Lobby"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="device-reference">Webhook URL / SDK key</Label>
+                  <Input
+                    id="device-reference"
+                    value={deviceForm.reference}
+                    onChange={(event) => setDeviceForm((previous) => ({ ...previous, reference: event.target.value }))}
+                    placeholder="https://"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setDeviceDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddDevice}>Connect device</Button>
+                </div>
               </div>
-            </CardContent>
-          </Card>
+            </DialogContent>
+          </Dialog>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {biometricDevices.map((device) => (
+              <Card key={device.id} className="border border-slate-200">
+                <CardHeader className="space-y-3">
+                  <div className="flex items-start justify_between gap-2">
+                    <div>
+                      <CardTitle className="text-base font-semibold text-slate-900">{device.name}</CardTitle>
+                      <CardDescription>{device.location}</CardDescription>
+                    </div>
+                    <Badge
+                      className={
+                        device.status === "online"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : device.status === "syncing"
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-rose-100 text-rose-700"
+                      }
+                    >
+                      {device.status.toUpperCase()}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-slate-500">Last sync: {device.lastSync}</p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <LinkIcon className="h-3 w-3" /> {device.integration} • {device.provider}
+                  </div>
+                  {device.reference && <div className="rounded bg-slate-50 p-2 text-xs text-slate-500">{device.reference}</div>}
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => toast({ title: "Configure", description: "Device configuration launched." })}>
+                      Configure
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleSyncDevice(device.id)}>
+                      Sync data
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleDeviceStatusToggle(device)}>
+                      {device.status === "online" ? "Mark offline" : "Bring online"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </TabsContent>
 
-        <TabsContent value="reports" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <TabsContent value="automation" className="space-y-6">
+          <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Attendance Reports</CardTitle>
-                <CardDescription>Generate comprehensive attendance reports</CardDescription>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                  <BellRing className="h-5 w-5 text-amber-500" /> Missed attendee alerts
+                </CardTitle>
+                <CardDescription>Configure automated nudges when employees miss check-in targets.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <Button variant="outline" className="w-full justify-start bg-transparent">
-                  <Download className="w-4 h-4 mr-2" />
-                  Daily Attendance Report
-                </Button>
-                <Button variant="outline" className="w-full justify-start bg-transparent">
-                  <Download className="w-4 h-4 mr-2" />
-                  Monthly Attendance Summary
-                </Button>
-                <Button variant="outline" className="w-full justify-start bg-transparent">
-                  <Download className="w-4 h-4 mr-2" />
-                  Overtime Report
-                </Button>
-                <Button variant="outline" className="w-full justify-start bg-transparent">
-                  <Download className="w-4 h-4 mr-2" />
-                  Late Arrivals Report
-                </Button>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">Enable alerts</p>
+                    <p className="text-xs text-slate-500">Send alert when AI detects missing check-ins.</p>
+                  </div>
+                  <Switch checked={alertSettings.enabled} onCheckedChange={(checked) => setAlertSettings((previous) => ({ ...previous, enabled: checked }))} />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="alert-time">Alert time</Label>
+                    <Input
+                      id="alert-time"
+                      type="time"
+                      value={alertSettings.time}
+                      onChange={(event) => setAlertSettings((previous) => ({ ...previous, time: event.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label>Channel</Label>
+                    <Select value={alertSettings.channel} onValueChange={(value) => setAlertSettings((previous) => ({ ...previous, channel: value as AlertSettings["channel"] }))}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="email">Email digest</SelectItem>
+                        <SelectItem value="sms">SMS text</SelectItem>
+                        <SelectItem value="push">Mobile push</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="flex items-center justify-between rounded border p-3">
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">Escalate to managers</p>
+                      <p className="text-xs text-slate-500">Notify direct leads</p>
+                    </div>
+                    <Switch
+                      checked={alertSettings.escalateToManagers}
+                      onCheckedChange={(checked) => setAlertSettings((previous) => ({ ...previous, escalateToManagers: checked }))}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between rounded border p-3">
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">Include contractors</p>
+                      <p className="text-xs text-slate-500">Send alerts to partner staff</p>
+                    </div>
+                    <Switch
+                      checked={alertSettings.includeContractors}
+                      onCheckedChange={(checked) => setAlertSettings((previous) => ({ ...previous, includeContractors: checked }))}
+                    />
+                  </div>
+                </div>
+                <Button onClick={handleSaveAlertSettings}>Save preferences</Button>
               </CardContent>
             </Card>
+
             <Card>
               <CardHeader>
-                <CardTitle>Analytics</CardTitle>
-                <CardDescription>Attendance trends and insights</CardDescription>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                  <Settings2 className="h-5 w-5 text-indigo-500" /> Holiday & blackout calendar
+                </CardTitle>
+                <CardDescription>HR can define holidays or location-specific blackout days. Attendance auto-adjusts.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="p-4 bg-emerald-50 rounded-lg">
-                  <p className="text-sm font-medium text-emerald-800">Average Attendance Rate</p>
-                  <p className="text-2xl font-bold text-emerald-600">94.7%</p>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">Upcoming holidays</p>
+                    <p className="text-xs text-slate-500">Synced with payroll & leave management</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setHolidayDialogOpen(true)}>
+                    <Plus className="mr-1 h-3 w-3" /> Add
+                  </Button>
                 </div>
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <p className="text-sm font-medium text-blue-800">Average Daily Hours</p>
-                  <p className="text-2xl font-bold text-blue-600">8.2h</p>
-                </div>
-                <div className="p-4 bg-orange-50 rounded-lg">
-                  <p className="text-sm font-medium text-orange-800">Monthly Overtime</p>
-                  <p className="text-2xl font-bold text-orange-600">156h</p>
+                <div className="space-y-3">
+                  {holidays.map((holiday) => (
+                    <div
+                      key={holiday.id}
+                      className="flex flex-col gap-2 rounded border border-slate-200 p-3 text-sm text-slate-700 md:flex-row md:items-center md:justify-between"
+                    >
+                      <div>
+                        <p className="font-medium text-slate-900">{holiday.name}</p>
+                        <p className="text-xs text-slate-500">
+                          {new Date(holiday.date).toLocaleDateString()} • {holiday.scope === "company" ? "Company-wide" : holiday.scope === "subsidiary" ? holiday.scopeReference : `${holiday.scopeReference} team`}
+                        </p>
+                        {holiday.notes && <p className="text-xs text-slate-500">{holiday.notes}</p>}
+                      </div>
+                      <div className="flex items-center gap-2 self-start md:self-end">
+                        <Badge className={holiday.isPaid ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}>
+                          {holiday.isPaid ? "Paid" : "Unpaid"}
+                        </Badge>
+                        <Button size="sm" variant="ghost" onClick={() => handleRemoveHoliday(holiday.id)}>
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {!holidays.length && <p className="text-xs text-slate-500">No holidays defined yet.</p>}
                 </div>
               </CardContent>
             </Card>
           </div>
+
+          <Dialog open={holidayDialogOpen} onOpenChange={setHolidayDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Schedule a holiday / blackout day</DialogTitle>
+                <DialogDescription>Employees scheduled on this day receive automatic exemptions.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="holiday-name">Holiday name</Label>
+                  <Input
+                    id="holiday-name"
+                    value={holidayForm.name}
+                    onChange={(event) => setHolidayForm((previous) => ({ ...previous, name: event.target.value }))}
+                  />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="holiday-date">Date</Label>
+                    <Input
+                      id="holiday-date"
+                      type="date"
+                      value={holidayForm.date}
+                      onChange={(event) => setHolidayForm((previous) => ({ ...previous, date: event.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label>Scope</Label>
+                    <Select value={holidayForm.scope} onValueChange={(value) => setHolidayForm((previous) => ({ ...previous, scope: value as Holiday["scope"] }))}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="company">Company-wide</SelectItem>
+                        <SelectItem value="subsidiary">Subsidiary</SelectItem>
+                        <SelectItem value="department">Department</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="holiday-scope">Reference (optional)</Label>
+                  <Input
+                    id="holiday-scope"
+                    value={holidayForm.scopeReference}
+                    onChange={(event) => setHolidayForm((previous) => ({ ...previous, scopeReference: event.target.value }))}
+                    placeholder="e.g., Core Group"
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded border p-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">Paid holiday</p>
+                    <p className="text-xs text-slate-500">Exempt from overtime accruals</p>
+                  </div>
+                  <Switch
+                    checked={holidayForm.isPaid}
+                    onCheckedChange={(checked) => setHolidayForm((previous) => ({ ...previous, isPaid: checked }))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="holiday-notes">Notes</Label>
+                  <Textarea
+                    id="holiday-notes"
+                    value={holidayForm.notes}
+                    onChange={(event) => setHolidayForm((previous) => ({ ...previous, notes: event.target.value }))}
+                    placeholder="Who is exempt and additional guidance"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setHolidayDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddHoliday}>Save holiday</Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
       </Tabs>
     </div>

@@ -16,6 +16,7 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
+    "smoke": "bash scripts/smoke-tests.sh",
     "start": "next start"
   },
   "dependencies": {
@@ -61,12 +62,11 @@
     "embla-carousel-react": "8.5.1",
     "fs": "latest",
     "geist": "latest",
-    "google-auth-library": "latest",
     "groq-sdk": "latest",
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
     "mammoth": "latest",
-    "next": "15.2.4",
+    "next": "15.2.6",
     "next-themes": "latest",
     "pdfjs-dist": "latest",
     "react": "^19",

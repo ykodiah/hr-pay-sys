@@ -1,6 +1,6 @@
 "use client"
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useEffect, useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -11,6 +11,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Textarea } from "@/components/ui/textarea"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
 import { toast } from "@/hooks/use-toast"
 import {
   Calculator,
@@ -29,6 +33,10 @@ import {
   Filter,
   Search,
   FileSpreadsheet,
+  ArrowRightLeft,
+  Building2,
+  Clock,
+  Bell,
 } from "lucide-react"
 
 const calculateSSNIT = (basicSalary: number) => {
@@ -83,6 +91,186 @@ const calculatePAYE = (
   return Math.round(tax)
 }
 
+type TransferType = "permanent" | "temporary"
+
+type Subsidiary = {
+  id: string
+  name: string
+  code: string
+  location: string
+  description?: string
+  divisions: string[]
+  departments: string[]
+  supervisor: string
+  headOfDepartment: string
+}
+
+type TransferEmployeeRecord = {
+  id: number
+  name: string
+  fromSubsidiaryId: string
+  fromSubsidiaryName: string
+  fromDivision?: string
+  fromDepartment?: string
+}
+
+type TransferApprovalStage = {
+  role: "Supervisor" | "Head of Department"
+  approver: string
+  status: "pending" | "approved" | "rejected"
+  actionDate?: string
+  notes?: string
+}
+
+type TransferRecord = {
+  id: string
+  initiatedOn: string
+  effectiveDate: string
+  transferType: TransferType
+  targetSubsidiaryId: string
+  targetSubsidiaryName: string
+  targetDivision?: string
+  targetDepartment?: string
+  reason?: string
+  returnDate?: string
+  approvalStatus: "pending" | "approved" | "rejected"
+  approvals: TransferApprovalStage[]
+  employees: TransferEmployeeRecord[]
+}
+
+type NotificationMessage = {
+  id: string
+  timestamp: string
+  audience: "Supervisor" | "Head of Department" | "HR"
+  message: string
+  transferId: string
+}
+
+const subsidiaries: Subsidiary[] = [
+  {
+    id: "accra-hq",
+    name: "Accra Headquarters",
+    code: "SUB-001",
+    location: "Accra",
+    description: "Corporate head office",
+    divisions: ["Technology", "Corporate Services"],
+    departments: ["Engineering", "Finance", "Operations"],
+    supervisor: "Ama Owusu",
+    headOfDepartment: "Kwaku Agyeman",
+  },
+  {
+    id: "kumasi-branch",
+    name: "Kumasi Branch",
+    code: "SUB-002",
+    location: "Kumasi",
+    description: "Northern region operations",
+    divisions: ["Sales", "Support"],
+    departments: ["Field Sales", "Customer Care", "Compliance"],
+    supervisor: "Yaw Mensah",
+    headOfDepartment: "Akosua Aboagye",
+  },
+  {
+    id: "takoradi-ops",
+    name: "Takoradi Operations Centre",
+    code: "SUB-003",
+    location: "Takoradi",
+    description: "Western corridor services",
+    divisions: ["Projects", "Service Delivery"],
+    departments: ["Marine Projects", "Logistics", "Support Desk"],
+    supervisor: "Kojo Ampofo",
+    headOfDepartment: "Esi Serwaa",
+  },
+]
+
+const getSubsidiary = (id: string) => subsidiaries.find((subsidiary) => subsidiary.id === id)
+
+const getSubsidiaryName = (id: string) => getSubsidiary(id)?.name ?? "Unknown subsidiary"
+
+const getSubsidiaryCode = (id: string) => getSubsidiary(id)?.code ?? "—"
+
+const getSubsidiaryDivisions = (id: string) => getSubsidiary(id)?.divisions ?? []
+
+const getSubsidiaryDepartments = (id: string) => getSubsidiary(id)?.departments ?? []
+
+const getSubsidiarySupervisor = (id: string) => getSubsidiary(id)?.supervisor ?? "Assigned Supervisor"
+
+const getSubsidiaryHeadOfDepartment = (id: string) => getSubsidiary(id)?.headOfDepartment ?? "Head of Department"
+
+const formatDisplayDate = (date?: string | null) => {
+  if (!date) {
+    return "Immediate"
+  }
+
+  if (date.includes("T")) {
+    return formatDisplayDate(date.split("T")[0])
+  }
+
+  const [year, month, day] = date.split("-").map(Number)
+
+  if (!year || !month || !day) {
+    return date
+  }
+
+  return new Date(year, month - 1, day).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })
+}
+
+const toTitleCase = (value: string) =>
+  value
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
+
+const formatTransferCount = (count: number) => `${count} ${count === 1 ? "employee" : "employees"}`
+
+const normalizeStatus = (status: string) => status.toLowerCase().replace(/\s+/g, "-")
+
+const getStatusBadgeAppearance = (status: string) => {
+  const normalized = normalizeStatus(status)
+
+  if (normalized === "processed") {
+    return { variant: "default" as const, className: "bg-emerald-100 text-emerald-800" }
+  }
+
+  if (normalized === "calculated") {
+    return { variant: "secondary" as const, className: "bg-blue-100 text-blue-800" }
+  }
+
+  if (normalized === "pending-transfer") {
+    return { variant: "secondary" as const, className: "bg-amber-100 text-amber-800 border-amber-200" }
+  }
+
+  if (normalized === "pending-transfer-approval") {
+    return { variant: "secondary" as const, className: "bg-amber-100 text-amber-800 border-amber-200" }
+  }
+
+  if (normalized === "transfer-scheduled" || normalized === "transfer-approved") {
+    return { variant: "default" as const, className: "bg-emerald-100 text-emerald-700" }
+  }
+
+  if (normalized === "on-temporary-assignment") {
+    return { variant: "secondary" as const, className: "bg-blue-100 text-blue-800" }
+  }
+
+  if (normalized === "transfer-rejected") {
+    return { variant: "secondary" as const, className: "bg-red-100 text-red-700 border-red-200" }
+  }
+
+  return { variant: "outline" as const, className: "bg-gray-100 text-gray-800" }
+}
+
+const formatDateTime = (timestamp: string) =>
+  new Date(timestamp).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+
 const initialPayrollPeriods = [
   {
     id: 1,
@@ -135,6 +323,12 @@ const initialEmployeePayroll = [
     avatar: "/placeholder.svg?height=40&width=40",
     position: "Senior Software Engineer",
     employeeId: "EMP001",
+    subsidiaryId: "accra-hq",
+    subsidiary: getSubsidiaryName("accra-hq"),
+    division: "Technology",
+    department: "Engineering",
+    supervisor: getSubsidiarySupervisor("accra-hq"),
+    headOfDepartment: getSubsidiaryHeadOfDepartment("accra-hq"),
     basicSalary: 8500,
     allowances: {
       transport: 500,
@@ -165,6 +359,12 @@ const initialEmployeePayroll = [
     avatar: "/placeholder.svg?height=40&width=40",
     position: "HR Manager",
     employeeId: "EMP002",
+    subsidiaryId: "kumasi-branch",
+    subsidiary: getSubsidiaryName("kumasi-branch"),
+    division: "Support",
+    department: "Customer Care",
+    supervisor: getSubsidiarySupervisor("kumasi-branch"),
+    headOfDepartment: getSubsidiaryHeadOfDepartment("kumasi-branch"),
     basicSalary: 7200,
     allowances: {
       transport: 400,
@@ -195,6 +395,12 @@ const initialEmployeePayroll = [
     avatar: "/placeholder.svg?height=40&width=40",
     position: "Marketing Specialist",
     employeeId: "EMP003",
+    subsidiaryId: "takoradi-ops",
+    subsidiary: getSubsidiaryName("takoradi-ops"),
+    division: "Projects",
+    department: "Marine Projects",
+    supervisor: getSubsidiarySupervisor("takoradi-ops"),
+    headOfDepartment: getSubsidiaryHeadOfDepartment("takoradi-ops"),
     basicSalary: 5800,
     allowances: {
       transport: 300,
@@ -221,16 +427,117 @@ const initialEmployeePayroll = [
   },
 ]
 
+const initialTransferHistory: TransferRecord[] = [
+  {
+    id: "TR-2024-12-01",
+    initiatedOn: "2024-12-01",
+    effectiveDate: "2025-01-01",
+    transferType: "permanent",
+    targetSubsidiaryId: "kumasi-branch",
+    targetSubsidiaryName: getSubsidiaryName("kumasi-branch"),
+    targetDivision: "Support",
+    targetDepartment: "Compliance",
+    reason: "Align workforce with regional expansion",
+    approvalStatus: "approved",
+    approvals: [
+      {
+        role: "Supervisor",
+        approver: getSubsidiarySupervisor("accra-hq"),
+        status: "approved",
+        actionDate: "2024-12-03",
+        notes: "Cleared after knowledge transfer",
+      },
+      {
+        role: "Head of Department",
+        approver: getSubsidiaryHeadOfDepartment("accra-hq"),
+        status: "approved",
+        actionDate: "2024-12-04",
+        notes: "Approved to support northern expansion",
+      },
+    ],
+    employees: [
+      {
+        id: 105,
+        name: "Yaw Boateng",
+        fromSubsidiaryId: "accra-hq",
+        fromSubsidiaryName: getSubsidiaryName("accra-hq"),
+        fromDivision: "Technology",
+        fromDepartment: "Engineering",
+      },
+      {
+        id: 117,
+        name: "Abena Koomson",
+        fromSubsidiaryId: "accra-hq",
+        fromSubsidiaryName: getSubsidiaryName("accra-hq"),
+        fromDivision: "Corporate Services",
+        fromDepartment: "Operations",
+      },
+    ],
+  },
+  {
+    id: "TR-2024-10-15",
+    initiatedOn: "2024-10-15",
+    effectiveDate: "2024-11-01",
+    transferType: "temporary",
+    targetSubsidiaryId: "takoradi-ops",
+    targetSubsidiaryName: getSubsidiaryName("takoradi-ops"),
+    targetDivision: "Projects",
+    targetDepartment: "Marine Projects",
+    reason: "Support offshore project go-live",
+    returnDate: "2025-02-01",
+    approvalStatus: "approved",
+    approvals: [
+      {
+        role: "Supervisor",
+        approver: getSubsidiarySupervisor("kumasi-branch"),
+        status: "approved",
+        actionDate: "2024-10-17",
+      },
+      {
+        role: "Head of Department",
+        approver: getSubsidiaryHeadOfDepartment("kumasi-branch"),
+        status: "approved",
+        actionDate: "2024-10-18",
+        notes: "Return to customer care by February",
+      },
+    ],
+    employees: [
+      {
+        id: 202,
+        name: "Esi Nyarko",
+        fromSubsidiaryId: "kumasi-branch",
+        fromSubsidiaryName: getSubsidiaryName("kumasi-branch"),
+        fromDivision: "Support",
+        fromDepartment: "Customer Care",
+      },
+    ],
+  },
+]
+
+type TransferFormData = {
+  targetSubsidiaryId: string
+  effectiveDate: string
+  reason: string
+  transferType: TransferType
+  targetDivision?: string
+  targetDepartment?: string
+  returnDate?: string
+}
+
 export default function PayrollPage() {
   const [payrollPeriods, setPayrollPeriods] = useState(initialPayrollPeriods)
   const [employeePayroll, setEmployeePayroll] = useState(initialEmployeePayroll)
   const [selectedPeriod, setSelectedPeriod] = useState("January 2025")
   const [isProcessDialogOpen, setIsProcessDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [selectAll, setSelectAll] = useState(false)
+  const [transferCandidates, setTransferCandidates] = useState<any[]>([])
+  const [transferHistory, setTransferHistory] = useState(initialTransferHistory)
+  const [notifications, setNotifications] = useState<NotificationMessage[]>([])
 
   const currentPeriod = payrollPeriods.find((p) => p.period === selectedPeriod)
 
@@ -305,16 +612,334 @@ export default function PayrollPage() {
     setEmployeePayroll(employeePayroll.map((emp) => (emp.id === employeeId ? { ...emp, selected: checked } : emp)))
   }
 
+  const handleOpenTransferDialog = (candidates: any[]) => {
+    if (!candidates.length) {
+      toast({
+        variant: "destructive",
+        title: "No employees selected",
+        description: "Select at least one employee to transfer across subsidiaries.",
+      })
+      return
+    }
+
+    setTransferCandidates(candidates)
+    setIsTransferDialogOpen(true)
+  }
+
+  const pushNotification = (audience: NotificationMessage["audience"], message: string, transferId: string) => {
+    setNotifications((prev) => [
+      {
+        id: `NT-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        timestamp: new Date().toISOString(),
+        audience,
+        message,
+        transferId,
+      },
+      ...prev,
+    ])
+    toast({ title: `${audience} notified`, description: message })
+  }
+
+  const handleTransferConfirm = ({
+    targetSubsidiaryId,
+    effectiveDate,
+    reason,
+    transferType,
+    targetDivision,
+    targetDepartment,
+    returnDate,
+  }: TransferFormData) => {
+    if (!transferCandidates.length) {
+      toast({
+        variant: "destructive",
+        title: "No employees selected",
+        description: "Select the employees you want to move and try again.",
+      })
+      return
+    }
+
+    const employeesToTransfer = transferCandidates.filter((employee) => employee.subsidiaryId !== targetSubsidiaryId)
+    const alreadyAssignedCount = transferCandidates.length - employeesToTransfer.length
+
+    if (!employeesToTransfer.length) {
+      toast({
+        variant: "destructive",
+        title: "Transfer not required",
+        description: "All selected employees already belong to the destination subsidiary.",
+      })
+      return
+    }
+
+    const targetName = getSubsidiaryName(targetSubsidiaryId)
+    const normalizedEffectiveDate = effectiveDate || new Date().toISOString().split("T")[0]
+    const normalizedReturnDate = transferType === "temporary" ? returnDate || "" : undefined
+    const candidateIdSet = new Set(transferCandidates.map((candidate) => candidate.id))
+    const transferIdSet = new Set(employeesToTransfer.map((candidate) => candidate.id))
+    const destinationDivision = targetDivision || getSubsidiaryDivisions(targetSubsidiaryId)[0] || "General"
+    const destinationDepartment = targetDepartment || getSubsidiaryDepartments(targetSubsidiaryId)[0] || "General"
+    const supervisorName =
+      transferCandidates[0]?.supervisor || getSubsidiarySupervisor(employeesToTransfer[0].subsidiaryId)
+    const hodName =
+      transferCandidates[0]?.headOfDepartment || getSubsidiaryHeadOfDepartment(employeesToTransfer[0].subsidiaryId)
+    const transferId = `TR-${Date.now()}`
+
+    setEmployeePayroll((prev) =>
+      prev.map((employee) => {
+        if (!candidateIdSet.has(employee.id)) {
+          return employee
+        }
+
+        if (!transferIdSet.has(employee.id)) {
+          return {
+            ...employee,
+            selected: false,
+          }
+        }
+
+        return {
+          ...employee,
+          selected: false,
+          status: "Pending Transfer Approval",
+          pendingTransfer: {
+            transferId,
+            targetSubsidiaryId,
+            targetSubsidiaryName: targetName,
+            targetDivision: destinationDivision,
+            targetDepartment: destinationDepartment,
+            transferType,
+            effectiveDate: normalizedEffectiveDate,
+            returnDate: normalizedReturnDate,
+            reason,
+          },
+        }
+      }),
+    )
+
+    setTransferHistory((prev) => [
+      {
+        id: transferId,
+        initiatedOn: new Date().toISOString().split("T")[0],
+        effectiveDate: normalizedEffectiveDate,
+        transferType,
+        targetSubsidiaryId,
+        targetSubsidiaryName: targetName,
+        targetDivision: destinationDivision,
+        targetDepartment: destinationDepartment,
+        reason,
+        returnDate: normalizedReturnDate,
+        approvalStatus: "pending",
+        approvals: [
+          {
+            role: "Supervisor",
+            approver: supervisorName,
+            status: "pending",
+          },
+          {
+            role: "Head of Department",
+            approver: hodName,
+            status: "pending",
+          },
+        ],
+        employees: employeesToTransfer.map((employee) => ({
+          id: employee.id,
+          name: employee.name,
+          fromSubsidiaryId: employee.subsidiaryId,
+          fromSubsidiaryName: employee.subsidiary,
+          fromDivision: employee.division,
+          fromDepartment: employee.department,
+        })),
+      },
+      ...prev,
+    ])
+
+    pushNotification(
+      "Supervisor",
+      `${formatTransferCount(employeesToTransfer.length)} awaiting your approval for transfer to ${targetName}.`,
+      transferId,
+    )
+
+    pushNotification(
+      "Head of Department",
+      `Transfer request for ${formatTransferCount(employeesToTransfer.length)} queued after supervisor review.`,
+      transferId,
+    )
+
+    setTransferCandidates([])
+    setIsTransferDialogOpen(false)
+    setSelectAll(false)
+
+    toast({
+      title: "Transfer request submitted",
+      description: `Awaiting approvals before moving ${formatTransferCount(employeesToTransfer.length)} to ${targetName}${
+        alreadyAssignedCount > 0 ? ` • ${alreadyAssignedCount} already assigned` : ""
+      }.`,
+    })
+  }
+
+  const applyApprovedTransfer = (record: TransferRecord) => {
+    setEmployeePayroll((prev) =>
+      prev.map((employee) => {
+        const match = record.employees.find((candidate) => candidate.id === employee.id)
+        if (!match) {
+          return employee
+        }
+
+        return {
+          ...employee,
+          subsidiaryId: record.targetSubsidiaryId,
+          subsidiary: record.targetSubsidiaryName,
+          division: record.targetDivision ?? employee.division,
+          department: record.targetDepartment ?? employee.department,
+          previousSubsidiaryId: match.fromSubsidiaryId,
+          previousSubsidiary: match.fromSubsidiaryName,
+          previousDivision: match.fromDivision ?? employee.division,
+          previousDepartment: match.fromDepartment ?? employee.department,
+          status: record.transferType === "temporary" ? "On Temporary Assignment" : "Transfer Scheduled",
+          pendingTransfer: undefined,
+          transferEffectiveDate: record.effectiveDate,
+          transferType: record.transferType,
+          transferNotes: record.reason,
+          expectedReturnDate: record.returnDate,
+          supervisor: getSubsidiarySupervisor(record.targetSubsidiaryId),
+          headOfDepartment: getSubsidiaryHeadOfDepartment(record.targetSubsidiaryId),
+        }
+      }),
+    )
+
+    pushNotification(
+      "HR",
+      `Transfer ${record.id} fully approved. Move effective ${formatDisplayDate(record.effectiveDate)}.`,
+      record.id,
+    )
+
+    toast({
+      title: "Transfer approved",
+      description: `All approvals captured for ${formatTransferCount(record.employees.length)}.`,
+    })
+  }
+
+  const handleTransferRejection = (
+    record: TransferRecord,
+    notes: string | undefined,
+    rejectedBy: TransferApprovalStage["role"],
+  ) => {
+    setEmployeePayroll((prev) =>
+      prev.map((employee) => {
+        const match = record.employees.find((candidate) => candidate.id === employee.id)
+        if (!match) {
+          return employee
+        }
+
+        return {
+          ...employee,
+          status: "Transfer Rejected",
+          pendingTransfer: undefined,
+          transferNotes: notes || record.reason,
+          transferEffectiveDate: undefined,
+          expectedReturnDate: undefined,
+          transferType: undefined,
+        }
+      }),
+    )
+
+    pushNotification(
+      "HR",
+      `Transfer ${record.id} rejected by ${rejectedBy.toLowerCase()}. ${notes ? `Reason: ${notes}` : ""}`.trim(),
+      record.id,
+    )
+
+    toast({
+      variant: "destructive",
+      title: "Transfer rejected",
+      description: `Transfer ${record.id} marked as rejected.`,
+    })
+  }
+
+  const handleApprovalAction = (
+    recordId: string,
+    role: TransferApprovalStage["role"],
+    action: "approve" | "reject",
+    notes?: string,
+  ) => {
+    let updatedRecord: TransferRecord | null = null
+    const actionDate = new Date().toISOString().split("T")[0]
+
+    setTransferHistory((prev) =>
+      prev.map((record) => {
+        if (record.id !== recordId) {
+          return record
+        }
+
+        if (record.approvalStatus !== "pending") {
+          updatedRecord = record
+          return record
+        }
+
+        const approvals = record.approvals.map((stage) =>
+          stage.role === role
+            ? {
+                ...stage,
+                status: action === "approve" ? "approved" : "rejected",
+                actionDate,
+                notes,
+              }
+            : stage,
+        )
+
+        const approvalStatus =
+          action === "reject"
+            ? "rejected"
+            : approvals.every((stage) => stage.status === "approved")
+              ? "approved"
+              : "pending"
+
+        updatedRecord = {
+          ...record,
+          approvals,
+          approvalStatus,
+        }
+
+        return updatedRecord
+      }),
+    )
+
+    if (!updatedRecord) {
+      return
+    }
+
+    if (action === "approve") {
+      const remainingStage = updatedRecord.approvals.find((stage) => stage.status === "pending")
+
+      if (remainingStage?.role === "Head of Department") {
+        pushNotification(
+          "Head of Department",
+          `Supervisor approved transfer ${recordId}. Awaiting your decision.`,
+          recordId,
+        )
+      }
+
+      if (updatedRecord.approvalStatus === "approved") {
+        applyApprovedTransfer(updatedRecord)
+      }
+    } else {
+      handleTransferRejection(updatedRecord, notes, role)
+    }
+  }
+
   const filteredEmployees = employeePayroll.filter((employee) => {
     const matchesSearch =
       employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       employee.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.position.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || employee.status.toLowerCase() === statusFilter.toLowerCase()
+      employee.position.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (employee.department && employee.department.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (employee.division && employee.division.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (employee.subsidiary && employee.subsidiary.toLowerCase().includes(searchTerm.toLowerCase()))
+    const matchesStatus = statusFilter === "all" || normalizeStatus(employee.status) === statusFilter
     return matchesSearch && matchesStatus
   })
 
   const selectedCount = employeePayroll.filter((e) => e.selected).length
+  const latestTransfer = transferHistory[0]
 
   const handleExportPayslips = (format: string) => {
     // Placeholder function for exporting payslips
@@ -515,6 +1140,233 @@ export default function PayrollPage() {
         </CardContent>
       </Card>
 
+      {/* Intercompany Transfers */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ArrowRightLeft className="h-5 w-5 text-emerald-600" />
+            <span>Intercompany Transfer Center</span>
+          </CardTitle>
+          <CardDescription>Move employees between subsidiaries and keep payroll aligned.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 p-4">
+              <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-emerald-700">
+                <span>Active Subsidiaries</span>
+                <Building2 className="h-4 w-4" />
+              </div>
+              <p className="mt-2 text-2xl font-semibold text-emerald-900">{subsidiaries.length}</p>
+              <p className="mt-1 text-xs text-emerald-700">Configured in this payroll group</p>
+            </div>
+            <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-4">
+              <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-blue-700">
+                <span>Selected Employees</span>
+                <Users className="h-4 w-4" />
+              </div>
+              <p className="mt-2 text-2xl font-semibold text-blue-900">{selectedCount}</p>
+              <p className="mt-1 text-xs text-blue-700">Ready to transfer this period</p>
+            </div>
+            <div className="rounded-lg border border-amber-100 bg-amber-50/70 p-4">
+              <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-amber-700">
+                <span>Last Transfer</span>
+                <Clock className="h-4 w-4" />
+              </div>
+              <p className="mt-2 text-2xl font-semibold text-amber-900">
+                {latestTransfer ? formatDisplayDate(latestTransfer.initiatedOn) : "—"}
+              </p>
+              <p className="mt-1 text-xs text-amber-700">
+                {latestTransfer ? `${formatTransferCount(latestTransfer.employees.length)} moved` : "No records yet"}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2 bg-transparent"
+              onClick={() => handleOpenTransferDialog(employeePayroll.filter((employee) => employee.selected))}
+              disabled={selectedCount === 0}
+            >
+              <ArrowRightLeft className="h-4 w-4" />
+              Transfer Selected ({selectedCount})
+            </Button>
+            <p className="text-sm text-gray-500">Tip: use the checkboxes below to choose employees for transfer.</p>
+          </div>
+
+          <Separator />
+
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-gray-700">Recent transfer activity</h4>
+              <span className="text-xs text-gray-500">{formatTransferCount(transferHistory.length)} total</span>
+            </div>
+            {transferHistory.length > 0 ? (
+              <ScrollArea className="h-64 pr-3">
+                <div className="space-y-3">
+                  {transferHistory.map((record) => (
+                    <div key={record.id} className="rounded-lg border border-gray-100 bg-gray-50/80 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                        <span className="font-medium text-gray-900">
+                          {toTitleCase(record.transferType)} transfer to {record.targetSubsidiaryName}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {record.approvalStatus && (
+                            <Badge
+                              variant={
+                                record.approvalStatus === "approved"
+                                  ? "default"
+                                  : record.approvalStatus === "pending"
+                                    ? "secondary"
+                                    : "outline"
+                              }
+                              className={
+                                record.approvalStatus === "approved"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : record.approvalStatus === "pending"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-red-100 text-red-700 border-red-200"
+                              }
+                            >
+                              {toTitleCase(record.approvalStatus)}
+                            </Badge>
+                          )}
+                          <span className="text-xs text-gray-500">
+                            Effective {formatDisplayDate(record.effectiveDate)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500 space-y-1">
+                        <p>
+                          Initiated {formatDisplayDate(record.initiatedOn)} •{" "}
+                          {formatTransferCount(record.employees.length)}
+                        </p>
+                        <p>
+                          Division: {record.targetDivision || "—"} • Department: {record.targetDepartment || "—"}
+                        </p>
+                        {record.returnDate && <p>Expected return: {formatDisplayDate(record.returnDate)}</p>}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {record.employees.map((employee) => (
+                          <Badge key={`${record.id}-${employee.id}`} variant="outline" className="text-xs">
+                            {employee.name} ({employee.fromSubsidiaryName} → {record.targetSubsidiaryName})
+                          </Badge>
+                        ))}
+                      </div>
+                      {record.reason && <p className="mt-2 text-xs italic text-gray-500">Reason: {record.reason}</p>}
+                      <div className="mt-3 space-y-2 rounded-md bg-white/60 p-2">
+                        {record.approvals.map((stage) => (
+                          <div
+                            key={`${record.id}-${stage.role}`}
+                            className="flex flex-wrap items-center justify-between gap-2 text-xs"
+                          >
+                            <div className="space-y-1">
+                              <p className="font-medium text-gray-700">
+                                {stage.role}: {stage.approver}
+                              </p>
+                              {stage.notes && <p className="italic text-gray-500">Notes: {stage.notes}</p>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant={
+                                  stage.status === "approved"
+                                    ? "default"
+                                    : stage.status === "pending"
+                                      ? "secondary"
+                                      : "outline"
+                                }
+                                className={
+                                  stage.status === "approved"
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : stage.status === "pending"
+                                      ? "bg-amber-100 text-amber-700"
+                                      : "bg-red-100 text-red-700 border-red-200"
+                                }
+                              >
+                                {toTitleCase(stage.status)}
+                              </Badge>
+                              {stage.status === "pending" && (
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    size="xs"
+                                    className="bg-emerald-600 hover:bg-emerald-700"
+                                    onClick={() => handleApprovalAction(record.id, stage.role, "approve")}
+                                  >
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    size="xs"
+                                    variant="outline"
+                                    className="border-red-200 text-red-600 hover:bg-red-50 bg-transparent"
+                                    onClick={() => {
+                                      const rejectionNotes = window.prompt(
+                                        `Add reason for rejecting transfer ${record.id} as ${stage.role}`,
+                                      )
+                                      if (rejectionNotes === null) {
+                                        return
+                                      }
+                                      handleApprovalAction(record.id, stage.role, "reject", rejectionNotes || undefined)
+                                    }}
+                                  >
+                                    Reject
+                                  </Button>
+                                </div>
+                              )}
+                              {stage.status !== "pending" && stage.actionDate && (
+                                <span className="text-gray-500">{formatDisplayDate(stage.actionDate)}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            ) : (
+              <p className="text-sm text-gray-500">No intercompany transfers recorded yet.</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Workflow Notifications */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5 text-blue-600" />
+            <span>Workflow Notifications</span>
+          </CardTitle>
+          <CardDescription>Track who has been alerted about intercompany moves.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {notifications.length > 0 ? (
+            <ScrollArea className="h-40 pr-3">
+              <div className="space-y-3">
+                {notifications.map((notification) => (
+                  <div
+                    key={notification.id}
+                    className="rounded-lg border border-blue-100 bg-blue-50/70 p-3 text-xs text-blue-900"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium">{notification.audience}</span>
+                      <span className="text-blue-700">{formatDateTime(notification.timestamp)}</span>
+                    </div>
+                    <p className="mt-1 text-blue-900/90">{notification.message}</p>
+                    <p className="mt-1 text-[10px] uppercase tracking-wide text-blue-600">
+                      Transfer {notification.transferId}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          ) : (
+            <p className="text-sm text-gray-500">Notifications will appear here as approvals progress.</p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Employee Payroll Details */}
       <Card>
         <CardHeader>
@@ -527,6 +1379,16 @@ export default function PayrollPage() {
                   Calculate Selected ({selectedCount})
                 </Button>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 bg-transparent"
+                onClick={() => handleOpenTransferDialog(employeePayroll.filter((employee) => employee.selected))}
+                disabled={selectedCount === 0}
+              >
+                <ArrowRightLeft className="h-4 w-4" />
+                Transfer Selected
+              </Button>
               <Button variant="outline" size="sm" onClick={() => handleExportPayslips("pdf")}>
                 <Download className="w-4 h-4 mr-2" />
                 Export Payslips (PDF)
@@ -562,8 +1424,14 @@ export default function PayrollPage() {
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="pending-transfer">Pending Transfer</SelectItem>
+                <SelectItem value="pending-transfer-approval">Pending Transfer Approval</SelectItem>
                 <SelectItem value="calculated">Calculated</SelectItem>
                 <SelectItem value="processed">Processed</SelectItem>
+                <SelectItem value="transfer-scheduled">Transfer Scheduled</SelectItem>
+                <SelectItem value="transfer-approved">Transfer Approved</SelectItem>
+                <SelectItem value="on-temporary-assignment">On Temporary Assignment</SelectItem>
+                <SelectItem value="transfer-rejected">Transfer Rejected</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -577,104 +1445,147 @@ export default function PayrollPage() {
           </div>
 
           <div className="space-y-4">
-            {filteredEmployees.map((employee) => (
-              <div
-                key={employee.id}
-                className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${
-                  employee.selected ? "border-emerald-200 bg-emerald-50" : "border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                <div className="flex items-center space-x-4">
-                  <Checkbox
-                    checked={employee.selected}
-                    onCheckedChange={(checked) => handleSelectEmployee(employee.id, checked as boolean)}
-                  />
-                  <Avatar className="w-12 h-12">
-                    <AvatarImage src={employee.avatar || "/placeholder.svg"} />
-                    <AvatarFallback>
-                      {employee.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <h3 className="font-semibold text-gray-900">{employee.name}</h3>
-                      <Badge variant="outline" className="text-xs">
-                        {employee.employeeId}
-                      </Badge>
+            {filteredEmployees.map((employee) => {
+              const statusBadge = getStatusBadgeAppearance(employee.status)
+
+              return (
+                <div
+                  key={employee.id}
+                  className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${
+                    employee.selected ? "border-emerald-200 bg-emerald-50" : "border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  <div className="flex items-center space-x-4">
+                    <Checkbox
+                      checked={employee.selected}
+                      onCheckedChange={(checked) => handleSelectEmployee(employee.id, checked as boolean)}
+                    />
+                    <Avatar className="w-12 h-12">
+                      <AvatarImage src={employee.avatar || "/placeholder.svg"} />
+                      <AvatarFallback>
+                        {employee.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold text-gray-900">{employee.name}</h3>
+                        <Badge variant="outline" className="text-xs">
+                          {employee.employeeId}
+                        </Badge>
+                        {employee.subsidiary && (
+                          <Badge className="text-xs bg-emerald-100 text-emerald-700 border-emerald-100">
+                            {employee.subsidiary}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600">{employee.position}</p>
+                      {employee.previousSubsidiary && employee.previousSubsidiary !== employee.subsidiary && (
+                        <p className="text-xs text-gray-500">From {employee.previousSubsidiary}</p>
+                      )}
+                      {employee.transferEffectiveDate && (
+                        <p className="text-xs text-amber-600">
+                          Transfer effective {formatDisplayDate(employee.transferEffectiveDate)}
+                        </p>
+                      )}
+                      {employee.transferNotes && (
+                        <p className="text-xs text-gray-500 italic">{employee.transferNotes}</p>
+                      )}
                     </div>
-                    <p className="text-sm text-gray-600">{employee.position}</p>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-7 gap-4 text-center text-sm">
-                  <div>
-                    <p className="font-medium text-gray-900">GHS {employee.basicSalary.toLocaleString()}</p>
-                    <p className="text-gray-500">Basic</p>
+                  <div className="grid grid-cols-7 gap-4 text-center text-sm">
+                    <div>
+                      <p className="font-medium text-gray-900">GHS {employee.basicSalary.toLocaleString()}</p>
+                      <p className="text-gray-500">Basic</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">GHS {employee.allowances.total.toLocaleString()}</p>
+                      <p className="text-gray-500">Allowances</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">GHS {employee.grossPay.toLocaleString()}</p>
+                      <p className="text-gray-500">Gross</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-red-600">-GHS {employee.paye.toLocaleString()}</p>
+                      <p className="text-gray-500">PAYE</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-blue-600">-GHS {employee.ssnit.employee.toLocaleString()}</p>
+                      <p className="text-gray-500">SSNIT</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-purple-600">-GHS {employee.tier3.employee.toLocaleString()}</p>
+                      <p className="text-gray-500">Tier 3</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-emerald-600">GHS {employee.netPay.toLocaleString()}</p>
+                      <p className="text-gray-500">Net Pay</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900">GHS {employee.allowances.total.toLocaleString()}</p>
-                    <p className="text-gray-500">Allowances</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">GHS {employee.grossPay.toLocaleString()}</p>
-                    <p className="text-gray-500">Gross</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-red-600">-GHS {employee.paye.toLocaleString()}</p>
-                    <p className="text-gray-500">PAYE</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-blue-600">-GHS {employee.ssnit.employee.toLocaleString()}</p>
-                    <p className="text-gray-500">SSNIT</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-purple-600">-GHS {employee.tier3.employee.toLocaleString()}</p>
-                    <p className="text-gray-500">Tier 3</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-emerald-600">GHS {employee.netPay.toLocaleString()}</p>
-                    <p className="text-gray-500">Net Pay</p>
-                  </div>
-                </div>
 
-                <div className="flex items-center space-x-2">
-                  <Badge
-                    variant={
-                      employee.status === "Processed"
-                        ? "default"
-                        : employee.status === "Calculated"
-                          ? "secondary"
-                          : "outline"
-                    }
-                    className={
-                      employee.status === "Processed"
-                        ? "bg-emerald-100 text-emerald-800"
-                        : employee.status === "Calculated"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-gray-100 text-gray-800"
-                    }
-                  >
-                    {employee.status}
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedEmployee(employee)
-                      setIsEditDialogOpen(true)
-                    }}
-                  >
-                    <Edit className="w-4 h-4" />
-                  </Button>
+                  <div className="flex items-center space-x-2">
+                    <Badge variant={statusBadge.variant} className={statusBadge.className}>
+                      {employee.status}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleOpenTransferDialog([employee])}
+                      title="Schedule intercompany transfer"
+                    >
+                      <ArrowRightLeft className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedEmployee(employee)
+                        setIsEditDialogOpen(true)
+                      }}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </CardContent>
       </Card>
+
+      {/* Intercompany Transfer Dialog */}
+      <Dialog
+        open={isTransferDialogOpen}
+        onOpenChange={(open) => {
+          setIsTransferDialogOpen(open)
+          if (!open) {
+            setTransferCandidates([])
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {transferCandidates.length > 1
+                ? `Transfer ${formatTransferCount(transferCandidates.length)}`
+                : `Transfer ${transferCandidates[0]?.name ?? "Employee"}`}
+            </DialogTitle>
+          </DialogHeader>
+          <IntercompanyTransferDialog
+            employees={transferCandidates}
+            subsidiaries={subsidiaries}
+            onSubmit={handleTransferConfirm}
+            onClose={() => {
+              setIsTransferDialogOpen(false)
+              setTransferCandidates([])
+            }}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Employee Payroll Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -1203,5 +2114,264 @@ function EditEmployeePayrollForm({
         </Button>
       </div>
     </Tabs>
+  )
+}
+
+function IntercompanyTransferDialog({
+  employees,
+  subsidiaries,
+  onSubmit,
+  onClose,
+}: {
+  employees: any[]
+  subsidiaries: Subsidiary[]
+  onSubmit: (data: TransferFormData) => void
+  onClose: () => void
+}) {
+  const [targetSubsidiary, setTargetSubsidiary] = useState("")
+  const [transferType, setTransferType] = useState<TransferType>("permanent")
+  const [effectiveDate, setEffectiveDate] = useState("")
+  const [reason, setReason] = useState("")
+  const [targetDivision, setTargetDivision] = useState("")
+  const [targetDepartment, setTargetDepartment] = useState("")
+  const [returnDate, setReturnDate] = useState("")
+
+  useEffect(() => {
+    if (!employees.length) {
+      setTargetSubsidiary("")
+      return
+    }
+
+    const currentSubsidiaryIds = new Set(employees.map((employee) => employee.subsidiaryId))
+    const fallbackSubsidiary =
+      subsidiaries.find((subsidiary) => !currentSubsidiaryIds.has(subsidiary.id))?.id || subsidiaries[0]?.id || ""
+
+    setTargetSubsidiary(fallbackSubsidiary)
+    setTransferType("permanent")
+    setEffectiveDate("")
+    setReason("")
+    const defaultDivisions = getSubsidiaryDivisions(fallbackSubsidiary)
+    const defaultDepartments = getSubsidiaryDepartments(fallbackSubsidiary)
+    setTargetDivision(defaultDivisions[0] || "")
+    setTargetDepartment(defaultDepartments[0] || "")
+    setReturnDate("")
+  }, [employees, subsidiaries])
+
+  useEffect(() => {
+    if (!targetSubsidiary) {
+      setTargetDivision("")
+      setTargetDepartment("")
+      return
+    }
+
+    const divisions = getSubsidiaryDivisions(targetSubsidiary)
+    const departments = getSubsidiaryDepartments(targetSubsidiary)
+
+    setTargetDivision((prev) => (prev && divisions.includes(prev) ? prev : divisions[0] || ""))
+    setTargetDepartment((prev) => (prev && departments.includes(prev) ? prev : departments[0] || ""))
+  }, [targetSubsidiary])
+
+  useEffect(() => {
+    if (transferType === "permanent") {
+      setReturnDate("")
+    }
+  }, [transferType])
+
+  const handleSubmit = () => {
+    if (!targetSubsidiary) {
+      toast({
+        variant: "destructive",
+        title: "Select destination subsidiary",
+        description: "Choose the subsidiary the employees should be moved to.",
+      })
+      return
+    }
+
+    onSubmit({
+      targetSubsidiaryId: targetSubsidiary,
+      effectiveDate,
+      reason,
+      transferType,
+      targetDivision,
+      targetDepartment,
+      returnDate: transferType === "temporary" ? returnDate : undefined,
+    })
+  }
+
+  const currentSubsidiaryList = employees.length
+    ? Array.from(new Set(employees.map((employee) => employee.subsidiary || "—"))).join(", ")
+    : "—"
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+        <h4 className="text-sm font-semibold text-gray-700">Employees selected</h4>
+        {employees.length > 0 ? (
+          <ScrollArea className="mt-3 max-h-32 pr-2">
+            <div className="space-y-2 text-sm text-gray-700">
+              {employees.map((employee) => (
+                <div key={employee.id} className="flex items-center justify-between">
+                  <span className="font-medium text-gray-900">{employee.name}</span>
+                  <span className="text-xs text-gray-500">
+                    {employee.subsidiary} • {employee.division || "—"} / {employee.department || "—"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        ) : (
+          <p className="mt-2 text-sm text-gray-500">Select employees from the payroll table to begin.</p>
+        )}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <Label>Destination subsidiary</Label>
+          <Select value={targetSubsidiary} onValueChange={setTargetSubsidiary}>
+            <SelectTrigger className="w-full overflow-hidden [&>span]:truncate">
+              <SelectValue placeholder="Select subsidiary" />
+            </SelectTrigger>
+            <SelectContent>
+              {subsidiaries.map((subsidiary) => (
+                <SelectItem key={subsidiary.id} value={subsidiary.id}>
+                  {subsidiary.name} ({subsidiary.code}) • {subsidiary.location}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Target division</Label>
+          <Select value={targetDivision} onValueChange={setTargetDivision}>
+            <SelectTrigger className="w-full overflow-hidden [&>span]:truncate">
+              <SelectValue placeholder="Select division" />
+            </SelectTrigger>
+            <SelectContent>
+              {getSubsidiaryDivisions(targetSubsidiary).map((division) => (
+                <SelectItem key={division} value={division}>
+                  {division}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Target department</Label>
+          <Select value={targetDepartment} onValueChange={setTargetDepartment}>
+            <SelectTrigger className="w-full overflow-hidden [&>span]:truncate">
+              <SelectValue placeholder="Select department" />
+            </SelectTrigger>
+            <SelectContent>
+              {getSubsidiaryDepartments(targetSubsidiary).map((department) => (
+                <SelectItem key={department} value={department}>
+                  {department}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="transfer-effective-date">Effective date</Label>
+          <Input
+            id="transfer-effective-date"
+            type="date"
+            value={effectiveDate}
+            onChange={(event) => setEffectiveDate(event.target.value)}
+            min={new Date().toISOString().split("T")[0]}
+          />
+          <p className="text-xs text-gray-500">Leave blank for an immediate (current period) transfer.</p>
+        </div>
+      </div>
+
+      {transferType === "temporary" && (
+        <div className="space-y-2">
+          <Label htmlFor="transfer-return-date">Expected return date</Label>
+          <Input
+            id="transfer-return-date"
+            type="date"
+            value={returnDate}
+            min={effectiveDate || new Date().toISOString().split("T")[0]}
+            onChange={(event) => setReturnDate(event.target.value)}
+          />
+          <p className="text-xs text-gray-500">Used to remind HR when the employee should return to their home unit.</p>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <Label>Transfer type</Label>
+        <RadioGroup
+          value={transferType}
+          onValueChange={(value) => setTransferType(value as TransferType)}
+          className="flex flex-col gap-2 md:flex-row"
+        >
+          {(
+            [
+              {
+                id: "transfer-permanent",
+                value: "permanent" as TransferType,
+                title: "Permanent Transfer",
+                description: "Employee relocates indefinitely",
+                activeClasses: "border-emerald-300 bg-emerald-50",
+              },
+              {
+                id: "transfer-temporary",
+                value: "temporary" as TransferType,
+                title: "Temporary Transfer",
+                description: "Employee returns to home subsidiary later",
+                activeClasses: "border-blue-300 bg-blue-50",
+              },
+            ] as const
+          ).map((option) => (
+            <div
+              key={option.id}
+              className={`flex items-start space-x-3 rounded-lg border p-3 text-sm transition-colors ${
+                transferType === option.value ? option.activeClasses : "border-gray-200"
+              }`}
+            >
+              <RadioGroupItem id={option.id} value={option.value} className="mt-1" />
+              <Label htmlFor={option.id} className="flex flex-col space-y-1 text-sm">
+                <span className="font-medium text-gray-900">{option.title}</span>
+                <span className="text-xs text-gray-500">{option.description}</span>
+              </Label>
+            </div>
+          ))}
+        </RadioGroup>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="transfer-notes">Transfer notes (optional)</Label>
+        <Textarea
+          id="transfer-notes"
+          placeholder="Provide context so HR, payroll, and line managers understand this move."
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          rows={4}
+        />
+      </div>
+
+      <div className="flex items-center justify-between rounded-lg border border-gray-100 bg-white p-4 text-sm text-gray-600">
+        <div>
+          <p className="font-medium text-gray-900">Current subsidiaries</p>
+          <p>{currentSubsidiaryList}</p>
+        </div>
+        <div className="text-right">
+          <p className="font-medium text-gray-900">Destination</p>
+          <p>{targetSubsidiary ? getSubsidiaryName(targetSubsidiary) : "Select subsidiary"}</p>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-3">
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button
+          onClick={handleSubmit}
+          className="bg-emerald-600 hover:bg-emerald-700"
+          disabled={employees.length === 0}
+        >
+          Confirm Transfer
+        </Button>
+      </div>
+    </div>
   )
 }

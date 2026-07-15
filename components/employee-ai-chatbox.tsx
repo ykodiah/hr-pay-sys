@@ -1,23 +1,23 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef, useEffect } from "react"
+
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { Input } from "@/components/ui/input"
 import {
-  MessageCircle,
-  Send,
-  X,
   Bot,
-  User,
-  Minimize2,
-  Maximize2,
-  ChevronUp,
   ChevronDown,
+  ChevronUp,
+  Maximize2,
+  MessageCircle,
+  Minimize2,
+  Send,
+  User,
   Volume2,
   VolumeX,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -27,6 +27,89 @@ interface Message {
   content: string
   timestamp: Date
 }
+
+interface KnowledgeArticle {
+  id: string
+  title: string
+  summary: string
+  keywords: string[]
+  response: string
+}
+
+const EMPLOYEE_KNOWLEDGE_BASE: KnowledgeArticle[] = [
+  {
+    id: "self-service-overview",
+    title: "What can I do here?",
+    summary: "Portal modules & quick wins",
+    keywords: ["overview", "portal", "self-service", "what can", "everything"],
+    response:
+      "Your portal is the personalised side of AkwaabaHRPay. You can request leave, download payslips, track attendance streaks, review performance goals, access learning plans, submit reimbursements, update personal details, and chat with HR support. Each widget mirrors a live module so every action syncs back instantly.",
+  },
+  {
+    id: "leave-workflows",
+    title: "Leave & time off",
+    summary: "Balances, approvals, escalations",
+    keywords: ["leave", "time off", "vacation", "sick", "holidays"],
+    response:
+      "Request annual, sick, parental, study, or compassionate leave directly from the Leave tile. Balances update in real time once approvals land. The workflow notifies your manager and HR, supports attachments, and escalates automatically if responses lag.",
+  },
+  {
+    id: "payslip-guidance",
+    title: "Payslips & payroll",
+    summary: "Download, taxes, discrepancies",
+    keywords: ["payslip", "salary", "payroll", "tax", "deduction"],
+    response:
+      "Payslips publish after payroll closes. Download them from the Payslip tile or Quick actions drawer. Each slip explains gross pay, PAYE, SSNIT, Tier 2/3, loans, and allowances. If something looks off, ask me to draft a ticket for payroll with the right context.",
+  },
+  {
+    id: "learning-growth",
+    title: "Growth & learning",
+    summary: "Courses, mentors, nudges",
+    keywords: ["learning", "training", "growth", "courses", "career"],
+    response:
+      "The Growth cockpit shows required and elective learning mapped to your role. Enrol in courses, request mentors, tick milestones, and get AI nudges that highlight skill gaps, micro-learning, and peers who recently completed the same journey.",
+  },
+  {
+    id: "benefits-support",
+    title: "Benefits & support",
+    summary: "Loans, medical, wellness",
+    keywords: ["benefits", "loan", "medical", "wellness", "support"],
+    response:
+      "The Support hub covers medical enrolments, wellness sessions, salary advances, reimbursements, and policy documents. I can surface status updates, next steps, or point you to the right HR contact when human intervention is needed.",
+  },
+  {
+    id: "attendance-checkins",
+    title: "Attendance & check-ins",
+    summary: "Geo clocking, biometrics, streaks",
+    keywords: ["attendance", "clock in", "check in", "geo", "biometric"],
+    response:
+      "You can clock in from mobile or web with geo verification if HR enables it. If you use a biometric device, the sync runs every few minutes and updates your portal history. I can remind you of your current streak, missed check-ins, and how to submit corrections if you forgot to clock.",
+  },
+  {
+    id: "performance-feedback",
+    title: "Performance & feedback",
+    summary: "Goals, 1:1s, reviews",
+    keywords: ["performance", "feedback", "review", "goal", "check-in"],
+    response:
+      "Track goals, quarterly reviews, and 1:1 notes from the Performance tile. You can request feedback, log achievements, and preview upcoming review cycles. Ask me for preparation tips or to draft a self-evaluation outline based on your recent progress.",
+  },
+  {
+    id: "personal-data-updates",
+    title: "Update my details",
+    summary: "Personal info, documents",
+    keywords: ["update", "details", "address", "documents", "profile"],
+    response:
+      "Head to Update My Details to change your address, emergency contacts, dependent info, or upload IDs. Requests route to HR for approval with a full audit trail. I can help list the documents you need or draft a change request message.",
+  },
+  {
+    id: "expenses-reimbursements",
+    title: "Expenses & reimbursements",
+    summary: "Claims, receipts, approvals",
+    keywords: ["expense", "reimbursement", "claim", "allowance", "receipt"],
+    response:
+      "Submit travel, meal, or allowance claims from the Expenses quick action. Attach receipts, pick the cost centre, and check approval status from the history tab. I can outline the policy limits, help you prepare a summary for finance, or flag overdue approvals.",
+  },
+]
 
 export function EmployeeAIChatbox() {
   const [isOpen, setIsOpen] = useState(false)
@@ -38,27 +121,27 @@ export function EmployeeAIChatbox() {
       id: "1",
       role: "assistant",
       content:
-        "Hello! I'm your personal HR assistant. I can help you with leave requests, payslips, performance goals, learning courses, loan applications, and more. What would you like to know?",
+        "Hi! I'm your personal HR assistant. I can walk you through leave, payslips, performance goals, learning paths, loans, benefits, and wellbeing programs. What would you like help with first?",
       timestamp: new Date(),
     },
   ])
   const [inputMessage, setInputMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [showScrollButtons, setShowScrollButtons] = useState(false)
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
 
   const speakText = (text: string) => {
     if (!isTTSEnabled || !("speechSynthesis" in window)) return
 
-    // Cancel any ongoing speech
     window.speechSynthesis.cancel()
 
     const utterance = new SpeechSynthesisUtterance(text)
-    utterance.rate = 0.9
+    utterance.rate = 0.95
     utterance.pitch = 1
-    utterance.volume = 0.8
+    utterance.volume = 0.85
 
     utterance.onstart = () => setIsSpeaking(true)
     utterance.onend = () => setIsSpeaking(false)
@@ -81,23 +164,38 @@ export function EmployeeAIChatbox() {
   }
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      })
+    }
   }
 
   const scrollToTop = () => {
-    const scrollArea = scrollAreaRef.current?.querySelector("[data-radix-scroll-area-viewport]")
-    if (scrollArea) {
-      scrollArea.scrollTo({ top: 0, behavior: "smooth" })
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({ top: 0, behavior: "smooth" })
     }
   }
 
   useEffect(() => {
-    setShowScrollButtons(messages.length > 5)
+    setShowScrollButtons(messages.length > 6)
   }, [messages])
 
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  const injectKnowledgeResponse = (article: KnowledgeArticle) => {
+    const assistantMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      role: "assistant",
+      content: `${article.response}\n\nWant more? Ask me about ${article.summary.toLowerCase()}.`,
+      timestamp: new Date(),
+    }
+    setMessages((prev) => [...prev, assistantMessage])
+    setIsLoading(false)
+  }
 
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return
@@ -114,7 +212,14 @@ export function EmployeeAIChatbox() {
     setIsLoading(true)
 
     try {
-      console.log("[v0] Sending employee message to API...")
+      const knowledgeHit = EMPLOYEE_KNOWLEDGE_BASE.find((article) =>
+        article.keywords.some((keyword) => userMessage.content.toLowerCase().includes(keyword)),
+      )
+
+      if (knowledgeHit) {
+        injectKnowledgeResponse(knowledgeHit)
+        return
+      }
 
       const response = await fetch("/api/employee-chat", {
         method: "POST",
@@ -123,32 +228,25 @@ export function EmployeeAIChatbox() {
         },
         body: JSON.stringify({
           message: userMessage.content,
-          conversationHistory: messages.slice(-10).map((msg) => ({
-            role: msg.role,
-            content: msg.content,
-          })),
+          conversationHistory: messages.slice(-10).map((msg) => ({ role: msg.role, content: msg.content })),
           employeeContext: {
             employeeId: "EMP-001",
             name: "Kwame Asante",
             department: "Technology",
             position: "Senior Software Engineer",
             leaveBalance: 18,
-            currentModule: window.location.pathname.split("/").pop() || "dashboard",
+            currentModule:
+              typeof window !== "undefined" ? window.location.pathname.split("/").pop() || "dashboard" : "dashboard",
           },
         }),
       })
 
-      console.log("[v0] Employee API response status:", response.status)
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        console.error("[v0] Employee API error:", errorData)
         throw new Error(errorData.error || `HTTP ${response.status}`)
       }
 
       const data = await response.json()
-      console.log("[v0] Employee API response data received")
-
       if (!data.response) {
         throw new Error("Invalid response format")
       }
@@ -166,14 +264,12 @@ export function EmployeeAIChatbox() {
         speakText(data.response)
       }
     } catch (error) {
-      console.error("[v0] Employee chat error:", error)
-
       let errorMessage = "Failed to send message. Please try again."
       if (error instanceof Error) {
         if (error.message.includes("timeout")) {
           errorMessage = "Request timed out. Please try again."
         } else if (error.message.includes("503")) {
-          errorMessage = "AI service is temporarily unavailable."
+          errorMessage = "Assistant service is temporarily unavailable."
         }
       }
 
@@ -183,7 +279,7 @@ export function EmployeeAIChatbox() {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content:
-          "I'm sorry, I'm having trouble connecting right now. Please try again in a moment, or contact HR if you need immediate assistance.",
+          "I'm having trouble connecting at the moment. Please try again shortly or reach out to HR if it's urgent.",
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, errorAssistantMessage])
@@ -192,9 +288,9 @@ export function EmployeeAIChatbox() {
     }
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
+  const handleKeyPress = (event: React.KeyboardEvent) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault()
       sendMessage()
     }
   }
@@ -206,7 +302,7 @@ export function EmployeeAIChatbox() {
         id: "1",
         role: "assistant",
         content:
-          "Hello! I'm your personal HR assistant. I can help you with leave requests, payslips, performance goals, learning courses, loan applications, and more. What would you like to know?",
+          "Hi! I'm your personal HR assistant. I can walk you through leave, payslips, performance goals, learning paths, loans, benefits, and wellbeing programs. What would you like help with first?",
         timestamp: new Date(),
       },
     ])
@@ -216,7 +312,7 @@ export function EmployeeAIChatbox() {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-emerald-600 hover:bg-emerald-700 shadow-lg z-50"
+        className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-emerald-600 shadow-lg hover:bg-emerald-700"
         size="icon"
       >
         <MessageCircle className="h-6 w-6 text-white" />
@@ -227,13 +323,12 @@ export function EmployeeAIChatbox() {
   return (
     <Card
       className={`fixed bottom-6 right-6 z-50 shadow-2xl transition-all duration-300 ${
-        isMinimized ? "w-80 h-16" : "w-96 h-[600px]"
+        isMinimized ? "h-16 w-80" : "h-[600px] w-96"
       }`}
     >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-emerald-600 text-white rounded-t-lg">
-        <CardTitle className="text-lg font-semibold flex items-center gap-2">
-          <Bot className="h-5 w-5" />
-          Personal HR Assistant
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 rounded-t-lg bg-emerald-600 pb-2 text-white">
+        <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+          <Bot className="h-5 w-5" /> Personal HR Assistant
         </CardTitle>
         <div className="flex items-center gap-1">
           <Button
@@ -243,15 +338,7 @@ export function EmployeeAIChatbox() {
             className={`h-8 w-8 text-white hover:bg-emerald-700 ${isTTSEnabled ? "bg-emerald-700" : ""}`}
             title={isTTSEnabled ? "Disable voice" : "Enable voice"}
           >
-            {isTTSEnabled ? (
-              isSpeaking ? (
-                <VolumeX className="h-4 w-4" />
-              ) : (
-                <Volume2 className="h-4 w-4" />
-              )
-            ) : (
-              <VolumeX className="h-4 w-4 opacity-50" />
-            )}
+            {isTTSEnabled ? (isSpeaking ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />) : <VolumeX className="h-4 w-4 opacity-50" />}
           </Button>
           <Button
             variant="ghost"
@@ -273,140 +360,118 @@ export function EmployeeAIChatbox() {
       </CardHeader>
 
       {!isMinimized && (
-        <CardContent className="flex flex-col h-[calc(600px-80px)] p-0">
-          <div className="flex-1 flex flex-col">
-            <div className="flex justify-between items-center p-2 border-b">
-              {isTTSEnabled && (
-                <div className="flex items-center gap-2 text-xs text-green-600">
-                  <Volume2 className="h-3 w-3" />
-                  {isSpeaking ? "Speaking..." : "Voice enabled"}
-                </div>
-              )}
-              {!isTTSEnabled && <div></div>}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearChat}
-                className="text-xs text-gray-500 hover:text-gray-700"
-              >
-                Clear Chat
-              </Button>
-            </div>
-
-            <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 relative">
-              {showScrollButtons && (
-                <div className="absolute right-2 top-2 z-10 flex flex-col gap-1">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={scrollToTop}
-                    className="h-8 w-8 bg-white/90 hover:bg-white shadow-sm"
-                  >
-                    <ChevronUp className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={scrollToBottom}
-                    className="h-8 w-8 bg-white/90 hover:bg-white shadow-sm"
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-
-              <div className="space-y-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                  >
-                    {message.role === "assistant" && (
-                      <div className="flex-shrink-0 w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
-                        <Bot className="h-4 w-4 text-emerald-600" />
-                      </div>
-                    )}
-                    <div
-                      className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                        message.role === "user" ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-900"
-                      }`}
-                    >
-                      <div className="whitespace-pre-wrap">{message.content}</div>
-                      <div className="flex items-center justify-between mt-1">
-                        <div
-                          className={`text-xs opacity-70 ${
-                            message.role === "user" ? "text-emerald-100" : "text-gray-500"
-                          }`}
-                        >
-                          {message.timestamp.toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </div>
-                        {message.role === "assistant" && isTTSEnabled && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => speakText(message.content)}
-                            className="h-6 w-6 opacity-50 hover:opacity-100"
-                            title="Speak this message"
-                          >
-                            <Volume2 className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                    {message.role === "user" && (
-                      <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                        <User className="h-4 w-4 text-gray-600" />
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {isLoading && (
-                  <div className="flex gap-3 justify-start">
-                    <div className="flex-shrink-0 w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
-                      <Bot className="h-4 w-4 text-emerald-600" />
-                    </div>
-                    <div className="bg-gray-100 rounded-lg px-3 py-2 text-sm">
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div
-                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                          style={{ animationDelay: "0.1s" }}
-                        ></div>
-                        <div
-                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                          style={{ animationDelay: "0.2s" }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
+        <CardContent className="flex h-[calc(600px-80px)] flex-col p-0">
+          <div className="flex items-center justify-between border-b bg-emerald-50 p-3">
+            {isTTSEnabled ? (
+              <div className="flex items-center gap-2 text-xs text-emerald-700">
+                <Volume2 className="h-3 w-3" /> {isSpeaking ? "Speaking..." : "Voice enabled"}
               </div>
-            </ScrollArea>
+            ) : (
+              <div className="text-xs text-emerald-800/60">Voice disabled</div>
+            )}
+            <Button variant="ghost" size="sm" onClick={clearChat} className="text-xs text-emerald-700 hover:text-emerald-900">
+              Clear chat
+            </Button>
+          </div>
 
-            <div className="border-t p-4">
-              <div className="flex gap-2">
-                <Input
-                  ref={inputRef}
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Ask about leave, payslips, goals, courses..."
-                  disabled={isLoading}
-                  className="flex-1"
-                />
+          <div
+            ref={messagesContainerRef}
+            className="relative flex-1 overflow-y-auto px-4 py-3 pr-3"
+          >
+            {showScrollButtons && (
+              <div className="pointer-events-none absolute right-2 top-2 z-10 flex flex-col gap-1">
                 <Button
-                  onClick={sendMessage}
-                  disabled={!inputMessage.trim() || isLoading}
+                  variant="outline"
                   size="icon"
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  onClick={scrollToTop}
+                  className="pointer-events-auto h-8 w-8 bg-white/90 shadow-sm hover:bg-white"
+                  title="Scroll to top"
                 >
-                  <Send className="h-4 w-4" />
+                  <ChevronUp className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={scrollToBottom}
+                  className="pointer-events-auto h-8 w-8 bg-white/90 shadow-sm hover:bg-white"
+                  title="Scroll to bottom"
+                >
+                  <ChevronDown className="h-4 w-4" />
                 </Button>
               </div>
+            )}
+
+            <div className="space-y-4 pb-6">
+              {messages.map((message) => (
+                <div key={message.id} className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                  {message.role === "assistant" && (
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                      <Bot className="h-4 w-4 text-emerald-600" />
+                    </div>
+                  )}
+                  <div
+                    className={`max-w-[75%] rounded-lg px-3 py-2 text-sm shadow-sm ${
+                      message.role === "user" ? "bg-emerald-600 text-white" : "bg-white text-slate-900"
+                    }`}
+                  >
+                    <div className="whitespace-pre-wrap break-words">{message.content}</div>
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className={`text-xs opacity-70 ${message.role === "user" ? "text-emerald-100" : "text-slate-500"}`}>
+                        {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      {message.role === "assistant" && isTTSEnabled && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => speakText(message.content)}
+                          className="h-6 w-6 opacity-60 hover:opacity-100"
+                          title="Speak this message"
+                        >
+                          <Volume2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  {message.role === "user" && (
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-100">
+                      <User className="h-4 w-4 text-slate-600" />
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {isLoading && (
+                <div className="flex gap-3">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                    <Bot className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <div className="rounded-lg bg-slate-100 px-3 py-2 text-sm">
+                    <div className="flex space-x-1">
+                      <div className="h-2 w-2 animate-bounce rounded-full bg-slate-500"></div>
+                      <div className="h-2 w-2 animate-bounce rounded-full bg-slate-500" style={{ animationDelay: "0.1s" }}></div>
+                      <div className="h-2 w-2 animate-bounce rounded-full bg-slate-500" style={{ animationDelay: "0.2s" }}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+
+          <div className="border-t bg-white p-4">
+            <div className="flex gap-2">
+              <Input
+                ref={inputRef}
+                value={inputMessage}
+                onChange={(event) => setInputMessage(event.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Ask about leave, payslips, goals, wellbeing..."
+                disabled={isLoading}
+                className="flex-1"
+              />
+              <Button onClick={sendMessage} disabled={!inputMessage.trim() || isLoading} size="icon" className="bg-emerald-600 hover:bg-emerald-700">
+                <Send className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </CardContent>

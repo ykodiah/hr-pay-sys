@@ -1,5 +1,4 @@
 import { createHmac } from "crypto"
-import { JWT } from "google-auth-library"
 import type { ChannelIntegration } from "../delivery"
 
 export interface OutboundMessagePayload {
@@ -15,7 +14,10 @@ export interface ProviderDeliveryResult {
   providerResponse?: any
 }
 
-async function sendViaSendGrid(integration: ChannelIntegration, payload: OutboundMessagePayload): Promise<ProviderDeliveryResult> {
+async function sendViaSendGrid(
+  integration: ChannelIntegration,
+  payload: OutboundMessagePayload,
+): Promise<ProviderDeliveryResult> {
   const apiKey = integration.credentials.apiKey
   const fromEmail = integration.configuration.fromEmail
   if (!apiKey) throw new Error("SendGrid API key missing")
@@ -99,7 +101,10 @@ async function sendViaTwilio(integration: ChannelIntegration, payload: OutboundM
   return results.pop() ?? { externalId: undefined }
 }
 
-async function sendViaSlack(integration: ChannelIntegration, payload: OutboundMessagePayload): Promise<ProviderDeliveryResult> {
+async function sendViaSlack(
+  integration: ChannelIntegration,
+  payload: OutboundMessagePayload,
+): Promise<ProviderDeliveryResult> {
   const botToken = integration.credentials.botToken
   if (!botToken) {
     throw new Error("Slack bot token missing")
@@ -140,7 +145,10 @@ async function sendViaSlack(integration: ChannelIntegration, payload: OutboundMe
   }
 }
 
-async function sendViaTeams(integration: ChannelIntegration, payload: OutboundMessagePayload): Promise<ProviderDeliveryResult> {
+async function sendViaTeams(
+  integration: ChannelIntegration,
+  payload: OutboundMessagePayload,
+): Promise<ProviderDeliveryResult> {
   const webhook = integration.configuration.defaultChannelWebhook as string | undefined
   if (!webhook) {
     throw new Error("Teams defaultChannelWebhook not configured")
@@ -199,7 +207,10 @@ async function sendViaTeams(integration: ChannelIntegration, payload: OutboundMe
   }
 }
 
-async function sendViaPush(integration: ChannelIntegration, payload: OutboundMessagePayload): Promise<ProviderDeliveryResult> {
+async function sendViaPush(
+  integration: ChannelIntegration,
+  payload: OutboundMessagePayload,
+): Promise<ProviderDeliveryResult> {
   const rawServiceAccount = integration.credentials.serviceAccount
   if (!rawServiceAccount) {
     throw new Error("Push notifications require serviceAccount credential")
@@ -225,22 +236,21 @@ async function sendViaPush(integration: ChannelIntegration, payload: OutboundMes
     throw new Error("Push notifications require at least one device token")
   }
 
-  const jwtClient = new JWT({
-    email: clientEmail,
-    key: privateKey,
-    scopes: ["https://www.googleapis.com/auth/firebase.messaging"],
-  })
+  const jwt = await createServiceAccountJWT(clientEmail, privateKey, [
+    "https://www.googleapis.com/auth/firebase.messaging",
+  ])
 
-  const { access_token } = await jwtClient.authorize()
+  const access_token = await getAccessToken(jwt)
   if (!access_token) {
     throw new Error("Failed to authorize Firebase messaging request")
   }
 
   const url = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`
   const metadata = payload.metadata || {}
-  const metadataData = metadata && typeof metadata === "object" && metadata.data && typeof metadata.data === "object"
-    ? (metadata.data as Record<string, unknown>)
-    : {}
+  const metadataData =
+    metadata && typeof metadata === "object" && metadata.data && typeof metadata.data === "object"
+      ? (metadata.data as Record<string, unknown>)
+      : {}
   let lastResponse: any = null
 
   for (const token of tokens) {
@@ -257,9 +267,7 @@ async function sendViaPush(integration: ChannelIntegration, payload: OutboundMes
             title: payload.subject || metadata.title || "Notification",
             body: payload.text || payload.html || metadata.body || "",
           },
-          data: Object.fromEntries(
-            Object.entries(metadataData).map(([key, value]) => [key, String(value)])
-          ),
+          data: Object.fromEntries(Object.entries(metadataData).map(([key, value]) => [key, String(value)])),
         },
       }),
     })
@@ -296,9 +304,7 @@ async function sendWebhook(integration: ChannelIntegration, payload: OutboundMes
   }
 
   const serialized = JSON.stringify(body)
-  const signature = secret
-    ? createHmac("sha256", secret).update(serialized).digest("hex")
-    : undefined
+  const signature = secret ? createHmac("sha256", secret).update(serialized).digest("hex") : undefined
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -326,7 +332,7 @@ async function sendWebhook(integration: ChannelIntegration, payload: OutboundMes
 
 export async function sendThroughProvider(
   integration: ChannelIntegration,
-  payload: OutboundMessagePayload
+  payload: OutboundMessagePayload,
 ): Promise<ProviderDeliveryResult> {
   switch (integration.channelType) {
     case "email":
@@ -346,4 +352,61 @@ export async function sendThroughProvider(
     default:
       throw new Error(`Channel ${integration.channelType} delivery not yet implemented`)
   }
+}
+
+function base64UrlEncode(str: string): string {
+  return Buffer.from(str).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "")
+}
+
+async function createServiceAccountJWT(clientEmail: string, privateKey: string, scopes: string[]): Promise<string> {
+  const now = Math.floor(Date.now() / 1000)
+  const expiry = now + 3600 // 1 hour
+
+  const header = {
+    alg: "RS256",
+    typ: "JWT",
+  }
+
+  const payload = {
+    iss: clientEmail,
+    scope: scopes.join(" "),
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now,
+    exp: expiry,
+  }
+
+  const encodedHeader = base64UrlEncode(JSON.stringify(header))
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload))
+  const signatureInput = `${encodedHeader}.${encodedPayload}`
+
+  // Note: In a real production environment, you'd use proper RSA signing
+  // For v0 environment, we'll use a simplified approach
+  const crypto = await import("crypto")
+  const sign = crypto.createSign("RSA-SHA256")
+  sign.update(signatureInput)
+  const signature = sign.sign(privateKey, "base64")
+  const encodedSignature = signature.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "")
+
+  return `${signatureInput}.${encodedSignature}`
+}
+
+async function getAccessToken(jwt: string): Promise<string> {
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  })
+
+  if (!response.ok) {
+    const error = await response.text()
+    throw new Error(`Failed to get access token: ${error}`)
+  }
+
+  const data = await response.json()
+  return data.access_token
 }

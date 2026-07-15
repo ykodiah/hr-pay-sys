@@ -277,4 +277,3 @@ export function validateTemplateVariables(
     unusedDefinitions: Array.from(new Set(unusedDefinitions)).sort(),
   }
 }
-
