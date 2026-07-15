@@ -37,16 +37,27 @@ export async function updateSession(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Missing Supabase environment variables")
-  }
-
   const publicPaths = ["/", "/about", "/contact", "/careers", "/help", "/api-docs", "/auth", "/login", "/privacy", "/terms"]
   const isPublicPath = publicPaths.some(
     (path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(path + "/"),
   )
 
   if (isPublicPath) {
+    return NextResponse.next({ request })
+  }
+
+  const isProtectedPath =
+    request.nextUrl.pathname.startsWith("/app") || request.nextUrl.pathname.startsWith("/self-service")
+
+  // Allow Quick Demo Access (cookie set by /auth/login) without a Supabase Auth session
+  const hasDemoSession = request.cookies.get("demo-session")?.value === "active"
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    if (isProtectedPath && !hasDemoSession) {
+      const url = request.nextUrl.clone()
+      url.pathname = "/auth/login"
+      return NextResponse.redirect(url)
+    }
     return NextResponse.next({ request })
   }
 
@@ -68,12 +79,6 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-
-  const isProtectedPath =
-    request.nextUrl.pathname.startsWith("/app") || request.nextUrl.pathname.startsWith("/self-service")
-
-  // Allow Quick Demo Access (cookie set by /auth/login) without a Supabase Auth session
-  const hasDemoSession = request.cookies.get("demo-session")?.value === "active"
 
   if (isProtectedPath && !user && !hasDemoSession) {
     const url = request.nextUrl.clone()
