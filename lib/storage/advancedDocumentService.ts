@@ -746,7 +746,7 @@ export class AdvancedDocumentService {
       'confidential': 'confidential',
       'restricted': 'restricted'
     }
-    return classificationMap[accessLevel as keyof typeof classificationMap] || 'internal'
+    return (classificationMap[accessLevel as keyof typeof classificationMap] || 'internal') as "public" | "confidential" | "restricted" | "internal"
   }
 
   private requiresWorkflow(documentType: string): boolean {

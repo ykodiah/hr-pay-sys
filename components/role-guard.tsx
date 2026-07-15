@@ -1,6 +1,6 @@
 "use client"
 
-import { type ReactNode } from "react"
+import React, { type ReactNode } from "react"
 
 import { Loader2, ShieldAlert } from "lucide-react"
 
@@ -12,7 +12,7 @@ type RoleGuardProps = {
   fallback?: ReactNode
 }
 
-export function RoleGuard({ requiredRoles, children, fallback }: RoleGuardProps) {
+export function RoleGuard({ requiredRoles, children, fallback }: RoleGuardProps): React.JSX.Element {
   const { roles, isLoading } = useRoles()
 
   if (isLoading) {
@@ -27,12 +27,14 @@ export function RoleGuard({ requiredRoles, children, fallback }: RoleGuardProps)
 
   if (!hasAccess) {
     return (
-      fallback ?? (
-        <div className="flex min-h-[240px] flex-col items-center justify-center space-y-2 rounded-lg border border-dashed bg-muted/40 p-6 text-center text-sm text-muted-foreground">
-          <ShieldAlert className="h-5 w-5" />
-          <p>Access denied. Contact your administrator to request the appropriate permissions.</p>
-        </div>
-      )
+      <div className="flex min-h-[240px] flex-col items-center justify-center space-y-2 rounded-lg border border-dashed bg-muted/40 p-6 text-center text-sm text-muted-foreground">
+        {fallback ?? (
+          <>
+            <ShieldAlert className="h-5 w-5" />
+            <p>Access denied. Contact your administrator to request the appropriate permissions.</p>
+          </>
+        )}
+      </div>
     )
   }
 

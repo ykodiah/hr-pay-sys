@@ -129,10 +129,10 @@ export class PayrollService extends BaseService {
 
       const summary = {
         count: items?.length || 0,
-        totalGrossPay: items?.reduce((sum, item) => sum + (item.gross_pay || 0), 0) || 0,
-        totalDeductions: items?.reduce((sum, item) => sum + (item.total_deductions || 0), 0) || 0,
-        totalNetPay: items?.reduce((sum, item) => sum + (item.net_pay || 0), 0) || 0,
-        totalTax: items?.reduce((sum, item) => sum + (item.tax_deduction || 0), 0) || 0,
+        totalGrossPay: items?.reduce((sum: number, item: any) => sum + (item.gross_pay || 0), 0) || 0,
+        totalDeductions: items?.reduce((sum: number, item: any) => sum + (item.total_deductions || 0), 0) || 0,
+        totalNetPay: items?.reduce((sum: number, item: any) => sum + (item.net_pay || 0), 0) || 0,
+        totalTax: items?.reduce((sum: number, item: any) => sum + (item.tax_deduction || 0), 0) || 0,
       }
 
       return summary
@@ -300,7 +300,7 @@ export class PayrollService extends BaseService {
 
       if (items && items.length > 0) {
         const totals = items.reduce(
-          (acc, item) => ({
+          (acc: { gross: number; deductions: number; net: number }, item: any) => ({
             gross: acc.gross + Number(item.gross_pay ?? 0),
             deductions: acc.deductions + Number(item.total_deductions ?? 0),
             net: acc.net + Number(item.net_pay ?? 0),

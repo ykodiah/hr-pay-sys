@@ -1152,23 +1152,26 @@ export default function EmployeesPage() {
     })
   }
 
-  const handleImportEmployees = (importedData: any[]) => {
-    const newEmployees = importedData.map((data, index) => ({
-      ...data,
-      id: employees.length + index + 1,
-      employeeId: data.employeeId || `EMP${String(employees.length + index + 1).padStart(3, "0")}`,
-      leaveBalance: { annual: 21, sick: 10, casual: 5 },
-      documents: [],
-      avatar: "/placeholder.svg?height=40&width=40",
-    }))
+  const handleImportEmployees = async (importedData: any[], filename?: string) => {
+    try {
+      const res = await fetch("/api/employees/bulk-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: importedData, filename: filename || "import.csv" }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Import failed")
 
-    setEmployees([...employees, ...newEmployees])
-    setIsImportDialogOpen(false)
-
-    toast({
-      title: "Import Successful",
-      description: `${importedData.length} employees have been imported successfully.`,
-    })
+      setIsImportDialogOpen(false)
+      toast({
+        title: "Import Successful",
+        description: `${json.success_rows} of ${json.total_rows} employees imported successfully.${json.error_rows > 0 ? ` ${json.error_rows} rows had errors.` : ""}`,
+      })
+      // Refresh employee list
+      window.location.reload()
+    } catch (err: any) {
+      toast({ title: "Import Failed", description: err.message, variant: "destructive" })
+    }
   }
 
   const downloadTemplate = (templateType: string) => {
@@ -2078,7 +2081,7 @@ function ImportDataDialog({
         return row
       })
 
-      onImport(allData)
+      handleImportEmployees(allData, selectedFile.name)
     }
     reader.readAsText(selectedFile)
   }
@@ -2763,7 +2766,7 @@ function AddEmployeeForm({
     { code: "+27", country: "South Africa", flag: "🇿🇦" },
     { code: "+82", country: "South Korea", flag: "🇰🇷" },
     { code: "+211", country: "South Sudan", flag: "🇸🇸" },
-    { code: "+34", country: "Spain", flag: "🇪🇸" },
+    { code: "+34", country: "Spain", flag: "���🇸" },
     { code: "+94", country: "Sri Lanka", flag: "🇱🇰" },
     { code: "+249", country: "Sudan", flag: "🇸🇩" },
     { code: "+597", country: "Suriname", flag: "🇸🇷" },

@@ -61,7 +61,7 @@ export abstract class BaseService {
     select: string = "*",
     filter?: { column: string; operator: string; value: unknown }[],
     sorting?: { column: string; order: "asc" | "desc" }[],
-    pagination?: { page: number; pageSize: number }
+    pagination?: { page?: number; pageSize?: number }
   ): Promise<
     ServiceResponse<{
       items: T[]

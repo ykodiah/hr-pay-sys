@@ -22,7 +22,7 @@ function isRateLimited(key: string): boolean {
 export async function updateSession(request: NextRequest) {
   // Rate limit API routes
   if (request.nextUrl.pathname.startsWith("/api")) {
-    const clientKey = request.ip || request.headers.get("x-forwarded-for") || "unknown"
+    const clientKey = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
     if (isRateLimited(clientKey)) {
       return new NextResponse(JSON.stringify({ error: "Too many requests" }), {
         status: 429,

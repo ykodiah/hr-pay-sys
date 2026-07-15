@@ -32,6 +32,7 @@ import {
   X,
   AlertTriangle,
   DoorOpen,
+  Clock,
 } from "lucide-react"
 import { Logo } from "@/components/logo"
 
@@ -289,6 +290,13 @@ export default function SelfServiceLayout({
               >
                 <Calendar className="w-5 h-5" />
                 <span>Leave Requests</span>
+              </a>
+              <a
+                href="/self-service/overtime"
+                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <Clock className="w-5 h-5" />
+                <span>Overtime</span>
               </a>
               <a
                 href="/self-service/loans"

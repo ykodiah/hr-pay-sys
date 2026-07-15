@@ -55,6 +55,8 @@ import {
   GraduationCap,
   DollarSign,
   PieChart,
+  Timer,
+  CheckSquare,
   Globe,
   Cog,
   ArrowRight,
@@ -271,6 +273,7 @@ export default function ClientAppLayout({
         items: [
           { name: "Attendance", href: "/app/attendance", icon: Clock, description: "Track work hours" },
           { name: "Leave Management", href: "/app/leave", icon: Calendar, description: "Manage leave requests" },
+          { name: "Overtime", href: "/app/overtime", icon: Timer, description: "Overtime requests" },
         ],
       },
       {
@@ -286,6 +289,7 @@ export default function ClientAppLayout({
         items: [
           { name: "Payroll", href: "/app/payroll", icon: Calculator, description: "Process payroll" },
           { name: "Payroll History", href: "/app/payroll/history", icon: History, description: "Past payroll records" },
+          { name: "Approvals", href: "/app/approvals", icon: CheckSquare, description: "Approve payroll, leave & overtime" },
           { name: "Loans", href: "/app/loans", icon: CreditCard, description: "Employee loans" },
         ],
       },

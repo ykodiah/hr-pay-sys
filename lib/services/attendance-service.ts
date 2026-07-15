@@ -12,7 +12,7 @@ export class AttendanceService extends BaseService {
 
       if (!employees || employees.length === 0) return []
 
-      const employeeIds = employees.map((e) => e.id)
+      const employeeIds = employees.map((e: { id: string }) => e.id)
       const { data, error } = await client
         .from("attendance_records")
         .select("*")

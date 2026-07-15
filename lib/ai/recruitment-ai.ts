@@ -139,7 +139,7 @@ export class RecruitmentAI {
         matchScore,
         strengths: this.identifyStrengths(candidate, jobAnalysis),
         concerns: this.identifyConcerns(candidate, jobAnalysis),
-        recommendedQuestions: this.generateInterviewQuestions(candidate, jobAnalysis),
+        recommendedQuestions: this.generateInterviewQuestionsForCandidate(candidate, jobAnalysis),
         salaryExpectation: this.estimateSalaryExpectation(candidate, jobAnalysis),
         availability: this.assessAvailability(candidate),
         culturalFit,
@@ -597,7 +597,7 @@ export class RecruitmentAI {
     return concerns.length > 0 ? concerns : ['Requires further assessment'];
   }
 
-  private static generateInterviewQuestions(candidate: any, jobAnalysis: JobAnalysis): string[] {
+  private static generateInterviewQuestionsForCandidate(candidate: any, jobAnalysis: JobAnalysis): string[] {
     return [
       'Tell me about your experience with ' + (candidate.skills?.[0] || 'relevant technologies'),
       'How do you handle challenging projects?',
