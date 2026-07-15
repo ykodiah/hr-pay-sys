@@ -8,10 +8,11 @@
 
 import { createClient } from "@/lib/supabase/server"
 import {
-  GRA_2025_PAYE_BANDS,
+  GRA_MONTHLY_PAYE_BANDS,
   GRA_2025_SSNIT,
   GRA_2025_TIER2,
   GRA_2025_TIER3,
+  normalizePayeBands,
   type PAYEBand,
   type SSNITRates,
   type Tier2Rates,
@@ -56,7 +57,7 @@ export async function getTaxRates(
     .eq("is_active", true)
     .order("band_order", { ascending: true })
 
-  const payeBands: PAYEBand[] =
+  const rawBands: PAYEBand[] =
     !bandError && bandRows && bandRows.length > 0
       ? bandRows.map((r) => ({
           band_order: r.band_order,
@@ -65,7 +66,10 @@ export async function getTaxRates(
           is_remaining_amount: r.is_remaining_amount ?? false,
           description: r.description ?? "",
         }))
-      : GRA_2025_PAYE_BANDS
+      : GRA_MONTHLY_PAYE_BANDS
+
+  // Replace obsolete pre-2024 band tables and detect monthly vs annual widths
+  const { bands: payeBands, isMonthly } = normalizePayeBands(rawBands)
 
   // Fetch SSNIT / Tier 2 / Tier 3 rates
   const { data: rateRows, error: rateError } = await supabase
@@ -90,7 +94,13 @@ export async function getTaxRates(
     }
   }
 
-  return { paye_bands: payeBands, ssnit, tier2, tier3 }
+  return {
+    paye_bands: payeBands,
+    ssnit,
+    tier2,
+    tier3,
+    paye_bands_are_monthly: isMonthly,
+  }
 }
 
 // ---------------------------------------------------------------------------

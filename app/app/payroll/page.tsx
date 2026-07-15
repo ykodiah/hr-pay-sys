@@ -40,18 +40,20 @@ import {
   Bell,
 } from "lucide-react"
 
+import { calculateMonthlyPaye, round2 } from "@/lib/ghana-tax/engine"
+
 const calculateSSNIT = (basicSalary: number) => {
   const maxSSNITSalary = 4500 // Maximum SSNIT salary ceiling
   const ssnitSalary = Math.min(basicSalary, maxSSNITSalary)
   return {
-    employee: Math.round(ssnitSalary * 0.055), // 5.5% on basic salary
-    employer: Math.round(ssnitSalary * 0.13), // 13% on basic salary
-    total: Math.round(ssnitSalary * 0.185),
+    employee: round2(ssnitSalary * 0.055), // 5.5% on basic salary
+    employer: round2(ssnitSalary * 0.13), // 13% on basic salary
+    total: round2(ssnitSalary * 0.185),
   }
 }
 
 const calculateTier3 = (basicSalary: number, contributionRate = 0.05) => {
-  return Math.round(basicSalary * contributionRate)
+  return round2(basicSalary * contributionRate)
 }
 
 const calculatePAYE = (
@@ -59,37 +61,13 @@ const calculatePAYE = (
   allowances: number,
   ssnitEmployee: number,
   tier3Employee: number,
-  tier3Employer: number,
+  _tier3Employer: number = 0,
 ) => {
-  // Calculate taxable income: (basic + allowances) - SSNIT Employee - Tier3 (both employee and employer)
-  const taxableIncome = Math.max(0, basicSalary + allowances - ssnitEmployee - tier3Employee - tier3Employer)
-
-  const taxBands = [
-    { min: 0, max: 490, rate: 0 }, // First GH₵ 490: 0%
-    { min: 490, max: 600, rate: 0.05 }, // Next GH₵ 110: 5%
-    { min: 600, max: 730, rate: 0.1 }, // Next GH₵ 130: 10%
-    { min: 730, max: 3896.67, rate: 0.175 }, // Next GH₵ 3,166.67: 17.5%
-    { min: 3896.67, max: 19896.67, rate: 0.25 }, // Next GH₵ 16,000: 25%
-    { min: 19896.67, max: 50416.67, rate: 0.3 }, // Next GH₵ 30,520: 30%
-    { min: 50416.67, max: Number.POSITIVE_INFINITY, rate: 0.35 }, // Exceeding GH₵ 50,416.67: 35%
-  ]
-
-  let tax = 0
-  let remainingIncome = taxableIncome
-
-  for (const band of taxBands) {
-    if (remainingIncome <= 0) break
-
-    const bandWidth = band.max - band.min
-    const taxableInBand = Math.min(remainingIncome, bandWidth)
-
-    if (taxableInBand > 0) {
-      tax += taxableInBand * band.rate
-      remainingIncome -= taxableInBand
-    }
-  }
-
-  return Math.round(tax)
+  // Chargeable income: gross − employee SSNIT − employee Tier 3 only
+  // (Employer Tier 3 must never reduce the employee's PAYE base.)
+  const taxableIncome = Math.max(0, basicSalary + allowances - ssnitEmployee - tier3Employee)
+  const { monthlyTax } = calculateMonthlyPaye(taxableIncome)
+  return round2(monthlyTax)
 }
 
 type TransferType = "permanent" | "temporary"

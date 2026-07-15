@@ -61,6 +61,10 @@ import {
   Cog,
   ArrowRight,
   ArrowLeft,
+  Video,
+  Brain,
+  ClipboardList,
+  AlertCircle,
 } from "lucide-react"
 import { Suspense, useState, useEffect } from "react"
 import { AIChatbox } from "@/components/ai-chatbox"
@@ -206,6 +210,7 @@ export default function ClientAppLayout({
           'learning': { label: 'Learning', icon: BookOpen },
           'documents': { label: 'Documents', icon: FileText },
           'analytics': { label: 'Analytics', icon: BarChart3 },
+          'reports': { label: 'Compliance Reports', icon: FileCheck },
           'settings': { label: 'Settings', icon: Settings },
           'recruitment': { label: 'Recruitment', icon: UserPlus },
           'communication': { label: 'Communication', icon: MessageSquare },
@@ -216,6 +221,11 @@ export default function ClientAppLayout({
           'promotions': { label: 'Promotions', icon: Award },
           'loans': { label: 'Loans', icon: CreditCard },
           'integrations': { label: 'Integrations', icon: Plug },
+          'meetings': { label: 'Meetings', icon: Video },
+          'ml-analytics': { label: 'ML Analytics', icon: Brain },
+          'hr': { label: 'HR', icon: ClipboardList },
+          'overtime': { label: 'Overtime', icon: Timer },
+          'approvals': { label: 'Approvals', icon: CheckSquare },
         }
 
         const moduleEntry = moduleMap[module as keyof typeof moduleMap]
@@ -235,6 +245,7 @@ export default function ClientAppLayout({
             profile: "Profile",
             settings: "Settings",
             "update-details": "Update details",
+            "change-requests": "Change Requests",
           }
 
           if (subPageMap[subPage as keyof typeof subPageMap]) {
@@ -266,12 +277,15 @@ export default function ClientAppLayout({
           { name: "Org Chart", href: "/app/org-chart", icon: Sitemap, description: "Organizational structure" },
           { name: "Documents", href: "/app/documents", icon: FileText, description: "Document vault" },
           { name: "Communication", href: "/app/communication", icon: MessageSquare, description: "Team communication" },
+          { name: "Comm. Settings", href: "/app/communication/settings", icon: Cog, description: "Channels, templates & credentials" },
+          { name: "Meetings", href: "/app/meetings", icon: Video, description: "Secure meetings workspace" },
         ],
       },
       {
         title: "Time & Attendance",
         items: [
           { name: "Attendance", href: "/app/attendance", icon: Clock, description: "Track work hours" },
+          { name: "Attendance Alerts", href: "/attendance/alerts", icon: AlertCircle, description: "Alerts & attendance rules" },
           { name: "Leave Management", href: "/app/leave", icon: Calendar, description: "Manage leave requests" },
           { name: "Overtime", href: "/app/overtime", icon: Timer, description: "Overtime requests" },
         ],
@@ -296,7 +310,9 @@ export default function ClientAppLayout({
       {
         title: "Analytics",
         items: [
-          { name: "Reports", href: "/app/analytics", icon: BarChart3, description: "Reports & insights" },
+          { name: "Analytics", href: "/app/analytics", icon: BarChart3, description: "Reports & insights" },
+          { name: "Compliance Reports", href: "/app/reports", icon: FileCheck, description: "PAYE, SSNIT & statutory reports" },
+          { name: "ML Analytics", href: "/app/ml-analytics", icon: Brain, description: "AI-powered HR analytics" },
         ],
       },
       {
@@ -304,6 +320,7 @@ export default function ClientAppLayout({
         items: [
           { name: "My Portal", href: "/app/self-service", icon: UserCheck, description: "Personalised employee workspace" },
           { name: "Update My Details", href: "/app/self-service/update-details", icon: FileCheck, description: "Submit change requests" },
+          { name: "Change Requests", href: "/app/hr/change-requests", icon: ClipboardList, description: "Review employee change requests" },
         ],
       },
       {
@@ -627,7 +644,7 @@ export default function ClientAppLayout({
                     <p className="text-xs text-gray-500">kwame.asante@company.com</p>
                   </div>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => (window.location.href = "/app/profile")}>
+                  <DropdownMenuItem onClick={() => (window.location.href = "/app/self-service")}>
                     <User className="w-4 h-4 mr-2" />
                     My Profile
                   </DropdownMenuItem>

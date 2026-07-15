@@ -14,6 +14,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { EmployeeAIChatbox } from "@/components/employee-ai-chatbox"
 import {
   User,
@@ -33,14 +34,57 @@ import {
   AlertTriangle,
   DoorOpen,
   Clock,
+  Menu,
 } from "lucide-react"
 import { Logo } from "@/components/logo"
+
+const employeeNavSections = [
+  {
+    title: "Personal",
+    items: [
+      { name: "Dashboard", href: "/self-service", icon: Home },
+      { name: "My Profile", href: "/self-service/profile", icon: User },
+      { name: "Payslips", href: "/self-service/payslips", icon: FileText },
+    ],
+  },
+  {
+    title: "Performance",
+    items: [
+      { name: "My Goals", href: "/self-service/goals", icon: Target },
+      { name: "Performance Reviews", href: "/self-service/performance", icon: Star },
+    ],
+  },
+  {
+    title: "Learning",
+    items: [
+      { name: "My Courses", href: "/self-service/courses", icon: BookOpen },
+      { name: "Certifications", href: "/self-service/certifications", icon: Award },
+    ],
+  },
+  {
+    title: "Requests",
+    items: [
+      { name: "Leave Requests", href: "/self-service/leave", icon: Calendar },
+      { name: "Overtime", href: "/self-service/overtime", icon: Clock },
+      { name: "Loans", href: "/self-service/loans", icon: CreditCard },
+      { name: "Grievances", href: "/self-service/grievances", icon: AlertTriangle },
+    ],
+  },
+  {
+    title: "Support",
+    items: [
+      { name: "Exit Process", href: "/self-service/exit-process", icon: DoorOpen },
+      { name: "Settings", href: "/self-service/settings", icon: Settings },
+    ],
+  },
+]
 
 export default function SelfServiceLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [selectedNotification, setSelectedNotification] = useState<any>(null)
   const [notifications, setNotifications] = useState([
     {
@@ -91,10 +135,47 @@ export default function SelfServiceLayout({
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center space-x-4">
+            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="sm" className="md:hidden">
+                  <Menu className="w-5 h-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-80 p-0">
+                <div className="flex flex-col h-full">
+                  <div className="p-4 border-b flex items-center space-x-2">
+                    <Logo variant="icon" size="sm" />
+                    <span className="text-lg font-bold text-gray-900">Employee Portal</span>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-5">
+                    {employeeNavSections.map((section) => (
+                      <div key={section.title}>
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                          {section.title}
+                        </p>
+                        <div className="space-y-1">
+                          {section.items.map((item) => (
+                            <a
+                              key={item.href}
+                              href={item.href}
+                              onClick={() => setIsMobileMenuOpen(false)}
+                              className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                            >
+                              <item.icon className="w-5 h-5" />
+                              <span>{item.name}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
             <div className="flex items-center space-x-2">
               <Logo variant="icon" size="sm" />
               <span className="text-xl font-bold text-gray-900">AkwaabaHRPay</span>
-              <span className="text-sm text-gray-500 ml-2">Employee Portal</span>
+              <span className="text-sm text-gray-500 ml-2 hidden sm:inline">Employee Portal</span>
             </div>
           </div>
 

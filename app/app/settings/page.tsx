@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import TaxReliefManager from "@/components/tax-relief-manager"
 import { createClient } from "@/lib/supabase/client"
+import { calculateMonthlyPaye, round2 as roundMoney } from "@/lib/ghana-tax/engine"
 import {
   Building2,
   Users,
@@ -532,14 +533,15 @@ export default function SettingsPage() {
       apiEndpoint: "https://api.gra.gov.gh/tax-rates",
       lastUpdated: "2024-01-01",
       version: "2024.1",
+      // GRA monthly PAYE bands effective 1 Jan 2024 (display + calculator source of truth)
       taxBands: [
         { rate: 0, from: 0, to: 490, cumulativeTax: 0 },
-        { rate: 5, from: 491, to: 600, cumulativeTax: 0 },
-        { rate: 10, from: 601, to: 730, cumulativeTax: 5.5 },
-        { rate: 17.5, from: 731, to: 3896.67, cumulativeTax: 18.5 },
-        { rate: 25, from: 3896.68, to: 19896.67, cumulativeTax: 572.54 },
-        { rate: 30, from: 19896.68, to: 50416.67, cumulativeTax: 4572.54 },
-        { rate: 35, from: 50416.68, to: Number.POSITIVE_INFINITY, cumulativeTax: 13728.54 },
+        { rate: 5, from: 490, to: 600, cumulativeTax: 0 },
+        { rate: 10, from: 600, to: 730, cumulativeTax: 5.5 },
+        { rate: 17.5, from: 730, to: 3896.67, cumulativeTax: 18.5 },
+        { rate: 25, from: 3896.67, to: 19896.67, cumulativeTax: 572.67 },
+        { rate: 30, from: 19896.67, to: 50416.67, cumulativeTax: 4572.67 },
+        { rate: 35, from: 50416.67, to: Number.POSITIVE_INFINITY, cumulativeTax: 13728.67 },
       ],
       socialSecurity: {
         employee: 5.5,
@@ -548,9 +550,9 @@ export default function SettingsPage() {
         cap: 2000000, // Annual cap in GHS
       },
       tier2: {
-        employee: 5.5,
-        employer: 5.5,
-        total: 11.0,
+        employee: 5.0,
+        employer: 5.0,
+        total: 10.0,
       },
       tier3: {
         employee: 5.0,
@@ -1026,18 +1028,28 @@ export default function SettingsPage() {
     const config = getCurrencyConfig(currency)
     if (!config) return 0
 
-    let tax = 0
-    let remainingIncome = income
-
-    for (const band of config.taxBands) {
-      if (remainingIncome <= 0) break
-
-      const bandIncome = band.to ? Math.min(remainingIncome, band.to - (band.from || 0)) : remainingIncome
-      tax += (bandIncome * band.rate) / 100
-      remainingIncome -= bandIncome
+    // Ghana PAYE: use the shared GRA monthly engine so Settings matches Payroll
+    if (currency === "ghs") {
+      return roundMoney(calculateMonthlyPaye(Math.max(0, income)).monthlyTax)
     }
 
-    return tax
+    let tax = 0
+    let remainingIncome = Math.max(0, income)
+    const bands = [...config.taxBands].sort((a: any, b: any) => (a.from || 0) - (b.from || 0))
+
+    for (let i = 0; i < bands.length; i++) {
+      if (remainingIncome <= 0) break
+      const band = bands[i]
+      const bandStart = band.from || 0
+      const bandEnd = band.to == null || !Number.isFinite(band.to) ? Number.POSITIVE_INFINITY : band.to
+      const bandWidth = bandEnd - bandStart
+      if (bandWidth <= 0 && Number.isFinite(bandEnd)) continue
+      const taxableInBand = Number.isFinite(bandWidth) ? Math.min(remainingIncome, bandWidth) : remainingIncome
+      tax += (taxableInBand * band.rate) / 100
+      remainingIncome -= taxableInBand
+    }
+
+    return Math.round(tax * 100) / 100
   }
 
   const validateTaxBands = (bands: any[]) => {
