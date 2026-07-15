@@ -453,4 +453,3 @@ UPDATE communication_templates t
 SET current_version_id = iv.id
 FROM inserted_versions iv
 WHERE t.id = iv.template_id;
-

@@ -677,8 +677,10 @@ export default function PayrollPage() {
     const transferIdSet = new Set(employeesToTransfer.map((candidate) => candidate.id))
     const destinationDivision = targetDivision || getSubsidiaryDivisions(targetSubsidiaryId)[0] || "General"
     const destinationDepartment = targetDepartment || getSubsidiaryDepartments(targetSubsidiaryId)[0] || "General"
-    const supervisorName = transferCandidates[0]?.supervisor || getSubsidiarySupervisor(employeesToTransfer[0].subsidiaryId)
-    const hodName = transferCandidates[0]?.headOfDepartment || getSubsidiaryHeadOfDepartment(employeesToTransfer[0].subsidiaryId)
+    const supervisorName =
+      transferCandidates[0]?.supervisor || getSubsidiarySupervisor(employeesToTransfer[0].subsidiaryId)
+    const hodName =
+      transferCandidates[0]?.headOfDepartment || getSubsidiaryHeadOfDepartment(employeesToTransfer[0].subsidiaryId)
     const transferId = `TR-${Date.now()}`
 
     setEmployeePayroll((prev) =>
@@ -1138,272 +1140,273 @@ export default function PayrollPage() {
         </CardContent>
       </Card>
 
-        {/* Intercompany Transfers */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ArrowRightLeft className="h-5 w-5 text-emerald-600" />
-              <span>Intercompany Transfer Center</span>
-            </CardTitle>
-            <CardDescription>Move employees between subsidiaries and keep payroll aligned.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 p-4">
-                <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-emerald-700">
-                  <span>Active Subsidiaries</span>
-                  <Building2 className="h-4 w-4" />
-                </div>
-                <p className="mt-2 text-2xl font-semibold text-emerald-900">{subsidiaries.length}</p>
-                <p className="mt-1 text-xs text-emerald-700">Configured in this payroll group</p>
+      {/* Intercompany Transfers */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ArrowRightLeft className="h-5 w-5 text-emerald-600" />
+            <span>Intercompany Transfer Center</span>
+          </CardTitle>
+          <CardDescription>Move employees between subsidiaries and keep payroll aligned.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 p-4">
+              <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-emerald-700">
+                <span>Active Subsidiaries</span>
+                <Building2 className="h-4 w-4" />
               </div>
-              <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-4">
-                <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-blue-700">
-                  <span>Selected Employees</span>
-                  <Users className="h-4 w-4" />
-                </div>
-                <p className="mt-2 text-2xl font-semibold text-blue-900">{selectedCount}</p>
-                <p className="mt-1 text-xs text-blue-700">Ready to transfer this period</p>
-              </div>
-              <div className="rounded-lg border border-amber-100 bg-amber-50/70 p-4">
-                <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-amber-700">
-                  <span>Last Transfer</span>
-                  <Clock className="h-4 w-4" />
-                </div>
-                <p className="mt-2 text-2xl font-semibold text-amber-900">
-                  {latestTransfer ? formatDisplayDate(latestTransfer.initiatedOn) : "—"}
-                </p>
-                <p className="mt-1 text-xs text-amber-700">
-                  {latestTransfer ? `${formatTransferCount(latestTransfer.employees.length)} moved` : "No records yet"}
-                </p>
-              </div>
+              <p className="mt-2 text-2xl font-semibold text-emerald-900">{subsidiaries.length}</p>
+              <p className="mt-1 text-xs text-emerald-700">Configured in this payroll group</p>
             </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-2"
-                onClick={() => handleOpenTransferDialog(employeePayroll.filter((employee) => employee.selected))}
-                disabled={selectedCount === 0}
-              >
-                <ArrowRightLeft className="h-4 w-4" />
-                Transfer Selected ({selectedCount})
-              </Button>
-              <p className="text-sm text-gray-500">
-                Tip: use the checkboxes below to choose employees for transfer.
+            <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-4">
+              <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-blue-700">
+                <span>Selected Employees</span>
+                <Users className="h-4 w-4" />
+              </div>
+              <p className="mt-2 text-2xl font-semibold text-blue-900">{selectedCount}</p>
+              <p className="mt-1 text-xs text-blue-700">Ready to transfer this period</p>
+            </div>
+            <div className="rounded-lg border border-amber-100 bg-amber-50/70 p-4">
+              <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-amber-700">
+                <span>Last Transfer</span>
+                <Clock className="h-4 w-4" />
+              </div>
+              <p className="mt-2 text-2xl font-semibold text-amber-900">
+                {latestTransfer ? formatDisplayDate(latestTransfer.initiatedOn) : "—"}
+              </p>
+              <p className="mt-1 text-xs text-amber-700">
+                {latestTransfer ? `${formatTransferCount(latestTransfer.employees.length)} moved` : "No records yet"}
               </p>
             </div>
+          </div>
 
-            <Separator />
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2 bg-transparent"
+              onClick={() => handleOpenTransferDialog(employeePayroll.filter((employee) => employee.selected))}
+              disabled={selectedCount === 0}
+            >
+              <ArrowRightLeft className="h-4 w-4" />
+              Transfer Selected ({selectedCount})
+            </Button>
+            <p className="text-sm text-gray-500">Tip: use the checkboxes below to choose employees for transfer.</p>
+          </div>
 
-            <div>
-              <div className="mb-3 flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-gray-700">Recent transfer activity</h4>
-                <span className="text-xs text-gray-500">{formatTransferCount(transferHistory.length)} total</span>
-              </div>
-                {transferHistory.length > 0 ? (
-                  <ScrollArea className="h-64 pr-3">
-                    <div className="space-y-3">
-                      {transferHistory.map((record) => (
-                        <div key={record.id} className="rounded-lg border border-gray-100 bg-gray-50/80 p-3">
-                          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                            <span className="font-medium text-gray-900">
-                              {toTitleCase(record.transferType)} transfer to {record.targetSubsidiaryName}
-                            </span>
+          <Separator />
+
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-gray-700">Recent transfer activity</h4>
+              <span className="text-xs text-gray-500">{formatTransferCount(transferHistory.length)} total</span>
+            </div>
+            {transferHistory.length > 0 ? (
+              <ScrollArea className="h-64 pr-3">
+                <div className="space-y-3">
+                  {transferHistory.map((record) => (
+                    <div key={record.id} className="rounded-lg border border-gray-100 bg-gray-50/80 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                        <span className="font-medium text-gray-900">
+                          {toTitleCase(record.transferType)} transfer to {record.targetSubsidiaryName}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {record.approvalStatus && (
+                            <Badge
+                              variant={
+                                record.approvalStatus === "approved"
+                                  ? "default"
+                                  : record.approvalStatus === "pending"
+                                    ? "secondary"
+                                    : "outline"
+                              }
+                              className={
+                                record.approvalStatus === "approved"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : record.approvalStatus === "pending"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-red-100 text-red-700 border-red-200"
+                              }
+                            >
+                              {toTitleCase(record.approvalStatus)}
+                            </Badge>
+                          )}
+                          <span className="text-xs text-gray-500">
+                            Effective {formatDisplayDate(record.effectiveDate)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500 space-y-1">
+                        <p>
+                          Initiated {formatDisplayDate(record.initiatedOn)} •{" "}
+                          {formatTransferCount(record.employees.length)}
+                        </p>
+                        <p>
+                          Division: {record.targetDivision || "—"} • Department: {record.targetDepartment || "—"}
+                        </p>
+                        {record.returnDate && <p>Expected return: {formatDisplayDate(record.returnDate)}</p>}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {record.employees.map((employee) => (
+                          <Badge key={`${record.id}-${employee.id}`} variant="outline" className="text-xs">
+                            {employee.name} ({employee.fromSubsidiaryName} → {record.targetSubsidiaryName})
+                          </Badge>
+                        ))}
+                      </div>
+                      {record.reason && <p className="mt-2 text-xs italic text-gray-500">Reason: {record.reason}</p>}
+                      <div className="mt-3 space-y-2 rounded-md bg-white/60 p-2">
+                        {record.approvals.map((stage) => (
+                          <div
+                            key={`${record.id}-${stage.role}`}
+                            className="flex flex-wrap items-center justify-between gap-2 text-xs"
+                          >
+                            <div className="space-y-1">
+                              <p className="font-medium text-gray-700">
+                                {stage.role}: {stage.approver}
+                              </p>
+                              {stage.notes && <p className="italic text-gray-500">Notes: {stage.notes}</p>}
+                            </div>
                             <div className="flex items-center gap-2">
-                              {record.approvalStatus && (
-                                <Badge
-                                  variant={
-                                    record.approvalStatus === "approved"
-                                      ? "default"
-                                      : record.approvalStatus === "pending"
-                                        ? "secondary"
-                                        : "outline"
-                                  }
-                                  className={
-                                    record.approvalStatus === "approved"
-                                      ? "bg-emerald-100 text-emerald-700"
-                                      : record.approvalStatus === "pending"
-                                        ? "bg-amber-100 text-amber-700"
-                                        : "bg-red-100 text-red-700 border-red-200"
-                                  }
-                                >
-                                  {toTitleCase(record.approvalStatus)}
-                                </Badge>
+                              <Badge
+                                variant={
+                                  stage.status === "approved"
+                                    ? "default"
+                                    : stage.status === "pending"
+                                      ? "secondary"
+                                      : "outline"
+                                }
+                                className={
+                                  stage.status === "approved"
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : stage.status === "pending"
+                                      ? "bg-amber-100 text-amber-700"
+                                      : "bg-red-100 text-red-700 border-red-200"
+                                }
+                              >
+                                {toTitleCase(stage.status)}
+                              </Badge>
+                              {stage.status === "pending" && (
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    size="xs"
+                                    className="bg-emerald-600 hover:bg-emerald-700"
+                                    onClick={() => handleApprovalAction(record.id, stage.role, "approve")}
+                                  >
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    size="xs"
+                                    variant="outline"
+                                    className="border-red-200 text-red-600 hover:bg-red-50 bg-transparent"
+                                    onClick={() => {
+                                      const rejectionNotes = window.prompt(
+                                        `Add reason for rejecting transfer ${record.id} as ${stage.role}`,
+                                      )
+                                      if (rejectionNotes === null) {
+                                        return
+                                      }
+                                      handleApprovalAction(record.id, stage.role, "reject", rejectionNotes || undefined)
+                                    }}
+                                  >
+                                    Reject
+                                  </Button>
+                                </div>
                               )}
-                              <span className="text-xs text-gray-500">
-                                Effective {formatDisplayDate(record.effectiveDate)}
-                              </span>
+                              {stage.status !== "pending" && stage.actionDate && (
+                                <span className="text-gray-500">{formatDisplayDate(stage.actionDate)}</span>
+                              )}
                             </div>
                           </div>
-                          <div className="mt-1 text-xs text-gray-500 space-y-1">
-                            <p>
-                              Initiated {formatDisplayDate(record.initiatedOn)} • {formatTransferCount(record.employees.length)}
-                            </p>
-                            <p>
-                              Division: {record.targetDivision || "—"} • Department: {record.targetDepartment || "—"}
-                            </p>
-                            {record.returnDate && (
-                              <p>Expected return: {formatDisplayDate(record.returnDate)}</p>
-                            )}
-                          </div>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {record.employees.map((employee) => (
-                              <Badge key={`${record.id}-${employee.id}`} variant="outline" className="text-xs">
-                                {employee.name} ({employee.fromSubsidiaryName} → {record.targetSubsidiaryName})
-                              </Badge>
-                            ))}
-                          </div>
-                          {record.reason && (
-                            <p className="mt-2 text-xs italic text-gray-500">Reason: {record.reason}</p>
-                          )}
-                          <div className="mt-3 space-y-2 rounded-md bg-white/60 p-2">
-                            {record.approvals.map((stage) => (
-                              <div key={`${record.id}-${stage.role}`} className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                                <div className="space-y-1">
-                                  <p className="font-medium text-gray-700">
-                                    {stage.role}: {stage.approver}
-                                  </p>
-                                  {stage.notes && <p className="italic text-gray-500">Notes: {stage.notes}</p>}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Badge
-                                    variant={
-                                      stage.status === "approved"
-                                        ? "default"
-                                        : stage.status === "pending"
-                                          ? "secondary"
-                                          : "outline"
-                                    }
-                                    className={
-                                      stage.status === "approved"
-                                        ? "bg-emerald-100 text-emerald-700"
-                                        : stage.status === "pending"
-                                          ? "bg-amber-100 text-amber-700"
-                                          : "bg-red-100 text-red-700 border-red-200"
-                                    }
-                                  >
-                                    {toTitleCase(stage.status)}
-                                  </Badge>
-                                  {stage.status === "pending" && (
-                                    <div className="flex items-center gap-2">
-                                      <Button
-                                        size="xs"
-                                        className="bg-emerald-600 hover:bg-emerald-700"
-                                        onClick={() => handleApprovalAction(record.id, stage.role, "approve")}
-                                      >
-                                        Approve
-                                      </Button>
-                                      <Button
-                                        size="xs"
-                                        variant="outline"
-                                        className="border-red-200 text-red-600 hover:bg-red-50"
-                                        onClick={() => {
-                                          const rejectionNotes = window.prompt(
-                                            `Add reason for rejecting transfer ${record.id} as ${stage.role}`,
-                                          )
-                                          if (rejectionNotes === null) {
-                                            return
-                                          }
-                                          handleApprovalAction(record.id, stage.role, "reject", rejectionNotes || undefined)
-                                        }}
-                                      >
-                                        Reject
-                                      </Button>
-                                    </div>
-                                  )}
-                                  {stage.status !== "pending" && stage.actionDate && (
-                                    <span className="text-gray-500">
-                                      {formatDisplayDate(stage.actionDate)}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                ) : (
-                  <p className="text-sm text-gray-500">No intercompany transfers recorded yet.</p>
-                )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Workflow Notifications */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5 text-blue-600" />
-              <span>Workflow Notifications</span>
-            </CardTitle>
-            <CardDescription>Track who has been alerted about intercompany moves.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {notifications.length > 0 ? (
-              <ScrollArea className="h-40 pr-3">
-                <div className="space-y-3">
-                  {notifications.map((notification) => (
-                    <div key={notification.id} className="rounded-lg border border-blue-100 bg-blue-50/70 p-3 text-xs text-blue-900">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium">{notification.audience}</span>
-                        <span className="text-blue-700">{formatDateTime(notification.timestamp)}</span>
+                        ))}
                       </div>
-                      <p className="mt-1 text-blue-900/90">{notification.message}</p>
-                      <p className="mt-1 text-[10px] uppercase tracking-wide text-blue-600">Transfer {notification.transferId}</p>
                     </div>
                   ))}
                 </div>
               </ScrollArea>
             ) : (
-              <p className="text-sm text-gray-500">Notifications will appear here as approvals progress.</p>
+              <p className="text-sm text-gray-500">No intercompany transfers recorded yet.</p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Employee Payroll Details */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Employee Payroll Details - {selectedPeriod}</CardTitle>
-              <div className="flex space-x-2">
-                {selectedCount > 0 && (
-                  <Button onClick={handleCalculateSelected} variant="outline" size="sm">
-                    <Calculator className="w-4 h-4 mr-2" />
-                    Calculate Selected ({selectedCount})
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  onClick={() => handleOpenTransferDialog(employeePayroll.filter((employee) => employee.selected))}
-                  disabled={selectedCount === 0}
-                >
-                  <ArrowRightLeft className="h-4 w-4" />
-                  Transfer Selected
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => handleExportPayslips("pdf")}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Export Payslips (PDF)
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => handleExportPayslips("excel")}>
-                  <FileSpreadsheet className="w-4 h-4 mr-2" />
-                  Export Payslips (Excel)
-                </Button>
-                <Button variant="outline" size="sm" onClick={handlePreviewReport}>
-                  <Eye className="w-4 h-4 mr-2" />
-                  Preview Report
-                </Button>
-                </div>
+      {/* Workflow Notifications */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5 text-blue-600" />
+            <span>Workflow Notifications</span>
+          </CardTitle>
+          <CardDescription>Track who has been alerted about intercompany moves.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {notifications.length > 0 ? (
+            <ScrollArea className="h-40 pr-3">
+              <div className="space-y-3">
+                {notifications.map((notification) => (
+                  <div
+                    key={notification.id}
+                    className="rounded-lg border border-blue-100 bg-blue-50/70 p-3 text-xs text-blue-900"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium">{notification.audience}</span>
+                      <span className="text-blue-700">{formatDateTime(notification.timestamp)}</span>
+                    </div>
+                    <p className="mt-1 text-blue-900/90">{notification.message}</p>
+                    <p className="mt-1 text-[10px] uppercase tracking-wide text-blue-600">
+                      Transfer {notification.transferId}
+                    </p>
+                  </div>
+                ))}
               </div>
-          </CardHeader>
-          <CardContent>
-            {/* Search and Filter */}
-            <div className="flex items-center space-x-4 mb-6">
+            </ScrollArea>
+          ) : (
+            <p className="text-sm text-gray-500">Notifications will appear here as approvals progress.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Employee Payroll Details */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Employee Payroll Details - {selectedPeriod}</CardTitle>
+            <div className="flex space-x-2">
+              {selectedCount > 0 && (
+                <Button onClick={handleCalculateSelected} variant="outline" size="sm">
+                  <Calculator className="w-4 h-4 mr-2" />
+                  Calculate Selected ({selectedCount})
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 bg-transparent"
+                onClick={() => handleOpenTransferDialog(employeePayroll.filter((employee) => employee.selected))}
+                disabled={selectedCount === 0}
+              >
+                <ArrowRightLeft className="h-4 w-4" />
+                Transfer Selected
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleExportPayslips("pdf")}>
+                <Download className="w-4 h-4 mr-2" />
+                Export Payslips (PDF)
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleExportPayslips("excel")}>
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Export Payslips (Excel)
+              </Button>
+              <Button variant="outline" size="sm" onClick={handlePreviewReport}>
+                <Eye className="w-4 h-4 mr-2" />
+                Preview Report
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {/* Search and Filter */}
+          <div className="flex items-center space-x-4 mb-6">
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <Input
@@ -1441,150 +1444,148 @@ export default function PayrollPage() {
             </Label>
           </div>
 
-            <div className="space-y-4">
-              {filteredEmployees.map((employee) => {
-                const statusBadge = getStatusBadgeAppearance(employee.status)
+          <div className="space-y-4">
+            {filteredEmployees.map((employee) => {
+              const statusBadge = getStatusBadgeAppearance(employee.status)
 
-                return (
-                  <div
-                    key={employee.id}
-                    className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${
-                      employee.selected ? "border-emerald-200 bg-emerald-50" : "border-gray-200 hover:bg-gray-50"
-                    }`}
-                  >
-                    <div className="flex items-center space-x-4">
-                      <Checkbox
-                        checked={employee.selected}
-                        onCheckedChange={(checked) => handleSelectEmployee(employee.id, checked as boolean)}
-                      />
-                      <Avatar className="w-12 h-12">
-                        <AvatarImage src={employee.avatar || "/placeholder.svg"} />
-                        <AvatarFallback>
-                          {employee.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-semibold text-gray-900">{employee.name}</h3>
-                          <Badge variant="outline" className="text-xs">
-                            {employee.employeeId}
+              return (
+                <div
+                  key={employee.id}
+                  className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${
+                    employee.selected ? "border-emerald-200 bg-emerald-50" : "border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  <div className="flex items-center space-x-4">
+                    <Checkbox
+                      checked={employee.selected}
+                      onCheckedChange={(checked) => handleSelectEmployee(employee.id, checked as boolean)}
+                    />
+                    <Avatar className="w-12 h-12">
+                      <AvatarImage src={employee.avatar || "/placeholder.svg"} />
+                      <AvatarFallback>
+                        {employee.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold text-gray-900">{employee.name}</h3>
+                        <Badge variant="outline" className="text-xs">
+                          {employee.employeeId}
+                        </Badge>
+                        {employee.subsidiary && (
+                          <Badge className="text-xs bg-emerald-100 text-emerald-700 border-emerald-100">
+                            {employee.subsidiary}
                           </Badge>
-                          {employee.subsidiary && (
-                            <Badge className="text-xs bg-emerald-100 text-emerald-700 border-emerald-100">
-                              {employee.subsidiary}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-600">{employee.position}</p>
-                        {employee.previousSubsidiary && employee.previousSubsidiary !== employee.subsidiary && (
-                          <p className="text-xs text-gray-500">
-                            From {employee.previousSubsidiary}
-                          </p>
-                        )}
-                        {employee.transferEffectiveDate && (
-                          <p className="text-xs text-amber-600">
-                            Transfer effective {formatDisplayDate(employee.transferEffectiveDate)}
-                          </p>
-                        )}
-                        {employee.transferNotes && (
-                          <p className="text-xs text-gray-500 italic">{employee.transferNotes}</p>
                         )}
                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-7 gap-4 text-center text-sm">
-                      <div>
-                        <p className="font-medium text-gray-900">GHS {employee.basicSalary.toLocaleString()}</p>
-                        <p className="text-gray-500">Basic</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">GHS {employee.allowances.total.toLocaleString()}</p>
-                        <p className="text-gray-500">Allowances</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">GHS {employee.grossPay.toLocaleString()}</p>
-                        <p className="text-gray-500">Gross</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-red-600">-GHS {employee.paye.toLocaleString()}</p>
-                        <p className="text-gray-500">PAYE</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-blue-600">-GHS {employee.ssnit.employee.toLocaleString()}</p>
-                        <p className="text-gray-500">SSNIT</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-purple-600">-GHS {employee.tier3.employee.toLocaleString()}</p>
-                        <p className="text-gray-500">Tier 3</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-emerald-600">GHS {employee.netPay.toLocaleString()}</p>
-                        <p className="text-gray-500">Net Pay</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Badge variant={statusBadge.variant} className={statusBadge.className}>
-                        {employee.status}
-                      </Badge>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleOpenTransferDialog([employee])}
-                        title="Schedule intercompany transfer"
-                      >
-                        <ArrowRightLeft className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedEmployee(employee)
-                          setIsEditDialogOpen(true)
-                        }}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
+                      <p className="text-sm text-gray-600">{employee.position}</p>
+                      {employee.previousSubsidiary && employee.previousSubsidiary !== employee.subsidiary && (
+                        <p className="text-xs text-gray-500">From {employee.previousSubsidiary}</p>
+                      )}
+                      {employee.transferEffectiveDate && (
+                        <p className="text-xs text-amber-600">
+                          Transfer effective {formatDisplayDate(employee.transferEffectiveDate)}
+                        </p>
+                      )}
+                      {employee.transferNotes && (
+                        <p className="text-xs text-gray-500 italic">{employee.transferNotes}</p>
+                      )}
                     </div>
                   </div>
-                )
-              })}
-            </div>
+
+                  <div className="grid grid-cols-7 gap-4 text-center text-sm">
+                    <div>
+                      <p className="font-medium text-gray-900">GHS {employee.basicSalary.toLocaleString()}</p>
+                      <p className="text-gray-500">Basic</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">GHS {employee.allowances.total.toLocaleString()}</p>
+                      <p className="text-gray-500">Allowances</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">GHS {employee.grossPay.toLocaleString()}</p>
+                      <p className="text-gray-500">Gross</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-red-600">-GHS {employee.paye.toLocaleString()}</p>
+                      <p className="text-gray-500">PAYE</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-blue-600">-GHS {employee.ssnit.employee.toLocaleString()}</p>
+                      <p className="text-gray-500">SSNIT</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-purple-600">-GHS {employee.tier3.employee.toLocaleString()}</p>
+                      <p className="text-gray-500">Tier 3</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-emerald-600">GHS {employee.netPay.toLocaleString()}</p>
+                      <p className="text-gray-500">Net Pay</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Badge variant={statusBadge.variant} className={statusBadge.className}>
+                      {employee.status}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleOpenTransferDialog([employee])}
+                      title="Schedule intercompany transfer"
+                    >
+                      <ArrowRightLeft className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedEmployee(employee)
+                        setIsEditDialogOpen(true)
+                      }}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </CardContent>
       </Card>
 
-        {/* Intercompany Transfer Dialog */}
-        <Dialog
-          open={isTransferDialogOpen}
-          onOpenChange={(open) => {
-            setIsTransferDialogOpen(open)
-            if (!open) {
+      {/* Intercompany Transfer Dialog */}
+      <Dialog
+        open={isTransferDialogOpen}
+        onOpenChange={(open) => {
+          setIsTransferDialogOpen(open)
+          if (!open) {
+            setTransferCandidates([])
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {transferCandidates.length > 1
+                ? `Transfer ${formatTransferCount(transferCandidates.length)}`
+                : `Transfer ${transferCandidates[0]?.name ?? "Employee"}`}
+            </DialogTitle>
+          </DialogHeader>
+          <IntercompanyTransferDialog
+            employees={transferCandidates}
+            subsidiaries={subsidiaries}
+            onSubmit={handleTransferConfirm}
+            onClose={() => {
+              setIsTransferDialogOpen(false)
               setTransferCandidates([])
-            }
-          }}
-        >
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {transferCandidates.length > 1
-                  ? `Transfer ${formatTransferCount(transferCandidates.length)}`
-                  : `Transfer ${transferCandidates[0]?.name ?? "Employee"}`}
-              </DialogTitle>
-            </DialogHeader>
-            <IntercompanyTransferDialog
-              employees={transferCandidates}
-              subsidiaries={subsidiaries}
-              onSubmit={handleTransferConfirm}
-              onClose={() => {
-                setIsTransferDialogOpen(false)
-                setTransferCandidates([])
-              }}
-            />
-          </DialogContent>
-        </Dialog>
+            }}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Employee Payroll Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -2227,7 +2228,7 @@ function IntercompanyTransferDialog({
         <div className="space-y-2">
           <Label>Destination subsidiary</Label>
           <Select value={targetSubsidiary} onValueChange={setTargetSubsidiary}>
-            <SelectTrigger>
+            <SelectTrigger className="w-full overflow-hidden [&>span]:truncate">
               <SelectValue placeholder="Select subsidiary" />
             </SelectTrigger>
             <SelectContent>
@@ -2242,7 +2243,7 @@ function IntercompanyTransferDialog({
         <div className="space-y-2">
           <Label>Target division</Label>
           <Select value={targetDivision} onValueChange={setTargetDivision}>
-            <SelectTrigger>
+            <SelectTrigger className="w-full overflow-hidden [&>span]:truncate">
               <SelectValue placeholder="Select division" />
             </SelectTrigger>
             <SelectContent>
@@ -2257,7 +2258,7 @@ function IntercompanyTransferDialog({
         <div className="space-y-2">
           <Label>Target department</Label>
           <Select value={targetDepartment} onValueChange={setTargetDepartment}>
-            <SelectTrigger>
+            <SelectTrigger className="w-full overflow-hidden [&>span]:truncate">
               <SelectValue placeholder="Select department" />
             </SelectTrigger>
             <SelectContent>
@@ -2303,22 +2304,24 @@ function IntercompanyTransferDialog({
           onValueChange={(value) => setTransferType(value as TransferType)}
           className="flex flex-col gap-2 md:flex-row"
         >
-          {([
-            {
-              id: "transfer-permanent",
-              value: "permanent" as TransferType,
-              title: "Permanent Transfer",
-              description: "Employee relocates indefinitely",
-              activeClasses: "border-emerald-300 bg-emerald-50",
-            },
-            {
-              id: "transfer-temporary",
-              value: "temporary" as TransferType,
-              title: "Temporary Transfer",
-              description: "Employee returns to home subsidiary later",
-              activeClasses: "border-blue-300 bg-blue-50",
-            },
-          ] as const).map((option) => (
+          {(
+            [
+              {
+                id: "transfer-permanent",
+                value: "permanent" as TransferType,
+                title: "Permanent Transfer",
+                description: "Employee relocates indefinitely",
+                activeClasses: "border-emerald-300 bg-emerald-50",
+              },
+              {
+                id: "transfer-temporary",
+                value: "temporary" as TransferType,
+                title: "Temporary Transfer",
+                description: "Employee returns to home subsidiary later",
+                activeClasses: "border-blue-300 bg-blue-50",
+              },
+            ] as const
+          ).map((option) => (
             <div
               key={option.id}
               className={`flex items-start space-x-3 rounded-lg border p-3 text-sm transition-colors ${
@@ -2361,7 +2364,11 @@ function IntercompanyTransferDialog({
         <Button variant="outline" onClick={onClose}>
           Cancel
         </Button>
-        <Button onClick={handleSubmit} className="bg-emerald-600 hover:bg-emerald-700" disabled={employees.length === 0}>
+        <Button
+          onClick={handleSubmit}
+          className="bg-emerald-600 hover:bg-emerald-700"
+          disabled={employees.length === 0}
+        >
           Confirm Transfer
         </Button>
       </div>

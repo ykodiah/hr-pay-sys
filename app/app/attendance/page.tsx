@@ -1,7 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { useToast } from "@/hooks/use-toast"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -19,7 +18,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   AlertCircle,
   BarChart3,
@@ -39,96 +40,54 @@ import {
   Sparkles,
   Timer,
   UserCheck,
-  Users,
+  TrendingUp,
+  MapPin,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  Settings,
+  Edit,
+  Wifi,
+  MapPinned,
+  Navigation,
+  Smartphone,
+  Monitor,
+  ArrowUpDown,
+  Loader2,
+  Filter,
+  CreditCard,
+  Trash2,
+  MoreHorizontal,
+  Brain,
+  Sparkles,
 } from "lucide-react"
-
-type AttendanceStatus = "present" | "late" | "absent" | "early-departure"
-type AttendanceMethod = "fingerprint" | "facial" | "mobile" | "manual" | "card"
-type PredictedTrend = "on-track" | "late-risk" | "absence-risk"
-
-const formatDateByOffset = (offsetDays: number) => {
-  const date = new Date()
-  date.setDate(date.getDate() + offsetDays)
-  return date.toISOString().split("T")[0]
-}
-
-interface AttendanceRecord {
-  id: string
-  employeeId: string
-  employeeName: string
-  date: string
-  clockIn: string
-  clockOut: string
-  totalHours: number
-  overtimeHours: number
-  expectedHours: number
-  status: AttendanceStatus
-  location: string
-  department: string
-  division: string
-  subsidiary: string
-  team: string
-  shift: string
-  method: AttendanceMethod
-  workingArrangement: "onsite" | "remote" | "hybrid"
-  productivityScore: number
-  aiRiskScore: number
-  predictedTrend: PredictedTrend
-}
-
-interface Shift {
-  id: string
-  name: string
-  startTime: string
-  endTime: string
-  breakDuration: number
-  employees: string[]
-  isActive: boolean
-  location: string
-  department: string
-  notes?: string
-}
-
-interface BiometricDevice {
-  id: string
-  name: string
-  type: "fingerprint" | "facial" | "card" | "mobile"
-  location: string
-  status: "online" | "offline" | "syncing"
-  lastSync: string
-  integration: "REST" | "SDK" | "CSV"
-  provider: string
-  reference?: string
-}
-
-type OvertimeStatus = "pending" | "approved" | "rejected"
-
-interface OvertimeRequest {
-  id: string
-  employeeId: string
-  employeeName: string
-  date: string
-  hoursRequested: number
-  status: OvertimeStatus
-  justification: string
-  department: string
-}
-
-interface Holiday {
-  id: string
-  name: string
-  date: string
-  scope: "company" | "subsidiary" | "department"
-  scopeReference: string
-  isPaid: boolean
-  notes?: string
-}
-
-interface GeoCapture {
-  coordinates: string
-  accuracy?: string
-  capturedAt: string
-}
+import { useToast } from "@/hooks/use-toast"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Textarea } from "@/components/ui/textarea"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  getAttendanceRecords,
+  getShifts,
+  getBiometricDevices,
+  getOvertimeRequests,
+  getAttendanceStats,
+  getClockStatus,
+  clockIn,
+  clockOut,
+  createShift,
+  updateShift,
+  deleteShift,
+  createBiometricDevice,
+  syncBiometricDevice,
+  toggleDeviceStatus,
+  createOvertimeRequest,
+  updateOvertimeRequest,
+  generateAttendanceReport,
+  type AttendanceRecord,
+  type Shift,
+  type BiometricDevice,
+  type OvertimeRequest,
+} from "@/app/actions/attendance"
 
 interface AlertSettings {
   enabled: boolean
@@ -423,7 +382,6 @@ const initialHolidays: Holiday[] = [
 
 export default function AttendancePage() {
   const { toast } = useToast()
-
   const [activeTab, setActiveTab] = useState("overview")
   const [attendanceRecords, setAttendanceRecords] = useState(initialAttendanceRecords)
   const [shifts, setShifts] = useState(initialShifts)
@@ -961,6 +919,462 @@ export default function AttendancePage() {
   }
 
   const getStatusColor = (status: AttendanceStatus) => {
+  // Load data
+  const loadData = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const [recordsRes, shiftsRes, devicesRes, overtimeRes, statsRes, statusRes] = await Promise.all([
+        getAttendanceRecords({
+          dateRange: dateFilter,
+          department: departmentFilter !== "all" ? departmentFilter : undefined,
+          division: divisionFilter !== "all" ? divisionFilter : undefined,
+          location: locationFilter !== "all" ? locationFilter : undefined,
+          status: statusFilter !== "all" ? statusFilter : undefined,
+          search: searchTerm || undefined,
+        }),
+        getShifts(),
+        getBiometricDevices(),
+        getOvertimeRequests(),
+        getAttendanceStats(),
+        getClockStatus(),
+      ])
+
+      setAttendanceRecords(recordsRes.data || [])
+      setShifts(shiftsRes.data || [])
+      setBiometricDevices(devicesRes.data || [])
+      setOvertimeRequests(overtimeRes.data || [])
+      if (statsRes) setStats(statsRes)
+      setClockStatus(statusRes)
+    } catch (error) {
+      console.error("Error loading data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load attendance data",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [dateFilter, departmentFilter, divisionFilter, locationFilter, statusFilter, searchTerm, toast])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  // Get GPS location
+  const getGPSLocation = useCallback(() => {
+    setIsGettingLocation(true)
+    setGpsError(null)
+
+    if (!navigator.geolocation) {
+      setGpsError("Geolocation is not supported by your browser")
+      setIsGettingLocation(false)
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setGpsLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        })
+        setIsGettingLocation(false)
+      },
+      (error) => {
+        setGpsError(error.message)
+        setIsGettingLocation(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    )
+  }, [])
+
+  // Clock In/Out handlers
+  const handleClockIn = async (method: string) => {
+    setIsProcessing(true)
+    try {
+      const result = await clockIn({
+        method,
+        latitude: gpsLocation?.lat,
+        longitude: gpsLocation?.lng,
+      })
+
+      if (result.success) {
+        toast({
+          title: "Clocked In Successfully",
+          description: `You clocked in at ${result.time} via ${method}${gpsLocation ? " with GPS" : ""}`,
+        })
+        setShowClockDialog(false)
+        loadData()
+      } else {
+        toast({
+          title: "Clock In Failed",
+          description: result.error,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to clock in",
+        variant: "destructive",
+      })
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleClockOut = async (method: string) => {
+    setIsProcessing(true)
+    try {
+      const result = await clockOut({
+        method,
+        latitude: gpsLocation?.lat,
+        longitude: gpsLocation?.lng,
+      })
+
+      if (result.success) {
+        toast({
+          title: "Clocked Out Successfully",
+          description: `You clocked out at ${result.time}. Total: ${result.totalHours}h, Overtime: ${result.overtimeHours}h`,
+        })
+        setShowClockDialog(false)
+        loadData()
+      } else {
+        toast({
+          title: "Clock Out Failed",
+          description: result.error,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to clock out",
+        variant: "destructive",
+      })
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  // Shift handlers
+  const handleCreateShift = async () => {
+    if (!newShift.name || !newShift.start_time || !newShift.end_time) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      const result = await createShift({
+        name: newShift.name,
+        start_time: newShift.start_time,
+        end_time: newShift.end_time,
+        break_duration_minutes: newShift.break_duration_minutes,
+        grace_period_minutes: newShift.grace_period_minutes,
+        working_days: newShift.working_days,
+        department: newShift.department || undefined,
+        division: newShift.division || undefined,
+        location: newShift.location || undefined,
+      })
+
+      if (result.success) {
+        toast({
+          title: "Shift Created",
+          description: `${newShift.name} has been created successfully`,
+        })
+        setShowShiftDialog(false)
+        setNewShift({
+          name: "",
+          start_time: "09:00",
+          end_time: "17:00",
+          break_duration_minutes: 60,
+          grace_period_minutes: 15,
+          working_days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+          department: "",
+          division: "",
+          location: "",
+        })
+        loadData()
+      } else {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        })
+      }
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleToggleShift = async (shift: Shift) => {
+    const result = await updateShift(shift.id, { is_active: !shift.is_active })
+    if (result.success) {
+      toast({
+        title: shift.is_active ? "Shift Deactivated" : "Shift Activated",
+        description: `${shift.name} has been ${shift.is_active ? "deactivated" : "activated"}`,
+      })
+      loadData()
+    }
+  }
+
+  const handleDeleteShift = async (shift: Shift) => {
+    const result = await deleteShift(shift.id)
+    if (result.success) {
+      toast({
+        title: "Shift Deleted",
+        description: `${shift.name} has been deleted`,
+      })
+      loadData()
+    }
+  }
+
+  // Device handlers
+  const handleCreateDevice = async () => {
+    if (!newDevice.name || !newDevice.type || !newDevice.location) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      const result = await createBiometricDevice({
+        name: newDevice.name,
+        type: newDevice.type,
+        location: newDevice.location,
+        ip_address: newDevice.ip_address || undefined,
+        serial_number: newDevice.serial_number || undefined,
+      })
+
+      if (result.success) {
+        toast({
+          title: "Device Added",
+          description: `${newDevice.name} has been added successfully`,
+        })
+        setShowDeviceDialog(false)
+        setNewDevice({
+          name: "",
+          type: "fingerprint",
+          location: "",
+          ip_address: "",
+          serial_number: "",
+        })
+        loadData()
+      } else {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        })
+      }
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleSyncDevice = async (device: BiometricDevice) => {
+    const result = await syncBiometricDevice(device.id)
+    if (result.success) {
+      toast({
+        title: "Device Synced",
+        description: `${device.name} has been synchronized`,
+      })
+      loadData()
+    }
+  }
+
+  const handleToggleDevice = async (device: BiometricDevice) => {
+    const newStatus = device.status === "online" ? "offline" : "online"
+    const result = await toggleDeviceStatus(device.id, newStatus)
+    if (result.success) {
+      toast({
+        title: "Device Status Updated",
+        description: `${device.name} is now ${newStatus}`,
+      })
+      loadData()
+    }
+  }
+
+  // Overtime handlers
+  const handleCreateOvertime = async () => {
+    if (!newOvertime.reason) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide a reason for overtime",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      const result = await createOvertimeRequest(newOvertime)
+
+      if (result.success) {
+        toast({
+          title: "Overtime Request Submitted",
+          description: `Request for ${newOvertime.hours_requested}h overtime has been submitted`,
+        })
+        setShowOvertimeDialog(false)
+        setNewOvertime({
+          date: new Date().toISOString().split("T")[0],
+          hours_requested: 2,
+          reason: "",
+        })
+        loadData()
+      } else {
+        toast({
+          title: "Error",
+          description: result.error,
+          variant: "destructive",
+        })
+      }
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleOvertimeAction = async (request: OvertimeRequest, action: "approved" | "rejected") => {
+    const result = await updateOvertimeRequest(request.id, action, {
+      hours_approved: action === "approved" ? request.hours_requested : undefined,
+    })
+
+    if (result.success) {
+      toast({
+        title: action === "approved" ? "Overtime Approved" : "Overtime Rejected",
+        description: `${request.employee?.full_name}'s request has been ${action}`,
+      })
+      loadData()
+    }
+  }
+
+  // Report handler
+  const handleGenerateReport = async (type: string) => {
+    toast({
+      title: "Generating Report",
+      description: `${type} is being prepared...`,
+    })
+
+    const result = await generateAttendanceReport(type.toLowerCase().replace(" ", "-"))
+
+    if (result.success && result.data) {
+      // Create CSV content
+      const records = result.data.records
+      const csvContent = [
+        [
+          "Employee",
+          "Employee ID",
+          "Department",
+          "Date",
+          "Clock In",
+          "Clock Out",
+          "In Method",
+          "Out Method",
+          "Hours",
+          "Overtime",
+          "Status",
+        ],
+        ...records.map((r: AttendanceRecord) => [
+          r.employee?.full_name || "",
+          r.employee?.employee_id || "",
+          r.employee?.department || "",
+          r.date,
+          r.clock_in || "",
+          r.clock_out || "",
+          r.clock_in_method || "",
+          r.clock_out_method || "",
+          r.total_hours || 0,
+          r.overtime_hours || 0,
+          r.status,
+        ]),
+      ]
+        .map((row) => row.join(","))
+        .join("\n")
+
+      // Download CSV
+      const blob = new Blob([csvContent], { type: "text/csv" })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `attendance-${type.toLowerCase()}-${new Date().toISOString().split("T")[0]}.csv`
+      a.click()
+
+      toast({
+        title: "Report Downloaded",
+        description: `${type} has been downloaded successfully`,
+      })
+    }
+  }
+
+  // Sorting
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
+    } else {
+      setSortColumn(column)
+      setSortDirection("asc")
+    }
+  }
+
+  const sortedRecords = [...attendanceRecords].sort((a, b) => {
+    let aVal: string | number | null = null
+    let bVal: string | number | null = null
+
+    switch (sortColumn) {
+      case "employee":
+        aVal = a.employee?.full_name || ""
+        bVal = b.employee?.full_name || ""
+        break
+      case "department":
+        aVal = a.employee?.department || ""
+        bVal = b.employee?.department || ""
+        break
+      case "date":
+        aVal = a.date
+        bVal = b.date
+        break
+      case "clock_in":
+        aVal = a.clock_in || ""
+        bVal = b.clock_in || ""
+        break
+      case "clock_out":
+        aVal = a.clock_out || ""
+        bVal = b.clock_out || ""
+        break
+      case "hours":
+        aVal = a.total_hours || 0
+        bVal = b.total_hours || 0
+        break
+      case "overtime":
+        aVal = a.overtime_hours || 0
+        bVal = b.overtime_hours || 0
+        break
+      case "status":
+        aVal = a.status
+        bVal = b.status
+        break
+      default:
+        return 0
+    }
+
+    if (typeof aVal === "number" && typeof bVal === "number") {
+      return sortDirection === "asc" ? aVal - bVal : bVal - aVal
+    }
+
+    return sortDirection === "asc" ? String(aVal).localeCompare(String(bVal)) : String(bVal).localeCompare(String(aVal))
+  })
+
+  // Helper functions
+  const getStatusColor = (status: string) => {
     switch (status) {
       case "present":
         return "bg-emerald-100 text-emerald-800"
@@ -1005,6 +1419,8 @@ export default function AttendancePage() {
     }
   }
 
+  const pendingOvertimeCount = overtimeRequests.filter((r) => r.status === "pending").length
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -1021,7 +1437,7 @@ export default function AttendancePage() {
               {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
             </p>
           </div>
-          <Dialog open={showClockInDialog} onOpenChange={setShowClockInDialog}>
+          <Dialog open={showClockDialog} onOpenChange={setShowClockDialog}>
             <DialogTrigger asChild>
               <Button className="bg-emerald-600 hover:bg-emerald-700">
                 <Clock className="mr-2 h-4 w-4" /> Quick Clock In/Out

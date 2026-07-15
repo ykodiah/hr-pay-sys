@@ -506,4 +506,3 @@ export function TemplateManager() {
     </Card>
   )
 }
-
