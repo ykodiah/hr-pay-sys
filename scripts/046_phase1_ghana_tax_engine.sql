@@ -1,0 +1,23 @@
+-- ============================================================
+-- MIGRATION 046: Phase 1 Ghana Tax Engine Schema
+-- Applied: 2025-07-15
+-- Description:
+--   - Adds tax_year + effective_date + currency_code to paye_tax_bands
+--   - Seeds GRA 2025 PAYE bands (7 bands including 30% and 35%)
+--   - Adds tax_year / description / ceiling_amount to tax_rates
+--   - Adds Ghana-specific columns to payroll_items
+--     (tier2, tier3, paye_taxable_income, tax_relief_total, breakdown)
+--   - Creates payslips table (employee-facing payslip document)
+--   - Creates tax_reliefs and employee_tax_reliefs tables
+--   - Seeds standard GRA 2025 tax reliefs
+--   - RLS policies for all new tables
+-- ============================================================
+-- NOTE: This file documents the migration that was applied via the
+--       Supabase MCP apply_migration tool during Phase 1 build.
+--       Re-running this script is idempotent (all ops use IF NOT EXISTS
+--       and ON CONFLICT DO NOTHING / DO UPDATE).
+-- ============================================================
+
+-- See supabase migration history for the applied version.
+-- All DDL and seed statements are in the migration applied by the
+-- supabase_apply_migration MCP call with name: phase1_ghana_tax_engine_schema
