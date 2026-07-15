@@ -1,231 +1,190 @@
 "use client"
-import { useState } from "react"
+
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Progress } from "@/components/ui/progress"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Progress } from "@/components/ui/progress"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
+import { createClient } from "@/lib/supabase/client"
+import { buildAmortizationPreview } from "@/lib/services/loan-service"
 import {
-  CreditCard,
-  Plus,
-  Calendar,
-  DollarSign,
-  TrendingDown,
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  Eye,
-  Check,
-  X,
+  CreditCard, Plus, DollarSign, TrendingDown,
+  CheckCircle, AlertCircle, Clock, Eye, X, RefreshCw, Search,
 } from "lucide-react"
 
-// Mock loan data
-const loans = [
-  {
-    id: 1,
-    employeeName: "Kwame Asante",
-    employeeAvatar: "/placeholder.svg?height=40&width=40",
-    loanType: "Personal Loan",
-    amount: 15000,
-    balance: 8500,
-    monthlyDeduction: 750,
-    startDate: "2024-06-01",
-    endDate: "2025-12-01",
-    status: "Active",
-    interestRate: 12,
-  },
-  {
-    id: 2,
-    employeeName: "Ama Osei",
-    employeeAvatar: "/placeholder.svg?height=40&width=40",
-    loanType: "Emergency Loan",
-    amount: 5000,
-    balance: 1200,
-    monthlyDeduction: 400,
-    startDate: "2024-09-01",
-    endDate: "2025-03-01",
-    status: "Active",
-    interestRate: 8,
-  },
-  {
-    id: 3,
-    employeeName: "Kofi Mensah",
-    employeeAvatar: "/placeholder.svg?height=40&width=40",
-    loanType: "Salary Advance",
-    amount: 3000,
-    balance: 0,
-    monthlyDeduction: 0,
-    startDate: "2024-08-01",
-    endDate: "2024-12-01",
-    status: "Completed",
-    interestRate: 0,
-  },
-  {
-    id: 4,
-    employeeName: "Akosua Boateng",
-    employeeAvatar: "/placeholder.svg?height=40&width=40",
-    loanType: "Equipment Loan",
-    amount: 8000,
-    balance: 6400,
-    monthlyDeduction: 400,
-    startDate: "2024-10-01",
-    endDate: "2026-10-01",
-    status: "Active",
-    interestRate: 10,
-  },
-]
+interface LoanRecord {
+  id: string
+  employee_id: string
+  employee_name: string | null
+  employee_id_no: string | null
+  department: string | null
+  loan_type: string
+  purpose: string | null
+  principal: number
+  interest_rate: number
+  repayment_months: number
+  monthly_payment: number
+  amount_paid: number
+  remaining_balance: number
+  start_date: string | null
+  status: string
+  rejection_reason: string | null
+  created_at: string
+}
 
-const loanRequests = [
-  {
-    id: 1,
-    employeeName: "Kwame Asante",
-    employeeAvatar: "/placeholder.svg?height=40&width=40",
-    employeeId: "EMP001",
-    loanType: "Personal Loan",
-    amount: 5000,
-    purpose: "Medical Emergency",
-    requestDate: "2025-01-15",
-    status: "Pending",
-    monthlyDeduction: 500,
-    duration: 10,
-    interestRate: 5,
-    justification:
-      "Need funds for urgent medical treatment for family member. Have been with company for 3 years with good payment history.",
-  },
-  {
-    id: 2,
-    employeeName: "Ama Osei",
-    employeeAvatar: "/placeholder.svg?height=40&width=40",
-    employeeId: "EMP002",
-    loanType: "Salary Advance",
-    amount: 2000,
-    purpose: "School Fees",
-    requestDate: "2025-01-10",
-    status: "Pending",
-    monthlyDeduction: 400,
-    duration: 5,
-    interestRate: 0,
-    justification: "Need advance for children's school fees for new term starting next week.",
-  },
-  {
-    id: 3,
-    employeeName: "Kofi Mensah",
-    employeeAvatar: "/placeholder.svg?height=40&width=40",
-    employeeId: "EMP003",
-    loanType: "Emergency Loan",
-    amount: 1500,
-    purpose: "Car Repair",
-    requestDate: "2025-01-08",
-    status: "Approved",
-    monthlyDeduction: 300,
-    duration: 5,
-    interestRate: 3,
-    justification: "Car broke down and need repairs to get to work. Essential for daily commute.",
-    approvedDate: "2025-01-09",
-    approvedBy: "John Doe",
-  },
-]
+const STATUS_MAP: Record<string, string> = {
+  pending:   "bg-yellow-100 text-yellow-800",
+  approved:  "bg-blue-100 text-blue-800",
+  active:    "bg-green-100 text-green-800",
+  completed: "bg-gray-100 text-gray-700",
+  rejected:  "bg-red-100 text-red-800",
+  cancelled: "bg-gray-100 text-gray-500",
+}
 
-export default function LoansPage() {
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [selectedRequest, setSelectedRequest] = useState<any>(null)
-  const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false)
-  const [requests, setRequests] = useState(loanRequests)
+function fmtGHS(n: number) {
+  return `GHS ${n.toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
 
-  const totalLoansAmount = loans.reduce((sum, loan) => sum + loan.amount, 0)
-  const totalOutstanding = loans.reduce((sum, loan) => sum + loan.balance, 0)
-  const activeLoans = loans.filter((loan) => loan.status === "Active").length
-  const completedLoans = loans.filter((loan) => loan.status === "Completed").length
+function initials(name: string | null) {
+  if (!name) return "?"
+  return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+}
 
-  const pendingRequests = requests.filter((req) => req.status === "Pending").length
-  const approvedRequests = requests.filter((req) => req.status === "Approved").length
+export default function AdminLoansPage() {
+  const [loans, setLoans]               = useState<LoanRecord[]>([])
+  const [loading, setLoading]           = useState(true)
+  const [tab, setTab]                   = useState("requests")
+  const [search, setSearch]             = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [selected, setSelected]         = useState<LoanRecord | null>(null)
+  const [detailOpen, setDetailOpen]     = useState(false)
+  const [rejectReason, setRejectReason] = useState("")
+  const [actionLoading, setActionLoading] = useState(false)
+  const [newLoanOpen, setNewLoanOpen]   = useState(false)
+  const [employees, setEmployees]       = useState<any[]>([])
+  const [companyId, setCompanyId]       = useState("")
 
-  const handleApproveRequest = (requestId: number, comments: string) => {
-    setRequests(
-      requests.map((req) =>
-        req.id === requestId
-          ? {
-              ...req,
-              status: "Approved",
-              approvedDate: new Date().toISOString().split("T")[0],
-              approvedBy: "John Doe",
-              comments,
-            }
-          : req,
-      ),
-    )
-    setIsApprovalDialogOpen(false)
-    toast({
-      title: "Loan Approved",
-      description: "The loan request has been approved successfully.",
-    })
-  }
+  // new loan form
+  const [newForm, setNewForm] = useState({
+    employee_id: "", loan_type: "Personal Loan", amount: "",
+    interest_rate: "0", repayment_months: "12", purpose: "", notes: "",
+  })
+  const [creating, setCreating] = useState(false)
 
-  const handleRejectRequest = (requestId: number, comments: string) => {
-    setRequests(
-      requests.map((req) =>
-        req.id === requestId
-          ? {
-              ...req,
-              status: "Rejected",
-              rejectedDate: new Date().toISOString().split("T")[0],
-              rejectedBy: "John Doe",
-              comments,
-            }
-          : req,
-      ),
-    )
-    setIsApprovalDialogOpen(false)
-    toast({
-      title: "Loan Rejected",
-      description: "The loan request has been rejected.",
-      variant: "destructive",
-    })
-  }
+  const supabase = createClient()
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "Active":
-        return <Clock className="w-4 h-4 text-orange-600" />
-      case "Completed":
-        return <CheckCircle className="w-4 h-4 text-green-600" />
-      case "Overdue":
-        return <AlertCircle className="w-4 h-4 text-red-600" />
-      case "Pending":
-        return <Clock className="w-4 h-4 text-yellow-600" />
-      case "Approved":
-        return <CheckCircle className="w-4 h-4 text-green-600" />
-      case "Rejected":
-        return <X className="w-4 h-4 text-red-600" />
-      default:
-        return <Clock className="w-4 h-4 text-gray-600" />
+  const loadLoans = useCallback(async () => {
+    setLoading(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: emp } = await supabase.from("employees").select("company_id").eq("id", user.id).single()
+      const cid = emp?.company_id ?? ""
+      setCompanyId(cid)
+
+      const params = new URLSearchParams()
+      if (cid) params.set("company_id", cid)
+      if (statusFilter !== "all") params.set("status", statusFilter)
+
+      const res = await fetch(`/api/loans?${params}`)
+      if (res.ok) {
+        const data = await res.json()
+        setLoans(data.loans ?? [])
+      }
+
+      // Load employees for new loan form
+      const { data: emps } = await supabase
+        .from("employees")
+        .select("id, first_name, last_name, employee_id, department")
+        .eq("company_id", cid)
+        .eq("status", "Active")
+        .order("first_name")
+      setEmployees(emps ?? [])
+    } finally {
+      setLoading(false)
+    }
+  }, [statusFilter])
+
+  useEffect(() => { loadLoans() }, [loadLoans])
+
+  const handleAction = async (id: string, action: "approve" | "reject", reason?: string) => {
+    setActionLoading(true)
+    try {
+      const res = await fetch(`/api/loans/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, rejection_reason: reason }),
+      })
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error) }
+      toast({
+        title: action === "approve" ? "Loan Approved" : "Loan Rejected",
+        description: action === "approve"
+          ? "Loan approved and amortization schedule generated."
+          : "Loan application rejected.",
+        variant: action === "approve" ? "default" : "destructive",
+      })
+      setDetailOpen(false)
+      setRejectReason("")
+      loadLoans()
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" })
+    } finally {
+      setActionLoading(false)
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "Active":
-        return <Badge className="bg-orange-100 text-orange-800">Active</Badge>
-      case "Completed":
-        return <Badge className="bg-green-100 text-green-800">Completed</Badge>
-      case "Overdue":
-        return <Badge className="bg-red-100 text-red-800">Overdue</Badge>
-      case "Pending":
-        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
-      case "Approved":
-        return <Badge className="bg-green-100 text-green-800">Approved</Badge>
-      case "Rejected":
-        return <Badge className="bg-red-100 text-red-800">Rejected</Badge>
-      default:
-        return <Badge variant="secondary">{status}</Badge>
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newForm.employee_id || !newForm.amount || !companyId) {
+      toast({ title: "Missing fields", description: "Employee and amount are required.", variant: "destructive" })
+      return
     }
+    setCreating(true)
+    try {
+      const res = await fetch("/api/loans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employee_id: newForm.employee_id, company_id: companyId,
+          loan_type: newForm.loan_type, purpose: newForm.purpose || null,
+          principal: Number(newForm.amount), interest_rate: Number(newForm.interest_rate),
+          repayment_months: Number(newForm.repayment_months), notes: newForm.notes || null,
+        }),
+      })
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error) }
+      toast({ title: "Loan Created", description: "Loan application created successfully." })
+      setNewLoanOpen(false)
+      setNewForm({ employee_id: "", loan_type: "Personal Loan", amount: "", interest_rate: "0", repayment_months: "12", purpose: "", notes: "" })
+      loadLoans()
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" })
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const filtered = loans.filter((l) => {
+    const matchStatus = statusFilter === "all" || l.status === statusFilter
+    const q = search.toLowerCase()
+    const matchSearch = !q || l.employee_name?.toLowerCase().includes(q) || l.loan_type.toLowerCase().includes(q) || l.employee_id_no?.toLowerCase().includes(q)
+    return matchStatus && matchSearch
+  })
+
+  const stats = {
+    total:       loans.length,
+    pending:     loans.filter((l) => l.status === "pending").length,
+    active:      loans.filter((l) => l.status === "active").length,
+    outstanding: loans.filter((l) => l.status === "active").reduce((s, l) => s + l.remaining_balance, 0),
   }
 
   return (
@@ -233,469 +192,268 @@ export default function LoansPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Loans & Advances</h1>
-          <p className="text-gray-600">Manage employee loans and salary advances</p>
+          <h1 className="text-2xl font-bold text-foreground">Loans & Advances</h1>
+          <p className="text-muted-foreground">Manage employee loans, approvals, and repayment schedules</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-emerald-600 hover:bg-emerald-700">
-              <Plus className="w-4 h-4 mr-2" />
-              New Loan
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Create New Loan</DialogTitle>
-            </DialogHeader>
-            <NewLoanForm onClose={() => setIsAddDialogOpen(false)} />
-          </DialogContent>
-        </Dialog>
+        <div className="flex gap-2">
+          <Button variant="outline" size="icon" onClick={loadLoans} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
+          <Button onClick={() => setNewLoanOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />New Loan
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <CreditCard className="w-5 h-5 text-blue-600" />
-              <div>
-                <div className="text-2xl font-bold text-gray-900">GHS {totalLoansAmount.toLocaleString()}</div>
-                <p className="text-sm text-gray-600">Total Loans Issued</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <TrendingDown className="w-5 h-5 text-red-600" />
-              <div>
-                <div className="text-2xl font-bold text-gray-900">GHS {totalOutstanding.toLocaleString()}</div>
-                <p className="text-sm text-gray-600">Outstanding Balance</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Clock className="w-5 h-5 text-orange-600" />
-              <div>
-                <div className="text-2xl font-bold text-gray-900">{activeLoans}</div>
-                <p className="text-sm text-gray-600">Active Loans</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <CheckCircle className="w-5 h-5 text-green-600" />
-              <div>
-                <div className="text-2xl font-bold text-gray-900">{completedLoans}</div>
-                <p className="text-sm text-gray-600">Completed Loans</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <AlertCircle className="w-5 h-5 text-yellow-600" />
-              <div>
-                <div className="text-2xl font-bold text-gray-900">{pendingRequests}</div>
-                <p className="text-sm text-gray-600">Pending Requests</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Check className="w-5 h-5 text-emerald-600" />
-              <div>
-                <div className="text-2xl font-bold text-gray-900">{approvedRequests}</div>
-                <p className="text-sm text-gray-600">Approved Requests</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs defaultValue="active-loans" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="active-loans">Active Loans</TabsTrigger>
-          <TabsTrigger value="loan-requests">
-            Loan Requests{" "}
-            {pendingRequests > 0 && <Badge className="ml-2 bg-red-500 text-white">{pendingRequests}</Badge>}
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="active-loans">
-          <Card>
-            <CardHeader>
-              <CardTitle>Employee Loans</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {loans.map((loan) => {
-                  const progress = ((loan.amount - loan.balance) / loan.amount) * 100
-                  return (
-                    <div
-                      key={loan.id}
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex items-center space-x-4">
-                        <Avatar className="w-12 h-12">
-                          <AvatarImage src={loan.employeeAvatar || "/placeholder.svg"} />
-                          <AvatarFallback>
-                            {loan.employeeName
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <h3 className="font-semibold text-gray-900">{loan.employeeName}</h3>
-                          <p className="text-sm text-gray-600">{loan.loanType}</p>
-                          <div className="flex items-center space-x-4 mt-1">
-                            <div className="flex items-center text-xs text-gray-500">
-                              <Calendar className="w-3 h-3 mr-1" />
-                              {new Date(loan.startDate).toLocaleDateString()} -{" "}
-                              {new Date(loan.endDate).toLocaleDateString()}
-                            </div>
-                            {loan.interestRate > 0 && (
-                              <div className="flex items-center text-xs text-gray-500">
-                                <DollarSign className="w-3 h-3 mr-1" />
-                                {loan.interestRate}% interest
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center space-x-6">
-                        <div className="text-center">
-                          <p className="text-lg font-semibold text-gray-900">GHS {loan.amount.toLocaleString()}</p>
-                          <p className="text-xs text-gray-500">Loan Amount</p>
-                        </div>
-
-                        <div className="text-center">
-                          <p className="text-lg font-semibold text-red-600">GHS {loan.balance.toLocaleString()}</p>
-                          <p className="text-xs text-gray-500">Outstanding</p>
-                        </div>
-
-                        <div className="text-center">
-                          <p className="text-lg font-semibold text-blue-600">
-                            GHS {loan.monthlyDeduction.toLocaleString()}
-                          </p>
-                          <p className="text-xs text-gray-500">Monthly Deduction</p>
-                        </div>
-
-                        <div className="w-24">
-                          <div className="flex justify-between text-xs text-gray-500 mb-1">
-                            <span>Progress</span>
-                            <span>{Math.round(progress)}%</span>
-                          </div>
-                          <Progress value={progress} className="h-2" />
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                          {getStatusIcon(loan.status)}
-                          {getStatusBadge(loan.status)}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: "Total Applications", value: stats.total,    icon: CreditCard,   color: "text-blue-600"   },
+          { label: "Pending Review",     value: stats.pending,  icon: Clock,        color: "text-yellow-600" },
+          { label: "Active Loans",       value: stats.active,   icon: CheckCircle,  color: "text-green-600"  },
+          { label: "Outstanding (GHS)",  value: fmtGHS(stats.outstanding), icon: TrendingDown, color: "text-red-600" },
+        ].map(({ label, value, icon: Icon, color }) => (
+          <Card key={label}>
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">{label}</p>
+                  <p className="text-xl font-bold">{loading ? "—" : value}</p>
+                </div>
+                <Icon className={`w-5 h-5 ${color}`} />
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        ))}
+      </div>
 
-        <TabsContent value="loan-requests">
-          <Card>
-            <CardHeader>
-              <CardTitle>Loan Requests</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {requests.map((request) => (
-                  <div
-                    key={request.id}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <Avatar className="w-12 h-12">
-                        <AvatarImage src={request.employeeAvatar || "/placeholder.svg"} />
-                        <AvatarFallback>
-                          {request.employeeName
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <h3 className="font-semibold text-gray-900">{request.employeeName}</h3>
-                          <Badge variant="outline">{request.employeeId}</Badge>
-                        </div>
-                        <p className="text-sm text-gray-600">
-                          {request.loanType} - {request.purpose}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Requested on {new Date(request.requestDate).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
+      {/* Filters */}
+      <Card>
+        <CardContent className="pt-5">
+          <div className="flex flex-wrap gap-3">
+            <div className="relative flex-1 min-w-48">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input placeholder="Search employee, loan type..." className="pl-9"
+                value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                {["pending","active","completed","rejected","cancelled"].map((s) => (
+                  <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
-                    <div className="flex items-center space-x-6">
-                      <div className="text-center">
-                        <p className="text-lg font-semibold text-gray-900">GHS {request.amount.toLocaleString()}</p>
-                        <p className="text-xs text-gray-500">Amount</p>
-                      </div>
-
-                      <div className="text-center">
-                        <p className="text-lg font-semibold text-blue-600">
-                          GHS {request.monthlyDeduction.toLocaleString()}
-                        </p>
-                        <p className="text-xs text-gray-500">Monthly Deduction</p>
-                      </div>
-
-                      <div className="text-center">
-                        <p className="text-lg font-semibold text-purple-600">{request.duration} months</p>
-                        <p className="text-xs text-gray-500">Duration</p>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        {getStatusIcon(request.status)}
-                        {getStatusBadge(request.status)}
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedRequest(request)
-                            setIsApprovalDialogOpen(true)
-                          }}
-                        >
-                          <Eye className="w-4 h-4 mr-2" />
-                          Review
-                        </Button>
-                      </div>
+      {/* Loans Table */}
+      <Card>
+        <CardHeader><CardTitle>Loan Applications ({loading ? "…" : filtered.length})</CardTitle></CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <CreditCard className="w-10 h-10 mx-auto mb-3 opacity-40" />
+              <p className="font-medium">No loan applications found</p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {filtered.map((loan) => (
+                <div key={loan.id} className="flex items-center justify-between py-4 gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar className="w-9 h-9 shrink-0">
+                      <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                        {initials(loan.employee_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm truncate">{loan.employee_name ?? "Unknown"}</p>
+                      <p className="text-xs text-muted-foreground">{loan.department ?? loan.employee_id_no}</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
 
-      <Dialog open={isApprovalDialogOpen} onOpenChange={setIsApprovalDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Review Loan Request</DialogTitle>
-          </DialogHeader>
-          {selectedRequest && (
-            <LoanApprovalForm
-              request={selectedRequest}
-              onApprove={handleApproveRequest}
-              onReject={handleRejectRequest}
-              onClose={() => setIsApprovalDialogOpen(false)}
-            />
+                  <div className="hidden md:block">
+                    <p className="text-sm font-medium">{loan.loan_type}</p>
+                    <p className="text-xs text-muted-foreground">{fmtGHS(loan.principal)}</p>
+                  </div>
+
+                  <div className="hidden lg:block text-sm text-muted-foreground">
+                    {loan.repayment_months} months • {fmtGHS(loan.monthly_payment)}/mo
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge className={STATUS_MAP[loan.status] ?? "bg-gray-100"}>
+                      {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
+                    </Badge>
+                    <Button variant="ghost" size="icon" onClick={() => { setSelected(loan); setDetailOpen(true) }}>
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                    {loan.status === "pending" && (
+                      <>
+                        <Button size="sm" variant="outline"
+                          className="text-green-700 border-green-300 hover:bg-green-50"
+                          disabled={actionLoading}
+                          onClick={() => handleAction(loan.id, "approve")}>
+                          <CheckCircle className="w-4 h-4 mr-1" />Approve
+                        </Button>
+                        <Button size="sm" variant="outline"
+                          className="text-red-700 border-red-300 hover:bg-red-50"
+                          disabled={actionLoading}
+                          onClick={() => { setSelected(loan); setDetailOpen(true) }}>
+                          <X className="w-4 h-4 mr-1" />Reject
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Detail Dialog */}
+      <Dialog open={detailOpen} onOpenChange={(o) => { setDetailOpen(o); if (!o) setRejectReason("") }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Loan Application Detail</DialogTitle></DialogHeader>
+          {selected && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div><span className="text-muted-foreground">Employee</span><p className="font-semibold">{selected.employee_name}</p></div>
+                <div><span className="text-muted-foreground">Department</span><p className="font-semibold">{selected.department ?? "—"}</p></div>
+                <div><span className="text-muted-foreground">Loan Type</span><p className="font-semibold">{selected.loan_type}</p></div>
+                <div><span className="text-muted-foreground">Principal</span><p className="font-semibold">{fmtGHS(selected.principal)}</p></div>
+                <div><span className="text-muted-foreground">Duration</span><p className="font-semibold">{selected.repayment_months} months</p></div>
+                <div><span className="text-muted-foreground">Monthly Payment</span><p className="font-semibold">{fmtGHS(selected.monthly_payment)}</p></div>
+                <div className="col-span-2"><span className="text-muted-foreground">Purpose</span><p className="font-semibold">{selected.purpose ?? "Not specified"}</p></div>
+              </div>
+
+              {/* Amortization preview */}
+              <div>
+                <p className="font-semibold text-sm mb-2">Amortization Schedule</p>
+                <div className="rounded-lg border overflow-hidden max-h-52 overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10">#</TableHead>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead className="text-right">Payment</TableHead>
+                        <TableHead className="text-right">Principal</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {buildAmortizationPreview(
+                        selected.principal, selected.interest_rate,
+                        selected.repayment_months,
+                        selected.start_date ?? new Date().toISOString().split("T")[0],
+                      ).map((row) => (
+                        <TableRow key={row.month_number}>
+                          <TableCell className="text-muted-foreground text-xs">{row.month_number}</TableCell>
+                          <TableCell className="text-sm">{new Date(row.due_date).toLocaleDateString()}</TableCell>
+                          <TableCell className="text-right text-sm">{fmtGHS(row.payment_amount)}</TableCell>
+                          <TableCell className="text-right text-sm">{fmtGHS(row.principal_portion)}</TableCell>
+                          <TableCell className="text-right text-sm">{fmtGHS(row.balance_remaining)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              {selected.status === "pending" && (
+                <>
+                  <div>
+                    <Label>Rejection Reason (required to reject)</Label>
+                    <Textarea placeholder="Enter rejection reason..."
+                      value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} rows={3} />
+                  </div>
+                  <div className="flex justify-end gap-3">
+                    <Button variant="outline" onClick={() => setDetailOpen(false)}>Close</Button>
+                    <Button className="bg-red-600 hover:bg-red-700 text-white"
+                      disabled={actionLoading || !rejectReason.trim()}
+                      onClick={() => handleAction(selected.id, "reject", rejectReason)}>
+                      {actionLoading ? "Processing..." : "Reject"}
+                    </Button>
+                    <Button disabled={actionLoading} onClick={() => handleAction(selected.id, "approve")}>
+                      {actionLoading ? "Processing..." : "Approve"}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </DialogContent>
       </Dialog>
-    </div>
-  )
-}
 
-function LoanApprovalForm({
-  request,
-  onApprove,
-  onReject,
-  onClose,
-}: {
-  request: any
-  onApprove: (id: number, comments: string) => void
-  onReject: (id: number, comments: string) => void
-  onClose: () => void
-}) {
-  const [comments, setComments] = useState("")
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label>Employee</Label>
-          <div className="flex items-center space-x-2 mt-1">
-            <Avatar className="w-8 h-8">
-              <AvatarImage src={request.employeeAvatar || "/placeholder.svg"} />
-              <AvatarFallback>
-                {request.employeeName
-                  .split(" ")
-                  .map((n: string) => n[0])
-                  .join("")}
-              </AvatarFallback>
-            </Avatar>
+      {/* New Loan Dialog */}
+      <Dialog open={newLoanOpen} onOpenChange={setNewLoanOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Create Loan for Employee</DialogTitle></DialogHeader>
+          <form onSubmit={handleCreate} className="space-y-4">
             <div>
-              <p className="font-medium">{request.employeeName}</p>
-              <p className="text-sm text-gray-500">{request.employeeId}</p>
+              <Label>Employee *</Label>
+              <Select value={newForm.employee_id} onValueChange={(v) => setNewForm((f) => ({ ...f, employee_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                <SelectContent>
+                  {employees.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.first_name} {e.last_name} — {e.employee_id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </div>
-        </div>
-        <div>
-          <Label>Request Date</Label>
-          <p className="mt-1 font-medium">{new Date(request.requestDate).toLocaleDateString()}</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label>Loan Type</Label>
-          <p className="mt-1 font-medium">{request.loanType}</p>
-        </div>
-        <div>
-          <Label>Purpose</Label>
-          <p className="mt-1 font-medium">{request.purpose}</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4">
-        <div>
-          <Label>Amount</Label>
-          <p className="mt-1 font-medium text-lg">GHS {request.amount.toLocaleString()}</p>
-        </div>
-        <div>
-          <Label>Duration</Label>
-          <p className="mt-1 font-medium">{request.duration} months</p>
-        </div>
-        <div>
-          <Label>Interest Rate</Label>
-          <p className="mt-1 font-medium">{request.interestRate}%</p>
-        </div>
-      </div>
-
-      <div>
-        <Label>Justification</Label>
-        <div className="mt-1 p-3 bg-gray-50 rounded-lg">
-          <p className="text-sm">{request.justification}</p>
-        </div>
-      </div>
-
-      <div>
-        <Label>Monthly Deduction</Label>
-        <p className="mt-1 font-medium text-lg text-blue-600">GHS {request.monthlyDeduction.toLocaleString()}</p>
-      </div>
-
-      <div>
-        <Label htmlFor="comments">Comments (Optional)</Label>
-        <Textarea
-          id="comments"
-          placeholder="Add any comments about this loan request..."
-          value={comments}
-          onChange={(e) => setComments(e.target.value)}
-        />
-      </div>
-
-      {request.status === "Pending" && (
-        <div className="flex justify-end space-x-3 pt-4 border-t">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="destructive" onClick={() => onReject(request.id, comments)}>
-            <X className="w-4 h-4 mr-2" />
-            Reject
-          </Button>
-          <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => onApprove(request.id, comments)}>
-            <Check className="w-4 h-4 mr-2" />
-            Approve
-          </Button>
-        </div>
-      )}
-
-      {request.status !== "Pending" && (
-        <div className="flex justify-end pt-4 border-t">
-          <Button variant="outline" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-      )}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Loan Type</Label>
+                <Select value={newForm.loan_type} onValueChange={(v) => setNewForm((f) => ({ ...f, loan_type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {["Personal Loan","Salary Advance","Emergency Loan","Education Loan"].map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Amount (GHS) *</Label>
+                <Input type="number" min="100" value={newForm.amount}
+                  onChange={(e) => setNewForm((f) => ({ ...f, amount: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Duration (months)</Label>
+                <Select value={newForm.repayment_months} onValueChange={(v) => setNewForm((f) => ({ ...f, repayment_months: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[3,6,12,18,24,36].map((m) => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Interest Rate (%)</Label>
+                <Input type="number" min="0" step="0.5" value={newForm.interest_rate}
+                  onChange={(e) => setNewForm((f) => ({ ...f, interest_rate: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <Label>Purpose</Label>
+              <Textarea placeholder="Purpose of loan..." rows={2}
+                value={newForm.purpose} onChange={(e) => setNewForm((f) => ({ ...f, purpose: e.target.value }))} />
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="outline" onClick={() => setNewLoanOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={creating}>{creating ? "Creating..." : "Create Loan"}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
-  )
-}
-
-function NewLoanForm({ onClose }: { onClose: () => void }) {
-  return (
-    <form className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="employee">Employee</Label>
-          <Select>
-            <SelectTrigger>
-              <SelectValue placeholder="Select employee" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="kwame">Kwame Asante</SelectItem>
-              <SelectItem value="ama">Ama Osei</SelectItem>
-              <SelectItem value="kofi">Kofi Mensah</SelectItem>
-              <SelectItem value="akosua">Akosua Boateng</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="loanType">Loan Type</Label>
-          <Select>
-            <SelectTrigger>
-              <SelectValue placeholder="Select loan type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="personal">Personal Loan</SelectItem>
-              <SelectItem value="emergency">Emergency Loan</SelectItem>
-              <SelectItem value="advance">Salary Advance</SelectItem>
-              <SelectItem value="equipment">Equipment Loan</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="amount">Loan Amount (GHS)</Label>
-          <Input id="amount" type="number" placeholder="10000" />
-        </div>
-        <div>
-          <Label htmlFor="interestRate">Interest Rate (%)</Label>
-          <Input id="interestRate" type="number" placeholder="10" />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="startDate">Start Date</Label>
-          <Input id="startDate" type="date" />
-        </div>
-        <div>
-          <Label htmlFor="duration">Duration (Months)</Label>
-          <Input id="duration" type="number" placeholder="12" />
-        </div>
-      </div>
-
-      <div>
-        <Label htmlFor="purpose">Purpose</Label>
-        <Textarea id="purpose" placeholder="Reason for loan request..." />
-      </div>
-
-      <div className="flex justify-end space-x-3 pt-4">
-        <Button type="button" variant="outline" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">
-          Create Loan
-        </Button>
-      </div>
-    </form>
   )
 }

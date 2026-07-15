@@ -1,314 +1,370 @@
 "use client"
-import { useState } from "react"
+
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Progress } from "@/components/ui/progress"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
-import { CreditCard, Plus, Calendar, DollarSign, Clock, CheckCircle, AlertCircle, XCircle } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import { calcMonthlyPayment, buildAmortizationPreview } from "@/lib/services/loan-service"
+import {
+  CreditCard, Plus, Calendar, DollarSign, Clock,
+  CheckCircle, AlertCircle, XCircle, RefreshCw, Eye,
+} from "lucide-react"
 
-export default function LoansPage() {
-  const [isNewLoanDialogOpen, setIsNewLoanDialogOpen] = useState(false)
-  const [loanRequests, setLoanRequests] = useState([
-    {
-      id: 1,
-      type: "Personal Loan",
-      amount: 5000,
-      purpose: "Medical Emergency",
-      requestDate: "2025-01-15",
-      status: "Pending",
-      approver: "John Doe - HR Manager",
-      monthlyDeduction: 500,
-      duration: 10,
-      interestRate: 5,
-    },
-    {
-      id: 2,
-      type: "Salary Advance",
-      amount: 2000,
-      purpose: "School Fees",
-      requestDate: "2024-12-20",
-      status: "Approved",
-      approver: "John Doe - HR Manager",
-      monthlyDeduction: 400,
-      duration: 5,
-      interestRate: 0,
-      approvedDate: "2024-12-22",
-    },
-    {
-      id: 3,
-      type: "Emergency Loan",
-      amount: 1500,
-      purpose: "Car Repair",
-      requestDate: "2024-11-10",
-      status: "Completed",
-      approver: "John Doe - HR Manager",
-      monthlyDeduction: 300,
-      duration: 5,
-      interestRate: 3,
-      completedDate: "2024-12-15",
-    },
-  ])
+interface LoanRecord {
+  id: string
+  loan_type: string
+  purpose: string | null
+  principal: number
+  interest_rate: number
+  repayment_months: number
+  monthly_payment: number
+  amount_paid: number
+  remaining_balance: number
+  start_date: string | null
+  end_date: string | null
+  status: string
+  rejection_reason: string | null
+  created_at: string
+}
 
-  const [newLoanData, setNewLoanData] = useState({
-    type: "",
-    amount: "",
-    purpose: "",
-    duration: "",
-    justification: "",
+const LOAN_TYPES = ["Personal Loan", "Salary Advance", "Emergency Loan", "Education Loan", "Equipment Loan"]
+const STATUS_COLOR: Record<string, string> = {
+  pending:   "bg-yellow-100 text-yellow-800",
+  approved:  "bg-blue-100 text-blue-800",
+  active:    "bg-green-100 text-green-800",
+  completed: "bg-gray-100 text-gray-700",
+  rejected:  "bg-red-100 text-red-800",
+  cancelled: "bg-gray-100 text-gray-500",
+}
+
+function fmtGHS(n: number) { return `GHS ${n.toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }
+
+export default function SSLoansPage() {
+  const [loans, setLoans]             = useState<LoanRecord[]>([])
+  const [loading, setLoading]         = useState(true)
+  const [dialogOpen, setDialogOpen]   = useState(false)
+  const [submitting, setSubmitting]   = useState(false)
+  const [selected, setSelected]       = useState<LoanRecord | null>(null)
+  const [scheduleOpen, setScheduleOpen] = useState(false)
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [companyId, setCompanyId]     = useState<string>("")
+  const [employeeId, setEmployeeId]   = useState<string>("")
+
+  const [form, setForm] = useState({
+    loan_type: "", amount: "", repayment_months: "", purpose: "", notes: "",
   })
 
-  const handleSubmitLoan = () => {
-    const newLoan = {
-      id: loanRequests.length + 1,
-      type: newLoanData.type,
-      amount: Number.parseFloat(newLoanData.amount),
-      purpose: newLoanData.purpose,
-      requestDate: new Date().toISOString().split("T")[0],
-      status: "Pending",
-      approver: "John Doe - HR Manager",
-      monthlyDeduction: Math.ceil(Number.parseFloat(newLoanData.amount) / Number.parseInt(newLoanData.duration)),
-      duration: Number.parseInt(newLoanData.duration),
-      interestRate: newLoanData.type === "Salary Advance" ? 0 : 5,
-    }
+  const supabase = createClient()
 
-    setLoanRequests([newLoan, ...loanRequests])
-    setNewLoanData({ type: "", amount: "", purpose: "", duration: "", justification: "" })
-    setIsNewLoanDialogOpen(false)
-    toast({
-      title: "Loan Request Submitted",
-      description: "Your loan request has been submitted for approval. You will be notified once reviewed.",
-    })
+  const loadLoans = useCallback(async () => {
+    setLoading(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      setEmployeeId(user.id)
+
+      // Get company_id from employees table
+      const { data: emp } = await supabase
+        .from("employees").select("company_id").eq("id", user.id).single()
+      if (emp?.company_id) setCompanyId(emp.company_id)
+
+      const res = await fetch(`/api/loans?employee_id=${user.id}`)
+      if (res.ok) {
+        const data = await res.json()
+        setLoans(data.loans ?? [])
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadLoans() }, [loadLoans])
+
+  const previewMonthly = form.amount && form.repayment_months
+    ? calcMonthlyPayment(Number(form.amount), 0, Number(form.repayment_months))
+    : null
+
+  const amortizationPreview = selected && selected.status === "pending"
+    ? buildAmortizationPreview(
+        selected.principal, selected.interest_rate,
+        selected.repayment_months, selected.start_date ?? new Date().toISOString().split("T")[0],
+      )
+    : []
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!form.loan_type || !form.amount || !form.repayment_months) {
+      toast({ title: "Missing fields", description: "Loan type, amount and duration are required.", variant: "destructive" })
+      return
+    }
+    if (!employeeId || !companyId) {
+      toast({ title: "Not authenticated", description: "Please reload and try again.", variant: "destructive" })
+      return
+    }
+    setSubmitting(true)
+    try {
+      const res = await fetch("/api/loans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employee_id:      employeeId,
+          company_id:       companyId,
+          loan_type:        form.loan_type,
+          purpose:          form.purpose || null,
+          principal:        Number(form.amount),
+          interest_rate:    0,
+          repayment_months: Number(form.repayment_months),
+          notes:            form.notes || null,
+          auto_deduct:      true,
+        }),
+      })
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error) }
+      toast({ title: "Loan Request Submitted", description: "Your request has been submitted for HR review." })
+      setDialogOpen(false)
+      setForm({ loan_type: "", amount: "", repayment_months: "", purpose: "", notes: "" })
+      loadLoans()
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Pending":
-        return "bg-yellow-100 text-yellow-800"
-      case "Approved":
-        return "bg-green-100 text-green-800"
-      case "Rejected":
-        return "bg-red-100 text-red-800"
-      case "Completed":
-        return "bg-blue-100 text-blue-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+  const handleCancel = async (id: string) => {
+    setCancellingId(id)
+    try {
+      const res = await fetch(`/api/loans/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cancel" }),
+      })
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error) }
+      toast({ title: "Cancelled", description: "Loan request cancelled." })
+      loadLoans()
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" })
+    } finally {
+      setCancellingId(null)
     }
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "Pending":
-        return <Clock className="w-4 h-4" />
-      case "Approved":
-        return <CheckCircle className="w-4 h-4" />
-      case "Rejected":
-        return <XCircle className="w-4 h-4" />
-      case "Completed":
-        return <CheckCircle className="w-4 h-4" />
-      default:
-        return <AlertCircle className="w-4 h-4" />
-    }
-  }
-
-  const totalActiveLoans = loanRequests.filter((loan) => loan.status === "Approved").length
-  const totalOutstanding = loanRequests
-    .filter((loan) => loan.status === "Approved")
-    .reduce((sum, loan) => sum + loan.amount, 0)
-  const monthlyDeductions = loanRequests
-    .filter((loan) => loan.status === "Approved")
-    .reduce((sum, loan) => sum + loan.monthlyDeduction, 0)
+  const activeLoans    = loans.filter((l) => l.status === "active")
+  const totalBalance   = activeLoans.reduce((s, l) => s + l.remaining_balance, 0)
+  const monthlyTotal   = activeLoans.reduce((s, l) => s + l.monthly_payment, 0)
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Loan Requests</h1>
-          <p className="text-gray-600">Manage your loan applications and track repayments</p>
+          <h1 className="text-2xl font-bold text-foreground">Loan Requests</h1>
+          <p className="text-muted-foreground">Manage your loan applications and track repayments</p>
         </div>
-        <Dialog open={isNewLoanDialogOpen} onOpenChange={setIsNewLoanDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-emerald-600 hover:bg-emerald-700">
-              <Plus className="w-4 h-4 mr-2" />
-              New Loan Request
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Submit Loan Request</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="loanType">Loan Type</Label>
-                <Select
-                  value={newLoanData.type}
-                  onValueChange={(value) => setNewLoanData({ ...newLoanData, type: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select loan type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Personal Loan">Personal Loan</SelectItem>
-                    <SelectItem value="Salary Advance">Salary Advance</SelectItem>
-                    <SelectItem value="Emergency Loan">Emergency Loan</SelectItem>
-                    <SelectItem value="Education Loan">Education Loan</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="amount">Amount (GHS)</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  placeholder="Enter amount"
-                  value={newLoanData.amount}
-                  onChange={(e) => setNewLoanData({ ...newLoanData, amount: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="duration">Repayment Duration (months)</Label>
-                <Select
-                  value={newLoanData.duration}
-                  onValueChange={(value) => setNewLoanData({ ...newLoanData, duration: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select duration" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="3">3 months</SelectItem>
-                    <SelectItem value="6">6 months</SelectItem>
-                    <SelectItem value="12">12 months</SelectItem>
-                    <SelectItem value="18">18 months</SelectItem>
-                    <SelectItem value="24">24 months</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="purpose">Purpose</Label>
-                <Input
-                  id="purpose"
-                  placeholder="Brief purpose of loan"
-                  value={newLoanData.purpose}
-                  onChange={(e) => setNewLoanData({ ...newLoanData, purpose: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="justification">Justification</Label>
-                <Textarea
-                  id="justification"
-                  placeholder="Provide detailed justification for the loan request"
-                  value={newLoanData.justification}
-                  onChange={(e) => setNewLoanData({ ...newLoanData, justification: e.target.value })}
-                />
-              </div>
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>Note:</strong> Loan requests will be reviewed by your HR Manager (John Doe). You will receive
-                  notification once your request is processed.
-                </p>
-              </div>
-              <div className="flex justify-end space-x-3">
-                <Button variant="outline" onClick={() => setIsNewLoanDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSubmitLoan} className="bg-emerald-600 hover:bg-emerald-700">
-                  Submit Request
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-                <CreditCard className="w-6 h-6 text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">{totalActiveLoans}</p>
-                <p className="text-sm text-gray-600">Active Loans</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">GHS {totalOutstanding.toLocaleString()}</p>
-                <p className="text-sm text-gray-600">Outstanding Balance</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">GHS {monthlyDeductions.toLocaleString()}</p>
-                <p className="text-sm text-gray-600">Monthly Deductions</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Loan Requests */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Loan History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {loanRequests.map((loan) => (
-              <div key={loan.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <CreditCard className="w-6 h-6 text-gray-600" />
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <h3 className="font-semibold text-gray-900">{loan.type}</h3>
-                      <Badge className={getStatusColor(loan.status)}>
-                        <div className="flex items-center space-x-1">
-                          {getStatusIcon(loan.status)}
-                          <span>{loan.status}</span>
-                        </div>
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-gray-600">{loan.purpose}</p>
-                    <p className="text-xs text-gray-500">
-                      Requested on {new Date(loan.requestDate).toLocaleDateString()} • Approver: {loan.approver}
-                    </p>
-                  </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="icon" onClick={loadLoans} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button><Plus className="w-4 h-4 mr-2" />New Loan Request</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader><DialogTitle>Submit Loan Request</DialogTitle></DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <Label>Loan Type *</Label>
+                  <Select value={form.loan_type} onValueChange={(v) => setForm((f) => ({ ...f, loan_type: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                    <SelectContent>
+                      {LOAN_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-semibold text-gray-900">GHS {loan.amount.toLocaleString()}</p>
-                  <p className="text-sm text-gray-600">
-                    GHS {loan.monthlyDeduction}/month × {loan.duration} months
+                <div>
+                  <Label>Amount (GHS) *</Label>
+                  <Input type="number" min="100" placeholder="e.g. 5000"
+                    value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Repayment Duration *</Label>
+                  <Select value={form.repayment_months} onValueChange={(v) => setForm((f) => ({ ...f, repayment_months: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select months" /></SelectTrigger>
+                    <SelectContent>
+                      {[3,6,12,18,24,36].map((m) => <SelectItem key={m} value={String(m)}>{m} months</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {previewMonthly && (
+                  <p className="text-sm bg-muted rounded-lg p-3">
+                    Estimated monthly deduction: <strong>{fmtGHS(previewMonthly)}</strong>
                   </p>
-                  {loan.interestRate > 0 && <p className="text-xs text-gray-500">{loan.interestRate}% interest</p>}
+                )}
+                <div>
+                  <Label>Purpose</Label>
+                  <Input placeholder="Brief purpose of loan"
+                    value={form.purpose} onChange={(e) => setForm((f) => ({ ...f, purpose: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Additional Notes</Label>
+                  <Textarea placeholder="Any additional details..."
+                    value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={3} />
+                </div>
+                <div className="bg-blue-50 border border-blue-100 p-3 rounded-lg text-sm text-blue-800">
+                  Loan requests require HR Manager approval. You will be notified once reviewed.
+                </div>
+                <div className="flex justify-end gap-3">
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit" disabled={submitting}>{submitting ? "Submitting..." : "Submit Request"}</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {/* Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {[
+          { label: "Active Loans",       value: String(activeLoans.length), icon: CreditCard, color: "text-blue-600" },
+          { label: "Outstanding Balance", value: fmtGHS(totalBalance),      icon: DollarSign, color: "text-red-600"  },
+          { label: "Monthly Deductions",  value: fmtGHS(monthlyTotal),      icon: Calendar,   color: "text-purple-600" },
+        ].map(({ label, value, icon: Icon, color }) => (
+          <Card key={label}>
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                  <Icon className={`w-5 h-5 ${color}`} />
+                </div>
+                <div>
+                  <p className="text-xl font-bold">{loading ? "—" : value}</p>
+                  <p className="text-sm text-muted-foreground">{label}</p>
                 </div>
               </div>
-            ))}
-          </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Loan History */}
+      <Card>
+        <CardHeader><CardTitle>Loan History</CardTitle></CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}</div>
+          ) : loans.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <CreditCard className="w-10 h-10 mx-auto mb-3 opacity-40" />
+              <p className="font-medium">No loan applications yet</p>
+              <p className="text-sm">Click &quot;New Loan Request&quot; to apply.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {loans.map((loan) => (
+                <div key={loan.id} className="border rounded-lg p-4 hover:bg-muted/40 transition-colors">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="font-semibold">{loan.loan_type}</p>
+                      <p className="text-sm text-muted-foreground">{loan.purpose ?? "No purpose specified"}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className={STATUS_COLOR[loan.status] ?? "bg-gray-100"}>
+                        {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
+                      </Badge>
+                      <Button variant="ghost" size="icon" onClick={() => { setSelected(loan); setScheduleOpen(true) }}>
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      {loan.status === "pending" && (
+                        <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50"
+                          disabled={cancellingId === loan.id}
+                          onClick={() => handleCancel(loan.id)}>
+                          {cancellingId === loan.id ? <Clock className="w-4 h-4 animate-spin" /> : "Cancel"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    <div><p className="text-muted-foreground">Principal</p><p className="font-medium">{fmtGHS(loan.principal)}</p></div>
+                    <div><p className="text-muted-foreground">Monthly</p><p className="font-medium">{fmtGHS(loan.monthly_payment)}</p></div>
+                    <div><p className="text-muted-foreground">Paid</p><p className="font-medium text-green-600">{fmtGHS(loan.amount_paid)}</p></div>
+                    <div><p className="text-muted-foreground">Balance</p><p className="font-medium text-red-600">{fmtGHS(loan.remaining_balance)}</p></div>
+                  </div>
+                  {loan.status === "active" && loan.principal > 0 && (
+                    <div className="mt-3">
+                      <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                        <span>Repayment Progress</span>
+                        <span>{Math.round((loan.amount_paid / loan.principal) * 100)}%</span>
+                      </div>
+                      <Progress value={(loan.amount_paid / loan.principal) * 100} className="h-1.5" />
+                    </div>
+                  )}
+                  {loan.rejection_reason && (
+                    <p className="text-xs text-red-600 mt-2">Rejection reason: {loan.rejection_reason}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Amortization Schedule Dialog */}
+      <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Loan Details — {selected?.loan_type}</DialogTitle></DialogHeader>
+          {selected && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div><span className="text-muted-foreground">Principal</span><p className="font-semibold">{fmtGHS(selected.principal)}</p></div>
+                <div><span className="text-muted-foreground">Monthly Payment</span><p className="font-semibold">{fmtGHS(selected.monthly_payment)}</p></div>
+                <div><span className="text-muted-foreground">Duration</span><p className="font-semibold">{selected.repayment_months} months</p></div>
+                <div><span className="text-muted-foreground">Balance</span><p className="font-semibold text-red-600">{fmtGHS(selected.remaining_balance)}</p></div>
+              </div>
+              <div>
+                <p className="font-semibold mb-2 text-sm">Amortization Schedule (Preview)</p>
+                <div className="rounded-lg border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">#</TableHead>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead className="text-right">Payment</TableHead>
+                        <TableHead className="text-right">Principal</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {buildAmortizationPreview(
+                        selected.principal, selected.interest_rate,
+                        selected.repayment_months,
+                        selected.start_date ?? new Date().toISOString().split("T")[0],
+                      ).map((row) => (
+                        <TableRow key={row.month_number}>
+                          <TableCell className="text-muted-foreground">{row.month_number}</TableCell>
+                          <TableCell>{new Date(row.due_date).toLocaleDateString()}</TableCell>
+                          <TableCell className="text-right">{fmtGHS(row.payment_amount)}</TableCell>
+                          <TableCell className="text-right">{fmtGHS(row.principal_portion)}</TableCell>
+                          <TableCell className="text-right">{fmtGHS(row.balance_remaining)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
