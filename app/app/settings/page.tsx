@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import TaxReliefManager from "@/components/tax-relief-manager"
+import GhanaTaxSettings from "@/components/ghana-tax-settings"
 import { createClient } from "@/lib/supabase/client"
 import { calculateMonthlyPaye, round2 as roundMoney } from "@/lib/ghana-tax/engine"
 import {
@@ -7140,6 +7141,11 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 Save Payroll Configuration
               </Button>
             </div>
+
+            {/* Ghana tax engine — PAYE bands, SSNIT rates, live preview */}
+            {companyData?.id && (
+              <GhanaTaxSettings companyId={companyData.id} taxYear={new Date().getFullYear()} />
+            )}
 
             {/* Enhanced Tax Reliefs Section */}
             <TaxReliefManager 

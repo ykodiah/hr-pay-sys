@@ -27,10 +27,9 @@ import {
 } from "lucide-react"
 import {
   calculateGhanaTax,
-  GRA_2025_PAYE_BANDS,
+  GRA_MONTHLY_PAYE_BANDS,
   GRA_2025_SSNIT,
   GRA_2025_TIER2,
-  type PAYEBand,
   type TaxRates,
   type EmployeePayInput,
   type TaxCalculationResult,
@@ -465,9 +464,9 @@ export default function GhanaTaxSettings({ companyId, taxYear }: Props) {
           }))
         )
       } else {
-        // Fallback to GRA defaults
+        // Fallback to current GRA monthly band widths
         setBands(
-          GRA_2025_PAYE_BANDS.map((b) => ({
+          GRA_MONTHLY_PAYE_BANDS.map((b) => ({
             band_order: b.band_order,
             rate: b.rate,
             threshold_amount: b.threshold_amount,
@@ -527,10 +526,10 @@ export default function GhanaTaxSettings({ companyId, taxYear }: Props) {
     }
   }
 
-  // Reset bands to GRA defaults
+  // Reset bands to GRA defaults (monthly widths used for withholding)
   const resetBands = () => {
     setBands(
-      GRA_2025_PAYE_BANDS.map((b) => ({
+      GRA_MONTHLY_PAYE_BANDS.map((b) => ({
         band_order: b.band_order,
         rate: b.rate,
         threshold_amount: b.threshold_amount,
@@ -538,7 +537,7 @@ export default function GhanaTaxSettings({ companyId, taxYear }: Props) {
         description: b.description,
       }))
     )
-    toast({ title: "Reset to GRA 2025 defaults", description: "Save to persist the reset." })
+    toast({ title: "Reset to GRA monthly defaults", description: "Save to persist the reset." })
   }
 
   // Save SSNIT / Tier rates
