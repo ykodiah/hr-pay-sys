@@ -13,6 +13,11 @@ interface AuthGuardProps {
   redirectTo?: string
 }
 
+function hasDemoSession(): boolean {
+  if (typeof document === "undefined") return false
+  return document.cookie.split(";").some((c) => c.trim() === "demo-session=active")
+}
+
 export function AuthGuard({ children, requireAuth = true, redirectTo = "/auth/login" }: AuthGuardProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -23,7 +28,7 @@ export function AuthGuard({ children, requireAuth = true, redirectTo = "/auth/lo
     const isMock = Boolean((supabase as any).__isMock)
     const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === "true" || process.env.NODE_ENV !== "production"
 
-    if (isMock || bypassAuth) {
+    if (isMock || bypassAuth || hasDemoSession()) {
       setIsAuthenticated(true)
       setIsLoading(false)
       return
@@ -61,6 +66,11 @@ export function AuthGuard({ children, requireAuth = true, redirectTo = "/auth/lo
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      if (hasDemoSession()) {
+        setIsAuthenticated(true)
+        return
+      }
+
       setIsAuthenticated(!!session?.user)
 
       if (requireAuth && !session?.user) {

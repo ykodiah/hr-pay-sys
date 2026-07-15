@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
-import { calcMonthlyPayment, buildAmortizationPreview } from "@/lib/services/loan-service"
+import { calcMonthlyPayment, buildAmortizationPreview } from "@/lib/services/loan-calculations"
 import {
   CreditCard, Plus, Calendar, DollarSign, Clock,
   CheckCircle, AlertCircle, XCircle, RefreshCw, Eye,

@@ -72,7 +72,10 @@ export async function updateSession(request: NextRequest) {
   const isProtectedPath =
     request.nextUrl.pathname.startsWith("/app") || request.nextUrl.pathname.startsWith("/self-service")
 
-  if (isProtectedPath && !user) {
+  // Allow Quick Demo Access (cookie set by /auth/login) without a Supabase Auth session
+  const hasDemoSession = request.cookies.get("demo-session")?.value === "active"
+
+  if (isProtectedPath && !user && !hasDemoSession) {
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"
     return NextResponse.redirect(url)
