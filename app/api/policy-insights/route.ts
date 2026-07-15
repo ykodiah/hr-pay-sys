@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { generateText } from "ai"
-import { groq } from "@ai-sdk/groq"
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,9 +24,9 @@ Provide a brief, actionable insight (2-3 sentences) focusing on:
 Keep the response professional and under 100 words.`
 
     const { text } = await generateText({
-      model: groq("llama-3.3-70b-versatile"),
+      model: "groq/llama-3.3-70b-versatile",
       prompt,
-      maxTokens: 150,
+      maxOutputTokens: 150,
       temperature: 0.7,
     })
 

@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     const keyTopics = extractTopics(text)
     const actionItems = generateActionItems(text, sentimentScore)
 
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Save analysis to database
     const { data, error } = await supabase
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employee_id')
     const companyId = searchParams.get('company_id')
@@ -85,9 +85,8 @@ export async function GET(request: NextRequest) {
     if (employeeId) {
       query = query.eq('employee_id', employeeId)
     } else if (companyId) {
-      query = query.in('employee_id', 
-        supabase.from('employees').select('id').eq('company_id', companyId)
-      )
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      query = query.in('employee_id', supabase.from('employees').select('id').eq('company_id', companyId) as any)
     }
 
     const { data: analyses, error } = await query
@@ -148,7 +147,7 @@ function analyzeSentiment(text: string): number {
 }
 
 function extractEmotions(text: string): string[] {
-  const emotions = []
+  const emotions: string[] = []
   const lowerText = text.toLowerCase()
 
   const emotionKeywords = {
@@ -170,7 +169,7 @@ function extractEmotions(text: string): string[] {
 }
 
 function extractTopics(text: string): string[] {
-  const topics = []
+  const topics: string[] = []
   const lowerText = text.toLowerCase()
 
   const topicKeywords = {

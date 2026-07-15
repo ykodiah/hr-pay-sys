@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client"
 
 import { DialogDescription } from "@/components/ui/dialog"

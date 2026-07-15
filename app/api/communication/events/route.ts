@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await handleCommunicationEvent(supabase, companyId, payload)
-    return NextResponse.json({ success: true, ...result })
+    return NextResponse.json({ success: true, data: result })
   } catch (error: any) {
     console.error("[communication/events][POST]", error)
     return NextResponse.json({ error: error.message || "Failed to process communication event" }, { status: 500 })

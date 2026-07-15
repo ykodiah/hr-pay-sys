@@ -60,7 +60,7 @@ async function initializeGroq() {
 
 async function logInteraction(employeeId: string, question: string, response: string, helpful = true) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     await supabase.from("ai_chat_logs").insert({
       employee_id: employeeId,

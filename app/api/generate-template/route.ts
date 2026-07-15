@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { generateText } from "ai"
-import { groq } from "@ai-sdk/groq"
-import { aiModelManager, getBestModel, getModelConfig } from "@/lib/ai/model-manager"
+import { getBestModel, getModelConfig } from "@/lib/ai/model-manager"
 
 // Template generation system context with continuous learning
 const TEMPLATE_SYSTEM_CONTEXT = `You are an expert HR and Payroll communication specialist with advanced AI capabilities. You generate professional, context-aware notification templates for HR and Payroll systems.
@@ -96,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     const result = await Promise.race([
       generateText({
-        model: groq(modelConfig.model), // Dynamic model selection
+        model: `groq/${modelConfig.model}`,
         system: TEMPLATE_SYSTEM_CONTEXT,
         messages: [
           {
@@ -104,15 +103,15 @@ export async function POST(request: NextRequest) {
             content: enhancedPrompt,
           },
         ],
-        temperature: modelConfig.temperature, // Dynamic temperature based on model capabilities
-        maxTokens: modelConfig.maxTokens, // Dynamic token limit based on model capabilities
+        temperature: modelConfig.temperature,
+        maxOutputTokens: modelConfig.maxTokens,
       }),
       new Promise((_, reject) => setTimeout(() => reject(new Error("Request timeout")), 45000)),
     ])
 
     console.log("[v0] AI SDK response received")
 
-    const generatedContent = result.text || "I apologize, but I could not generate a template. Please try again."
+    const generatedContent = (result as any).text || "I apologize, but I could not generate a template. Please try again."
 
     // Parse the generated content into structured template
     const parsedTemplate = parseGeneratedTemplate(generatedContent, category, type)

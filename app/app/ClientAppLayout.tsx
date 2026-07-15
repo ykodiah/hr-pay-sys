@@ -136,7 +136,7 @@ export default function ClientAppLayout({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [currentPath, setCurrentPath] = useState("")
-  const [breadcrumbs, setBreadcrumbs] = useState([])
+  const [breadcrumbs, setBreadcrumbs] = useState<{ label: string; href: string; icon: any }[]>([])
 
   // Service Worker registration with proper error handling
   useEffect(() => {
@@ -216,11 +216,12 @@ export default function ClientAppLayout({
           'integrations': { label: 'Integrations', icon: Plug },
         }
 
-        if (moduleMap[module]) {
+        const moduleEntry = moduleMap[module as keyof typeof moduleMap]
+        if (moduleEntry) {
           breadcrumbItems.push({
-            label: moduleMap[module].label,
+            label: moduleEntry.label,
             href: `/app/${module}`,
-            icon: moduleMap[module].icon,
+            icon: moduleEntry.icon,
           })
         }
 

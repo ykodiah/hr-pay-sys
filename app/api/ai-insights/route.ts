@@ -1,10 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { generateText } from "ai"
-import { createGroq } from "@ai-sdk/groq"
-
-const groq = createGroq({
-  apiKey: process.env.GROQ_API_KEY,
-})
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,9 +10,9 @@ export async function POST(request: NextRequest) {
     }
 
     const { text } = await generateText({
-      model: groq("llama-3.1-70b-instruct"),
+      model: "groq/llama-3.3-70b-versatile",
       prompt: prompt,
-      maxTokens: 1500,
+      maxOutputTokens: 1500,
       temperature: 0.7,
     })
 

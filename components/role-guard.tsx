@@ -1,6 +1,6 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { type ReactNode } from "react"
 
 import { Loader2, ShieldAlert } from "lucide-react"
 
@@ -8,7 +8,7 @@ import { useRoles } from "@/hooks/use-roles"
 
 type RoleGuardProps = {
   requiredRoles: string[]
-  children: ReactNode
+  children?: ReactNode
   fallback?: ReactNode
 }
 

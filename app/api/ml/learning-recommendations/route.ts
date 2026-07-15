@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employee_id')
     const companyId = searchParams.get('company_id')
@@ -30,9 +30,8 @@ export async function GET(request: NextRequest) {
     if (employeeId) {
       query = query.eq('employee_id', employeeId)
     } else if (companyId) {
-      query = query.in('employee_id', 
-        supabase.from('employees').select('id').eq('company_id', companyId)
-      )
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      query = query.in('employee_id', supabase.from('employees').select('id').eq('company_id', companyId) as any)
     }
 
     if (category) {
@@ -69,7 +68,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Employee ID is required" }, { status: 400 })
     }
 
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Generate personalized learning recommendations
     const recommendations = await generatePersonalizedRecommendations(
@@ -166,9 +165,9 @@ async function generatePersonalizedRecommendations(
 
   // Generate skill development recommendations
   if (skills && skills.length > 0) {
-    const skillGaps = skills.filter(s => s.current_level < s.target_level)
+    const skillGaps = skills.filter((s: any) => s.current_level < s.target_level)
     
-    skillGaps.forEach(skill => {
+    skillGaps.forEach((skill: any) => {
       const priorityScore = calculateSkillPriority(skill, performance, careerGoals)
       
       recommendations.push({

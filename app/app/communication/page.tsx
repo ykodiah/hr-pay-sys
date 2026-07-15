@@ -592,9 +592,9 @@ function MessageBubble({
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           {message.requiresAck && (
             <Button
-              size="xs"
+              size="sm"
               variant="outline"
-              className="gap-1"
+              className="gap-1 h-6 px-2 text-xs"
               onClick={(event) => {
                 event.stopPropagation()
                 onAcknowledge(message.id)

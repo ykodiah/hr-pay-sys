@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employee_id')
     const companyId = searchParams.get('company_id')
@@ -28,9 +28,8 @@ export async function GET(request: NextRequest) {
     if (employeeId) {
       query = query.eq('employee_id', employeeId)
     } else if (companyId) {
-      query = query.in('employee_id', 
-        supabase.from('employees').select('id').eq('company_id', companyId)
-      )
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      query = query.in('employee_id', supabase.from('employees').select('id').eq('company_id', companyId) as any)
     }
 
     if (category) {
@@ -77,7 +76,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Generate ML predictions
     const mlPredictions = await generateMLPredictions(employee_id, skill_name, current_level, supabase)
@@ -196,7 +195,7 @@ async function generateMLPredictions(employeeId: string, skillName: string, curr
 
   // Factor in learning activities
   if (learningActivities && learningActivities.length > 0) {
-    const completedLearning = learningActivities.filter(l => l.status === 'completed').length
+    const completedLearning = learningActivities.filter((l: any) => l.status === 'completed').length
     const totalLearning = learningActivities.length
     const learningProgress = completedLearning / totalLearning
     predictedLevel += learningProgress * 0.4

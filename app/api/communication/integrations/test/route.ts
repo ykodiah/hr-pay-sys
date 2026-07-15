@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     }
 
     const evaluator = HealthEvaluators[channelType]
-    const effectiveCredentials = hasCredentialInput ? incomingCredentials : storedCredentials
+    const effectiveCredentials = (hasCredentialInput ? incomingCredentials : storedCredentials) as Record<string, string>
 
     let message = "Configuration looks healthy"
 

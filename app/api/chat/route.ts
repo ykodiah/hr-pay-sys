@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { generateText } from "ai"
-import { groq } from "@ai-sdk/groq"
 
 // HR/Payroll system knowledge base
 const SYSTEM_CONTEXT = `You are an AI assistant for an HR and Payroll Management System called "Akwaaba HR & Payroll". You help users with:
@@ -52,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     const result = await Promise.race([
       generateText({
-        model: groq("llama-3.3-70b-versatile"),
+        model: "groq/llama-3.3-70b-versatile",
         system: SYSTEM_CONTEXT,
         messages: [
           ...conversationHistory,
@@ -62,14 +61,14 @@ export async function POST(request: NextRequest) {
           },
         ],
         temperature: 0.7,
-        maxTokens: 1000,
+        maxOutputTokens: 1000,
       }),
       new Promise((_, reject) => setTimeout(() => reject(new Error("Request timeout")), 30000)),
     ])
 
     console.log("[v0] AI SDK response received")
 
-    const response = result.text || "I apologize, but I could not generate a response. Please try again."
+    const response = (result as any).text || "I apologize, but I could not generate a response. Please try again."
 
     return NextResponse.json({
       response,
