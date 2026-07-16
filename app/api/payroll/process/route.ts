@@ -1,17 +1,43 @@
 /**
  * POST /api/payroll/process
  *
- * Server-authoritative payroll processing from DB:
- * employees + employee_financial + payroll_pay_inputs + employee_loans
- * + employee_allowances / employee_deductions
+ * Prefer worksheet `rows` from the client (already calculated) so Process & Submit
+ * never hangs on a second full DB tax pass. Falls back to server processPayrollRun
+ * when rows are omitted.
  *
- * Body: { company_id, pay_period, payroll_run_id?, submit_for_approval?, employee_ids? }
+ * Body: {
+ *   company_id, pay_period, payroll_run_id?, submit_for_approval?,
+ *   rows?: WorksheetRow[]
+ * }
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createClient, isMockSupabaseClient } from "@/lib/supabase/server"
 import { requireApiUserOrGuest } from "@/lib/auth/api-user"
 import { createPayrollService } from "@/lib/services"
+import { uid } from "@/lib/demo/memory-db"
+
+type ProcessRow = {
+  employeeId: string
+  employeeCode?: string
+  name?: string
+  department?: string
+  position?: string
+  basicSalary?: number
+  allowances?: number
+  overtime?: number
+  bonus?: number
+  loan?: number
+  advance?: number
+  other?: number
+  grossPay?: number
+  providentFund?: number
+  ssnitEmployee?: number
+  taxableIncome?: number
+  paye?: number
+  totalDeductions?: number
+  netPay?: number
+}
 
 function periodBounds(payPeriod: string) {
   const [y, m] = payPeriod.split("-").map(Number)
@@ -25,6 +51,164 @@ function periodBounds(payPeriod: string) {
   }
 }
 
+function n(v: unknown) {
+  return Math.round(Number(v || 0) * 100) / 100
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    promise.then(
+      (v) => {
+        clearTimeout(timer)
+        resolve(v)
+      },
+      (e) => {
+        clearTimeout(timer)
+        reject(e)
+      },
+    )
+  })
+}
+
+async function persistRowsFromWorksheet(
+  client: any,
+  runId: string,
+  companyId: string,
+  payPeriod: string,
+  bounds: ReturnType<typeof periodBounds>,
+  rows: ProcessRow[],
+) {
+  const errors: string[] = []
+  let processed = 0
+  let totalGross = 0
+  let totalDed = 0
+  let totalNet = 0
+
+  // Clear prior draft items for this run so re-process is idempotent
+  await client.from("payroll_items").delete().eq("payroll_run_id", runId)
+  await client.from("payslips").delete().eq("payroll_run_id", runId)
+
+  for (const row of rows) {
+    try {
+      if (!row.employeeId) {
+        errors.push(`${row.name || "row"}: missing employeeId`)
+        continue
+      }
+
+      const basic = n(row.basicSalary)
+      const allowances = n(row.allowances)
+      const overtime = n(row.overtime)
+      const bonus = n(row.bonus)
+      const gross = n(row.grossPay) || n(basic + allowances + overtime + bonus)
+      const ssnit = n(row.ssnitEmployee)
+      const pf = n(row.providentFund)
+      const paye = n(row.paye)
+      const loan = n(row.loan)
+      const advance = n(row.advance)
+      const other = n(row.other)
+      const totalDeductions =
+        n(row.totalDeductions) || n(ssnit + pf + paye + loan + advance + other)
+      const net = n(row.netPay) || n(gross - totalDeductions)
+      const taxable = n(row.taxableIncome)
+
+      const itemId = uid("pi")
+      const itemPayload = {
+        id: itemId,
+        payroll_run_id: runId,
+        employee_id: row.employeeId,
+        company_id: companyId,
+        basic_salary: basic,
+        allowances: { other: allowances },
+        overtime_pay: overtime,
+        bonus_pay: bonus,
+        gross_pay: gross,
+        ssnit_employee: ssnit,
+        ssnit_employer: n(ssnit * (13 / 5.5)),
+        tier2_employee: 0,
+        tier2_employer: 0,
+        tier3_employee: pf,
+        tier3_employer: 0,
+        paye_tax: paye,
+        loan_deduction: loan,
+        advance_deduction: advance,
+        other_deductions: other,
+        total_deductions: totalDeductions,
+        net_pay: net,
+        taxable_income: taxable,
+        status: "calculated",
+        updated_at: new Date().toISOString(),
+      }
+
+      const { error: itemErr } = await client.from("payroll_items").insert(itemPayload)
+      if (itemErr) {
+        errors.push(`${row.name || row.employeeId}: ${itemErr.message}`)
+        continue
+      }
+
+      const payslipPayload = {
+        id: uid("ps"),
+        payroll_item_id: itemId,
+        payroll_run_id: runId,
+        employee_id: row.employeeId,
+        company_id: companyId,
+        pay_period: payPeriod,
+        pay_period_start: bounds.pay_period_start,
+        pay_period_end: bounds.pay_period_end,
+        pay_date: bounds.pay_date,
+        snapshot_employee_name: row.name || "Employee",
+        snapshot_employee_id_no: row.employeeCode || null,
+        snapshot_position: row.position || null,
+        snapshot_department: row.department || null,
+        basic_salary: basic,
+        other_allowances: allowances,
+        overtime_pay: overtime,
+        bonus_pay: bonus,
+        gross_pay: gross,
+        ssnit_employee: ssnit,
+        ssnit_employer: itemPayload.ssnit_employer,
+        tier3_employee: pf,
+        paye_taxable_income: taxable,
+        paye_tax: paye,
+        loan_deduction: loan,
+        advance_deduction: advance,
+        other_deductions: other,
+        total_deductions: totalDeductions,
+        net_pay: net,
+        status: "draft",
+        updated_at: new Date().toISOString(),
+      }
+
+      const { error: slipErr } = await client.from("payslips").insert(payslipPayload)
+      if (slipErr) {
+        errors.push(`${row.name || row.employeeId}: payslip ${slipErr.message}`)
+        // item already saved — still count as processed
+      }
+
+      processed++
+      totalGross += gross
+      totalDed += totalDeductions
+      totalNet += net
+    } catch (err) {
+      errors.push(
+        `${row.name || row.employeeId}: ${err instanceof Error ? err.message : "save failed"}`,
+      )
+    }
+  }
+
+  await client
+    .from("payroll_runs")
+    .update({
+      total_gross_pay: n(totalGross),
+      total_deductions: n(totalDed),
+      total_net_pay: n(totalNet),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", runId)
+
+  return { processed, errors }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const user = await requireApiUserOrGuest()
@@ -35,11 +219,13 @@ export async function POST(req: NextRequest) {
       pay_period,
       payroll_run_id,
       submit_for_approval = true,
+      rows,
     } = body as {
       company_id: string
       pay_period: string
       payroll_run_id?: string
       submit_for_approval?: boolean
+      rows?: ProcessRow[]
     }
 
     if (!company_id || !pay_period) {
@@ -49,6 +235,7 @@ export async function POST(req: NextRequest) {
     const client = await createClient()
     const bounds = periodBounds(pay_period)
     let runId = payroll_run_id
+    const worksheetRows = Array.isArray(rows) ? rows.filter((r) => r && r.employeeId) : []
 
     // Never reuse approved/paid/cancelled runs
     if (runId) {
@@ -77,7 +264,6 @@ export async function POST(req: NextRequest) {
     }
 
     if (!runId) {
-      // Omit created_by when demo / FK may reject auth user ids
       const insertPayload: Record<string, unknown> = {
         company_id,
         ...bounds,
@@ -93,7 +279,6 @@ export async function POST(req: NextRequest) {
         .select("id")
         .single()
 
-      // Retry without created_by if FK fails
       if (error && String(error.message).toLowerCase().includes("created_by")) {
         delete insertPayload.created_by
         const retry = await client.from("payroll_runs").insert(insertPayload).select("id").single()
@@ -123,29 +308,50 @@ export async function POST(req: NextRequest) {
         .eq("id", runId)
     }
 
-    const service = createPayrollService(true)
-    const result = await service.processPayrollRun(runId, company_id)
+    let processed = 0
+    let processErrors: string[] = []
 
-    if (!result.success || !result.data) {
-      await client
-        .from("payroll_runs")
-        .update({ status: "draft", updated_at: new Date().toISOString() })
-        .eq("id", runId)
-      return NextResponse.json(
-        { error: result.error?.message ?? "Payroll processing failed" },
-        { status: 500 },
+    if (worksheetRows.length > 0) {
+      // Fast path: persist the worksheet the user already calculated
+      const result = await withTimeout(
+        persistRowsFromWorksheet(client, runId, company_id, pay_period, bounds, worksheetRows),
+        isMockSupabaseClient(client) ? 10000 : 45000,
+        "persist_worksheet",
       )
+      processed = result.processed
+      processErrors = result.errors
+    } else {
+      // Legacy / API-only path
+      const service = createPayrollService(true)
+      const result = await withTimeout(
+        service.processPayrollRun(runId, company_id),
+        50000,
+        "process_payroll_run",
+      )
+
+      if (!result.success || !result.data) {
+        await client
+          .from("payroll_runs")
+          .update({ status: "draft", updated_at: new Date().toISOString() })
+          .eq("id", runId)
+        return NextResponse.json(
+          { error: result.error?.message ?? "Payroll processing failed" },
+          { status: 500 },
+        )
+      }
+      processed = result.data.processed
+      processErrors = result.data.errors
     }
 
-    if (result.data.processed === 0 && result.data.errors.length > 0) {
+    if (processed === 0 && processErrors.length > 0) {
       await client
         .from("payroll_runs")
         .update({ status: "draft", updated_at: new Date().toISOString() })
         .eq("id", runId)
       return NextResponse.json(
         {
-          error: `No employees processed. ${result.data.errors[0]}`,
-          errors: result.data.errors,
+          error: `No employees processed. ${processErrors[0]}`,
+          errors: processErrors,
           payroll_run_id: runId,
         },
         { status: 422 },
@@ -153,11 +359,11 @@ export async function POST(req: NextRequest) {
     }
 
     const nextStatus =
-      result.data.errors.length === 0
+      processErrors.length === 0
         ? submit_for_approval
           ? "pending"
           : "completed"
-        : result.data.processed > 0
+        : processed > 0
           ? "partial"
           : "draft"
 
@@ -181,10 +387,11 @@ export async function POST(req: NextRequest) {
       success: true,
       payroll_run_id: runId,
       run,
-      processed: result.data.processed,
-      errors: result.data.errors,
+      processed,
+      errors: processErrors,
       submitted_for_approval: nextStatus === "pending",
-      meta: { fetched_at: new Date().toISOString() },
+      source: worksheetRows.length > 0 ? "worksheet" : "server",
+      meta: { fetched_at: new Date().toISOString(), demo: isMockSupabaseClient(client) },
     })
   } catch (err) {
     return NextResponse.json(

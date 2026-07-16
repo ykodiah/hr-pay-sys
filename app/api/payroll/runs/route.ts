@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { requireApiUser } from "@/lib/auth/api-user"
+import { requireApiUserOrGuest } from "@/lib/auth/api-user"
 
 function periodBounds(payPeriod: string) {
   const [y, m] = payPeriod.split("-").map(Number)
@@ -22,8 +22,7 @@ function periodBounds(payPeriod: string) {
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await requireApiUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    await requireApiUserOrGuest()
 
     const { searchParams } = new URL(req.url)
     const companyId = searchParams.get("company_id")
@@ -98,8 +97,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireApiUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const user = await requireApiUserOrGuest()
 
     const body = await req.json()
     const { company_id, pay_period, subsidiary_id, notes } = body as {

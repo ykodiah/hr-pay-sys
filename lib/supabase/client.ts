@@ -1,64 +1,53 @@
 import { createBrowserClient } from "@supabase/ssr"
-
-type QueryResult = { data: null; error: null; count: null }
-
-function createMockQueryBuilder(): any {
-  const result: QueryResult = { data: null, error: null, count: null }
-  const builder: any = {
-    select: () => builder,
-    insert: () => builder,
-    update: () => builder,
-    upsert: () => builder,
-    delete: () => builder,
-    eq: () => builder,
-    neq: () => builder,
-    gt: () => builder,
-    gte: () => builder,
-    lt: () => builder,
-    lte: () => builder,
-    like: () => builder,
-    ilike: () => builder,
-    is: () => builder,
-    in: () => builder,
-    contains: () => builder,
-    order: () => builder,
-    limit: () => builder,
-    range: () => builder,
-    single: async () => result,
-    maybeSingle: async () => result,
-    then: (resolve: (value: QueryResult) => unknown) => Promise.resolve(result).then(resolve),
-  }
-  return builder
-}
+import { createMemoryQueryBuilder, isDemoMode } from "@/lib/demo/memory-db"
 
 function createMockClient() {
   return {
     __isMock: true,
     auth: {
-      getUser: async () => ({ data: { user: null }, error: null }),
-      getSession: async () => ({ data: { session: null }, error: null }),
+      getUser: async () => ({
+        data: {
+          user: {
+            id: "demo-user",
+            email: "demo@akwaaba.local",
+          },
+        },
+        error: null,
+      }),
+      getSession: async () => ({
+        data: {
+          session: {
+            access_token: "demo",
+            user: { id: "demo-user", email: "demo@akwaaba.local" },
+          },
+        },
+        error: null,
+      }),
       signInWithPassword: async () => ({
-        data: { user: null, session: null },
-        error: { message: "Invalid login credentials" },
+        data: {
+          user: { id: "demo-user", email: "demo@akwaaba.local" },
+          session: { access_token: "demo", user: { id: "demo-user" } },
+        },
+        error: null,
       }),
       signOut: async () => ({ error: null }),
       onAuthStateChange: () => ({
         data: { subscription: { unsubscribe: () => undefined } },
       }),
     },
-    from: () => createMockQueryBuilder(),
+    from: (table: string) => createMemoryQueryBuilder(table),
     rpc: async () => ({ data: null, error: null }),
   }
 }
 
 export function createClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    // Allow builds/prerender and Quick Demo Access without hard-failing when env is unset
+  if (isDemoMode()) {
+    // Shared in-memory DB so browser company lookup + server APIs stay in sync in demos
     return createMockClient() as ReturnType<typeof createBrowserClient>
   }
 
-  return createBrowserClient(supabaseUrl, supabaseAnonKey)
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  )
 }
