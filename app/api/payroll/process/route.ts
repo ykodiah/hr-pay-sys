@@ -12,7 +12,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient, isMockSupabaseClient } from "@/lib/supabase/server"
+import { createServiceClient, isMockSupabaseClient } from "@/lib/supabase/server"
 import { requireApiUserOrGuest } from "@/lib/auth/api-user"
 import { createPayrollService } from "@/lib/services"
 import { uid } from "@/lib/demo/memory-db"
@@ -124,22 +124,26 @@ async function persistRowsFromWorksheet(
       const taxable = n(row.taxableIncome)
 
       const itemId = uid("pi")
+      const ssnitEmployer = n(ssnit * (13 / 5.5))
       const itemPayload = {
         id: itemId,
         payroll_run_id: runId,
         employee_id: row.employeeId,
         company_id: companyId,
+        pay_period: payPeriod,
         basic_salary: basic,
         allowances: { other: allowances },
         overtime_pay: overtime,
         bonus_pay: bonus,
         gross_pay: gross,
         ssnit_employee: ssnit,
-        ssnit_employer: n(ssnit * (13 / 5.5)),
+        ssnit_employer: ssnitEmployer,
         tier2_employee: 0,
         tier2_employer: 0,
         tier3_employee: pf,
         tier3_employer: 0,
+        // both column names: original (tax_deduction) and new (paye_tax)
+        tax_deduction: paye,
         paye_tax: paye,
         loan_deduction: loan,
         advance_deduction: advance,
@@ -147,6 +151,7 @@ async function persistRowsFromWorksheet(
         total_deductions: totalDeductions,
         net_pay: net,
         taxable_income: taxable,
+        paye_taxable_income: taxable,
         status: "calculated",
         updated_at: new Date().toISOString(),
       }
@@ -179,7 +184,7 @@ async function persistRowsFromWorksheet(
         bonus_pay: bonus,
         gross_pay: gross,
         ssnit_employee: ssnit,
-        ssnit_employer: itemPayload.ssnit_employer,
+        ssnit_employer: ssnitEmployer,
         tier3_employee: pf,
         paye_taxable_income: taxable,
         paye_tax: paye,
@@ -247,7 +252,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "company_id and pay_period are required" }, { status: 400 })
     }
 
-    const client = await createClient()
+    // Use service-role client so payroll writes bypass RLS
+    const client = createServiceClient()
     const bounds = periodBounds(pay_period)
     let runId = payroll_run_id
     const worksheetRows = Array.isArray(rows) ? rows.filter((r) => r && r.employeeId) : []

@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
 import { createMemoryQueryBuilder, isDemoMode } from "@/lib/demo/memory-db"
 
@@ -78,4 +79,23 @@ export async function createClient() {
 
 export function isMockSupabaseClient(client: any): boolean {
   return Boolean(client?.__isMock)
+}
+
+/**
+ * Service-role client that bypasses RLS entirely.
+ * Use ONLY in server-side API routes for privileged writes (e.g. payroll processing).
+ * Never expose to client components.
+ */
+export function createServiceClient() {
+  if (isDemoMode()) {
+    return createMockServerClient() as any
+  }
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  return createSupabaseClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
 }

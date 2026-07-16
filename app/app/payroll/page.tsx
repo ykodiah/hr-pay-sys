@@ -25,6 +25,7 @@ import {
   Download,
   Loader2,
   ArrowRight,
+  Zap,
 } from "lucide-react"
 
 type PayInputApiRow = {
@@ -701,6 +702,93 @@ export default function PayrollPage() {
     }
   }
 
+  /**
+   * Run Payroll — direct completion path.
+   * Processes all calculated rows and marks the run as completed immediately
+   * without routing through the approval workflow.
+   */
+  const handleRunPayroll = async () => {
+    ensureDemoSessionCookie()
+    if (!companyId) {
+      toast({ title: "Company required", description: "Load a company before running payroll.", variant: "destructive" })
+      return
+    }
+    if (!rows.length) {
+      toast({ title: "No employees", description: "Sync employees from the database first.", variant: "destructive" })
+      return
+    }
+
+    setProcessing(true)
+    setLastProcessMessage(null)
+    try {
+      const res = await fetchWithTimeout(
+        "/api/payroll/process",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            company_id: companyId,
+            pay_period: payPeriod,
+            payroll_run_id:
+              activeRun && !["approved", "paid", "cancelled"].includes(activeRun.status)
+                ? activeRun.id
+                : undefined,
+            submit_for_approval: false,
+            rows: (selected.length ? selected : rows).map((r) => ({
+              employeeId: r.employeeId,
+              employeeCode: r.employeeCode,
+              name: r.name,
+              department: r.department,
+              position: r.position,
+              basicSalary: r.basicSalary,
+              allowances: r.allowances,
+              overtime: r.overtime,
+              bonus: r.bonus,
+              loan: r.loan,
+              advance: r.advance,
+              other: r.other,
+              grossPay: r.grossPay,
+              providentFund: r.providentFund,
+              ssnitEmployee: r.ssnitEmployee,
+              taxableIncome: r.taxableIncome,
+              paye: r.paye,
+              totalDeductions: r.totalDeductions,
+              netPay: r.netPay,
+            })),
+          }),
+        },
+        60000,
+      )
+      const json = await res.json().catch(() => ({}))
+
+      if (!res.ok && res.status !== 422) {
+        throw new Error(json.error || `Run failed (${res.status})`)
+      }
+
+      const processed = json.processed || 0
+      const warnings = json.errors || []
+      setRows((prev) => prev.map((r) => ({ ...r, status: "Processed" })))
+      setLastProcessMessage(
+        `${processed} employee(s) processed and saved. Payroll run is now complete.`,
+      )
+      toast({
+        title: "Payroll run complete",
+        description: `${processed} employee(s) saved${warnings.length ? ` with ${warnings.length} warning(s)` : ""}. View payslips and reports.`,
+      })
+      setTimeout(() => void loadWorksheet(companyId, payPeriod), 1500)
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.name === "AbortError"
+            ? "Request timed out. Check connectivity and retry."
+            : err.message
+          : "Could not run payroll"
+      toast({ title: "Run failed", description: msg, variant: "destructive" })
+    } finally {
+      setProcessing(false)
+    }
+  }
+
   const handleExport = async (format: "csv" | "pdf") => {
     ensureDemoSessionCookie()
     const source = selected.length ? selected : rows
@@ -839,7 +927,15 @@ export default function PayrollPage() {
           <Calculator className="h-4 w-4 mr-2" />
           Recalculate
         </Button>
-        <Button onClick={handleProcess} disabled={processing || !rows.length || !companyId}>
+        <Button onClick={handleRunPayroll} disabled={processing || !rows.length || !companyId}>
+          {processing ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Zap className="h-4 w-4 mr-2" />
+          )}
+          Run Payroll
+        </Button>
+        <Button variant="outline" onClick={handleProcess} disabled={processing || !rows.length || !companyId}>
           {processing ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
           ) : (
