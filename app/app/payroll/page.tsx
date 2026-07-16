@@ -600,23 +600,90 @@ export default function PayrollPage() {
         60000,
       )
       const json = await res.json().catch(() => ({}))
+      
+      // Handle different response statuses
+      if (res.status === 422) {
+        // Partial success - some employees processed, others failed
+        const processed = json.processed || 0
+        const totalRequested = rows.length
+        const errors = json.errors || []
+        
+        setLastProcessMessage(
+          `${processed} of ${totalRequested} employee(s) processed${
+            errors.length > 0 ? ` with ${errors.length} issue(s)` : ""
+          }. Review errors below and retry after fixing.`,
+        )
+        
+        toast({
+          title: "Partial Processing",
+          description: `${processed}/${totalRequested} employees processed. See details for warnings.`,
+          variant: "default",
+        })
+        
+        // Show detailed error list if available
+        if (errors.length > 0 && errors.length <= 10) {
+          const errorDetails = errors.slice(0, 5).join("\n")
+          toast({
+            title: "Processing Issues",
+            description: errorDetails + (errors.length > 5 ? `\n+ ${errors.length - 5} more` : ""),
+            variant: "destructive",
+          })
+        }
+        return
+      }
+      
       if (!res.ok) {
-        throw new Error(json.error || `Processing failed (${res.status})`)
+        const errorMsg = json.error || `Processing failed (${res.status})`
+        const details = json.details || ""
+        throw new Error(errorMsg + (details ? `\n${details}` : ""))
       }
 
+      // Success case - update UI and navigate
+      const processed = json.processed || 0
+      const warnings = json.errors || []
+      const reconciliation = json.reconciliation
+      
       setRows((prev) => prev.map((r) => ({ ...r, status: "Submitted" })))
-      setLastProcessMessage(
-        `${json.processed} employee(s) processed and queued for approval. Next: Approvals → Approve → History / Payslips / Compliance.`,
-      )
+      
+      // Build detailed success message
+      let successMessage = `${processed} employee(s) processed and queued for approval`
+      if (reconciliation?.matched === reconciliation?.total_items) {
+        successMessage += " (data validated)"
+      } else if (reconciliation?.matched) {
+        successMessage += ` (${reconciliation.matched}/${reconciliation.total_items} validated)`
+      }
+      successMessage += ". Next: Approvals → Approve → History / Payslips / Compliance."
+      
+      setLastProcessMessage(successMessage)
+      
       toast({
-        title: "Submitted for approval",
-        description: `${json.processed} employee(s) saved${
-          json.errors?.length ? ` (${json.errors.length} warnings)` : ""
-        }. Opening Approvals…`,
+        title: "Success! Submitted for approval",
+        description: `${processed} employee(s) saved${
+          warnings.length ? ` with ${warnings.length} warning(s)` : ""
+        }. Opening Approvals in 2 seconds…`,
       })
-      // Navigate first so the user clearly moves to the next step
-      router.push("/app/approvals")
-      void loadWorksheet(companyId, payPeriod)
+      
+      // Show any warnings/info messages
+      if (warnings.length > 0) {
+        const warningText = warnings
+          .filter(w => w.includes("⚠"))
+          .slice(0, 3)
+          .join("\n")
+        if (warningText) {
+          toast({
+            title: "Data Validation Notes",
+            description: warningText,
+            variant: "default",
+          })
+        }
+      }
+      
+      // Navigate to approvals after brief delay so user sees success message
+      setTimeout(() => {
+        router.push("/app/approvals")
+        void loadWorksheet(companyId, payPeriod)
+      }, 2000)
+      
     } catch (err) {
       const msg =
         err instanceof Error

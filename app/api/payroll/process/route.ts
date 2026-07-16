@@ -80,6 +80,7 @@ async function persistRowsFromWorksheet(
   rows: ProcessRow[],
 ) {
   const errors: string[] = []
+  const employeeErrors: Record<string, string> = {}
   let processed = 0
   let totalGross = 0
   let totalDed = 0
@@ -91,8 +92,18 @@ async function persistRowsFromWorksheet(
 
   for (const row of rows) {
     try {
+      // Validate required fields before processing
       if (!row.employeeId) {
-        errors.push(`${row.name || "row"}: missing employeeId`)
+        const empError = `${row.name || "row"}: missing employeeId`
+        errors.push(empError)
+        employeeErrors[row.employeeId || "unknown"] = empError
+        continue
+      }
+
+      if (typeof row.basicSalary !== "number" || row.basicSalary < 0) {
+        const empError = `${row.name || row.employeeId}: invalid basic salary`
+        errors.push(empError)
+        employeeErrors[row.employeeId] = empError
         continue
       }
 
@@ -142,7 +153,9 @@ async function persistRowsFromWorksheet(
 
       const { error: itemErr } = await client.from("payroll_items").insert(itemPayload)
       if (itemErr) {
-        errors.push(`${row.name || row.employeeId}: ${itemErr.message}`)
+        const empError = `${row.name || row.employeeId}: ${itemErr.message}`
+        errors.push(empError)
+        employeeErrors[row.employeeId] = empError
         continue
       }
 
@@ -181,7 +194,9 @@ async function persistRowsFromWorksheet(
 
       const { error: slipErr } = await client.from("payslips").insert(payslipPayload)
       if (slipErr) {
-        errors.push(`${row.name || row.employeeId}: payslip ${slipErr.message}`)
+        const empError = `${row.name || row.employeeId}: payslip ${slipErr.message}`
+        errors.push(empError)
+        employeeErrors[row.employeeId] = empError
         // item already saved — still count as processed
       }
 
@@ -190,9 +205,9 @@ async function persistRowsFromWorksheet(
       totalDed += totalDeductions
       totalNet += net
     } catch (err) {
-      errors.push(
-        `${row.name || row.employeeId}: ${err instanceof Error ? err.message : "save failed"}`,
-      )
+      const empError = `${row.name || row.employeeId}: ${err instanceof Error ? err.message : "save failed"}`
+      errors.push(empError)
+      employeeErrors[row.employeeId] = empError
     }
   }
 
@@ -206,7 +221,7 @@ async function persistRowsFromWorksheet(
     })
     .eq("id", runId)
 
-  return { processed, errors }
+  return { processed, errors, employeeErrors }
 }
 
 export async function POST(req: NextRequest) {
@@ -310,6 +325,7 @@ export async function POST(req: NextRequest) {
 
     let processed = 0
     let processErrors: string[] = []
+    let reconciliationStatus: any = null
 
     if (worksheetRows.length > 0) {
       // Fast path: persist the worksheet the user already calculated
@@ -358,6 +374,28 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Post-save reconciliation: validate payroll_items and payslips sync
+    if (processed > 0) {
+      try {
+        const { data: reconciled, error: reconErr } = await client.rpc(
+          "reconcile_payroll_items_and_payslips",
+          { p_payroll_run_id: runId }
+        )
+        if (!reconErr && reconciled) {
+          reconciliationStatus = reconciled[0]
+          // Add warning if mismatches detected
+          if (reconciled[0].matched < reconciled[0].total_items) {
+            processErrors.push(
+              `⚠ Data sync warning: ${reconciled[0].total_items} items vs ${reconciled[0].total_slips} slips. Check details.`
+            )
+          }
+        }
+      } catch (e) {
+        console.log("[v0] Reconciliation warning:", e instanceof Error ? e.message : "unknown error")
+        // Don't fail processing on reconciliation warning
+      }
+    }
+
     const nextStatus =
       processErrors.length === 0
         ? submit_for_approval
@@ -391,6 +429,7 @@ export async function POST(req: NextRequest) {
       errors: processErrors,
       submitted_for_approval: nextStatus === "pending",
       source: worksheetRows.length > 0 ? "worksheet" : "server",
+      reconciliation: reconciliationStatus,
       meta: { fetched_at: new Date().toISOString(), demo: isMockSupabaseClient(client) },
     })
   } catch (err) {

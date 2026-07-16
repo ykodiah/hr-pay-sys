@@ -30,16 +30,83 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const report = await generateReport(
-      {
-        company_id,
-        report_type: report_type as ReportType,
-        pay_period,
-        payroll_run_id,
-        tax_year,
-      },
-      user.isDemo ? undefined : user.id,
-    )
+    // Pre-validate that report data exists before attempting generation
+    const client = await createClient()
+    const validationPeriod = pay_period || (payroll_run_id ? null : new Date().toISOString().slice(0, 7))
+    
+    if (validationPeriod) {
+      const { data: dataCheck, error: checkErr } = await client.rpc(
+        "validate_report_data_exists",
+        { p_company_id: company_id, p_report_type: report_type, p_pay_period: validationPeriod }
+      )
+      
+      if (!checkErr && dataCheck && dataCheck[0]) {
+        const validation = dataCheck[0]
+        if (!validation.has_data) {
+          // Log failed attempt
+          try {
+            await client.from("compliance_reports").insert({
+              company_id,
+              payroll_run_id: payroll_run_id || null,
+              report_type,
+              report_name: `${report_type} (Validation Failed)`,
+              pay_period: validationPeriod,
+              generated_by: user.isDemo ? null : user.id,
+              row_count: 0,
+              status: "failed",
+              error_message: validation.error_message,
+              validation_status: "failed",
+            })
+          } catch {
+            // Non-fatal
+          }
+          
+          return NextResponse.json(
+            { 
+              error: validation.error_message || "No payroll data available for this period",
+              details: "Please process and approve payroll for this period first, then try again.",
+            },
+            { status: 404 },
+          )
+        }
+      }
+    }
+
+    let report;
+    try {
+      report = await generateReport(
+        {
+          company_id,
+          report_type: report_type as ReportType,
+          pay_period,
+          payroll_run_id,
+          tax_year,
+        },
+        user.isDemo ? undefined : user.id,
+      )
+    } catch (err) {
+      // Enhanced error capture: distinguish between data and processing issues
+      const errorMsg = err instanceof Error ? err.message : "Report generation failed"
+      
+      try {
+        await client.from("compliance_reports").insert({
+          company_id,
+          payroll_run_id: payroll_run_id || null,
+          report_type,
+          report_name: `${report_type} (Failed)`,
+          pay_period: pay_period || validationPeriod,
+          generated_by: user.isDemo ? null : user.id,
+          row_count: 0,
+          status: "failed",
+          error_message: errorMsg,
+          validation_status: "failed",
+        })
+      } catch {
+        // Non-fatal
+      }
+      
+      throw err
+    }
 
     const safePeriod = (pay_period ?? report.pay_period).replace(/[^0-9-]/g, "")
     const safeType = String(report_type).replace(/_/g, "-")
@@ -119,6 +186,19 @@ export async function POST(req: NextRequest) {
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal server error"
+    console.log("[v0] Report download error:", message)
+    
+    // Return appropriate error based on message
+    if (message.includes("No payroll data") || message.includes("Process & approve payroll")) {
+      return NextResponse.json(
+        { 
+          error: "No payroll data found for this period",
+          details: "Please process and approve payroll for the requested period first.",
+        }, 
+        { status: 404 }
+      )
+    }
+    
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

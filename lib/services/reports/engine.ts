@@ -122,14 +122,21 @@ function mapPayslipToReportRow(p: any): PayrollReportRow {
   } as PayrollReportRow
 }
 
+interface FetchRowsResult {
+  rows: PayrollReportRow[]
+  source: "view" | "payslips" | "payroll_items" | "none"
+  rowCount: number
+  error?: string
+}
+
 async function fetchReportRows(
   companyId: string,
   payPeriod?: string,
   payrollRunId?: string
-): Promise<PayrollReportRow[]> {
+): Promise<FetchRowsResult> {
   const client = await createClient()
 
-  // Prefer the dedicated view
+  // Prefer the dedicated view (now handles fallback internally)
   let query = client
     .from("v_payroll_report_summary")
     .select("*")
@@ -144,9 +151,11 @@ async function fetchReportRows(
   query = query.order("employee_name", { ascending: true })
 
   const { data, error } = await query
-  if (!error && (data ?? []).length > 0) return data as PayrollReportRow[]
+  if (!error && (data ?? []).length > 0) {
+    return { rows: data as PayrollReportRow[], source: "view", rowCount: data.length }
+  }
 
-  // Fallback — payslips
+  // Fallback — direct payslips query
   let payslipQuery = client
     .from("payslips")
     .select(
@@ -162,7 +171,11 @@ async function fetchReportRows(
 
   const { data: payslips, error: payslipError } = await payslipQuery
   if (!payslipError && (payslips ?? []).length > 0) {
-    return (payslips ?? []).map(mapPayslipToReportRow)
+    return { 
+      rows: (payslips ?? []).map(mapPayslipToReportRow),
+      source: "payslips",
+      rowCount: payslips.length,
+    }
   }
 
   // Final fallback — payroll_items for the period's run(s)
@@ -180,12 +193,13 @@ async function fetchReportRows(
   }
 
   if (!runIds.length) {
-    if (error && payslipError) {
-      throw new Error(
-        `Report data fetch failed: ${error?.message || "no view"}; payslips: ${payslipError.message}`,
-      )
+    const errorMsg = error?.message || payslipError?.message || "No payroll data source available"
+    return { 
+      rows: [],
+      source: "none",
+      rowCount: 0,
+      error: errorMsg,
     }
-    return []
   }
 
   const { data: items, error: itemsError } = await client
@@ -198,12 +212,26 @@ async function fetchReportRows(
     .in("payroll_run_id", runIds)
 
   if (itemsError) {
-    throw new Error(`Report data fetch failed from payroll_items: ${itemsError.message}`)
+    return { 
+      rows: [],
+      source: "none",
+      rowCount: 0,
+      error: `Failed to fetch payroll_items: ${itemsError.message}`,
+    }
+  }
+  
+  if (!items || items.length === 0) {
+    return { 
+      rows: [],
+      source: "none",
+      rowCount: 0,
+      error: "No payroll items found for this period",
+    }
   }
 
   const { data: company } = await client.from("companies").select("name").eq("id", companyId).maybeSingle()
 
-  return (items ?? []).map((it: any) => {
+  const mappedRows = (items ?? []).map((it: any) => {
     const emp = Array.isArray(it.employee) ? it.employee[0] : it.employee
     const fin = Array.isArray(it.financial) ? it.financial[0] : it.financial
     const allowancesObj = it.allowances && typeof it.allowances === "object" ? it.allowances : {}
@@ -259,6 +287,12 @@ async function fetchReportRows(
       current_loan_deduction: Number(it.loan_deduction ?? 0),
     } as PayrollReportRow
   })
+  
+  return { 
+    rows: mappedRows,
+    source: "payroll_items",
+    rowCount: mappedRows.length,
+  }
 }
 
 // ─── Report generators ────────────────────────────────────────────────────────
@@ -767,21 +801,23 @@ export async function generateReport(
   input: GenerateReportInput,
   generatedBy?: string
 ): Promise<GeneratedReport> {
-  const rows = await fetchReportRows(
+  const fetchResult = await fetchReportRows(
     input.company_id,
     input.pay_period,
     input.payroll_run_id
   )
 
-  if (rows.length === 0) {
-    throw new Error(
+  if (fetchResult.rows.length === 0) {
+    const errorMsg = fetchResult.error || 
       `No payroll data found for this company` +
-        (input.pay_period ? ` / period ${input.pay_period}` : "") +
-        (input.payroll_run_id ? ` / run ${input.payroll_run_id}` : "") +
-        `. Process & approve payroll first so payslips / payroll_items exist.`,
-    )
+      (input.pay_period ? ` / period ${input.pay_period}` : "") +
+      (input.payroll_run_id ? ` / run ${input.payroll_run_id}` : "") +
+      `. Process & approve payroll first so payslips / payroll_items exist.`
+    
+    throw new Error(errorMsg)
   }
 
+  const rows = fetchResult.rows
   const clientForBrand = await createClient()
   const companyInfo = await loadCompanyBrand(clientForBrand, input.company_id)
 
@@ -808,39 +844,42 @@ export async function generateReport(
     default:                report = buildPayrollSummaryReport(rows, meta); break
   }
 
-  // Persist metadata to DB
+  // Persist metadata to DB with data source tracking
   try {
     const client = await createClient()
     const { data: saved } = await client
       .from("compliance_reports")
       .insert({
-        company_id:      input.company_id,
-        payroll_run_id:  input.payroll_run_id ?? null,
-        report_type:     input.report_type,
-        report_name:     report.report_name,
-        pay_period:      report.pay_period,
-        tax_year:        input.tax_year ?? new Date().getFullYear(),
-        generated_by:    generatedBy ?? null,
-        generated_at:    report.generated_at,
-        row_count:       report.row_count,
-        export_format:   "csv",
-        status:          "generated",
+        company_id:         input.company_id,
+        payroll_run_id:     input.payroll_run_id ?? null,
+        report_type:        input.report_type,
+        report_name:        report.report_name,
+        pay_period:         report.pay_period,
+        tax_year:           input.tax_year ?? new Date().getFullYear(),
+        generated_by:       generatedBy ?? null,
+        generated_at:       report.generated_at,
+        row_count:          report.row_count,
+        export_format:      "csv",
+        status:             "generated",
+        data_source:        fetchResult.source,
+        validation_status:  "validated",
       })
       .select("id")
       .single()
 
     if (saved?.id) {
-      // Audit log
+      // Audit log with data source info
       await client.rpc("log_report_action", {
         p_report_id:  saved.id,
         p_action:     "generated",
         p_actor_id:   generatedBy ?? null,
         p_actor_name: null,
-        p_notes:      `Generated ${report.row_count} rows`,
+        p_notes:      `Generated ${report.row_count} rows from ${fetchResult.source}`,
       })
     }
-  } catch {
+  } catch (e) {
     // Non-fatal — report still returned even if DB persist fails
+    console.log("[v0] Report DB persist error:", e instanceof Error ? e.message : "unknown")
   }
 
   return report
