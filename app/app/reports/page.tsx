@@ -388,6 +388,7 @@ export default function ComplianceReportsPage() {
       const res = await fetch("/api/reports", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body:    JSON.stringify({ company_id: companyId, pay_period: period, generate_all: true }),
       })
       const json = await res.json()
