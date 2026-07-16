@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "company_id and pay_period are required" }, { status: 400 })
     }
 
-    const bounds = periodBounds(payPeriod)
+    const bounds = periodBounds(pay_period)
     const client = await createClient()
 
     // Reuse existing draft/processing run for same company + period when present

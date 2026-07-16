@@ -237,6 +237,20 @@ export default function PayrollHistoryPage() {
       ? Math.round(filteredRuns.reduce((sum, run) => sum + (run.employee_count || 0), 0) / filteredRuns.length)
       : 0
 
+  // Declare helpers before any computed values that use them (avoids TDZ crash)
+  const formatCurrency = (amount: number) => {
+    return `GHS ${amount.toLocaleString()}`
+  }
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "N/A"
+    return new Date(dateString).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
+  }
+
   const trendData = filteredRuns
     .slice(0, 12)
     .reverse()
@@ -268,19 +282,6 @@ export default function PayrollHistoryPage() {
   // Generate years for filter
   const currentYear = new Date().getFullYear()
   const years = Array.from({ length: 5 }, (_, i) => String(currentYear - i))
-
-  const formatCurrency = (amount: number) => {
-    return `GHS ${amount.toLocaleString()}`
-  }
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "N/A"
-    return new Date(dateString).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    })
-  }
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {

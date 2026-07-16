@@ -15,7 +15,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient, isMockSupabaseClient } from "@/lib/supabase/server"
 import { requireApiUserOrGuest } from "@/lib/auth/api-user"
 import { createPayrollService } from "@/lib/services"
-import { uid } from "@/lib/demo/memory-db"
 
 type ProcessRow = {
   employeeId: string
@@ -123,11 +122,10 @@ async function persistRowsFromWorksheet(
       const net = n(row.netPay) || n(gross - totalDeductions)
       const taxable = n(row.taxableIncome)
 
-      const itemId = uid("pi")
       const ssnitEmployer = n(ssnit * (13 / 5.5))
       // Build only the columns that actually exist in payroll_items table
+      // Do NOT pass id — let Postgres gen_random_uuid() generate a valid UUID
       const itemPayload: Record<string, any> = {
-        id: itemId,
         payroll_run_id: runId,
         employee_id: row.employeeId,
         company_id: companyId,
@@ -151,12 +149,25 @@ async function persistRowsFromWorksheet(
         net_pay: net,
         taxable_income: taxable,
         paye_taxable_income: taxable,
-        calculation_breakdown: { allowances },
+        allowances: { total: allowances },
+        calculation_breakdown: {
+          allowances,
+          ssnit_employee: ssnit,
+          tier3_employee: pf,
+          paye,
+          loan,
+          advance,
+          other,
+        },
         status: "calculated",
         updated_at: new Date().toISOString(),
       }
 
-      const { error: itemErr } = await client.from("payroll_items").insert(itemPayload)
+      const { data: insertedItem, error: itemErr } = await client
+        .from("payroll_items")
+        .insert(itemPayload)
+        .select("id")
+        .single()
       if (itemErr) {
         const empError = `${row.name || row.employeeId}: ${itemErr.message}`
         errors.push(empError)
@@ -165,8 +176,7 @@ async function persistRowsFromWorksheet(
       }
 
       const payslipPayload = {
-        id: uid("ps"),
-        payroll_item_id: itemId,
+        payroll_item_id: insertedItem.id,
         payroll_run_id: runId,
         employee_id: row.employeeId,
         company_id: companyId,
