@@ -10,6 +10,19 @@ import { requireApiUser } from "@/lib/auth/api-user"
 import { normalizeEmployeeStatus } from "@/lib/employees/status"
 import { mapEmployeeRow } from "@/lib/employees/dto"
 
+async function loadEmployeeExtras(client: any, id: string) {
+  const [allowances, deductions, documents] = await Promise.all([
+    client.from("employee_allowances").select("*").eq("employee_id", id).eq("is_active", true),
+    client.from("employee_deductions").select("*").eq("employee_id", id).eq("is_active", true),
+    client.from("employee_documents").select("*").eq("employee_id", id).order("upload_date", { ascending: false }),
+  ])
+  return {
+    allowances: allowances.data ?? [],
+    deductions: deductions.data ?? [],
+    documents: documents.data ?? [],
+  }
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -27,6 +40,8 @@ export async function GET(
       : `*, subsidiaries:subsidiary_id(id, name)`
 
     const { data, error } = await client.from("employees").select(select).eq("id", id).single()
+    const extras = await loadEmployeeExtras(client, id)
+
     if (error || !data) {
       const fallback = await client.from("employees").select("*").eq("id", id).single()
       if (fallback.error || !fallback.data) {
@@ -41,12 +56,15 @@ export async function GET(
           .maybeSingle()
         row = { ...row, financial: fin }
       }
-      return NextResponse.json({ success: true, employee: mapEmployeeRow(row, includeFinancial) })
+      return NextResponse.json({
+        success: true,
+        employee: mapEmployeeRow(row, includeFinancial, extras),
+      })
     }
 
     return NextResponse.json({
       success: true,
-      employee: mapEmployeeRow(data, includeFinancial),
+      employee: mapEmployeeRow(data, includeFinancial, extras),
     })
   } catch (err) {
     return NextResponse.json(
@@ -136,6 +154,15 @@ export async function PATCH(
       const monthly = Number(
         financial?.monthly_salary ?? body.monthly_salary ?? body.salary ?? 0,
       )
+      const pfRate = Math.min(
+        16.5,
+        Math.max(0, Number(financial?.provident_fund_rate ?? body.provident_fund_rate ?? 0)),
+      )
+      const pfEnrolled =
+        financial?.provident_fund_enrolled === true ||
+        body.provident_fund_enrolled === true ||
+        pfRate > 0
+
       const finPayload: Record<string, unknown> = {
         employee_id: id,
         updated_at: new Date().toISOString(),
@@ -154,6 +181,7 @@ export async function PATCH(
         "uniform_allowance",
         "other_allowances",
         "bank_name",
+        "bank_branch",
         "bank_account_number",
         "ssnit_number",
         "tier3_contribution",
@@ -161,6 +189,13 @@ export async function PATCH(
         if (financial?.[key] !== undefined) finPayload[key] = financial[key]
         else if (body[key] !== undefined) finPayload[key] = body[key]
       }
+      finPayload.provident_fund_enrolled = pfEnrolled
+      finPayload.provident_fund_rate = pfEnrolled ? pfRate : 0
+      // Keep legacy flag for older payroll readers
+      if (pfEnrolled && Number(finPayload.tier3_contribution ?? 0) === 0) {
+        finPayload.tier3_contribution = 1
+      }
+      if (!pfEnrolled) finPayload.tier3_contribution = 0
 
       const { error: finError } = await client
         .from("employee_financial")
@@ -212,21 +247,62 @@ export async function PATCH(
       }
     }
 
-    if (Array.isArray(body.documents) && body.documents.length) {
-      const docs = body.documents.map((doc: any) => ({
-        employee_id: id,
-        document_type: doc.documentType || doc.document_type || doc.type || null,
-        document_name: doc.fileName || doc.document_name || doc.name || null,
-        file_name: doc.fileName || doc.file_name || doc.name || null,
-        file_path: doc.path || doc.file_path || null,
-        file_url: doc.url || doc.file_url || null,
-        file_size: doc.fileSize || doc.file_size || doc.size || null,
-        mime_type: doc.fileType || doc.mime_type || null,
-        upload_date: new Date().toISOString(),
-        uploaded_by: doc.uploadedBy || "HR Admin",
-        notes: doc.notes || null,
-      }))
-      await client.from("employee_documents").insert(docs)
+    if (Array.isArray(body.documents)) {
+      // Replace document set for types present in payload
+      for (const doc of body.documents) {
+        const documentType = doc.documentType || doc.document_type || doc.type || null
+        if (!documentType) continue
+        await client.from("employee_documents").delete().eq("employee_id", id).eq("document_type", documentType)
+        const fileUrl = doc.fileUrl || doc.file_url || doc.url || doc.path || doc.file_path || null
+        const { data: empDoc } = await client
+          .from("employee_documents")
+          .insert({
+            employee_id: id,
+            document_type: documentType,
+            document_name: doc.fileName || doc.document_name || doc.name || null,
+            file_name: doc.fileName || doc.file_name || doc.name || null,
+            file_path: fileUrl,
+            file_url: fileUrl,
+            file_size: doc.fileSize || doc.file_size || doc.size || null,
+            mime_type: doc.fileType || doc.mime_type || null,
+            file_content: doc.file_content || (typeof fileUrl === "string" && fileUrl.startsWith("data:") ? fileUrl : null),
+            vault_document_id: doc.vaultDocumentId || doc.vault_document_id || doc.id || null,
+            upload_date: new Date().toISOString(),
+            uploaded_by: doc.uploadedBy || "HR Admin",
+            notes: doc.notes || null,
+          })
+          .select()
+          .single()
+
+        // Link/update document vault with employee
+        const vaultId = doc.vaultDocumentId || doc.vault_document_id
+        if (vaultId && String(vaultId).length > 20) {
+          await client
+            .from("document_vault")
+            .update({
+              employee_id: id,
+              employee_name: updated.full_name || updated.display_name,
+              file_url: fileUrl,
+              file_name: doc.fileName || doc.file_name || doc.name,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", vaultId)
+        } else if (fileUrl) {
+          await client.from("document_vault").insert({
+            employee_id: id,
+            employee_name: updated.full_name || updated.display_name,
+            document_type: documentType,
+            file_name: doc.fileName || doc.file_name || doc.name || "document",
+            file_size: doc.fileSize || doc.file_size || 0,
+            file_type: doc.fileType || doc.mime_type || "application/octet-stream",
+            file_url: fileUrl,
+            source: "employee-onboarding",
+            category: "employee-document",
+            company_id: updated.company_id,
+            notes: `Linked from employee module${empDoc?.id ? ` (${empDoc.id})` : ""}`,
+          })
+        }
+      }
     }
 
     const { data: fin } = await client
@@ -234,10 +310,11 @@ export async function PATCH(
       .select("*")
       .eq("employee_id", id)
       .maybeSingle()
+    const extras = await loadEmployeeExtras(client, id)
 
     return NextResponse.json({
       success: true,
-      employee: mapEmployeeRow({ ...updated, financial: fin }, true),
+      employee: mapEmployeeRow({ ...updated, financial: fin }, true, extras),
     })
   } catch (err) {
     return NextResponse.json(

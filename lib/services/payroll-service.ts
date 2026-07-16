@@ -267,7 +267,8 @@ export class PayrollService extends BaseService {
                monthly_salary,
                transport_allowance, housing_allowance, medical_allowance,
                meal_allowance, communication_allowance, uniform_allowance, other_allowances,
-               tier2_employee_contribution, tier2_employer_contribution, tier3_contribution
+               tier2_employee_contribution, tier2_employer_contribution, tier3_contribution,
+               provident_fund_enrolled, provident_fund_rate
              )`,
           )
           .eq("company_id", companyId)
@@ -327,7 +328,15 @@ export class PayrollService extends BaseService {
             monthly_bonus: Number(period?.bonus_amount ?? 0),
             tier2_applicable: period?.tier2_applicable ?? true,
             tier3_applicable:
-              period?.tier3_applicable ?? Number(fin.tier3_contribution ?? 0) > 0,
+              period?.tier3_applicable ??
+              (Boolean(fin.provident_fund_enrolled) ||
+                Number(fin.provident_fund_rate ?? 0) > 0 ||
+                Number(fin.tier3_contribution ?? 0) > 0),
+            tier3_employee_rate: Number(
+              period?.tier3_employee_rate ??
+                fin.provident_fund_rate ??
+                0,
+            ),
             other_deductions: {
               loan:
                 Number(period?.loan_deduction ?? 0) ||

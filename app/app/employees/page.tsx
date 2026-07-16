@@ -43,6 +43,8 @@ import {
   listDisplayName,
   listEmployeeCode,
   listMonthlySalary,
+  toSelectedFinancialRows,
+  toUploadedDocumentsState,
 } from "@/lib/employees/form-mapper"
 // import { EmployeeProfile } from "@/components/employee-profile"
 
@@ -310,8 +312,11 @@ export default function EmployeesPage() {
     educationalLevel: "",
     gender: "",
     bankName: "",
+    bankBranch: "",
     bankAccount: "",
     ghanaCard: "",
+    providentFundEnrolled: "No",
+    providentFundRate: "",
     documents: [],
     profilePicture: "",
     profilePictureFile: null,
@@ -2427,46 +2432,49 @@ function AddEmployeeForm({
     }
 
     setUploadingDocuments((prev) => [...prev, documentType])
-    setUploadProgress((prev) => ({ ...prev, [documentType]: 0 }))
+    setUploadProgress((prev) => ({ ...prev, [documentType]: 10 }))
     try {
-      for (let progress = 0; progress <= 100; progress += 20) {
-        setUploadProgress((prev) => ({ ...prev, [documentType]: progress }))
-        await new Promise((resolve) => setTimeout(resolve, 40))
-      }
+      const body = new FormData()
+      body.append("file", file)
+      body.append("document_type", documentType)
+      body.append("employee_id", selectedEmployee?.id || formData.employeeId || "temp-id")
+      body.append(
+        "employee_name",
+        `${formData.firstName || ""} ${formData.lastName || ""}`.trim() || "New Employee",
+      )
+      if (companyId) body.append("company_id", companyId)
+      body.append("notes", `Uploaded during employee onboarding - ${doc.title}`)
 
-      let documentId = `local-${documentType}-${Date.now()}`
-      try {
-        const documentService = CentralDocumentService.getInstance()
-        documentId = await documentService.uploadDocument({
-          file,
-          employeeId: formData.employeeId || formData.employee_id || "temp-id",
-          employeeName: `${formData.firstName || ""} ${formData.lastName || ""}`.trim() || "New Employee",
-          documentType,
-          source: "employee-onboarding",
-          uploadedBy: "HR Admin",
-          notes: `Uploaded during employee onboarding - ${doc.title}`,
-        })
-      } catch (uploadErr) {
-        console.warn("[v0] Document vault upload failed, keeping local attachment metadata", uploadErr)
-      }
+      setUploadProgress((prev) => ({ ...prev, [documentType]: 55 }))
+      const res = await fetch("/api/employees/documents/upload", { method: "POST", body })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Upload failed")
 
+      setUploadProgress((prev) => ({ ...prev, [documentType]: 100 }))
       const uploadedDoc = {
-        id: documentId,
+        id: json.document.id,
+        vaultDocumentId: json.document.vault_document_id || json.document.id,
         documentType,
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type,
-        uploadDate: new Date(),
-        uploadedBy: "HR Admin",
+        fileName: json.document.fileName || file.name,
+        fileSize: json.document.fileSize || file.size,
+        fileType: json.document.fileType || file.type,
+        fileUrl: json.document.fileUrl,
+        file_content: json.document.file_content || null,
+        uploadDate: new Date(json.document.uploadDate || Date.now()),
+        uploadedBy: json.document.uploadedBy || "HR Admin",
       }
       setUploadedDocuments((prev) => {
         const filtered = prev.filter((d) => d.documentType !== documentType)
         return [...filtered, uploadedDoc]
       })
-      toast({ title: "Upload Successful", description: `${file.name} attached under ${doc.title}` })
+      toast({ title: "Upload Successful", description: `${file.name} saved to document vault` })
     } catch (error) {
       console.error("Upload error:", error)
-      toast({ title: "Upload Failed", description: "Failed to upload document. Please try again.", variant: "destructive" })
+      toast({
+        title: "Upload Failed",
+        description: error instanceof Error ? error.message : "Failed to upload document. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setUploadingDocuments((prev) => prev.filter((d) => d !== documentType))
       setUploadProgress((prev) => ({ ...prev, [documentType]: 0 }))
@@ -2704,6 +2712,9 @@ function AddEmployeeForm({
   useEffect(() => {
     if (employee) {
       setFormData(employeeToFormData(employee))
+      setSelectedAllowances(toSelectedFinancialRows(employee.allowances))
+      setSelectedDeductions(toSelectedFinancialRows(employee.deductions))
+      setUploadedDocuments(toUploadedDocumentsState(employee.documents))
     }
   }, [employee, setFormData])
 
@@ -2799,6 +2810,17 @@ function AddEmployeeForm({
       isValid = false
     }
 
+    if (formData.providentFundEnrolled === "Yes") {
+      const pfRate = Number(formData.providentFundRate)
+      if (!formData.providentFundRate || Number.isNaN(pfRate) || pfRate <= 0) {
+        newErrors.providentFundRate = "Enter a provident fund rate greater than 0"
+        isValid = false
+      } else if (pfRate > 16.5) {
+        newErrors.providentFundRate = "Provident fund rate cannot exceed 16.5%"
+        isValid = false
+      }
+    }
+
     setErrors(newErrors)
     return isValid
   }
@@ -2835,6 +2857,11 @@ function AddEmployeeForm({
           fileName: d.fileName,
           fileSize: d.fileSize,
           fileType: d.fileType,
+          fileUrl: d.fileUrl,
+          file_url: d.fileUrl,
+          file_content: d.file_content || null,
+          vaultDocumentId: d.vaultDocumentId || d.id,
+          vault_document_id: d.vaultDocumentId || d.id,
           uploadedBy: d.uploadedBy,
         })),
       }
@@ -4079,6 +4106,17 @@ function AddEmployeeForm({
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="bankBranch">Bank Branch</Label>
+                <Input
+                  type="text"
+                  id="bankBranch"
+                  value={formData.bankBranch || ""}
+                  onChange={(e) => handleInputChange("bankBranch", e.target.value)}
+                  placeholder="e.g. Accra Main"
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="bankAccount">Bank Account Number</Label>
                 <Input
                   type="text"
@@ -4109,6 +4147,67 @@ function AddEmployeeForm({
                   onChange={(e) => handleInputChange("ghanaCard", e.target.value)}
                   placeholder="GHA-123456789-0"
                 />
+              </div>
+            </div>
+
+            {/* Provident Fund / Tier 3 */}
+            <div className="space-y-4 rounded-lg border border-blue-100 bg-blue-50/40 p-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Provident Fund</h3>
+                <p className="text-sm text-muted-foreground">
+                  Optional Tier 3 contribution used in PAYE/payroll computation (max 16.5% of basic).
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="providentFundEnrolled">Contribute to Provident Fund?</Label>
+                  <Select
+                    value={formData.providentFundEnrolled || "No"}
+                    onValueChange={(value) => {
+                      setFormData((prev: any) => ({
+                        ...prev,
+                        providentFundEnrolled: value,
+                        providentFundRate: value === "No" ? "" : prev.providentFundRate || "",
+                      }))
+                    }}
+                  >
+                    <SelectTrigger id="providentFundEnrolled">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {formData.providentFundEnrolled === "Yes" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="providentFundRate">Employee PF Rate (%)</Label>
+                    <Input
+                      type="number"
+                      id="providentFundRate"
+                      min={0}
+                      max={16.5}
+                      step={0.1}
+                      value={formData.providentFundRate || ""}
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        const n = Number(raw)
+                        if (raw !== "" && Number.isFinite(n) && n > 16.5) {
+                          handleInputChange("providentFundRate", "16.5")
+                          return
+                        }
+                        handleInputChange("providentFundRate", raw)
+                      }}
+                      placeholder="e.g. 5"
+                      className={errors.providentFundRate ? "border-red-500" : ""}
+                    />
+                    <p className="text-xs text-muted-foreground">Maximum allowed rate is 16.5%.</p>
+                    {errors.providentFundRate && (
+                      <p className="text-red-500 text-sm">{errors.providentFundRate}</p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -4883,7 +4982,7 @@ function AddEmployeeForm({
 
       {/* Document Preview Dialog */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Document Preview</DialogTitle>
           </DialogHeader>
@@ -4891,7 +4990,7 @@ function AddEmployeeForm({
             <div className="space-y-4">
               <div className="flex items-center space-x-4">
                 <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                  {previewDocument.fileType.startsWith("image/") ? (
+                  {(previewDocument.fileType || "").startsWith("image/") ? (
                     <img
                       src={previewDocument.fileUrl || "/placeholder.svg"}
                       alt={previewDocument.fileName}
@@ -4911,13 +5010,30 @@ function AddEmployeeForm({
                 </div>
               </div>
 
-              {previewDocument.fileType.startsWith("image/") && (
-                <div className="border rounded-lg p-4">
+              {(previewDocument.fileType || "").startsWith("image/") && previewDocument.fileUrl ? (
+                <div className="border rounded-lg p-4 bg-slate-50">
                   <img
-                    src={previewDocument.fileUrl || "/placeholder.svg"}
+                    src={previewDocument.fileUrl}
                     alt={previewDocument.fileName}
-                    className="max-w-full h-auto rounded"
+                    className="max-w-full max-h-[60vh] h-auto rounded mx-auto"
                   />
+                </div>
+              ) : (previewDocument.fileType || "").includes("pdf") && previewDocument.fileUrl ? (
+                <div className="border rounded-lg overflow-hidden bg-slate-50">
+                  <iframe
+                    title={previewDocument.fileName}
+                    src={previewDocument.fileUrl}
+                    className="w-full h-[60vh]"
+                  />
+                </div>
+              ) : previewDocument.fileUrl ? (
+                <div className="rounded-lg border bg-slate-50 p-4 text-sm text-muted-foreground">
+                  Preview is not available for this file type. Use Download to open{" "}
+                  <span className="font-medium text-foreground">{previewDocument.fileName}</span>.
+                </div>
+              ) : (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                  No stored file URL was found for this attachment.
                 </div>
               )}
 
@@ -4927,12 +5043,24 @@ function AddEmployeeForm({
                 </Button>
                 <Button
                   onClick={() => {
-                    // In production, this would trigger actual download
+                    if (!previewDocument.fileUrl) {
+                      toast({
+                        title: "Download unavailable",
+                        description: "No file URL is stored for this document.",
+                        variant: "destructive",
+                      })
+                      return
+                    }
+                    const a = document.createElement("a")
+                    a.href = previewDocument.fileUrl
+                    a.download = previewDocument.fileName || "document"
+                    a.target = "_blank"
+                    a.rel = "noopener noreferrer"
+                    a.click()
                     toast({
                       title: "Download Started",
-                      description: `${previewDocument.fileName} is being downloaded.`,
+                      description: `${previewDocument.fileName} is opening.`,
                     })
-                    setIsPreviewOpen(false)
                   }}
                 >
                   <Download className="w-4 h-4 mr-2" />

@@ -32,6 +32,7 @@ export async function GET(request: Request) {
              monthly_salary, transport_allowance, housing_allowance, medical_allowance,
              meal_allowance, communication_allowance, uniform_allowance, other_allowances,
              tier2_employee_contribution, tier3_contribution,
+             provident_fund_enrolled, provident_fund_rate,
              bank_name, bank_account_number, ssnit_number
            )`,
         )
@@ -120,7 +121,11 @@ export async function GET(request: Request) {
           uniform_allowance: Number(fin?.uniform_allowance ?? 0),
           other_allowances: Number(fin?.other_allowances ?? 0),
           tier2_applicable: Number(fin?.tier2_employee_contribution ?? 0) >= 0,
-          tier3_applicable: Number(fin?.tier3_contribution ?? 0) > 0,
+          tier3_applicable:
+            Boolean(fin?.provident_fund_enrolled) ||
+            Number(fin?.provident_fund_rate ?? 0) > 0 ||
+            Number(fin?.tier3_contribution ?? 0) > 0,
+          provident_fund_rate: Number(fin?.provident_fund_rate ?? 0),
         },
         input: input
           ? {
@@ -139,8 +144,12 @@ export async function GET(request: Request) {
               advance_deduction: Number(input.advance_deduction ?? 0),
               other_deductions: Number(input.other_deductions ?? 0),
               tier2_applicable: input.tier2_applicable ?? true,
-              tier3_applicable: input.tier3_applicable ?? false,
-              tier3_employee_rate: Number(input.tier3_employee_rate ?? 0),
+              tier3_applicable:
+                input.tier3_applicable ??
+                (Boolean(fin?.provident_fund_enrolled) || Number(fin?.provident_fund_rate ?? 0) > 0),
+              tier3_employee_rate: Number(
+                input.tier3_employee_rate ?? fin?.provident_fund_rate ?? 0,
+              ),
               apply_to_master: Boolean(input.apply_to_master),
               notes: input.notes ?? "",
               status: input.status,
@@ -161,8 +170,11 @@ export async function GET(request: Request) {
               advance_deduction: 0,
               other_deductions: 0,
               tier2_applicable: true,
-              tier3_applicable: Number(fin?.tier3_contribution ?? 0) > 0,
-              tier3_employee_rate: 0,
+              tier3_applicable:
+                Boolean(fin?.provident_fund_enrolled) ||
+                Number(fin?.provident_fund_rate ?? 0) > 0 ||
+                Number(fin?.tier3_contribution ?? 0) > 0,
+              tier3_employee_rate: Number(fin?.provident_fund_rate ?? 0),
               apply_to_master: false,
               notes: "",
               status: "draft",

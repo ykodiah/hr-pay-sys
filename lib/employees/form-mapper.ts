@@ -89,6 +89,11 @@ export function employeeToFormData(employee: EmployeeDto | any) {
     taxDeduction: "",
     ssnit: fin.ssnit_number || employee?.ssnit_number || "",
     tier3: fin.tier3_contribution != null ? String(fin.tier3_contribution) : "",
+    providentFundEnrolled: fin.provident_fund_enrolled ? "Yes" : "No",
+    providentFundRate:
+      fin.provident_fund_rate != null && Number(fin.provident_fund_rate) > 0
+        ? String(fin.provident_fund_rate)
+        : "",
     loanDeduction: "",
     advanceDeduction: "",
     otherDeductions: "",
@@ -100,12 +105,48 @@ export function employeeToFormData(employee: EmployeeDto | any) {
     educationalLevel: employee?.educational_level || "",
     gender: employee?.gender || "",
     bankName: fin.bank_name || "",
+    bankBranch: fin.bank_branch || "",
     bankAccount: fin.bank_account_number || "",
     ghanaCard: employee?.ghana_card_number || "",
     documents: employee?.documents || [],
     profilePicture: employee?.profile_picture || "",
     profilePictureFile: null,
   }
+}
+
+/** Map API allowance/deduction rows into AddEmployeeForm selected* state. */
+export function toSelectedFinancialRows(rows: any[] | undefined | null) {
+  if (!Array.isArray(rows)) return []
+  return rows.map((row) => ({
+    id: row.allowance_id || row.deduction_id || row.id || row.code,
+    code: row.code || "",
+    description: row.description || "",
+    taxable: Boolean(row.taxable),
+    recurring: row.recurring !== false,
+    amount: String(row.amount ?? 0),
+    percentage: String(row.percentage ?? 0),
+    calculationType: (String(row.calculationType || row.calculation_type || "AMOUNT").toUpperCase() ===
+    "PERCENTAGE"
+      ? "PERCENTAGE"
+      : "AMOUNT") as "AMOUNT" | "PERCENTAGE",
+    effectiveDate: row.effectiveDate || row.effective_date || new Date().toISOString().slice(0, 10),
+    endDate: row.endDate || row.end_date || undefined,
+  }))
+}
+
+export function toUploadedDocumentsState(docs: any[] | undefined | null) {
+  if (!Array.isArray(docs)) return []
+  return docs.map((doc) => ({
+    id: doc.id || doc.vaultDocumentId || `doc-${doc.documentType || doc.document_type}`,
+    documentType: doc.documentType || doc.document_type,
+    fileName: doc.fileName || doc.file_name || doc.document_name || "Document",
+    fileSize: Number(doc.fileSize ?? doc.file_size ?? 0),
+    fileType: doc.fileType || doc.mime_type || doc.file_type || "application/octet-stream",
+    fileUrl: doc.fileUrl || doc.file_url || doc.file_path || doc.file_content || null,
+    vaultDocumentId: doc.vaultDocumentId || doc.vault_document_id || null,
+    uploadDate: doc.uploadDate || doc.upload_date ? new Date(doc.uploadDate || doc.upload_date) : new Date(),
+    uploadedBy: doc.uploadedBy || doc.uploaded_by || "HR Admin",
+  }))
 }
 
 function numOrNull(value: unknown) {
@@ -176,9 +217,15 @@ export function formToApiPayload(form: any, companyId?: string | null) {
       uniform_allowance: numOrZero(form.uniformAllowance),
       other_allowances: numOrZero(form.otherAllowances),
       bank_name: form.bankName || "Pending",
+      bank_branch: form.bankBranch || null,
       bank_account_number: form.bankAccount || "Pending",
       ssnit_number: form.ssnit || "Pending",
       tier3_contribution: numOrZero(form.tier3),
+      provident_fund_enrolled: form.providentFundEnrolled === "Yes" || form.providentFundEnrolled === true,
+      provident_fund_rate: Math.min(
+        16.5,
+        Math.max(0, numOrZero(form.providentFundRate)),
+      ),
     },
     allowances: Array.isArray(form.selectedAllowances) ? form.selectedAllowances : [],
     deductions: Array.isArray(form.selectedDeductions) ? form.selectedDeductions : [],

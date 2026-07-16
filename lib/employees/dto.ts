@@ -11,9 +11,53 @@ export type EmployeeFinancialDto = {
   uniform_allowance: number
   other_allowances: number
   bank_name: string | null
+  bank_branch: string | null
   bank_account_number: string | null
   ssnit_number: string | null
   tier3_contribution: number
+  provident_fund_enrolled: boolean
+  provident_fund_rate: number
+}
+
+export type EmployeeAllowanceDto = {
+  id?: string
+  allowance_id?: string | null
+  code: string | null
+  description: string | null
+  taxable: boolean
+  recurring: boolean
+  amount: number
+  percentage: number
+  calculationType: "AMOUNT" | "PERCENTAGE"
+  effectiveDate: string | null
+  endDate: string | null
+}
+
+export type EmployeeDeductionDto = {
+  id?: string
+  deduction_id?: string | null
+  code: string | null
+  description: string | null
+  taxable: boolean
+  recurring: boolean
+  amount: number
+  percentage: number
+  calculationType: "AMOUNT" | "PERCENTAGE"
+  effectiveDate: string | null
+  endDate: string | null
+}
+
+export type EmployeeDocumentDto = {
+  id: string
+  documentType: string | null
+  fileName: string | null
+  fileSize: number | null
+  fileType: string | null
+  fileUrl: string | null
+  vaultDocumentId?: string | null
+  uploadDate: string | null
+  uploadedBy?: string | null
+  notes?: string | null
 }
 
 export type EmployeeDto = {
@@ -57,6 +101,9 @@ export type EmployeeDto = {
   created_at?: string
   updated_at?: string
   financial?: EmployeeFinancialDto | null
+  allowances?: EmployeeAllowanceDto[]
+  deductions?: EmployeeDeductionDto[]
+  documents?: EmployeeDocumentDto[]
   subsidiaries?: { id: string; name: string } | null
 }
 
@@ -64,6 +111,11 @@ export function mapFinancial(raw: any): EmployeeFinancialDto | null {
   if (!raw) return null
   const fin = Array.isArray(raw) ? raw[0] : raw
   if (!fin) return null
+  const pfRate = Math.min(16.5, Math.max(0, Number(fin.provident_fund_rate ?? 0)))
+  const enrolled =
+    fin.provident_fund_enrolled === true ||
+    fin.provident_fund_enrolled === "true" ||
+    (fin.provident_fund_enrolled == null && pfRate > 0)
   return {
     monthly_salary: Number(fin.monthly_salary ?? fin.basic_salary ?? 0),
     annual_salary: fin.annual_salary != null ? Number(fin.annual_salary) : null,
@@ -75,13 +127,76 @@ export function mapFinancial(raw: any): EmployeeFinancialDto | null {
     uniform_allowance: Number(fin.uniform_allowance ?? 0),
     other_allowances: Number(fin.other_allowances ?? 0),
     bank_name: fin.bank_name ?? null,
+    bank_branch: fin.bank_branch ?? null,
     bank_account_number: fin.bank_account_number ?? null,
     ssnit_number: fin.ssnit_number ?? null,
     tier3_contribution: Number(fin.tier3_contribution ?? 0),
+    provident_fund_enrolled: enrolled,
+    provident_fund_rate: pfRate,
   }
 }
 
-export function mapEmployeeRow(row: any, includeFinancial = false): EmployeeDto {
+export function mapAllowanceRow(row: any): EmployeeAllowanceDto {
+  return {
+    id: row.id,
+    allowance_id: row.allowance_id ?? row.id ?? null,
+    code: row.code ?? null,
+    description: row.description ?? null,
+    taxable: Boolean(row.taxable),
+    recurring: row.recurring !== false,
+    amount: Number(row.amount ?? 0),
+    percentage: Number(row.percentage ?? 0),
+    calculationType: String(row.calculation_type || row.calculationType || "AMOUNT").toUpperCase() === "PERCENTAGE"
+      ? "PERCENTAGE"
+      : "AMOUNT",
+    effectiveDate: row.effective_date || row.effectiveDate || null,
+    endDate: row.end_date || row.endDate || null,
+  }
+}
+
+export function mapDeductionRow(row: any): EmployeeDeductionDto {
+  return {
+    id: row.id,
+    deduction_id: row.deduction_id ?? row.id ?? null,
+    code: row.code ?? null,
+    description: row.description ?? null,
+    taxable: Boolean(row.taxable),
+    recurring: row.recurring !== false,
+    amount: Number(row.amount ?? 0),
+    percentage: Number(row.percentage ?? 0),
+    calculationType: String(row.calculation_type || row.calculationType || "AMOUNT").toUpperCase() === "PERCENTAGE"
+      ? "PERCENTAGE"
+      : "AMOUNT",
+    effectiveDate: row.effective_date || row.effectiveDate || null,
+    endDate: row.end_date || row.endDate || null,
+  }
+}
+
+export function mapDocumentRow(row: any): EmployeeDocumentDto {
+  const fileUrl = row.file_url || row.file_path || row.file_content || null
+  return {
+    id: row.id,
+    documentType: row.document_type || row.documentType || null,
+    fileName: row.file_name || row.document_name || row.fileName || null,
+    fileSize: row.file_size != null ? Number(row.file_size) : null,
+    fileType: row.mime_type || row.file_type || row.fileType || null,
+    fileUrl,
+    vaultDocumentId: row.vault_document_id || null,
+    uploadDate: row.upload_date || row.created_at || null,
+    uploadedBy: row.uploaded_by || null,
+    notes: row.notes || null,
+  }
+}
+
+export function mapEmployeeRow(
+  row: any,
+  includeFinancial = false,
+  extras?: {
+    allowances?: any[]
+    deductions?: any[]
+    documents?: any[]
+  },
+): EmployeeDto {
   const subsidiary = Array.isArray(row.subsidiaries) ? row.subsidiaries[0] : row.subsidiaries
   const fullName =
     row.full_name ||
@@ -132,6 +247,9 @@ export function mapEmployeeRow(row: any, includeFinancial = false): EmployeeDto 
     updated_at: row.updated_at,
     subsidiaries: subsidiary ? { id: subsidiary.id, name: subsidiary.name } : null,
     financial: includeFinancial ? mapFinancial(row.financial ?? row.employee_financial) : undefined,
+    allowances: (extras?.allowances ?? row.allowances ?? []).map(mapAllowanceRow),
+    deductions: (extras?.deductions ?? row.deductions ?? []).map(mapDeductionRow),
+    documents: (extras?.documents ?? row.documents ?? []).map(mapDocumentRow),
   }
 }
 

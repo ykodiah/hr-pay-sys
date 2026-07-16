@@ -84,6 +84,8 @@ export interface EmployeePayInput {
   /** Tier 2 is mandatory under Act 766 for most employees (default true) */
   tier2_applicable?: boolean
   tier3_applicable?: boolean
+  /** Optional per-employee provident fund / Tier 3 rate override (0–16.5). */
+  tier3_employee_rate?: number
   annual_tax_reliefs?: TaxReliefItem[]
   /** Non-tax deductions applied after statutory tax to arrive at net */
   other_deductions?: OtherDeductionsInput
@@ -334,10 +336,21 @@ export function calculateGhanaTax(
   const monthlyPensionEmployee = round2(monthlySsnitEmployee + monthlyTier2Employee)
   const monthlyPensionEmployer = round2(monthlySsnitEmployer + monthlyTier2Employer)
 
-  // Tier 3 voluntary
+  // Tier 3 / Provident Fund voluntary — employee rate capped at 16.5%
   const tier3Applicable = input.tier3_applicable === true
+  const tier3EmployeeRate = Math.min(
+    16.5,
+    Math.max(
+      0,
+      Number(
+        input.tier3_employee_rate != null && input.tier3_employee_rate !== undefined
+          ? input.tier3_employee_rate
+          : rates.tier3.employee_rate,
+      ),
+    ),
+  )
   const monthlyTier3Employee = tier3Applicable
-    ? round2(input.monthly_basic * (rates.tier3.employee_rate / 100))
+    ? round2(input.monthly_basic * (tier3EmployeeRate / 100))
     : 0
   const monthlyTier3Employer = tier3Applicable
     ? round2(input.monthly_basic * (rates.tier3.employer_rate / 100))
