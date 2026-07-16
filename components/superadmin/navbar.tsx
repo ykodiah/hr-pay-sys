@@ -18,6 +18,8 @@ export function SuperAdminNavbar() {
     { href: '/superadmin/analytics', label: 'Analytics', icon: '📈' },
     { href: '/superadmin/integrations', label: 'Integrations', icon: '🔗' },
     { href: '/superadmin/feature-flags', label: 'Feature Flags', icon: '🚩' },
+    { href: '/superadmin/backups', label: 'Backups', icon: '💾' },
+    { href: '/superadmin/issues', label: 'Issues', icon: '⚠️' },
     { href: '/superadmin/audit', label: 'Audit Trail', icon: '📋' },
     { href: '/superadmin/notifications', label: 'Notifications', icon: '🔔' },
     { href: '/superadmin/settings', label: 'Settings', icon: '⚙️' },
