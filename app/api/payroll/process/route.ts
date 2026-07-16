@@ -28,7 +28,15 @@ function periodBounds(payPeriod: string) {
 export async function POST(req: NextRequest) {
   try {
     const user = await requireApiUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!user) {
+      return NextResponse.json(
+        {
+          error:
+            "Unauthorized. Sign in or enable demo session (demo-session=active) before processing payroll.",
+        },
+        { status: 401 },
+      )
+    }
 
     const body = await req.json()
     const {

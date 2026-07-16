@@ -69,7 +69,7 @@ export default function ApprovalsPage() {
       if (!res.ok) throw new Error(json.error || "Failed")
       toast({
         title: "Payroll approved",
-        description: `Payslips issued (${json.payslips_issued ?? 0}). Run moved to Payroll History.`,
+        description: `Payslips issued (${json.payslips_issued ?? 0}). Next: History for payslips, Compliance Reports for GRA/SSNIT/bank files, then Mark as Paid.`,
       })
       mutate(payrollKey)
     } catch (err: any) {

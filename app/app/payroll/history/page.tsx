@@ -814,6 +814,37 @@ export default function PayrollHistoryPage() {
                                     <SelectItem value="pdf">PDF</SelectItem>
                                   </SelectContent>
                                 </Select>
+                                {run.status === "approved" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 text-xs"
+                                    onClick={async () => {
+                                      try {
+                                        const res = await fetch(`/api/payroll/runs/${run.id}/mark-paid`, {
+                                          method: "POST",
+                                          credentials: "include",
+                                        })
+                                        const json = await res.json()
+                                        if (!res.ok) throw new Error(json.error || "Failed")
+                                        toast({
+                                          title: "Marked as paid",
+                                          description: "Payroll run status set to paid after disbursement.",
+                                        })
+                                        fetchPayrollHistory()
+                                      } catch (err) {
+                                        toast({
+                                          title: "Could not mark paid",
+                                          description:
+                                            err instanceof Error ? err.message : "Try again after approval",
+                                          variant: "destructive",
+                                        })
+                                      }
+                                    }}
+                                  >
+                                    Mark Paid
+                                  </Button>
+                                )}
                               </div>
                             </td>
                           </tr>

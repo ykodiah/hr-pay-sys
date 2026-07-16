@@ -17,6 +17,7 @@ import type {
 } from "./types"
 import { REPORT_LABELS } from "./types"
 import { toCSV } from "./csv"
+import { loadCompanyBrand, type CompanyBrandInfo } from "@/lib/exports/company-branding"
 
 export { toCSV }
 
@@ -30,6 +31,7 @@ interface ReportMeta {
   pay_period: string
   generated_at: string
   company_name: string
+  companyInfo?: CompanyBrandInfo | null
 }
 
 function withCsvMeta(
@@ -41,12 +43,84 @@ function withCsvMeta(
   return toCSV(columns, typedRows, {
     title: reportName,
     company: meta.company_name,
+    companyInfo: meta.companyInfo,
     period: meta.pay_period,
     generatedAt: meta.generated_at,
   })
 }
 
 // ─── Data fetcher ─────────────────────────────────────────────────────────────
+
+function mapPayslipToReportRow(p: any): PayrollReportRow {
+  const emp = Array.isArray(p.employee) ? p.employee[0] : p.employee
+  const fin = Array.isArray(p.financial) ? p.financial[0] : p.financial
+  const company = Array.isArray(p.company) ? p.company[0] : p.company
+  const totalAllowances =
+    Number(p.transport_allowance ?? 0) +
+    Number(p.housing_allowance ?? 0) +
+    Number(p.medical_allowance ?? 0) +
+    Number(p.meal_allowance ?? 0) +
+    Number(p.communication_allowance ?? 0) +
+    Number(p.other_allowances ?? 0)
+
+  return {
+    company_id: p.company_id,
+    payroll_run_id: p.payroll_run_id,
+    pay_period: p.pay_period,
+    pay_period_start: p.pay_period_start,
+    pay_period_end: p.pay_period_end,
+    pay_date: p.pay_date,
+    employee_id: p.employee_id,
+    employee_name:
+      p.snapshot_employee_name ||
+      (emp ? `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim() : null),
+    employee_id_no: p.snapshot_employee_id_no || emp?.employee_id || null,
+    position: p.snapshot_position || emp?.position || null,
+    department: p.snapshot_department || emp?.department || null,
+    ssnit_number: fin?.ssnit_number ?? p.snapshot_ssnit_number ?? null,
+    bank_name: fin?.bank_name ?? p.snapshot_bank_name ?? null,
+    account_number: fin?.bank_account_number ?? p.snapshot_account_number ?? null,
+    company_name: company?.name ?? null,
+    ghana_card_number: emp?.ghana_card_number ?? null,
+    date_of_joining: emp?.hire_date ?? emp?.date_of_joining ?? null,
+    contract_type: emp?.employment_type ?? emp?.contract_type ?? null,
+    basic_salary: Number(p.basic_salary ?? 0),
+    transport_allowance: Number(p.transport_allowance ?? 0),
+    housing_allowance: Number(p.housing_allowance ?? 0),
+    medical_allowance: Number(p.medical_allowance ?? 0),
+    meal_allowance: Number(p.meal_allowance ?? 0),
+    communication_allowance: Number(p.communication_allowance ?? 0),
+    other_allowances: Number(p.other_allowances ?? 0),
+    overtime_pay: Number(p.overtime_pay ?? 0),
+    bonus_pay: Number(p.bonus_pay ?? 0),
+    total_allowances: totalAllowances,
+    gross_pay: Number(p.gross_pay ?? 0),
+    ssnit_employee: Number(p.ssnit_employee ?? 0),
+    ssnit_employer: Number(p.ssnit_employer ?? 0),
+    tier2_employee: Number(p.tier2_employee ?? 0),
+    tier2_employer: Number(p.tier2_employer ?? 0),
+    tier3_employee: Number(p.tier3_employee ?? 0),
+    tier3_employer: Number(p.tier3_employer ?? 0),
+    paye_taxable_income: Number(p.paye_taxable_income ?? 0),
+    tax_relief_total: Number(p.tax_relief_total ?? 0),
+    paye_tax: Number(p.paye_tax ?? p.tax_deduction ?? 0),
+    loan_deduction: Number(p.loan_deduction ?? 0),
+    advance_deduction: Number(p.advance_deduction ?? 0),
+    other_deductions: Number(p.other_deductions ?? 0),
+    total_deductions: Number(p.total_deductions ?? 0),
+    net_pay: Number(p.net_pay ?? 0),
+    total_employer_cost: Number(p.total_employer_cost ?? 0),
+    cost_to_company:
+      Number(p.gross_pay ?? 0) +
+      Number(p.ssnit_employer ?? 0) +
+      Number(p.tier2_employer ?? 0) +
+      Number(p.tier3_employer ?? 0),
+    payslip_status: p.status ?? "draft",
+    loan_amount: fin?.loan_amount ?? null,
+    current_loan_balance: Number(p.loan_balance ?? fin?.loan_balance ?? 0),
+    current_loan_deduction: Number(p.loan_deduction ?? 0),
+  } as PayrollReportRow
+}
 
 async function fetchReportRows(
   companyId: string,
@@ -55,7 +129,7 @@ async function fetchReportRows(
 ): Promise<PayrollReportRow[]> {
   const client = await createClient()
 
-  // Prefer the dedicated view; fall back to payslips join if the view is missing
+  // Prefer the dedicated view
   let query = client
     .from("v_payroll_report_summary")
     .select("*")
@@ -70,16 +144,16 @@ async function fetchReportRows(
   query = query.order("employee_name", { ascending: true })
 
   const { data, error } = await query
-  if (!error) return (data ?? []) as PayrollReportRow[]
+  if (!error && (data ?? []).length > 0) return data as PayrollReportRow[]
 
-  // Fallback path — joins payslips + employees + employee_financial
+  // Fallback — payslips
   let payslipQuery = client
     .from("payslips")
     .select(
       `*,
-       employee:employees(id, employee_id, first_name, last_name, department, position, ghana_card_number, hire_date, employment_type),
+       employee:employees(id, employee_id, first_name, last_name, department, position, ghana_card_number, date_of_joining, contract_type),
        company:companies(name),
-       financial:employee_financial(bank_name, bank_account_number, ssnit_number, loan_amount, loan_balance)`,
+       financial:employee_financial(bank_name, bank_account_number, ssnit_number)`,
     )
     .eq("company_id", companyId)
 
@@ -87,30 +161,61 @@ async function fetchReportRows(
   else if (payPeriod) payslipQuery = payslipQuery.eq("pay_period", payPeriod)
 
   const { data: payslips, error: payslipError } = await payslipQuery
-  if (payslipError) {
-    throw new Error(`Report data fetch failed: ${error.message}; fallback: ${payslipError.message}`)
+  if (!payslipError && (payslips ?? []).length > 0) {
+    return (payslips ?? []).map(mapPayslipToReportRow)
   }
 
-  return (payslips ?? []).map((p: any) => {
-    const emp = Array.isArray(p.employee) ? p.employee[0] : p.employee
-    const fin = Array.isArray(p.financial) ? p.financial[0] : p.financial
-    const company = Array.isArray(p.company) ? p.company[0] : p.company
-    const totalAllowances =
-      Number(p.transport_allowance ?? 0) +
-      Number(p.housing_allowance ?? 0) +
-      Number(p.medical_allowance ?? 0) +
-      Number(p.meal_allowance ?? 0) +
-      Number(p.communication_allowance ?? 0) +
-      Number(p.other_allowances ?? 0)
+  // Final fallback — payroll_items for the period's run(s)
+  let runIds: string[] = []
+  if (payrollRunId) {
+    runIds = [payrollRunId]
+  } else if (payPeriod) {
+    const start = `${payPeriod}-01`
+    const { data: runs } = await client
+      .from("payroll_runs")
+      .select("id")
+      .eq("company_id", companyId)
+      .eq("pay_period_start", start)
+    runIds = (runs ?? []).map((r) => r.id)
+  }
 
+  if (!runIds.length) {
+    if (error && payslipError) {
+      throw new Error(
+        `Report data fetch failed: ${error?.message || "no view"}; payslips: ${payslipError.message}`,
+      )
+    }
+    return []
+  }
+
+  const { data: items, error: itemsError } = await client
+    .from("payroll_items")
+    .select(
+      `*,
+       employee:employees(id, employee_id, first_name, last_name, department, position, ghana_card_number, date_of_joining, contract_type),
+       financial:employee_financial(bank_name, bank_account_number, ssnit_number)`,
+    )
+    .in("payroll_run_id", runIds)
+
+  if (itemsError) {
+    throw new Error(`Report data fetch failed from payroll_items: ${itemsError.message}`)
+  }
+
+  const { data: company } = await client.from("companies").select("name").eq("id", companyId).maybeSingle()
+
+  return (items ?? []).map((it: any) => {
+    const emp = Array.isArray(it.employee) ? it.employee[0] : it.employee
+    const fin = Array.isArray(it.financial) ? it.financial[0] : it.financial
+    const allowancesObj = it.allowances && typeof it.allowances === "object" ? it.allowances : {}
+    const totalAllowances = Object.values(allowancesObj).reduce(
+      (s: number, v) => s + Number(v || 0),
+      0,
+    )
     return {
-      company_id: p.company_id,
-      payroll_run_id: p.payroll_run_id,
-      pay_period: p.pay_period,
-      pay_period_start: p.pay_period_start,
-      pay_period_end: p.pay_period_end,
-      pay_date: p.pay_date,
-      employee_id: p.employee_id,
+      company_id: companyId,
+      payroll_run_id: it.payroll_run_id,
+      pay_period: payPeriod || "",
+      employee_id: it.employee_id,
       employee_name: emp ? `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim() : null,
       employee_id_no: emp?.employee_id ?? null,
       position: emp?.position ?? null,
@@ -120,43 +225,38 @@ async function fetchReportRows(
       account_number: fin?.bank_account_number ?? null,
       company_name: company?.name ?? null,
       ghana_card_number: emp?.ghana_card_number ?? null,
-      date_of_joining: emp?.hire_date ?? null,
-      contract_type: emp?.employment_type ?? null,
-      basic_salary: Number(p.basic_salary ?? 0),
-      transport_allowance: Number(p.transport_allowance ?? 0),
-      housing_allowance: Number(p.housing_allowance ?? 0),
-      medical_allowance: Number(p.medical_allowance ?? 0),
-      meal_allowance: Number(p.meal_allowance ?? 0),
-      communication_allowance: Number(p.communication_allowance ?? 0),
-      other_allowances: Number(p.other_allowances ?? 0),
-      overtime_pay: Number(p.overtime_pay ?? 0),
-      bonus_pay: Number(p.bonus_pay ?? 0),
+      date_of_joining: emp?.date_of_joining ?? null,
+      contract_type: emp?.contract_type ?? null,
+      basic_salary: Number(it.basic_salary ?? 0),
+      transport_allowance: Number(allowancesObj.transport ?? 0),
+      housing_allowance: Number(allowancesObj.housing ?? 0),
+      medical_allowance: Number(allowancesObj.medical ?? 0),
+      meal_allowance: Number(allowancesObj.meal ?? 0),
+      communication_allowance: Number(allowancesObj.communication ?? 0),
+      other_allowances: Number(allowancesObj.other ?? 0),
+      overtime_pay: Number(it.overtime_pay ?? 0),
+      bonus_pay: Number(it.bonus_pay ?? 0),
       total_allowances: totalAllowances,
-      gross_pay: Number(p.gross_pay ?? 0),
-      ssnit_employee: Number(p.ssnit_employee ?? 0),
-      ssnit_employer: Number(p.ssnit_employer ?? 0),
-      tier2_employee: Number(p.tier2_employee ?? 0),
-      tier2_employer: Number(p.tier2_employer ?? 0),
-      tier3_employee: Number(p.tier3_employee ?? 0),
-      tier3_employer: Number(p.tier3_employer ?? 0),
-      paye_taxable_income: Number(p.paye_taxable_income ?? 0),
-      tax_relief_total: Number(p.tax_relief_total ?? 0),
-      paye_tax: Number(p.paye_tax ?? 0),
-      loan_deduction: Number(p.loan_deduction ?? 0),
-      advance_deduction: Number(p.advance_deduction ?? 0),
-      other_deductions: Number(p.other_deductions ?? 0),
-      total_deductions: Number(p.total_deductions ?? 0),
-      net_pay: Number(p.net_pay ?? 0),
-      total_employer_cost: Number(p.total_employer_cost ?? 0),
-      cost_to_company:
-        Number(p.gross_pay ?? 0) +
-        Number(p.ssnit_employer ?? 0) +
-        Number(p.tier2_employer ?? 0) +
-        Number(p.tier3_employer ?? 0),
-      payslip_status: p.status ?? "draft",
-      loan_amount: fin?.loan_amount ?? null,
-      current_loan_balance: Number(p.loan_balance ?? fin?.loan_balance ?? 0),
-      current_loan_deduction: Number(p.loan_deduction ?? 0),
+      gross_pay: Number(it.gross_pay ?? 0),
+      ssnit_employee: Number(it.ssnit_employee ?? 0),
+      ssnit_employer: Number(it.ssnit_employer ?? 0),
+      tier2_employee: Number(it.tier2_employee ?? 0),
+      tier2_employer: Number(it.tier2_employer ?? 0),
+      tier3_employee: Number(it.tier3_employee ?? 0),
+      tier3_employer: Number(it.tier3_employer ?? 0),
+      paye_taxable_income: Number(it.paye_taxable_income ?? 0),
+      tax_relief_total: Number(it.tax_relief_total ?? 0),
+      paye_tax: Number(it.tax_deduction ?? it.paye_tax ?? 0),
+      loan_deduction: Number(it.loan_deduction ?? 0),
+      advance_deduction: Number(it.advance_deduction ?? 0),
+      other_deductions: Number(it.other_deductions ?? 0),
+      total_deductions: Number(it.total_deductions ?? 0),
+      net_pay: Number(it.net_pay ?? 0),
+      total_employer_cost: 0,
+      cost_to_company: Number(it.gross_pay ?? 0),
+      payslip_status: "from_payroll_items",
+      current_loan_balance: 0,
+      current_loan_deduction: Number(it.loan_deduction ?? 0),
     } as PayrollReportRow
   })
 }
@@ -675,16 +775,21 @@ export async function generateReport(
 
   if (rows.length === 0) {
     throw new Error(
-      `No payslip data found for company ${input.company_id}` +
-        (input.pay_period ? ` period ${input.pay_period}` : "") +
-        (input.payroll_run_id ? ` run ${input.payroll_run_id}` : "")
+      `No payroll data found for this company` +
+        (input.pay_period ? ` / period ${input.pay_period}` : "") +
+        (input.payroll_run_id ? ` / run ${input.payroll_run_id}` : "") +
+        `. Process & approve payroll first so payslips / payroll_items exist.`,
     )
   }
+
+  const clientForBrand = await createClient()
+  const companyInfo = await loadCompanyBrand(clientForBrand, input.company_id)
 
   const meta: ReportMeta = {
     pay_period:   input.pay_period ?? rows[0].pay_period,
     generated_at: new Date().toISOString(),
-    company_name: rows[0].company_name ?? "Company",
+    company_name: companyInfo?.name || rows[0].company_name || "Company",
+    companyInfo,
   }
 
   let report: GeneratedReport

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { calculateGhanaTax, DEFAULT_TAX_RATES, round2 } from "@/lib/ghana-tax/engine"
 import { toast } from "@/hooks/use-toast"
@@ -23,6 +24,7 @@ import {
   CheckSquare,
   Download,
   Loader2,
+  ArrowRight,
 } from "lucide-react"
 
 type PayInputApiRow = {
@@ -83,12 +85,14 @@ type WorksheetRow = {
   tier3: boolean
   tier3Rate: number
   grossPay: number
-  paye: number
+  providentFund: number
   ssnitEmployee: number
+  taxableIncome: number
+  paye: number
   totalDeductions: number
   netPay: number
   selected: boolean
-  status: "Loaded" | "Calculated" | "Processed"
+  status: "Loaded" | "Calculated" | "Processed" | "Submitted"
 }
 
 type PayrollRunSummary = {
@@ -101,6 +105,13 @@ type PayrollRunSummary = {
   total_deductions?: number
   total_net_pay?: number
   employee_count?: number
+}
+
+type CompanyInfo = {
+  id: string
+  name?: string | null
+  address?: string | null
+  logo_url?: string | null
 }
 
 function currentPeriod() {
@@ -160,8 +171,10 @@ function mapApiRow(row: PayInputApiRow): WorksheetRow {
     tier3: Boolean(row.input.tier3_applicable),
     tier3Rate: Number(row.input.tier3_employee_rate ?? 0),
     grossPay: 0,
-    paye: 0,
+    providentFund: 0,
     ssnitEmployee: 0,
+    taxableIncome: 0,
+    paye: 0,
     totalDeductions: 0,
     netPay: 0,
     selected: true,
@@ -178,6 +191,7 @@ function calculateRow(row: WorksheetRow): WorksheetRow {
       monthly_bonus: row.bonus,
       tier2_applicable: row.tier2,
       tier3_applicable: row.tier3,
+      tier3_employee_rate: row.tier3Rate || undefined,
       other_deductions: {
         loan: row.loan,
         advance: row.advance,
@@ -196,10 +210,12 @@ function calculateRow(row: WorksheetRow): WorksheetRow {
   return {
     ...row,
     grossPay: round2(tax.monthly_gross + tax.monthly_overtime + tax.monthly_bonus),
-    paye: tax.monthly_total_paye_withheld,
-    ssnitEmployee: tax.monthly_pension_employee,
-    totalDeductions: tax.monthly_total_employee_deductions,
-    netPay: tax.monthly_net_pay,
+    providentFund: round2(tax.monthly_tier3_employee),
+    ssnitEmployee: round2(tax.monthly_ssnit_employee),
+    taxableIncome: round2(tax.monthly_taxable_income),
+    paye: round2(tax.monthly_total_paye_withheld),
+    totalDeductions: round2(tax.monthly_total_employee_deductions),
+    netPay: round2(tax.monthly_net_pay),
     status: "Calculated",
   }
 }
@@ -208,22 +224,53 @@ function money(n: number) {
   return `GHS ${Number(n || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+function exportPayload(rows: WorksheetRow[]) {
+  return rows.map((r) => ({
+    employeeCode: r.employeeCode,
+    employeeId: r.employeeId,
+    name: r.name,
+    department: r.department,
+    basicSalary: r.basicSalary,
+    allowances: r.allowances,
+    overtime: r.overtime,
+    grossPay: r.grossPay,
+    providentFund: r.providentFund,
+    ssnitEmployee: r.ssnitEmployee,
+    taxableIncome: r.taxableIncome,
+    paye: r.paye,
+    loan: r.loan,
+    totalDeductions: r.totalDeductions,
+    netPay: r.netPay,
+  }))
+}
+
 export default function PayrollPage() {
+  const router = useRouter()
   const [companyId, setCompanyId] = useState("")
+  const [company, setCompany] = useState<CompanyInfo | null>(null)
   const [payPeriod, setPayPeriod] = useState(currentPeriod())
   const [rows, setRows] = useState<WorksheetRow[]>([])
   const [runs, setRuns] = useState<PayrollRunSummary[]>([])
   const [activeRun, setActiveRun] = useState<PayrollRunSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
+  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null)
   const [search, setSearch] = useState("")
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null)
+  const [lastProcessMessage, setLastProcessMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const resolveCompany = useCallback(async () => {
     const supabase = createClient()
-    const { data } = await supabase.from("companies").select("id, name").limit(1).maybeSingle()
-    if (data?.id) setCompanyId(data.id)
+    const { data } = await supabase
+      .from("companies")
+      .select("id, name, address, logo_url, phone, email, email_address, city, region, country")
+      .limit(1)
+      .maybeSingle()
+    if (data?.id) {
+      setCompanyId(data.id)
+      setCompany(data)
+    }
     return data?.id ?? ""
   }, [])
 
@@ -233,12 +280,12 @@ export default function PayrollPage() {
       const [inputRes, runsRes] = await Promise.all([
         fetch(
           `/api/payroll/input?company_id=${encodeURIComponent(cid)}&pay_period=${encodeURIComponent(period)}`,
-          { cache: "no-store" },
+          { cache: "no-store", credentials: "include" },
         ),
-        fetch(
-          `/api/payroll/runs?company_id=${encodeURIComponent(cid)}&limit=24`,
-          { cache: "no-store" },
-        ),
+        fetch(`/api/payroll/runs?company_id=${encodeURIComponent(cid)}&limit=24`, {
+          cache: "no-store",
+          credentials: "include",
+        }),
       ])
 
       const inputJson = await inputRes.json()
@@ -257,13 +304,6 @@ export default function PayrollPage() {
         setActiveRun(matchingRun)
         setLastSyncedAt(inputJson.meta?.fetched_at ?? new Date().toISOString())
       })
-
-      if (inputJson.meta?.warnings?.length) {
-        toast({
-          title: "Partial sync",
-          description: inputJson.meta.warnings.join("; "),
-        })
-      }
     } catch (err) {
       toast({
         title: "Could not load payroll",
@@ -317,8 +357,25 @@ export default function PayrollPage() {
   }
 
   const handleProcess = async () => {
-    if (!companyId) return
+    if (!companyId) {
+      toast({
+        title: "Company required",
+        description: "Load a company before processing payroll.",
+        variant: "destructive",
+      })
+      return
+    }
+    if (!rows.length) {
+      toast({
+        title: "No employees",
+        description: "Sync employees from the database first.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setProcessing(true)
+    setLastProcessMessage(null)
     try {
       const res = await fetch("/api/payroll/process", {
         method: "POST",
@@ -334,16 +391,24 @@ export default function PayrollPage() {
           submit_for_approval: true,
         }),
       })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || "Processing failed")
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(json.error || `Processing failed (${res.status})`)
+      }
 
+      setRows((prev) => prev.map((r) => ({ ...r, status: "Submitted" })))
+      setLastProcessMessage(
+        `${json.processed} employee(s) processed and queued for approval. Next: Approvals → Approve → History / Payslips / Compliance.`,
+      )
       toast({
-        title: json.submitted_for_approval ? "Submitted for approval" : "Payroll processed",
-        description: `${json.processed} employee(s) written to payroll_items / payslips${
+        title: "Submitted for approval",
+        description: `${json.processed} employee(s) saved${
           json.errors?.length ? ` (${json.errors.length} warnings)` : ""
-        }. Approve in Approvals, then view in History.`,
+        }. Opening Approvals…`,
       })
       await loadWorksheet(companyId, payPeriod)
+      // Move to next step
+      setTimeout(() => router.push("/app/approvals"), 900)
     } catch (err) {
       toast({
         title: "Process failed",
@@ -355,69 +420,62 @@ export default function PayrollPage() {
     }
   }
 
-  const handleExportPdf = () => {
-    if (activeRun?.id) {
-      window.open(`/api/payroll/runs/${activeRun.id}/pdf`, "_blank", "noopener,noreferrer")
-      return
-    }
-    toast({
-      title: "Process payroll first",
-      description: "PDF register is available after a payroll run exists for this period.",
-      variant: "destructive",
-    })
-  }
-
-  const handleExport = () => {
+  const handleExport = async (format: "csv" | "pdf") => {
     const source = selected.length ? selected : rows
     if (!source.length) {
       toast({ title: "Nothing to export", variant: "destructive" })
       return
     }
-    const columns = [
-      "Employee ID",
-      "Employee Name",
-      "Department",
-      "Basic Salary (GHS)",
-      "Allowances (GHS)",
-      "Overtime (GHS)",
-      "Gross Pay (GHS)",
-      "PAYE (GHS)",
-      "SSNIT Employee (GHS)",
-      "Total Deductions (GHS)",
-      "Net Pay (GHS)",
-    ]
-    const bom = "\uFEFF"
-    const lines = [
-      `"Payroll Processing Export"`,
-      `"Pay Period","${fmtPeriod(payPeriod)}"`,
-      `"Generated At","${new Date().toISOString()}"`,
-      "",
-      columns.map((c) => `"${c}"`).join(","),
-      ...source.map((r) =>
-        [
-          r.employeeCode,
-          r.name,
-          r.department,
-          r.basicSalary,
-          r.allowances,
-          r.overtime,
-          r.grossPay,
-          r.paye,
-          r.ssnitEmployee,
-          r.totalDeductions,
-          r.netPay,
-        ]
-          .map((v) => (typeof v === "number" ? String(round2(v)) : `"${String(v).replace(/"/g, '""')}"`))
-          .join(","),
-      ),
-    ]
-    const blob = new Blob([bom + lines.join("\n")], { type: "text/csv;charset=utf-8" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `payroll-${payPeriod}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    setExporting(format)
+    try {
+      const res = await fetch("/api/payroll/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          company_id: companyId,
+          pay_period: payPeriod,
+          format,
+          rows: exportPayload(source),
+        }),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json.error || "Export failed")
+      }
+
+      if (format === "pdf") {
+        const html = await res.text()
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" })
+        const url = URL.createObjectURL(blob)
+        window.open(url, "_blank", "noopener,noreferrer")
+        setTimeout(() => URL.revokeObjectURL(url), 60_000)
+        toast({
+          title: "PDF opened",
+          description: "Use Print → Save as PDF. Company letterhead and AkwaabaHRPay footer included.",
+        })
+      } else {
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `payroll-${payPeriod}.csv`
+        a.click()
+        URL.revokeObjectURL(url)
+        toast({
+          title: "CSV downloaded",
+          description: "Includes company details and AkwaabaHRPay brand footer.",
+        })
+      }
+    } catch (err) {
+      toast({
+        title: "Export failed",
+        description: err instanceof Error ? err.message : "Could not export",
+        variant: "destructive",
+      })
+    } finally {
+      setExporting(null)
+    }
   }
 
   return (
@@ -426,8 +484,8 @@ export default function PayrollPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Payroll Processing</h1>
           <p className="text-gray-600 max-w-2xl">
-            Employees, financials, period inputs, and loans load from the database. Process writes
-            payroll_items and payslips, then queues the run for approval.
+            {company?.name ? `${company.name} · ` : ""}
+            Process writes payroll_items and payslips, then queues the run for approval.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -438,19 +496,33 @@ export default function PayrollPage() {
             </Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/app/payroll/history">
-              <History className="h-4 w-4 mr-2" />
-              History
-            </Link>
-          </Button>
-          <Button variant="outline" asChild>
             <Link href="/app/approvals">
               <CheckSquare className="h-4 w-4 mr-2" />
               Approvals
             </Link>
           </Button>
+          <Button variant="outline" asChild>
+            <Link href="/app/payroll/history">
+              <History className="h-4 w-4 mr-2" />
+              History
+            </Link>
+          </Button>
         </div>
       </div>
+
+      {lastProcessMessage && (
+        <Card className="border-emerald-200 bg-emerald-50/60">
+          <CardContent className="p-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <p className="text-sm text-emerald-900">{lastProcessMessage}</p>
+            <Button size="sm" asChild>
+              <Link href="/app/approvals">
+                Go to Approvals
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex flex-wrap items-end gap-3">
         <div>
@@ -491,12 +563,28 @@ export default function PayrollPage() {
           )}
           Process & Submit
         </Button>
-        <Button variant="outline" onClick={handleExport} disabled={!rows.length}>
-          <Download className="h-4 w-4 mr-2" />
+        <Button
+          variant="outline"
+          onClick={() => handleExport("csv")}
+          disabled={!rows.length || exporting !== null}
+        >
+          {exporting === "csv" ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4 mr-2" />
+          )}
           Export CSV
         </Button>
-        <Button variant="outline" onClick={handleExportPdf} disabled={!activeRun?.id}>
-          <Download className="h-4 w-4 mr-2" />
+        <Button
+          variant="outline"
+          onClick={() => handleExport("pdf")}
+          disabled={!rows.length || exporting !== null}
+        >
+          {exporting === "pdf" ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4 mr-2" />
+          )}
           Export PDF
         </Button>
         {lastSyncedAt && (
@@ -537,7 +625,7 @@ export default function PayrollPage() {
             <div>
               <CardTitle>Employee worksheet — {fmtPeriod(payPeriod)}</CardTitle>
               <CardDescription>
-                Sourced from employees, employee_financial, payroll_pay_inputs, and employee_loans.
+                Columns include Provident Fund, taxable income, PAYE, loans, and net pay.
               </CardDescription>
             </div>
             <Input
@@ -558,13 +646,6 @@ export default function PayrollPage() {
             <div className="text-center py-16 text-muted-foreground">
               <Users className="h-8 w-8 mx-auto mb-2 opacity-40" />
               <p>No active employees found for this company.</p>
-              <p className="text-sm mt-1">
-                Add employees and financial records, or capture period values in{" "}
-                <Link href="/app/payroll/input" className="underline text-emerald-700">
-                  Pay Inputs
-                </Link>
-                .
-              </p>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-md border">
@@ -577,13 +658,20 @@ export default function PayrollPage() {
                         onCheckedChange={(v) => handleSelectAll(Boolean(v))}
                       />
                     </TableHead>
-                    <TableHead>Employee</TableHead>
+                    <TableHead>Employee ID</TableHead>
+                    <TableHead>Employee Name</TableHead>
                     <TableHead>Department</TableHead>
-                    <TableHead className="text-right">Basic</TableHead>
-                    <TableHead className="text-right">Gross</TableHead>
+                    <TableHead className="text-right">Basic Salary</TableHead>
+                    <TableHead className="text-right">Allowances</TableHead>
+                    <TableHead className="text-right">Overtime</TableHead>
+                    <TableHead className="text-right">Gross Pay</TableHead>
+                    <TableHead className="text-right">Provident Fund</TableHead>
+                    <TableHead className="text-right">SSNIT Employee</TableHead>
+                    <TableHead className="text-right">Taxable Income</TableHead>
                     <TableHead className="text-right">PAYE</TableHead>
-                    <TableHead className="text-right">SSNIT</TableHead>
-                    <TableHead className="text-right">Net</TableHead>
+                    <TableHead className="text-right">Loans</TableHead>
+                    <TableHead className="text-right">Total Deductions</TableHead>
+                    <TableHead className="text-right">Net Pay</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -604,16 +692,22 @@ export default function PayrollPage() {
                           }
                         />
                       </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{row.name}</div>
-                        <div className="text-xs text-muted-foreground">{row.employeeCode}</div>
-                      </TableCell>
+                      <TableCell className="font-mono text-xs">{row.employeeCode || "—"}</TableCell>
+                      <TableCell className="font-medium whitespace-nowrap">{row.name}</TableCell>
                       <TableCell>{row.department || "—"}</TableCell>
-                      <TableCell className="text-right">{money(row.basicSalary)}</TableCell>
-                      <TableCell className="text-right">{money(row.grossPay)}</TableCell>
-                      <TableCell className="text-right">{money(row.paye)}</TableCell>
-                      <TableCell className="text-right">{money(row.ssnitEmployee)}</TableCell>
-                      <TableCell className="text-right font-medium">{money(row.netPay)}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">{money(row.basicSalary)}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">{money(row.allowances)}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">{money(row.overtime)}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">{money(row.grossPay)}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">{money(row.providentFund)}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">{money(row.ssnitEmployee)}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">{money(row.taxableIncome)}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">{money(row.paye)}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">{money(row.loan)}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">{money(row.totalDeductions)}</TableCell>
+                      <TableCell className="text-right font-medium whitespace-nowrap">
+                        {money(row.netPay)}
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline">{row.status}</Badge>
                       </TableCell>
@@ -626,11 +720,38 @@ export default function PayrollPage() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>What happens after Process & Submit?</CardTitle>
+          <CardDescription>End-to-end payroll flow</CardDescription>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground space-y-2">
+          <ol className="list-decimal pl-5 space-y-1">
+            <li>
+              <strong className="text-foreground">Process & Submit</strong> writes{" "}
+              <code>payroll_items</code> + draft <code>payslips</code> and sets the run to{" "}
+              <em>pending</em>.
+            </li>
+            <li>
+              <strong className="text-foreground">Approvals</strong> — HR/Finance approve or reject.
+            </li>
+            <li>
+              On <strong className="text-foreground">Approve</strong>: payslips are issued, loan
+              installments posted, pay inputs marked posted, and the run appears in{" "}
+              <strong className="text-foreground">Payroll History</strong>.
+            </li>
+            <li>
+              Next: download individual payslips, bank advice / compliance reports, then mark the
+              run as paid when funds are disbursed.
+            </li>
+          </ol>
+        </CardContent>
+      </Card>
+
       {runs.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Recent payroll runs</CardTitle>
-            <CardDescription>Loaded from payroll_runs with item counts.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             {runs.slice(0, 8).map((run) => (

@@ -202,7 +202,7 @@ function ReportCard({
   period:      string
   history:     ComplianceReportRecord[]
   onGenerate:  (type: ReportType) => void
-  onDownload:  (type: ReportType) => void
+  onDownload:  (type: ReportType, format?: "csv" | "pdf") => void
   generating:  boolean
   downloading: boolean
 }) {
@@ -272,7 +272,7 @@ function ReportCard({
             size="sm"
             variant="outline"
             className="h-8 text-xs px-2"
-            onClick={() => onDownload(def.type)}
+            onClick={() => onDownload(def.type, "csv")}
             disabled={downloading}
             title="Download CSV"
           >
@@ -281,6 +281,17 @@ function ReportCard({
             ) : (
               <Download className="h-3 w-3" />
             )}
+            <span className="ml-1">CSV</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs px-2"
+            onClick={() => onDownload(def.type, "pdf")}
+            disabled={downloading}
+            title="Download PDF"
+          >
+            PDF
           </Button>
         </div>
       </CardContent>
@@ -350,6 +361,7 @@ export default function ComplianceReportsPage() {
       const res = await fetch("/api/reports", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body:    JSON.stringify({ company_id: companyId, report_type: type, pay_period: period }),
       })
       const json = await res.json()
@@ -390,8 +402,8 @@ export default function ComplianceReportsPage() {
     }
   }, [companyId, period, historyKey])
 
-  // ── Download CSV ──────────────────────────────────────────────────────────
-  const handleDownload = useCallback(async (type: ReportType) => {
+  // ── Download CSV / PDF ────────────────────────────────────────────────────
+  const handleDownload = useCallback(async (type: ReportType, format: "csv" | "pdf" = "csv") => {
     if (!companyId) {
       toast({ title: "Company required", description: "Select or load a company first.", variant: "destructive" })
       return
@@ -401,23 +413,43 @@ export default function ComplianceReportsPage() {
       const res = await fetch("/api/reports/download", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ company_id: companyId, report_type: type, pay_period: period }),
+        credentials: "include",
+        body:    JSON.stringify({
+          company_id: companyId,
+          report_type: type,
+          pay_period: period,
+          format,
+        }),
       })
       if (!res.ok) {
-        const json = await res.json()
+        const json = await res.json().catch(() => ({}))
         throw new Error(json.error ?? "Download failed")
       }
-      const blob     = await res.blob()
-      const url      = URL.createObjectURL(blob)
-      const a        = document.createElement("a")
-      const filename = res.headers.get("content-disposition")?.match(/filename="(.+)"/)?.[1]
-                    ?? `${type}-${period}.csv`
-      a.href         = url
-      a.download     = filename
-      a.click()
-      URL.revokeObjectURL(url)
+      if (format === "pdf") {
+        const html = await res.text()
+        const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }))
+        window.open(url, "_blank", "noopener,noreferrer")
+        setTimeout(() => URL.revokeObjectURL(url), 60_000)
+        toast({
+          title: "PDF opened",
+          description: `${REPORT_LABELS[type]} — Print → Save as PDF. Company letterhead + AkwaabaHRPay footer included.`,
+        })
+      } else {
+        const blob     = await res.blob()
+        const url      = URL.createObjectURL(blob)
+        const a        = document.createElement("a")
+        const filename = res.headers.get("content-disposition")?.match(/filename="(.+)"/)?.[1]
+                      ?? `${type}-${period}.csv`
+        a.href         = url
+        a.download     = filename
+        a.click()
+        URL.revokeObjectURL(url)
+        toast({
+          title: "Download ready",
+          description: `${REPORT_LABELS[type]} CSV includes company details and AkwaabaHRPay brand footer.`,
+        })
+      }
       if (historyKey) mutate(historyKey)
-      toast({ title: "Download ready", description: `${REPORT_LABELS[type]} CSV includes headings and period metadata.` })
     } catch (err) {
       toast({ title: "Download failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" })
     } finally {

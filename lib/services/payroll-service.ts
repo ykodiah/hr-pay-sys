@@ -172,8 +172,7 @@ export class PayrollService extends BaseService {
       const taxYear = new Date().getFullYear()
       const taxResult = await calculateEmployeeTax(input, companyId, employeeId, taxYear)
 
-      // Build the payroll_items update payload
-      const itemPayload = {
+      const fullPayload: Record<string, unknown> = {
         employee_id: employeeId,
         payroll_run_id: payrollRunId,
         basic_salary: taxResult.monthly_basic,
@@ -185,7 +184,7 @@ export class PayrollService extends BaseService {
         tier2_employer: taxResult.monthly_tier2_employer,
         tier3_employee: taxResult.monthly_tier3_employee,
         tier3_employer: taxResult.monthly_tier3_employer,
-        paye_taxable_income: taxResult.annual_taxable_income / 12,
+        paye_taxable_income: taxResult.monthly_taxable_income ?? taxResult.annual_taxable_income / 12,
         tax_relief_total: taxResult.annual_tax_reliefs / 12,
         tax_deduction: taxResult.monthly_total_paye_withheld,
         loan_deduction: taxResult.monthly_loan_deduction,
@@ -203,6 +202,32 @@ export class PayrollService extends BaseService {
         updated_at: new Date().toISOString(),
       }
 
+      // Progressive fallbacks for older payroll_items schemas
+      const payloads: Record<string, unknown>[] = [
+        fullPayload,
+        {
+          employee_id: employeeId,
+          payroll_run_id: payrollRunId,
+          basic_salary: fullPayload.basic_salary,
+          gross_pay: fullPayload.gross_pay,
+          total_deductions: fullPayload.total_deductions,
+          net_pay: fullPayload.net_pay,
+          tax_deduction: fullPayload.tax_deduction,
+          ssnit_employee: fullPayload.ssnit_employee,
+          loan_deduction: fullPayload.loan_deduction,
+          overtime_pay: fullPayload.overtime_pay,
+          updated_at: fullPayload.updated_at,
+        },
+        {
+          employee_id: employeeId,
+          payroll_run_id: payrollRunId,
+          basic_salary: fullPayload.basic_salary,
+          gross_pay: fullPayload.gross_pay,
+          total_deductions: fullPayload.total_deductions,
+          net_pay: fullPayload.net_pay,
+        },
+      ]
+
       const { data: existingItem } = await client
         .from("payroll_items")
         .select("id")
@@ -210,29 +235,49 @@ export class PayrollService extends BaseService {
         .eq("employee_id", employeeId)
         .maybeSingle()
 
-      let payrollItem: PayrollItem
+      let payrollItem: PayrollItem | null = null
+      let lastError: string | null = null
 
-      if (existingItem?.id) {
-        const { data, error } = await client
-          .from("payroll_items")
-          .update(itemPayload)
-          .eq("id", existingItem.id)
-          .select()
-          .single()
-        if (error) throw error
-        payrollItem = data
-      } else {
-        const { data, error } = await client
-          .from("payroll_items")
-          .insert(itemPayload)
-          .select()
-          .single()
-        if (error) throw error
-        payrollItem = data
+      for (const itemPayload of payloads) {
+        if (existingItem?.id) {
+          const { data, error } = await client
+            .from("payroll_items")
+            .update(itemPayload)
+            .eq("id", existingItem.id)
+            .select()
+            .single()
+          if (!error && data) {
+            payrollItem = data
+            break
+          }
+          lastError = error?.message || lastError
+        } else {
+          const { data, error } = await client
+            .from("payroll_items")
+            .insert(itemPayload)
+            .select()
+            .single()
+          if (!error && data) {
+            payrollItem = data
+            break
+          }
+          lastError = error?.message || lastError
+        }
       }
 
-      // Create / update draft payslip
-      await this.upsertPayslip(client, payrollItem, taxResult, companyId)
+      if (!payrollItem) {
+        throw new Error(lastError || "Failed to save payroll item")
+      }
+
+      // Payslip is best-effort — do not fail the whole employee if vault/table drifts
+      try {
+        await this.upsertPayslip(client, payrollItem, taxResult, companyId)
+      } catch (slipErr) {
+        console.warn(
+          "[payroll] payslip upsert failed:",
+          slipErr instanceof Error ? slipErr.message : slipErr,
+        )
+      }
 
       return { payrollItem, taxResult }
     }, "CALC_EMPLOYEE_TAX_ERROR")
@@ -535,9 +580,39 @@ export class PayrollService extends BaseService {
       updated_at: new Date().toISOString(),
     }
 
-    const { error } = await client
+    let { error } = await client
       .from("payslips")
       .upsert(payslipPayload, { onConflict: "payroll_item_id" })
-    if (error) throw error
+
+    if (error) {
+      // Fallback without snapshot / optional columns
+      const minimal = {
+        payroll_item_id: payslipPayload.payroll_item_id,
+        payroll_run_id: payslipPayload.payroll_run_id,
+        employee_id: payslipPayload.employee_id,
+        company_id: payslipPayload.company_id,
+        pay_period: payslipPayload.pay_period,
+        pay_period_start: payslipPayload.pay_period_start,
+        pay_period_end: payslipPayload.pay_period_end,
+        pay_date: payslipPayload.pay_date,
+        basic_salary: payslipPayload.basic_salary,
+        gross_pay: payslipPayload.gross_pay,
+        ssnit_employee: payslipPayload.ssnit_employee,
+        tier3_employee: payslipPayload.tier3_employee,
+        paye_tax: payslipPayload.paye_tax,
+        loan_deduction: payslipPayload.loan_deduction,
+        total_deductions: payslipPayload.total_deductions,
+        net_pay: payslipPayload.net_pay,
+        status: "draft",
+        updated_at: payslipPayload.updated_at,
+      }
+      const retry = await client.from("payslips").upsert(minimal, { onConflict: "payroll_item_id" })
+      error = retry.error
+      if (error) {
+        // Last resort: plain insert
+        const ins = await client.from("payslips").insert(minimal)
+        if (ins.error) throw ins.error
+      }
+    }
   }
 }
