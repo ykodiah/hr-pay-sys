@@ -32,43 +32,52 @@ export async function POST(req: NextRequest) {
 
     // Pre-validate that report data exists before attempting generation
     const client = await createClient()
-    const validationPeriod = pay_period || (payroll_run_id ? null : new Date().toISOString().slice(0, 7))
-    
-    if (validationPeriod) {
-      const { data: dataCheck, error: checkErr } = await client.rpc(
-        "validate_report_data_exists",
-        { p_company_id: company_id, p_report_type: report_type, p_pay_period: validationPeriod }
-      )
-      
-      if (!checkErr && dataCheck && dataCheck[0]) {
-        const validation = dataCheck[0]
-        if (!validation.has_data) {
-          // Log failed attempt
-          try {
-            await client.from("compliance_reports").insert({
-              company_id,
-              payroll_run_id: payroll_run_id || null,
-              report_type,
-              report_name: `${report_type} (Validation Failed)`,
-              pay_period: validationPeriod,
-              generated_by: user.isDemo ? null : user.id,
-              row_count: 0,
-              status: "failed",
-              error_message: validation.error_message,
-              validation_status: "failed",
-            })
-          } catch {
-            // Non-fatal
-          }
-          
-          return NextResponse.json(
-            { 
-              error: validation.error_message || "No payroll data available for this period",
-              details: "Please process and approve payroll for this period first, then try again.",
-            },
-            { status: 404 },
-          )
+    // Only validate if we have a pay_period (if payroll_run_id is provided, the engine will validate)
+    if (pay_period) {
+      try {
+        const { data: dataCheck, error: checkErr } = await client.rpc(
+          "validate_report_data_exists",
+          { p_company_id: company_id, p_report_type: report_type, p_pay_period: pay_period }
+        )
+        
+        if (checkErr) {
+          throw new Error(`Validation check failed: ${checkErr.message}`)
         }
+        
+        if (dataCheck && Array.isArray(dataCheck) && dataCheck.length > 0) {
+          const validation = dataCheck[0]
+          if (!validation.has_data) {
+            // Log failed attempt
+            try {
+              await client.from("compliance_reports").insert({
+                company_id,
+                payroll_run_id: payroll_run_id || null,
+                report_type,
+                report_name: `${report_type} (Validation Failed)`,
+                pay_period: pay_period,
+                generated_by: user.isDemo ? null : user.id,
+                row_count: 0,
+                status: "failed",
+                error_message: validation.error_message,
+                validation_status: "failed",
+              })
+            } catch (e) {
+              // Non-fatal
+              console.log("[v0] Failed to log validation error:", e instanceof Error ? e.message : "unknown")
+            }
+            
+            return NextResponse.json(
+              { 
+                error: validation.error_message || "No payroll data available for this period",
+                details: "Please process and approve payroll for this period first, then try again.",
+              },
+              { status: 404 },
+            )
+          }
+        }
+      } catch (validationErr) {
+        // Log validation check error but don't fail - let report generation handle it
+        console.log("[v0] Report validation warning:", validationErr instanceof Error ? validationErr.message : "unknown")
       }
     }
 
