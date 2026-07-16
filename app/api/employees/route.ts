@@ -9,6 +9,7 @@ import { requireApiUser } from "@/lib/auth/api-user"
 import { resolveCompanyId } from "@/lib/employees/resolve-company"
 import { ACTIVE_EMPLOYEE_STATUSES, normalizeEmployeeStatus } from "@/lib/employees/status"
 import { mapEmployeeRow, toEmployeeOption } from "@/lib/employees/dto"
+import { persistVaultDocument } from "@/lib/employees/persist-vault-document"
 
 export async function GET(req: NextRequest) {
   try {
@@ -304,22 +305,33 @@ export async function POST(req: NextRequest) {
 
         const vaultId = doc.vaultDocumentId || doc.vault_document_id
         if (vaultId && String(vaultId).length > 20) {
-          await client
+          const { error: linkErr } = await client
             .from("document_vault")
             .update({
               employee_id: created.id,
               employee_name: created.full_name || created.display_name,
               company_id: created.company_id,
+              file_url: fileUrl,
+              file_name: doc.fileName || doc.file_name || doc.name,
               updated_at: new Date().toISOString(),
             })
             .eq("id", vaultId)
+          if (linkErr) {
+            console.warn("[employees] vault link update failed:", linkErr.message)
+          }
+          if (empDoc?.id) {
+            await client
+              .from("employee_documents")
+              .update({ vault_document_id: vaultId })
+              .eq("id", empDoc.id)
+          }
         } else if (fileUrl) {
-          await client.from("document_vault").insert({
+          const vault = await persistVaultDocument(client, {
             employee_id: created.id,
             employee_name: created.full_name || created.display_name,
             document_type: documentType || "other",
             file_name: doc.fileName || doc.file_name || doc.name || "document",
-            file_size: doc.fileSize || doc.file_size || 0,
+            file_size: Number(doc.fileSize || doc.file_size || 0),
             file_type: doc.fileType || doc.mime_type || "application/octet-stream",
             file_url: fileUrl,
             source: "employee-onboarding",
@@ -327,6 +339,12 @@ export async function POST(req: NextRequest) {
             company_id: created.company_id,
             notes: empDoc?.id ? `Employee document ${empDoc.id}` : "Employee onboarding document",
           })
+          if (vault.ok && vault.id && empDoc?.id) {
+            await client
+              .from("employee_documents")
+              .update({ vault_document_id: vault.id })
+              .eq("id", empDoc.id)
+          }
         }
       }
     }

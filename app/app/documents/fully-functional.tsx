@@ -377,14 +377,65 @@ export default function FullyFunctionalDocumentVaultPage() {
 
   const loadData = async () => {
     try {
-      const docs = documentService.getAllDocuments()
-      setDocuments(docs)
+      const res = await fetch("/api/documents", { credentials: "include", cache: "no-store" })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(json.error || "Failed to load documents from vault")
+      }
+
+      const fromDb: AdvancedDocument[] = (json.documents || []).map((d: any) => ({
+        id: d.id,
+        employeeId: d.employeeId,
+        employeeName: d.employeeName,
+        documentType: d.documentType || "other",
+        fileName: d.fileName || "Document",
+        fileSize: Number(d.fileSize || 0),
+        fileType: d.fileType || "application/octet-stream",
+        fileUrl: d.fileUrl || "",
+        uploadDate: new Date(d.uploadDate || Date.now()),
+        uploadedBy: d.uploadedBy || "HR Admin",
+        status: d.status || "pending",
+        notes: d.notes,
+        source: d.source || "employee-onboarding",
+        category: d.category || "employee-document",
+        accessLevel: (d.accessLevel || "standard") as AdvancedDocument["accessLevel"],
+        requiredRoles: [],
+        allowedUsers: [],
+        requiresSignature: false,
+        signatureStatus: (d.signatureStatus || "not_required") as AdvancedDocument["signatureStatus"],
+        isArchived: Boolean(d.isArchived),
+        gdprApplicable: false,
+        dataClassification: "internal",
+        encryptionStatus: "unencrypted",
+        versionNumber: 1,
+        isLatestVersion: true,
+        metadata: {},
+        tags: ["employee-module"],
+        createdAt: new Date(d.uploadDate || Date.now()),
+        updatedAt: new Date(d.uploadDate || Date.now()),
+      }))
+
+      // Merge any in-session local uploads that are not yet in DB
+      const local = documentService.getAllDocuments()
+      const byId = new Map<string, AdvancedDocument>()
+      for (const doc of fromDb) byId.set(doc.id, doc)
+      for (const doc of local) {
+        if (!byId.has(doc.id)) byId.set(doc.id, doc)
+      }
+      setDocuments(Array.from(byId.values()))
     } catch (error) {
       console.error("Error loading data:", error)
+      // Fallback to in-memory so the page still works offline / before SQL migrate
+      try {
+        setDocuments(documentService.getAllDocuments())
+      } catch {
+        setDocuments([])
+      }
       toast({
         title: "Error",
-        description: "Failed to load document data",
-        variant: "destructive"
+        description:
+          error instanceof Error ? error.message : "Failed to load document data",
+        variant: "destructive",
       })
     }
   }
@@ -664,7 +715,7 @@ export default function FullyFunctionalDocumentVaultPage() {
         doc.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         doc.employeeId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         doc.fileType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doc.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+        (doc.tags || []).some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
       
       const matchesEmployee = selectedEmployee === "all" || doc.employeeId === selectedEmployee
       const matchesDocumentType = selectedDocumentType === "all" || doc.documentType === selectedDocumentType
@@ -782,6 +833,10 @@ export default function FullyFunctionalDocumentVaultPage() {
           <p className="text-gray-600">Enterprise-grade document management with AI-driven features</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => loadData()}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
           <Button variant="outline" onClick={() => setIsSettingsOpen(true)}>
             <Settings className="w-4 h-4 mr-2" />
             Settings

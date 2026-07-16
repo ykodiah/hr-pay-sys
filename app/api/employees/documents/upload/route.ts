@@ -1,7 +1,7 @@
 /**
  * POST /api/employees/documents/upload
  * multipart: file, document_type, employee_id?, employee_name?, company_id?, notes?
- * Stores file, writes document_vault + returns previewable URL.
+ * Stores file, writes document_vault (+ employee_documents when employee UUID exists).
  */
 
 import { NextRequest, NextResponse } from "next/server"
@@ -9,6 +9,17 @@ import { createClient } from "@/lib/supabase/server"
 import { requireApiUser } from "@/lib/auth/api-user"
 import { resolveCompanyId } from "@/lib/employees/resolve-company"
 import { storeEmployeeDocumentFile } from "@/lib/employees/document-upload"
+import { persistVaultDocument } from "@/lib/employees/persist-vault-document"
+
+export const dynamic = "force-dynamic"
+export const runtime = "nodejs"
+
+function isUuid(value: string | null | undefined): boolean {
+  if (!value) return false
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  )
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,21 +35,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "File must be smaller than 10MB" }, { status: 400 })
     }
 
-    const documentType = String(form.get("document_type") || "other")
-    const employeeId = String(form.get("employee_id") || "").trim() || null
-    const employeeName = String(form.get("employee_name") || "").trim() || null
-    const notes = String(form.get("notes") || "").trim() || null
+    const documentType = String(
+      form.get("document_type") || form.get("documentType") || "other",
+    ).trim() || "other"
+    const employeeIdRaw = String(
+      form.get("employee_id") || form.get("employeeId") || "",
+    ).trim()
+    const employeeName =
+      String(form.get("employee_name") || form.get("employeeName") || "").trim() || null
+    const notes =
+      String(form.get("notes") || form.get("description") || "").trim() || null
+    const employeeCode = String(form.get("employee_code") || form.get("employeeCode") || "").trim()
 
     const client = await createClient()
-    let companyId = String(form.get("company_id") || "").trim() || null
+    let companyId =
+      String(form.get("company_id") || form.get("companyId") || "").trim() || null
     if (!companyId) {
       companyId = (await resolveCompanyId(client, user.isDemo ? null : user.id))?.companyId ?? null
     }
 
+    const employeeUuid =
+      employeeIdRaw && employeeIdRaw !== "temp-id" && isUuid(employeeIdRaw) ? employeeIdRaw : null
+
     const stored = await storeEmployeeDocumentFile(file, file.name)
 
-    const vaultPayload = {
-      employee_id: employeeId && employeeId !== "temp-id" && employeeId.length > 20 ? employeeId : null,
+    const vault = await persistVaultDocument(client, {
+      employee_id: employeeUuid,
       employee_name: employeeName,
       document_type: documentType,
       file_name: file.name,
@@ -48,75 +70,70 @@ export async function POST(req: NextRequest) {
       upload_date: new Date().toISOString(),
       uploaded_by: user.isDemo ? null : user.id,
       status: "pending",
-      notes,
+      notes:
+        notes ||
+        (employeeCode
+          ? `Employee module upload (${employeeCode})`
+          : "Uploaded from employee module"),
       source: "employee-onboarding",
       category: "employee-document",
       company_id: companyId,
-      updated_at: new Date().toISOString(),
-    }
+    })
 
-    const { data: vaultDoc, error: vaultErr } = await client
-      .from("document_vault")
-      .insert(vaultPayload)
-      .select()
-      .single()
-
-    if (vaultErr) {
-      // Still return a usable upload result even if vault table is missing columns
-      console.warn("[employee-docs] vault insert failed", vaultErr.message)
-      return NextResponse.json({
-        success: true,
-        document: {
-          id: `local-${Date.now()}`,
-          vault_document_id: null,
-          documentType,
-          fileName: file.name,
-          fileSize: file.size,
-          fileType: file.type,
-          fileUrl: stored.fileUrl,
-          file_content: stored.fileContent,
-          uploadDate: new Date().toISOString(),
-          uploadedBy: "HR Admin",
+    if (!vault.ok || !vault.id) {
+      return NextResponse.json(
+        {
+          error:
+            vault.error ||
+            "Failed to save document into Document Vault. Run scripts/054_employee_financial_docs_pf.sql (and 041 if needed).",
         },
-      })
+        { status: 500 },
+      )
     }
 
-    // If employee already exists, upsert employee_documents row now
-    if (vaultPayload.employee_id) {
-      await client.from("employee_documents").delete().eq("employee_id", vaultPayload.employee_id).eq("document_type", documentType)
-      await client.from("employee_documents").insert({
-        employee_id: vaultPayload.employee_id,
+    if (employeeUuid) {
+      await client
+        .from("employee_documents")
+        .delete()
+        .eq("employee_id", employeeUuid)
+        .eq("document_type", documentType)
+      const { error: empDocErr } = await client.from("employee_documents").insert({
+        employee_id: employeeUuid,
         document_type: documentType,
         document_name: file.name,
         file_name: file.name,
         file_path: stored.fileUrl,
         file_url: stored.fileUrl,
         file_size: file.size,
-        mime_type: file.type,
+        mime_type: file.type || "application/octet-stream",
         file_content: stored.fileContent,
-        vault_document_id: vaultDoc.id,
+        vault_document_id: vault.id,
         upload_date: new Date().toISOString(),
         uploaded_by: "HR Admin",
         notes,
       })
+      if (empDocErr) {
+        console.warn("[employee-docs] employee_documents insert failed:", empDocErr.message)
+      }
     }
 
     return NextResponse.json({
       success: true,
       document: {
-        id: vaultDoc.id,
-        vault_document_id: vaultDoc.id,
+        id: vault.id,
+        vault_document_id: vault.id,
         documentType,
         fileName: file.name,
         fileSize: file.size,
-        fileType: file.type,
+        fileType: file.type || "application/octet-stream",
         fileUrl: stored.fileUrl,
         file_content: stored.fileContent,
-        uploadDate: vaultDoc.upload_date || new Date().toISOString(),
+        uploadDate: vault.data?.upload_date || new Date().toISOString(),
         uploadedBy: "HR Admin",
       },
     })
   } catch (err) {
+    console.error("Employee document upload error:", err)
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Upload failed" },
       { status: 500 },

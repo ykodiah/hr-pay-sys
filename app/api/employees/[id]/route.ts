@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server"
 import { requireApiUser } from "@/lib/auth/api-user"
 import { normalizeEmployeeStatus } from "@/lib/employees/status"
 import { mapEmployeeRow } from "@/lib/employees/dto"
+import { persistVaultDocument } from "@/lib/employees/persist-vault-document"
 
 async function loadEmployeeExtras(client: any, id: string) {
   const [allowances, deductions, documents] = await Promise.all([
@@ -277,23 +278,33 @@ export async function PATCH(
         // Link/update document vault with employee
         const vaultId = doc.vaultDocumentId || doc.vault_document_id
         if (vaultId && String(vaultId).length > 20) {
-          await client
+          const { error: linkErr } = await client
             .from("document_vault")
             .update({
               employee_id: id,
               employee_name: updated.full_name || updated.display_name,
               file_url: fileUrl,
               file_name: doc.fileName || doc.file_name || doc.name,
+              company_id: updated.company_id,
               updated_at: new Date().toISOString(),
             })
             .eq("id", vaultId)
+          if (linkErr) {
+            console.warn("[employees] vault link update failed:", linkErr.message)
+          }
+          if (empDoc?.id) {
+            await client
+              .from("employee_documents")
+              .update({ vault_document_id: vaultId })
+              .eq("id", empDoc.id)
+          }
         } else if (fileUrl) {
-          await client.from("document_vault").insert({
+          const vault = await persistVaultDocument(client, {
             employee_id: id,
             employee_name: updated.full_name || updated.display_name,
             document_type: documentType,
             file_name: doc.fileName || doc.file_name || doc.name || "document",
-            file_size: doc.fileSize || doc.file_size || 0,
+            file_size: Number(doc.fileSize || doc.file_size || 0),
             file_type: doc.fileType || doc.mime_type || "application/octet-stream",
             file_url: fileUrl,
             source: "employee-onboarding",
@@ -301,6 +312,12 @@ export async function PATCH(
             company_id: updated.company_id,
             notes: `Linked from employee module${empDoc?.id ? ` (${empDoc.id})` : ""}`,
           })
+          if (vault.ok && vault.id && empDoc?.id) {
+            await client
+              .from("employee_documents")
+              .update({ vault_document_id: vault.id })
+              .eq("id", empDoc.id)
+          }
         }
       }
     }
