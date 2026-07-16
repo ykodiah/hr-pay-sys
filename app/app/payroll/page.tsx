@@ -40,6 +40,8 @@ type PayInputApiRow = {
     communication_allowance: number
     uniform_allowance: number
     other_allowances: number
+    card_allowances?: number
+    card_deductions?: number
     tier2_applicable: boolean
     tier3_applicable: boolean
   }
@@ -129,6 +131,8 @@ function pick(override: number | null | undefined, master: number) {
 
 function mapApiRow(row: PayInputApiRow): WorksheetRow {
   const basic = pick(row.input.basic_salary, row.master.basic_salary)
+  const cardAllow = Number(row.master.card_allowances ?? 0)
+  const cardDed = Number(row.master.card_deductions ?? 0)
   const allowances =
     pick(row.input.transport_allowance, row.master.transport_allowance) +
     pick(row.input.housing_allowance, row.master.housing_allowance) +
@@ -136,7 +140,8 @@ function mapApiRow(row: PayInputApiRow): WorksheetRow {
     pick(row.input.meal_allowance, row.master.meal_allowance) +
     pick(row.input.communication_allowance, row.master.communication_allowance) +
     pick(row.input.uniform_allowance, row.master.uniform_allowance) +
-    pick(row.input.other_allowances, row.master.other_allowances)
+    pick(row.input.other_allowances, row.master.other_allowances) +
+    cardAllow
 
   return {
     employeeId: row.employee_id,
@@ -150,7 +155,7 @@ function mapApiRow(row: PayInputApiRow): WorksheetRow {
     bonus: Number(row.input.bonus_amount ?? 0),
     loan: Number(row.input.loan_deduction ?? 0),
     advance: Number(row.input.advance_deduction ?? 0),
-    other: Number(row.input.other_deductions ?? 0),
+    other: Number(row.input.other_deductions ?? 0) + cardDed,
     tier2: row.input.tier2_applicable !== false,
     tier3: Boolean(row.input.tier3_applicable),
     tier3Rate: Number(row.input.tier3_employee_rate ?? 0),
@@ -318,10 +323,14 @@ export default function PayrollPage() {
       const res = await fetch("/api/payroll/process", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           company_id: companyId,
           pay_period: payPeriod,
-          payroll_run_id: activeRun?.id,
+          payroll_run_id:
+            activeRun && !["approved", "paid", "cancelled"].includes(activeRun.status)
+              ? activeRun.id
+              : undefined,
           submit_for_approval: true,
         }),
       })
@@ -329,10 +338,10 @@ export default function PayrollPage() {
       if (!res.ok) throw new Error(json.error || "Processing failed")
 
       toast({
-        title: "Payroll processed",
-        description: `${json.processed} employee(s) synced to payroll_items / payslips${
+        title: json.submitted_for_approval ? "Submitted for approval" : "Payroll processed",
+        description: `${json.processed} employee(s) written to payroll_items / payslips${
           json.errors?.length ? ` (${json.errors.length} warnings)` : ""
-        }.`,
+        }. Approve in Approvals, then view in History.`,
       })
       await loadWorksheet(companyId, payPeriod)
     } catch (err) {
@@ -344,6 +353,18 @@ export default function PayrollPage() {
     } finally {
       setProcessing(false)
     }
+  }
+
+  const handleExportPdf = () => {
+    if (activeRun?.id) {
+      window.open(`/api/payroll/runs/${activeRun.id}/pdf`, "_blank", "noopener,noreferrer")
+      return
+    }
+    toast({
+      title: "Process payroll first",
+      description: "PDF register is available after a payroll run exists for this period.",
+      variant: "destructive",
+    })
   }
 
   const handleExport = () => {
@@ -473,6 +494,10 @@ export default function PayrollPage() {
         <Button variant="outline" onClick={handleExport} disabled={!rows.length}>
           <Download className="h-4 w-4 mr-2" />
           Export CSV
+        </Button>
+        <Button variant="outline" onClick={handleExportPdf} disabled={!activeRun?.id}>
+          <Download className="h-4 w-4 mr-2" />
+          Export PDF
         </Button>
         {lastSyncedAt && (
           <Badge variant="outline" className="h-8 gap-1">

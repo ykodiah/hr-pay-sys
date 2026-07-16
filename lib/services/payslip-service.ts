@@ -271,14 +271,19 @@ export async function issuePayrollRunPayslips(
 ): Promise<{ issued: number; alreadyIssued: number; error: string | null }> {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
-    .rpc("issue_payroll_run_payslips", { p_payroll_run_id: payrollRunId })
-    .single()
+  const { data, error } = await supabase.rpc("issue_payroll_run_payslips", {
+    p_payroll_run_id: payrollRunId,
+  })
 
   if (error) return { issued: 0, alreadyIssued: 0, error: error.message }
 
-  const result = data as { issued: number; already_issued: number }
-  return { issued: result.issued, alreadyIssued: result.already_issued, error: null }
+  const row = Array.isArray(data) ? data[0] : data
+  const result = (row ?? {}) as { issued?: number; already_issued?: number }
+  return {
+    issued: Number(result.issued ?? 0),
+    alreadyIssued: Number(result.already_issued ?? 0),
+    error: null,
+  }
 }
 
 // ---------------------------------------------------------------------------

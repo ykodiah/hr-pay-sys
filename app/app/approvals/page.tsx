@@ -67,7 +67,10 @@ export default function ApprovalsPage() {
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Failed")
-      toast({ title: "Payroll approved", description: "Payroll run has been approved for payment." })
+      toast({
+        title: "Payroll approved",
+        description: `Payslips issued (${json.payslips_issued ?? 0}). Run moved to Payroll History.`,
+      })
       mutate(payrollKey)
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" })

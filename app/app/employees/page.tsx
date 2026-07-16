@@ -559,73 +559,86 @@ export default function EmployeesPage() {
     }
   }, [])
 
-  const generateEmployeeId = useCallback(() => {
-    // Get company name initials
+  const buildEmployeeIdPrefix = useCallback(() => {
     const companyName = companySettings?.name || "AKHR"
-    let letterPart = ""
-
     if (formData.hasSubsidiary === "Yes" && formData.subsidiary) {
-      // Get subsidiary name
       const selectedSubsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
       if (selectedSubsidiary) {
-        // First 2 initials of parent company
         const companyInitials = companyName
           .split(" ")
-          .map((word) => word[0])
+          .map((word: string) => word[0])
           .join("")
           .toUpperCase()
           .slice(0, 2)
-
-        // First 2 initials of subsidiary
         const subsidiaryInitials = selectedSubsidiary.name
           .split(" ")
-          .map((word) => word[0])
+          .map((word: string) => word[0])
           .join("")
           .toUpperCase()
           .slice(0, 2)
-
-        letterPart = (companyInitials + subsidiaryInitials).slice(0, 4).padEnd(4, "X")
-      } else {
-        // Fallback to company initials
-        letterPart = companyName
-          .split(" ")
-          .map((word) => word[0])
-          .join("")
-          .toUpperCase()
-          .slice(0, 4)
-          .padEnd(4, "X")
+        return (companyInitials + subsidiaryInitials).slice(0, 4).padEnd(4, "X")
       }
-    } else {
-      // Use first 4 initials of parent company
-      letterPart = companyName
-        .split(" ")
-        .map((word) => word[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 4)
-        .padEnd(4, "X")
     }
+    return companyName
+      .split(" ")
+      .map((word: string) => word[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 4)
+      .padEnd(4, "X")
+  }, [companySettings, formData.hasSubsidiary, formData.subsidiary, subsidiaries])
 
-    // Generate sequential 4-digit number based on existing employees
-    const numberPart = String(employees.length + 1).padStart(4, "0")
-
-    return `${letterPart}${numberPart}`
-  }, [companySettings, formData.hasSubsidiary, formData.subsidiary, subsidiaries, employees.length])
-
+  // Sequential employee ID from DB (max existing suffix + 1), not list length
   useEffect(() => {
-    // Only auto-generate for add flow — never overwrite an existing employee's code while editing
     if (isEditDialogOpen && selectedEmployee?.employee_id) return
-    const newEmployeeId = generateEmployeeId()
-    console.log("[v0] Generating Employee ID:", {
-      hasSubsidiary: formData.hasSubsidiary,
-      subsidiary: formData.subsidiary,
-      newEmployeeId,
-    })
-    setFormData((prev: any) => ({
-      ...prev,
-      employeeId: newEmployeeId,
-    }))
-  }, [formData.hasSubsidiary, formData.subsidiary, generateEmployeeId, isEditDialogOpen, selectedEmployee])
+    if (!isAddDialogOpen) return
+    if (!companyId) return
+
+    let cancelled = false
+    const prefix = buildEmployeeIdPrefix()
+    ;(async () => {
+      try {
+        const res = await fetch(
+          `/api/employees/next-id?company_id=${encodeURIComponent(companyId)}&prefix=${encodeURIComponent(prefix)}`,
+          { cache: "no-store" },
+        )
+        const json = await res.json()
+        if (cancelled) return
+        if (res.ok && json.employee_id) {
+          setFormData((prev: any) => ({ ...prev, employeeId: json.employee_id }))
+          return
+        }
+      } catch {
+        /* fall through */
+      }
+      if (cancelled) return
+      // Local fallback: max numeric suffix for prefix among loaded employees
+      let max = 0
+      for (const emp of employees) {
+        const code = String(emp.employee_id || "")
+        if (!code.startsWith(prefix)) continue
+        const num = Number(code.slice(prefix.length))
+        if (Number.isFinite(num) && num > max) max = num
+      }
+      setFormData((prev: any) => ({
+        ...prev,
+        employeeId: `${prefix}${String(max + 1).padStart(4, "0")}`,
+      }))
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    companyId,
+    buildEmployeeIdPrefix,
+    isEditDialogOpen,
+    isAddDialogOpen,
+    selectedEmployee,
+    formData.hasSubsidiary,
+    formData.subsidiary,
+    employees,
+  ])
   // </CHANGE>
 
   const loadCompanyData = async () => {
@@ -709,45 +722,55 @@ export default function EmployeesPage() {
   // Load supervisors and heads of department based on department selection
   useEffect(() => {
     const loadSupervisorsAndHeads = () => {
-      console.log("[v0] Loading supervisors and heads for department:", formData.department)
+      const activeEmployees = employees.filter(
+        (emp) => String(emp.status ?? "").toLowerCase() === "active",
+      )
+      const departmentEmployees = formData.department
+        ? activeEmployees.filter((emp) => emp.department === formData.department)
+        : activeEmployees
 
-      // Filter employees based on department and special roles (DB field: special_role)
-      const departmentEmployees = employees.filter(
-        (emp) =>
-          emp.department === formData.department &&
-          String(emp.status ?? "").toLowerCase() === "active",
+      const roleOf = (emp: any) => String(emp.special_role || emp.specialRole || "").toLowerCase()
+      const supervisorsList = departmentEmployees.filter(
+        (emp) => roleOf(emp).includes("supervisor") || roleOf(emp).includes("direct"),
+      )
+      const headsList = departmentEmployees.filter(
+        (emp) => roleOf(emp).includes("head") || roleOf(emp).includes("hod"),
       )
 
-      const roleOf = (emp: any) => emp.special_role || emp.specialRole || ""
-      const supervisorsList = departmentEmployees.filter((emp) =>
-        String(roleOf(emp)).toLowerCase().includes("supervisor"),
-      )
-      const headsList = departmentEmployees.filter((emp) =>
-        String(roleOf(emp)).toLowerCase().includes("head"),
-      )
+      // Prefer role-matched; else all department (or all active) employees
+      let finalSupervisors = supervisorsList.length > 0 ? supervisorsList : departmentEmployees
+      let finalHeads = headsList.length > 0 ? headsList : departmentEmployees
 
-      // If no specific roles found, show all department employees as options
-      const finalSupervisors = supervisorsList.length > 0 ? supervisorsList : departmentEmployees
-      const finalHeads = headsList.length > 0 ? headsList : departmentEmployees
+      // Always include currently saved supervisor/HOD so edit form can show the value
+      const ensureIncluded = (list: any[], id: string | undefined | null) => {
+        if (!id) return list
+        if (list.some((e) => e.id === id)) return list
+        const found = employees.find((e) => e.id === id)
+        return found ? [found, ...list] : list
+      }
+      finalSupervisors = ensureIncluded(
+        finalSupervisors,
+        formData.directSupervisor || selectedEmployee?.direct_supervisor,
+      )
+      finalHeads = ensureIncluded(
+        finalHeads,
+        formData.headOfDepartment || selectedEmployee?.head_of_department,
+      )
 
       setSupervisors(finalSupervisors)
       setHeadsOfDepartment(finalHeads)
-
-      console.log("[v0] Loaded supervisors:", finalSupervisors.length)
-      console.log("[v0] Loaded heads of department:", finalHeads.length)
-
-      // Show "No data" message if no employees found
-      if (departmentEmployees.length === 0) {
-        console.log("[v0] No employees found for department:", formData.department)
-        setSupervisors([])
-        setHeadsOfDepartment([])
-      }
     }
 
-    if (formData.department && employees.length > 0) {
+    if (employees.length > 0) {
       loadSupervisorsAndHeads()
     }
-  }, [formData.department, employees])
+  }, [
+    formData.department,
+    formData.directSupervisor,
+    formData.headOfDepartment,
+    employees,
+    selectedEmployee,
+  ])
 
   // Removed the duplicate loadParentCompanyData function. The useCallback version above is used.
 
@@ -1370,7 +1393,11 @@ export default function EmployeesPage() {
                         <div className="flex items-center space-x-4">
                           <Avatar className="w-12 h-12">
                             <AvatarImage
-                              src={`https://api.dicebear.com/7.x/initials/svg?seed=${listDisplayName(employee)}`}
+                              src={
+                                employee.profile_picture ||
+                                employee.profilePicture ||
+                                `https://api.dicebear.com/7.x/initials/svg?seed=${listDisplayName(employee)}`
+                              }
                             />
                             <AvatarFallback className="bg-emerald-100 text-emerald-700">
                               {listDisplayName(employee)
@@ -1496,6 +1523,8 @@ export default function EmployeesPage() {
               subsidiaries={subsidiaries}
               setFormData={setFormData}
               formData={formData}
+              supervisors={supervisors}
+              headsOfDepartment={headsOfDepartment}
               employees={employees}
               selectedEmployee={selectedEmployee}
               companySettings={companySettings}
@@ -2467,6 +2496,23 @@ function AddEmployeeForm({
         const filtered = prev.filter((d) => d.documentType !== documentType)
         return [...filtered, uploadedDoc]
       })
+
+      // Passport picture becomes the employee profile photo across the system
+      if (
+        (documentType === "passport-picture" || documentType === "passport_picture") &&
+        uploadedDoc.fileUrl
+      ) {
+        setFormData((prev: any) => ({ ...prev, profilePicture: uploadedDoc.fileUrl }))
+        const empUuid = selectedEmployee?.id
+        if (empUuid && String(empUuid).length > 20) {
+          fetch(`/api/employees/${empUuid}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ profile_picture: uploadedDoc.fileUrl }),
+          }).catch(() => {})
+        }
+      }
+
       toast({ title: "Upload Successful", description: `${file.name} saved to document vault` })
     } catch (error) {
       console.error("Upload error:", error)

@@ -140,9 +140,48 @@ export async function POST(req: NextRequest) {
       body.display_name ||
       `${body.first_name} ${body.last_name}`.trim()
 
+    // Ensure sequential employee_id: use provided code if unique, else allocate next
+    let employeeCode = body.employee_id ? String(body.employee_id).trim() : ""
+    if (employeeCode) {
+      const { data: clash } = await client
+        .from("employees")
+        .select("id")
+        .eq("company_id", companyId)
+        .eq("employee_id", employeeCode)
+        .maybeSingle()
+      if (clash) employeeCode = ""
+    }
+    if (!employeeCode) {
+      const prefix = String(body.prefix || employeeCode || "EMP")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 4)
+        .padEnd(4, "X")
+      const { data: rpcCode } = await client.rpc("next_employee_code", {
+        p_company_id: companyId,
+        p_prefix: prefix,
+      })
+      if (rpcCode) {
+        employeeCode = String(rpcCode)
+      } else {
+        const { data: existing } = await client
+          .from("employees")
+          .select("employee_id")
+          .eq("company_id", companyId)
+        let max = 0
+        for (const row of existing ?? []) {
+          const code = String(row.employee_id || "")
+          if (!code.startsWith(prefix)) continue
+          const n = Number(code.slice(prefix.length))
+          if (Number.isFinite(n) && n > max) max = n
+        }
+        employeeCode = `${prefix}${String(max + 1).padStart(4, "0")}`
+      }
+    }
+
     const employeePayload = {
       company_id: companyId,
-      employee_id: body.employee_id ?? null,
+      employee_id: employeeCode,
       prefix: body.prefix ?? null,
       first_name: body.first_name,
       other_names: body.other_names ?? null,

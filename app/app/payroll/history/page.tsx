@@ -330,6 +330,17 @@ export default function PayrollHistoryPage() {
   }
 
   const handleExportAll = (format: "excel" | "csv" | "pdf") => {
+    if (format === "pdf") {
+      const approved = payrollRuns.find((r) => r.status === "approved") || payrollRuns[0]
+      if (approved) {
+        window.open(`/api/payroll/runs/${approved.id}/pdf`, "_blank", "noopener,noreferrer")
+        toast({
+          title: "PDF register opened",
+          description: "Use Print → Save as PDF. For a specific run, use that row’s export menu.",
+        })
+        return
+      }
+    }
     const columns = [
       "Pay Period Start",
       "Pay Period End",
@@ -367,7 +378,16 @@ export default function PayrollHistoryPage() {
 
   const handleExportSingle = async (run: PayrollRun, format: "excel" | "csv" | "pdf") => {
     try {
-      if (run.company_id) {
+      if (format === "pdf") {
+        window.open(`/api/payroll/runs/${run.id}/pdf`, "_blank", "noopener,noreferrer")
+        toast({
+          title: "PDF register opened",
+          description: "Use Print → Save as PDF in the browser dialog.",
+        })
+        return
+      }
+
+      if ((run as any).company_id) {
         const period =
           (run as any).pay_period ||
           (run.pay_period_start ? String(run.pay_period_start).slice(0, 7) : new Date().toISOString().slice(0, 7))
@@ -375,7 +395,7 @@ export default function PayrollHistoryPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            company_id: run.company_id,
+            company_id: (run as any).company_id,
             report_type: "payroll_summary",
             pay_period: period,
             payroll_run_id: run.id,
@@ -434,6 +454,30 @@ export default function PayrollHistoryPage() {
       toast({
         title: "Export failed",
         description: err instanceof Error ? err.message : "Could not export payroll run",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDownloadPayslip = async (employeeId: string, runId: string) => {
+    try {
+      const res = await fetch(`/api/payroll/runs/${runId}/payslips`, { cache: "no-store" })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Failed to load payslips")
+      const slip = (json.payslips || []).find((p: any) => p.employee_id === employeeId)
+      if (!slip?.id) {
+        toast({
+          title: "Payslip not found",
+          description: "Approve the payroll run to issue payslips, or re-process the period.",
+          variant: "destructive",
+        })
+        return
+      }
+      window.open(`/api/payslips/${slip.id}/pdf`, "_blank", "noopener,noreferrer")
+    } catch (err) {
+      toast({
+        title: "Download failed",
+        description: err instanceof Error ? err.message : "Could not open payslip",
         variant: "destructive",
       })
     }
@@ -1116,6 +1160,7 @@ export default function PayrollHistoryPage() {
                           <th className="text-right py-2 px-3 text-xs font-semibold text-gray-700">Gross Pay</th>
                           <th className="text-right py-2 px-3 text-xs font-semibold text-gray-700">Deductions</th>
                           <th className="text-right py-2 px-3 text-xs font-semibold text-gray-700">Net Pay</th>
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-gray-700">Payslip</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1133,6 +1178,18 @@ export default function PayrollHistoryPage() {
                             </td>
                             <td className="py-2 px-3 text-right font-semibold text-emerald-600">
                               {formatCurrency(item.net_pay || 0)}
+                            </td>
+                            <td className="py-2 px-3 text-right">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  selectedRun && handleDownloadPayslip(item.employee_id, selectedRun.id)
+                                }
+                              >
+                                <Download className="h-3.5 w-3.5 mr-1" />
+                                PDF
+                              </Button>
                             </td>
                           </tr>
                         ))}

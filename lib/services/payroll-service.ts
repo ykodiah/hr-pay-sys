@@ -2,6 +2,7 @@ import { BaseService } from "./base-service"
 import type { PayrollRun, PayrollItem, CreatePayrollRunInput, UpdatePayrollRunInput, ServiceResponse } from "./types"
 import { calculateEmployeeTax, getTaxRates } from "@/lib/ghana-tax/tax-config-service"
 import type { EmployeePayInput, TaxCalculationResult } from "@/lib/ghana-tax/engine"
+import { sumCompLines } from "@/lib/payroll/employee-comp-extras"
 
 export class PayrollService extends BaseService {
   async getPayrollRuns(
@@ -257,18 +258,20 @@ export class PayrollService extends BaseService {
         ? String(run.pay_period_start).slice(0, 7)
         : new Date().toISOString().slice(0, 7)
 
-      // Parallel fetch: employees + period pay inputs + active loan installments
-      const [empRes, inputsRes, loansRes] = await Promise.all([
+      // Parallel fetch: employees + period pay inputs + loans + card allowances/deductions
+      const [empRes, inputsRes, loansRes, allowRes, dedRes] = await Promise.all([
         client
           .from("employees")
           .select(
-            `id, first_name, last_name,
+            `id, first_name, last_name, preferred_name, employee_id, position, department,
+             profile_picture, ssnit_number,
              financial:employee_financial(
                monthly_salary,
                transport_allowance, housing_allowance, medical_allowance,
                meal_allowance, communication_allowance, uniform_allowance, other_allowances,
                tier2_employee_contribution, tier2_employer_contribution, tier3_contribution,
-               provident_fund_enrolled, provident_fund_rate
+               provident_fund_enrolled, provident_fund_rate,
+               bank_name, bank_account_number
              )`,
           )
           .eq("company_id", companyId)
@@ -283,10 +286,18 @@ export class PayrollService extends BaseService {
           .select("employee_id, monthly_payment, status, auto_deduct")
           .eq("company_id", companyId)
           .in("status", ["active", "approved"]),
+        client
+          .from("employee_allowances")
+          .select("employee_id, amount, percentage, calculation_type, effective_date, end_date, is_active, recurring")
+          .eq("is_active", true),
+        client
+          .from("employee_deductions")
+          .select("employee_id, amount, percentage, calculation_type, effective_date, end_date, is_active, recurring")
+          .eq("is_active", true),
       ])
 
       if (empRes.error) throw empRes.error
-      // loans / pay_inputs failures are non-fatal — continue with master financials only
+      // loans / pay_inputs / card comps failures are non-fatal — continue with master financials
 
       const inputsByEmployee = new Map(
         (inputsRes.data ?? []).map((row: any) => [row.employee_id, row]),
@@ -297,6 +308,23 @@ export class PayrollService extends BaseService {
         const prev = loansByEmployee.get(loan.employee_id) ?? 0
         loansByEmployee.set(loan.employee_id, prev + Number(loan.monthly_payment ?? 0))
       }
+
+      const cardAllowByEmp = new Map<string, any[]>()
+      for (const row of allowRes.data ?? []) {
+        const list = cardAllowByEmp.get(row.employee_id) ?? []
+        list.push(row)
+        cardAllowByEmp.set(row.employee_id, list)
+      }
+      const cardDedByEmp = new Map<string, any[]>()
+      for (const row of dedRes.data ?? []) {
+        const list = cardDedByEmp.get(row.employee_id) ?? []
+        list.push(row)
+        cardDedByEmp.set(row.employee_id, list)
+      }
+
+      const asOf = run?.pay_period_end
+        ? String(run.pay_period_end).slice(0, 10)
+        : new Date().toISOString().slice(0, 10)
 
       const errors: string[] = []
       let processed = 0
@@ -313,8 +341,16 @@ export class PayrollService extends BaseService {
           const pick = (override: unknown, master: unknown) =>
             override != null && override !== "" ? Number(override) : Number(master ?? 0)
 
+          const monthlyBasic = pick(period?.basic_salary, fin.monthly_salary)
+          const cardAllowTotal = sumCompLines(cardAllowByEmp.get(emp.id), monthlyBasic, asOf)
+          const cardDedTotal = sumCompLines(cardDedByEmp.get(emp.id), monthlyBasic, asOf)
+
+          // Period override for other_allowances replaces master; card allowances always add
+          const masterOther = pick(period?.other_allowances, fin.other_allowances)
+          const periodOtherDed = Number(period?.other_deductions ?? 0)
+
           const input: EmployeePayInput = {
-            monthly_basic: pick(period?.basic_salary, fin.monthly_salary),
+            monthly_basic: monthlyBasic,
             monthly_allowances: {
               transport: pick(period?.transport_allowance, fin.transport_allowance),
               housing: pick(period?.housing_allowance, fin.housing_allowance),
@@ -322,7 +358,7 @@ export class PayrollService extends BaseService {
               meal: pick(period?.meal_allowance, fin.meal_allowance),
               communication: pick(period?.communication_allowance, fin.communication_allowance),
               uniform: pick(period?.uniform_allowance, fin.uniform_allowance),
-              other: pick(period?.other_allowances, fin.other_allowances),
+              other: masterOther + cardAllowTotal,
             },
             monthly_overtime: Number(period?.overtime_amount ?? 0),
             monthly_bonus: Number(period?.bonus_amount ?? 0),
@@ -342,11 +378,22 @@ export class PayrollService extends BaseService {
                 Number(period?.loan_deduction ?? 0) ||
                 Number(loansByEmployee.get(emp.id) ?? 0),
               advance: Number(period?.advance_deduction ?? 0),
-              other: Number(period?.other_deductions ?? 0),
+              other: periodOtherDed + cardDedTotal,
             },
           }
 
-          await this.calculateAndSaveEmployeeTax(payrollRunId, emp.id, companyId, input)
+          const saveResult = await this.calculateAndSaveEmployeeTax(
+            payrollRunId,
+            emp.id,
+            companyId,
+            input,
+          )
+          if (!saveResult.success) {
+            errors.push(
+              `${emp.first_name} ${emp.last_name}: ${saveResult.error?.message ?? "tax/save failed"}`,
+            )
+            continue
+          }
           processed++
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unknown error"
@@ -421,6 +468,24 @@ export class PayrollService extends BaseService {
       ? new Date(run.pay_period_start).toISOString().slice(0, 7)
       : new Date().toISOString().slice(0, 7)
 
+    const [{ data: emp }, { data: company }] = await Promise.all([
+      client
+        .from("employees")
+        .select(
+          `first_name, last_name, preferred_name, employee_id, position, department, ssnit_number,
+           financial:employee_financial(bank_name, bank_account_number, ssnit_number)`,
+        )
+        .eq("id", payrollItem.employee_id)
+        .maybeSingle(),
+      client.from("companies").select("name").eq("id", companyId).maybeSingle(),
+    ])
+
+    const fin = Array.isArray(emp?.financial) ? emp?.financial?.[0] : emp?.financial
+    const empName =
+      emp?.preferred_name ||
+      `${emp?.first_name || ""} ${emp?.last_name || ""}`.trim() ||
+      "Employee"
+
     const payslipPayload = {
       payroll_item_id: payrollItem.id,
       payroll_run_id: payrollItem.payroll_run_id,
@@ -430,6 +495,14 @@ export class PayrollService extends BaseService {
       pay_period_start: run.pay_period_start,
       pay_period_end: run.pay_period_end,
       pay_date: run.pay_date,
+      snapshot_employee_name: empName,
+      snapshot_employee_id_no: emp?.employee_id || null,
+      snapshot_position: emp?.position || null,
+      snapshot_department: emp?.department || null,
+      snapshot_ssnit_number: fin?.ssnit_number || emp?.ssnit_number || null,
+      snapshot_bank_name: fin?.bank_name || null,
+      snapshot_account_number: fin?.bank_account_number || null,
+      snapshot_company_name: company?.name || null,
       basic_salary: tax.monthly_basic,
       transport_allowance: (payrollItem.allowances as any)?.transport ?? 0,
       housing_allowance: (payrollItem.allowances as any)?.housing ?? 0,
@@ -462,8 +535,9 @@ export class PayrollService extends BaseService {
       updated_at: new Date().toISOString(),
     }
 
-    await client
+    const { error } = await client
       .from("payslips")
       .upsert(payslipPayload, { onConflict: "payroll_item_id" })
+    if (error) throw error
   }
 }

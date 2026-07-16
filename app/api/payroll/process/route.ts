@@ -3,8 +3,9 @@
  *
  * Server-authoritative payroll processing from DB:
  * employees + employee_financial + payroll_pay_inputs + employee_loans
+ * + employee_allowances / employee_deductions
  *
- * Body: { company_id, pay_period, payroll_run_id?, submit_for_approval? }
+ * Body: { company_id, pay_period, payroll_run_id?, submit_for_approval?, employee_ids? }
  */
 
 import { NextRequest, NextResponse } from "next/server"
@@ -50,13 +51,25 @@ export async function POST(req: NextRequest) {
     const bounds = periodBounds(pay_period)
     let runId = payroll_run_id
 
+    // Never reuse approved/paid/cancelled runs
+    if (runId) {
+      const { data: existingRun } = await client
+        .from("payroll_runs")
+        .select("id, status")
+        .eq("id", runId)
+        .maybeSingle()
+      if (existingRun && ["approved", "paid", "cancelled"].includes(String(existingRun.status))) {
+        runId = undefined
+      }
+    }
+
     if (!runId) {
       const { data: existing } = await client
         .from("payroll_runs")
-        .select("id")
+        .select("id, status")
         .eq("company_id", company_id)
         .eq("pay_period_start", bounds.pay_period_start)
-        .in("status", ["draft", "processing", "pending", "completed", "partial"])
+        .in("status", ["draft", "processing", "pending", "completed", "partial", "rejected"])
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle()
@@ -65,22 +78,37 @@ export async function POST(req: NextRequest) {
     }
 
     if (!runId) {
-      const { data: created, error } = await client
+      // Omit created_by when demo / FK may reject auth user ids
+      const insertPayload: Record<string, unknown> = {
+        company_id,
+        ...bounds,
+        status: "processing",
+        approval_stage: "pending",
+        updated_at: new Date().toISOString(),
+      }
+      if (!user.isDemo) insertPayload.created_by = user.id
+
+      let { data: created, error } = await client
         .from("payroll_runs")
-        .insert({
-          company_id,
-          ...bounds,
-          status: "processing",
-          approval_stage: "pending",
-          created_by: user.isDemo ? null : user.id,
-          updated_at: new Date().toISOString(),
-        })
+        .insert(insertPayload)
         .select("id")
         .single()
 
+      // Retry without created_by if FK fails
+      if (error && String(error.message).toLowerCase().includes("created_by")) {
+        delete insertPayload.created_by
+        const retry = await client.from("payroll_runs").insert(insertPayload).select("id").single()
+        created = retry.data
+        error = retry.error
+      }
+
       if (error || !created) {
         return NextResponse.json(
-          { error: error?.message ?? "Failed to create payroll run" },
+          {
+            error:
+              error?.message ??
+              "Failed to create payroll run. Ensure scripts/049 and 055 are applied.",
+          },
           { status: 500 },
         )
       }
@@ -100,9 +128,28 @@ export async function POST(req: NextRequest) {
     const result = await service.processPayrollRun(runId, company_id)
 
     if (!result.success || !result.data) {
+      await client
+        .from("payroll_runs")
+        .update({ status: "draft", updated_at: new Date().toISOString() })
+        .eq("id", runId)
       return NextResponse.json(
         { error: result.error?.message ?? "Payroll processing failed" },
         { status: 500 },
+      )
+    }
+
+    if (result.data.processed === 0 && result.data.errors.length > 0) {
+      await client
+        .from("payroll_runs")
+        .update({ status: "draft", updated_at: new Date().toISOString() })
+        .eq("id", runId)
+      return NextResponse.json(
+        {
+          error: `No employees processed. ${result.data.errors[0]}`,
+          errors: result.data.errors,
+          payroll_run_id: runId,
+        },
+        { status: 422 },
       )
     }
 
@@ -123,7 +170,6 @@ export async function POST(req: NextRequest) {
 
     await client.from("payroll_runs").update(runUpdate).eq("id", runId)
 
-    // Mark period pay inputs as processed
     await client
       .from("payroll_pay_inputs")
       .update({ status: "processed", updated_at: new Date().toISOString() })
@@ -138,6 +184,7 @@ export async function POST(req: NextRequest) {
       run,
       processed: result.data.processed,
       errors: result.data.errors,
+      submitted_for_approval: nextStatus === "pending",
       meta: { fetched_at: new Date().toISOString() },
     })
   } catch (err) {

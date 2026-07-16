@@ -8,6 +8,7 @@
 
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { sumCompLines } from "@/lib/payroll/employee-comp-extras"
 
 const ACTIVE_STATUSES = ["Active", "active", "ACTIVE"]
 
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
     }
 
     // Parallel fetch from respective tables for fast sync
-    const [employeesRes, inputsRes, loansRes] = await Promise.all([
+    const [employeesRes, inputsRes, loansRes, allowRes, dedRes] = await Promise.all([
       supabase
         .from("employees")
         .select(
@@ -49,6 +50,14 @@ export async function GET(request: Request) {
         .select("employee_id, monthly_payment, remaining_balance, status, auto_deduct")
         .eq("company_id", companyId)
         .in("status", ["active", "approved"]),
+      supabase
+        .from("employee_allowances")
+        .select("employee_id, amount, percentage, calculation_type, effective_date, end_date, is_active")
+        .eq("is_active", true),
+      supabase
+        .from("employee_deductions")
+        .select("employee_id, amount, percentage, calculation_type, effective_date, end_date, is_active")
+        .eq("is_active", true),
     ])
 
     let employees: any[] = employeesRes.data ?? []
@@ -95,10 +104,29 @@ export async function GET(request: Request) {
       })
     }
 
+    const cardAllowByEmp = new Map<string, any[]>()
+    for (const row of allowRes.data ?? []) {
+      const list = cardAllowByEmp.get(row.employee_id) ?? []
+      list.push(row)
+      cardAllowByEmp.set(row.employee_id, list)
+    }
+    const cardDedByEmp = new Map<string, any[]>()
+    for (const row of dedRes.data ?? []) {
+      const list = cardDedByEmp.get(row.employee_id) ?? []
+      list.push(row)
+      cardDedByEmp.set(row.employee_id, list)
+    }
+
+    // Mid-month of period for effective dating
+    const asOf = `${payPeriod}-15`
+
     const rows = employees.map((emp: any) => {
       const fin = Array.isArray(emp.financial) ? emp.financial[0] : emp.financial
       const input = inputsByEmployee.get(emp.id)
       const loan = loansByEmployee.get(emp.id)
+      const basic = Number(fin?.monthly_salary ?? 0)
+      const cardAllow = sumCompLines(cardAllowByEmp.get(emp.id), basic, asOf)
+      const cardDed = sumCompLines(cardDedByEmp.get(emp.id), basic, asOf)
 
       return {
         employee_id: emp.id,
@@ -112,7 +140,7 @@ export async function GET(request: Request) {
         account_number: fin?.bank_account_number ?? null,
         ssnit_number: fin?.ssnit_number ?? null,
         master: {
-          basic_salary: Number(fin?.monthly_salary ?? 0),
+          basic_salary: basic,
           transport_allowance: Number(fin?.transport_allowance ?? 0),
           housing_allowance: Number(fin?.housing_allowance ?? 0),
           medical_allowance: Number(fin?.medical_allowance ?? 0),
@@ -120,6 +148,9 @@ export async function GET(request: Request) {
           communication_allowance: Number(fin?.communication_allowance ?? 0),
           uniform_allowance: Number(fin?.uniform_allowance ?? 0),
           other_allowances: Number(fin?.other_allowances ?? 0),
+          // Employee-module card comps (added at process + worksheet preview; not stored in pay_inputs)
+          card_allowances: cardAllow,
+          card_deductions: cardDed,
           tier2_applicable: Number(fin?.tier2_employee_contribution ?? 0) >= 0,
           tier3_applicable:
             Boolean(fin?.provident_fund_enrolled) ||

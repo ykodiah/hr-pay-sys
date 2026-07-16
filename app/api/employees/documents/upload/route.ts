@@ -115,6 +115,18 @@ export async function POST(req: NextRequest) {
       if (empDocErr) {
         console.warn("[employee-docs] employee_documents insert failed:", empDocErr.message)
       }
+
+      // Passport picture becomes the system profile photo
+      if (
+        documentType === "passport-picture" ||
+        documentType === "passport_picture" ||
+        documentType === "profile-picture"
+      ) {
+        await client
+          .from("employees")
+          .update({ profile_picture: stored.fileUrl, updated_at: new Date().toISOString() })
+          .eq("id", employeeUuid)
+      }
     }
 
     return NextResponse.json({
@@ -130,6 +142,10 @@ export async function POST(req: NextRequest) {
         file_content: stored.fileContent,
         uploadDate: vault.data?.upload_date || new Date().toISOString(),
         uploadedBy: "HR Admin",
+        is_profile_picture:
+          documentType === "passport-picture" ||
+          documentType === "passport_picture" ||
+          documentType === "profile-picture",
       },
     })
   } catch (err) {
