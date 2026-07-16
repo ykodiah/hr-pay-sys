@@ -1,10 +1,9 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
-// Simple in-memory rate limiter (per-process). For distributed rate limiting,
-// replace with a shared store such as Upstash Redis.
+// Simple in-memory rate limiter (per-process).
 const RATE_LIMIT_WINDOW_MS = 60_000
-const RATE_LIMIT_MAX_REQUESTS = 60
+const RATE_LIMIT_MAX_REQUESTS = 300
 const clientHits: Map<string, { count: number; windowStart: number }> = new Map()
 
 function isRateLimited(key: string): boolean {
@@ -19,12 +18,31 @@ function isRateLimited(key: string): boolean {
   return false
 }
 
+async function getUserWithTimeout(
+  supabase: ReturnType<typeof createServerClient>,
+  ms = 2500,
+) {
+  try {
+    const result = await Promise.race([
+      supabase.auth.getUser(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
+    ])
+    if (!result) return null
+    return result.data?.user ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function updateSession(request: NextRequest) {
-  // Rate limit API routes
-  if (request.nextUrl.pathname.startsWith("/api")) {
-    const clientKey = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
+  const pathname = request.nextUrl.pathname
+
+  // Rate limit API routes (but never block forever)
+  if (pathname.startsWith("/api")) {
+    const clientKey =
+      request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
     if (isRateLimited(clientKey)) {
-      return new NextResponse(JSON.stringify({ error: "Too many requests" }), {
+      return new NextResponse(JSON.stringify({ error: "Too many requests. Wait a moment and retry." }), {
         status: 429,
         headers: {
           "Content-Type": "application/json",
@@ -51,21 +69,29 @@ export async function updateSession(request: NextRequest) {
     "/api/careers",
   ]
   const isPublicPath = publicPaths.some(
-    (path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(path + "/"),
+    (path) => pathname === path || pathname.startsWith(path + "/"),
   )
 
   if (isPublicPath) {
     return NextResponse.next({ request })
   }
 
-  const isProtectedPath =
-    request.nextUrl.pathname.startsWith("/app") || request.nextUrl.pathname.startsWith("/self-service")
-
-  // Allow Quick Demo Access (cookie set by /auth/login) without a Supabase Auth session
+  const isProtectedPath = pathname.startsWith("/app") || pathname.startsWith("/self-service")
+  const isApiPath = pathname.startsWith("/api")
   const hasDemoSession = request.cookies.get("demo-session")?.value === "active"
 
+  // Demo session: never call Supabase auth (avoids hangs on Process/Export/Reports)
+  if (hasDemoSession) {
+    return NextResponse.next({ request })
+  }
+
+  // API routes: do not block on auth refresh — route handlers enforce auth themselves
+  if (isApiPath) {
+    return NextResponse.next({ request })
+  }
+
   if (!supabaseUrl || !supabaseAnonKey) {
-    if (isProtectedPath && !hasDemoSession) {
+    if (isProtectedPath) {
       const url = request.nextUrl.clone()
       url.pathname = "/auth/login"
       return NextResponse.redirect(url)
@@ -83,14 +109,14 @@ export async function updateSession(request: NextRequest) {
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
         supabaseResponse = NextResponse.next({ request })
-        cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
+        cookiesToSet.forEach(({ name, value, options }) =>
+          supabaseResponse.cookies.set(name, value, options),
+        )
       },
     },
   })
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getUserWithTimeout(supabase, 2500)
 
   if (isProtectedPath && !user && !hasDemoSession) {
     const url = request.nextUrl.clone()

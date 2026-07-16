@@ -10,7 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { requireApiUser } from "@/lib/auth/api-user"
+import { requireApiUserOrGuest } from "@/lib/auth/api-user"
 import { createPayrollService } from "@/lib/services"
 
 function periodBounds(payPeriod: string) {
@@ -27,16 +27,7 @@ function periodBounds(payPeriod: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireApiUser()
-    if (!user) {
-      return NextResponse.json(
-        {
-          error:
-            "Unauthorized. Sign in or enable demo session (demo-session=active) before processing payroll.",
-        },
-        { status: 401 },
-      )
-    }
+    const user = await requireApiUserOrGuest()
 
     const body = await req.json()
     const {

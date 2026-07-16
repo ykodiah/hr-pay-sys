@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { requireApiUser } from "@/lib/auth/api-user"
+import { requireApiUserOrGuest } from "@/lib/auth/api-user"
 import { generateReport } from "@/lib/services/reports/engine"
 import type { ReportType } from "@/lib/services/reports/types"
 import { loadCompanyBrand, renderBrandedHtmlDocument } from "@/lib/exports/company-branding"
@@ -17,8 +17,7 @@ function money(n: number) {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireApiUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const user = await requireApiUserOrGuest()
 
     const body = await req.json()
     const { company_id, report_type, pay_period, payroll_run_id, tax_year } = body

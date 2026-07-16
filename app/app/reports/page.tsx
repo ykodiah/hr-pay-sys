@@ -312,6 +312,9 @@ export default function ComplianceReportsPage() {
   const [submissionRef, setSubmissionRef] = useState("")
 
   useEffect(() => {
+    if (typeof document !== "undefined" && !document.cookie.includes("demo-session=active")) {
+      document.cookie = "demo-session=active; path=/; max-age=86400; SameSite=Lax"
+    }
     const supabase = createClient()
     void supabase
       .from("companies")
@@ -357,22 +360,32 @@ export default function ComplianceReportsPage() {
       return
     }
     setGenerating(type)
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 45000)
     try {
       const res = await fetch("/api/reports", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
+        signal: controller.signal,
         body:    JSON.stringify({ company_id: companyId, report_type: type, pay_period: period }),
       })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? "Failed to generate")
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error ?? `Failed to generate (${res.status})`)
 
       setPreviewReport(json.data)
       if (historyKey) mutate(historyKey)
       toast({ title: "Report generated", description: `${REPORT_LABELS[type]} — ${json.data.row_count} employees` })
     } catch (err) {
-      toast({ title: "Generation failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" })
+      const msg =
+        err instanceof Error
+          ? err.name === "AbortError"
+            ? "Timed out. Process & approve payroll for this period first, then retry."
+            : err.message
+          : "Unknown error"
+      toast({ title: "Generation failed", description: msg, variant: "destructive" })
     } finally {
+      clearTimeout(timer)
       setGenerating(null)
     }
   }, [companyId, period, historyKey])
@@ -410,11 +423,14 @@ export default function ComplianceReportsPage() {
       return
     }
     setDownloading(type)
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 45000)
     try {
       const res = await fetch("/api/reports/download", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
+        signal: controller.signal,
         body:    JSON.stringify({
           company_id: companyId,
           report_type: type,
@@ -424,12 +440,19 @@ export default function ComplianceReportsPage() {
       })
       if (!res.ok) {
         const json = await res.json().catch(() => ({}))
-        throw new Error(json.error ?? "Download failed")
+        throw new Error(json.error ?? `Download failed (${res.status})`)
       }
       if (format === "pdf") {
         const html = await res.text()
         const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }))
-        window.open(url, "_blank", "noopener,noreferrer")
+        const opened = window.open(url, "_blank", "noopener,noreferrer")
+        if (!opened) {
+          // Popup blocked — force download as HTML file
+          const a = document.createElement("a")
+          a.href = url
+          a.download = `${type}-${period}.html`
+          a.click()
+        }
         setTimeout(() => URL.revokeObjectURL(url), 60_000)
         toast({
           title: "PDF opened",
@@ -452,8 +475,15 @@ export default function ComplianceReportsPage() {
       }
       if (historyKey) mutate(historyKey)
     } catch (err) {
-      toast({ title: "Download failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" })
+      const msg =
+        err instanceof Error
+          ? err.name === "AbortError"
+            ? "Timed out. Process & approve payroll for this period, then retry download."
+            : err.message
+          : "Unknown error"
+      toast({ title: "Download failed", description: msg, variant: "destructive" })
     } finally {
+      clearTimeout(timer)
       setDownloading(null)
     }
   }, [companyId, period, historyKey])

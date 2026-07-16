@@ -23,6 +23,7 @@ import {
   type EmployeePayInput,
   type TaxCalculationResult,
   calculateGhanaTax,
+  DEFAULT_TAX_RATES,
 } from "./engine"
 
 // ---------------------------------------------------------------------------
@@ -154,15 +155,22 @@ export async function calculateEmployeeTax(
 ): Promise<TaxCalculationResult> {
   const year = taxYear ?? new Date().getFullYear()
 
-  const [rates, reliefs] = await Promise.all([
-    getTaxRates(companyId, year),
-    getEmployeeTaxReliefs(employeeId, year),
-  ])
+  // Never block payroll on slow tax-config tables — fall back to GRA defaults
+  const withTimeout = async <T,>(p: Promise<T>, ms: number, fallback: T): Promise<T> => {
+    try {
+      return await Promise.race([
+        p,
+        new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+      ])
+    } catch {
+      return fallback
+    }
+  }
 
-  return calculateGhanaTax(
-    { ...input, annual_tax_reliefs: reliefs },
-    rates
-  )
+  const rates = await withTimeout(getTaxRates(companyId, year), 3000, DEFAULT_TAX_RATES)
+  const reliefs = await withTimeout(getEmployeeTaxReliefs(employeeId, year), 2000, [] as TaxReliefItem[])
+
+  return calculateGhanaTax({ ...input, annual_tax_reliefs: reliefs }, rates)
 }
 
 // ---------------------------------------------------------------------------

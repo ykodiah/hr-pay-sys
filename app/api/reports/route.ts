@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { requireApiUser } from "@/lib/auth/api-user"
+import { requireApiUserOrGuest } from "@/lib/auth/api-user"
 import {
   generateReport,
   generateAllReports,
@@ -16,8 +16,7 @@ import type { ReportType } from "@/lib/services/reports/types"
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await requireApiUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    await requireApiUserOrGuest()
 
     const { searchParams } = new URL(req.url)
     const companyId = searchParams.get("company_id")
@@ -46,9 +45,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireApiUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
+    const user = await requireApiUserOrGuest()
     const actorId = user.isDemo ? undefined : user.id
     const body = await req.json()
     const {

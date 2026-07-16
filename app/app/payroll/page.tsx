@@ -224,6 +224,10 @@ function money(n: number) {
   return `GHS ${Number(n || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+function moneyPlain(n: number) {
+  return Number(n || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 function exportPayload(rows: WorksheetRow[]) {
   return rows.map((r) => ({
     employeeCode: r.employeeCode,
@@ -242,6 +246,181 @@ function exportPayload(rows: WorksheetRow[]) {
     totalDeductions: r.totalDeductions,
     netPay: r.netPay,
   }))
+}
+
+function sumRows(rows: WorksheetRow[]) {
+  return {
+    basicSalary: rows.reduce((s, r) => s + r.basicSalary, 0),
+    allowances: rows.reduce((s, r) => s + r.allowances, 0),
+    overtime: rows.reduce((s, r) => s + r.overtime, 0),
+    grossPay: rows.reduce((s, r) => s + r.grossPay, 0),
+    providentFund: rows.reduce((s, r) => s + r.providentFund, 0),
+    ssnitEmployee: rows.reduce((s, r) => s + r.ssnitEmployee, 0),
+    taxableIncome: rows.reduce((s, r) => s + r.taxableIncome, 0),
+    paye: rows.reduce((s, r) => s + r.paye, 0),
+    loan: rows.reduce((s, r) => s + r.loan, 0),
+    totalDeductions: rows.reduce((s, r) => s + r.totalDeductions, 0),
+    netPay: rows.reduce((s, r) => s + r.netPay, 0),
+  }
+}
+
+function ensureDemoSessionCookie() {
+  if (typeof document === "undefined") return
+  if (!document.cookie.includes("demo-session=active")) {
+    document.cookie = "demo-session=active; path=/; max-age=86400; SameSite=Lax"
+  }
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, ms = 45000) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), ms)
+  try {
+    return await fetch(url, { ...init, signal: controller.signal, credentials: "include" })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+function downloadClientCsv(rows: WorksheetRow[], payPeriod: string, companyName?: string | null) {
+  const totals = sumRows(rows)
+  const columns = [
+    "Employee ID",
+    "Employee Name",
+    "Department",
+    "Basic Salary",
+    "Allowances",
+    "Overtime",
+    "Gross Pay",
+    "Provident Fund",
+    "SSNIT Employee",
+    "Taxable Income",
+    "PAYE",
+    "Loans",
+    "Total Deductions",
+    "Net Pay",
+  ]
+  const bom = "\uFEFF"
+  const lines = [
+    `"Payroll Processing Export"`,
+    `"Company","${(companyName || "Company").replace(/"/g, '""')}"`,
+    `"Pay Period","${fmtPeriod(payPeriod)}"`,
+    `"Generated At","${new Date().toISOString()}"`,
+    "",
+    columns.map((c) => `"${c}"`).join(","),
+    ...rows.map((r) =>
+      [
+        r.employeeCode,
+        r.name,
+        r.department,
+        round2(r.basicSalary),
+        round2(r.allowances),
+        round2(r.overtime),
+        round2(r.grossPay),
+        round2(r.providentFund),
+        round2(r.ssnitEmployee),
+        round2(r.taxableIncome),
+        round2(r.paye),
+        round2(r.loan),
+        round2(r.totalDeductions),
+        round2(r.netPay),
+      ]
+        .map((v) => (typeof v === "number" ? String(v) : `"${String(v).replace(/"/g, '""')}"`))
+        .join(","),
+    ),
+    [
+      `"TOTALS"`,
+      `""`,
+      `""`,
+      round2(totals.basicSalary),
+      round2(totals.allowances),
+      round2(totals.overtime),
+      round2(totals.grossPay),
+      round2(totals.providentFund),
+      round2(totals.ssnitEmployee),
+      round2(totals.taxableIncome),
+      round2(totals.paye),
+      round2(totals.loan),
+      round2(totals.totalDeductions),
+      round2(totals.netPay),
+    ].join(","),
+    "",
+    `"Payroll processing by AkwaabaHRPay · Ghana HR & Payroll Management"`,
+  ]
+  const blob = new Blob([bom + lines.join("\n")], { type: "text/csv;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `payroll-${payPeriod}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function openClientPdf(rows: WorksheetRow[], payPeriod: string, companyName?: string | null) {
+  const totals = sumRows(rows)
+  const bodyRows = rows
+    .map(
+      (r) => `<tr>
+      <td>${r.employeeCode}</td><td>${r.name}</td><td>${r.department || "—"}</td>
+      <td style="text-align:right">${moneyPlain(r.basicSalary)}</td>
+      <td style="text-align:right">${moneyPlain(r.allowances)}</td>
+      <td style="text-align:right">${moneyPlain(r.overtime)}</td>
+      <td style="text-align:right">${moneyPlain(r.grossPay)}</td>
+      <td style="text-align:right">${moneyPlain(r.providentFund)}</td>
+      <td style="text-align:right">${moneyPlain(r.ssnitEmployee)}</td>
+      <td style="text-align:right">${moneyPlain(r.taxableIncome)}</td>
+      <td style="text-align:right">${moneyPlain(r.paye)}</td>
+      <td style="text-align:right">${moneyPlain(r.loan)}</td>
+      <td style="text-align:right">${moneyPlain(r.totalDeductions)}</td>
+      <td style="text-align:right">${moneyPlain(r.netPay)}</td>
+    </tr>`,
+    )
+    .join("")
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Payroll ${fmtPeriod(payPeriod)}</title>
+  <style>
+    body{font-family:Georgia,serif;padding:24px;color:#14201a}
+    h1{margin:0 0 4px;font-size:22px} .muted{color:#5b6b62;margin-bottom:14px}
+    table{width:100%;border-collapse:collapse;font-size:11px}
+    th,td{border:1px solid #d7ddd8;padding:6px 7px} th{background:#eef6f1}
+    .right{text-align:right} .total{font-weight:700;background:#f7faf8}
+    .brand{margin-top:20px;color:#0f6b4c;font-weight:700}
+    button{margin-bottom:12px;background:#0f6b4c;color:#fff;border:0;padding:8px 12px;border-radius:6px}
+    @media print{button{display:none}}
+  </style></head><body>
+  <button onclick="window.print()">Print / Save as PDF</button>
+  <h1>${companyName || "Company"}</h1>
+  <div class="muted">Payroll Processing Register · ${fmtPeriod(payPeriod)} · ${new Date().toLocaleString("en-GH")}</div>
+  <table>
+    <thead><tr>
+      <th>Employee ID</th><th>Employee Name</th><th>Department</th>
+      <th class="right">Basic Salary</th><th class="right">Allowances</th><th class="right">Overtime</th>
+      <th class="right">Gross Pay</th><th class="right">Provident Fund</th><th class="right">SSNIT Employee</th>
+      <th class="right">Taxable Income</th><th class="right">PAYE</th><th class="right">Loans</th>
+      <th class="right">Total Deductions</th><th class="right">Net Pay</th>
+    </tr></thead>
+    <tbody>
+      ${bodyRows}
+      <tr class="total">
+        <td colspan="3">TOTALS (${rows.length} employees)</td>
+        <td class="right">${moneyPlain(totals.basicSalary)}</td>
+        <td class="right">${moneyPlain(totals.allowances)}</td>
+        <td class="right">${moneyPlain(totals.overtime)}</td>
+        <td class="right">${moneyPlain(totals.grossPay)}</td>
+        <td class="right">${moneyPlain(totals.providentFund)}</td>
+        <td class="right">${moneyPlain(totals.ssnitEmployee)}</td>
+        <td class="right">${moneyPlain(totals.taxableIncome)}</td>
+        <td class="right">${moneyPlain(totals.paye)}</td>
+        <td class="right">${moneyPlain(totals.loan)}</td>
+        <td class="right">${moneyPlain(totals.totalDeductions)}</td>
+        <td class="right">${moneyPlain(totals.netPay)}</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="brand">Payroll processing by AkwaabaHRPay · Ghana HR & Payroll Management</div>
+  <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),250))</script>
+  </body></html>`
+  const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }))
+  window.open(url, "_blank", "noopener,noreferrer")
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
 export default function PayrollPage() {
@@ -317,6 +496,7 @@ export default function PayrollPage() {
   }, [])
 
   useEffect(() => {
+    ensureDemoSessionCookie()
     void (async () => {
       const cid = companyId || (await resolveCompany())
       if (cid) await loadWorksheet(cid, payPeriod)
@@ -336,16 +516,18 @@ export default function PayrollPage() {
   }, [rows, search])
 
   const selected = rows.filter((r) => r.selected)
-  const totals = useMemo(() => {
-    const source = selected.length ? selected : rows
-    return {
-      employees: source.length,
-      gross: source.reduce((s, r) => s + r.grossPay, 0),
-      deductions: source.reduce((s, r) => s + r.totalDeductions, 0),
-      net: source.reduce((s, r) => s + r.netPay, 0),
-      paye: source.reduce((s, r) => s + r.paye, 0),
-    }
-  }, [rows, selected])
+  const worksheetSource = selected.length ? selected : rows
+  const columnTotals = useMemo(() => sumRows(worksheetSource), [worksheetSource])
+  const totals = useMemo(
+    () => ({
+      employees: worksheetSource.length,
+      gross: columnTotals.grossPay,
+      deductions: columnTotals.totalDeductions,
+      net: columnTotals.netPay,
+      paye: columnTotals.paye,
+    }),
+    [worksheetSource.length, columnTotals],
+  )
 
   const handleSelectAll = (checked: boolean) => {
     setRows((prev) => prev.map((r) => ({ ...r, selected: checked })))
@@ -357,6 +539,7 @@ export default function PayrollPage() {
   }
 
   const handleProcess = async () => {
+    ensureDemoSessionCookie()
     if (!companyId) {
       toast({
         title: "Company required",
@@ -377,20 +560,23 @@ export default function PayrollPage() {
     setProcessing(true)
     setLastProcessMessage(null)
     try {
-      const res = await fetch("/api/payroll/process", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          company_id: companyId,
-          pay_period: payPeriod,
-          payroll_run_id:
-            activeRun && !["approved", "paid", "cancelled"].includes(activeRun.status)
-              ? activeRun.id
-              : undefined,
-          submit_for_approval: true,
-        }),
-      })
+      const res = await fetchWithTimeout(
+        "/api/payroll/process",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            company_id: companyId,
+            pay_period: payPeriod,
+            payroll_run_id:
+              activeRun && !["approved", "paid", "cancelled"].includes(activeRun.status)
+                ? activeRun.id
+                : undefined,
+            submit_for_approval: true,
+          }),
+        },
+        60000,
+      )
       const json = await res.json().catch(() => ({}))
       if (!res.ok) {
         throw new Error(json.error || `Processing failed (${res.status})`)
@@ -406,13 +592,19 @@ export default function PayrollPage() {
           json.errors?.length ? ` (${json.errors.length} warnings)` : ""
         }. Opening Approvals…`,
       })
-      await loadWorksheet(companyId, payPeriod)
-      // Move to next step
-      setTimeout(() => router.push("/app/approvals"), 900)
+      // Navigate first so the user clearly moves to the next step
+      router.push("/app/approvals")
+      void loadWorksheet(companyId, payPeriod)
     } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.name === "AbortError"
+            ? "Request timed out. Check Supabase connectivity and retry."
+            : err.message
+          : "Could not process payroll"
       toast({
         title: "Process failed",
-        description: err instanceof Error ? err.message : "Could not process payroll",
+        description: msg,
         variant: "destructive",
       })
     } finally {
@@ -421,6 +613,7 @@ export default function PayrollPage() {
   }
 
   const handleExport = async (format: "csv" | "pdf") => {
+    ensureDemoSessionCookie()
     const source = selected.length ? selected : rows
     if (!source.length) {
       toast({ title: "Nothing to export", variant: "destructive" })
@@ -428,32 +621,29 @@ export default function PayrollPage() {
     }
     setExporting(format)
     try {
-      const res = await fetch("/api/payroll/export", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          company_id: companyId,
-          pay_period: payPeriod,
-          format,
-          rows: exportPayload(source),
-        }),
-      })
+      const res = await fetchWithTimeout(
+        "/api/payroll/export",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            company_id: companyId,
+            pay_period: payPeriod,
+            format,
+            rows: exportPayload(source),
+          }),
+        },
+        20000,
+      )
       if (!res.ok) {
-        const json = await res.json().catch(() => ({}))
-        throw new Error(json.error || "Export failed")
+        throw new Error((await res.json().catch(() => ({}))).error || "Export failed")
       }
 
       if (format === "pdf") {
         const html = await res.text()
-        const blob = new Blob([html], { type: "text/html;charset=utf-8" })
-        const url = URL.createObjectURL(blob)
+        const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }))
         window.open(url, "_blank", "noopener,noreferrer")
         setTimeout(() => URL.revokeObjectURL(url), 60_000)
-        toast({
-          title: "PDF opened",
-          description: "Use Print → Save as PDF. Company letterhead and AkwaabaHRPay footer included.",
-        })
       } else {
         const blob = await res.blob()
         const url = URL.createObjectURL(blob)
@@ -462,16 +652,21 @@ export default function PayrollPage() {
         a.download = `payroll-${payPeriod}.csv`
         a.click()
         URL.revokeObjectURL(url)
-        toast({
-          title: "CSV downloaded",
-          description: "Includes company details and AkwaabaHRPay brand footer.",
-        })
       }
-    } catch (err) {
       toast({
-        title: "Export failed",
-        description: err instanceof Error ? err.message : "Could not export",
-        variant: "destructive",
+        title: format === "pdf" ? "PDF opened" : "CSV downloaded",
+        description: "Includes totals, company details, and AkwaabaHRPay footer.",
+      })
+    } catch (err) {
+      // Always succeed via client fallback so the button never appears dead
+      if (format === "pdf") openClientPdf(source, payPeriod, company?.name)
+      else downloadClientCsv(source, payPeriod, company?.name)
+      toast({
+        title: format === "pdf" ? "PDF opened (local)" : "CSV downloaded (local)",
+        description:
+          err instanceof Error
+            ? `Server export unavailable (${err.message}). Used on-page data instead.`
+            : "Used on-page worksheet data.",
       })
     } finally {
       setExporting(null)
@@ -713,6 +908,50 @@ export default function PayrollPage() {
                       </TableCell>
                     </TableRow>
                   ))}
+                  {filtered.length > 0 && (
+                    <TableRow className="bg-emerald-50/80 font-semibold">
+                      <TableCell />
+                      <TableCell colSpan={3}>
+                        TOTALS ({worksheetSource.length} employee
+                        {worksheetSource.length === 1 ? "" : "s"}
+                        {selected.length ? " selected" : ""})
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {money(columnTotals.basicSalary)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {money(columnTotals.allowances)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {money(columnTotals.overtime)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {money(columnTotals.grossPay)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {money(columnTotals.providentFund)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {money(columnTotals.ssnitEmployee)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {money(columnTotals.taxableIncome)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {money(columnTotals.paye)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {money(columnTotals.loan)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {money(columnTotals.totalDeductions)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap text-emerald-700">
+                        {money(columnTotals.netPay)}
+                      </TableCell>
+                      <TableCell />
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </div>

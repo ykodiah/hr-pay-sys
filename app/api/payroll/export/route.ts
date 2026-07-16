@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { requireApiUser } from "@/lib/auth/api-user"
+import { requireApiUserOrGuest } from "@/lib/auth/api-user"
 import {
   csvBrandFooter,
   csvBrandHeader,
@@ -82,8 +82,7 @@ function normalizeRows(rows: ExportRow[]) {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireApiUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    await requireApiUserOrGuest()
 
     const body = await req.json()
     const companyId = body.company_id as string
@@ -164,11 +163,31 @@ export async function POST(req: NextRequest) {
 
       const totals = rows.reduce(
         (a, r) => ({
+          basicSalary: a.basicSalary + r.basicSalary,
+          allowances: a.allowances + r.allowances,
+          overtime: a.overtime + r.overtime,
           gross: a.gross + r.grossPay,
+          pf: a.pf + r.providentFund,
+          ssnit: a.ssnit + r.ssnitEmployee,
+          taxable: a.taxable + r.taxableIncome,
+          paye: a.paye + r.paye,
+          loan: a.loan + r.loan,
           ded: a.ded + r.totalDeductions,
           net: a.net + r.netPay,
         }),
-        { gross: 0, ded: 0, net: 0 },
+        {
+          basicSalary: 0,
+          allowances: 0,
+          overtime: 0,
+          gross: 0,
+          pf: 0,
+          ssnit: 0,
+          taxable: 0,
+          paye: 0,
+          loan: 0,
+          ded: 0,
+          net: 0,
+        },
       )
 
       const table = `<table>
@@ -176,9 +195,16 @@ export async function POST(req: NextRequest) {
         <tbody>
           ${bodyRows}
           <tr class="total">
-            <td colspan="6">Totals (${rows.length} employees)</td>
+            <td colspan="3">TOTALS (${rows.length} employees)</td>
+            <td class="right">${money(totals.basicSalary)}</td>
+            <td class="right">${money(totals.allowances)}</td>
+            <td class="right">${money(totals.overtime)}</td>
             <td class="right">${money(totals.gross)}</td>
-            <td colspan="5"></td>
+            <td class="right">${money(totals.pf)}</td>
+            <td class="right">${money(totals.ssnit)}</td>
+            <td class="right">${money(totals.taxable)}</td>
+            <td class="right">${money(totals.paye)}</td>
+            <td class="right">${money(totals.loan)}</td>
             <td class="right">${money(totals.ded)}</td>
             <td class="right">${money(totals.net)}</td>
           </tr>
@@ -206,6 +232,35 @@ export async function POST(req: NextRequest) {
 
     // CSV
     const bom = "\uFEFF"
+    const totals = rows.reduce(
+      (a, r) => ({
+        basicSalary: a.basicSalary + r.basicSalary,
+        allowances: a.allowances + r.allowances,
+        overtime: a.overtime + r.overtime,
+        grossPay: a.grossPay + r.grossPay,
+        providentFund: a.providentFund + r.providentFund,
+        ssnitEmployee: a.ssnitEmployee + r.ssnitEmployee,
+        taxableIncome: a.taxableIncome + r.taxableIncome,
+        paye: a.paye + r.paye,
+        loan: a.loan + r.loan,
+        totalDeductions: a.totalDeductions + r.totalDeductions,
+        netPay: a.netPay + r.netPay,
+      }),
+      {
+        basicSalary: 0,
+        allowances: 0,
+        overtime: 0,
+        grossPay: 0,
+        providentFund: 0,
+        ssnitEmployee: 0,
+        taxableIncome: 0,
+        paye: 0,
+        loan: 0,
+        totalDeductions: 0,
+        netPay: 0,
+      },
+    )
+    const num = (n: number) => String(Math.round((n + Number.EPSILON) * 100) / 100)
     const lines = [
       ...csvBrandHeader({
         title: "Payroll Processing Export",
@@ -232,12 +287,26 @@ export async function POST(req: NextRequest) {
           r.netPay,
         ]
           .map((v) =>
-            typeof v === "number"
-              ? String(Math.round((v + Number.EPSILON) * 100) / 100)
-              : `"${String(v ?? "").replace(/"/g, '""')}"`,
+            typeof v === "number" ? num(v) : `"${String(v ?? "").replace(/"/g, '""')}"`,
           )
           .join(","),
       ),
+      [
+        `"TOTALS"`,
+        `""`,
+        `""`,
+        num(totals.basicSalary),
+        num(totals.allowances),
+        num(totals.overtime),
+        num(totals.grossPay),
+        num(totals.providentFund),
+        num(totals.ssnitEmployee),
+        num(totals.taxableIncome),
+        num(totals.paye),
+        num(totals.loan),
+        num(totals.totalDeductions),
+        num(totals.netPay),
+      ].join(","),
       ...csvBrandFooter(),
     ]
 

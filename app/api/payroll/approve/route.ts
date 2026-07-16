@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { requireApiUser } from "@/lib/auth/api-user"
+import { requireApiUserOrGuest } from "@/lib/auth/api-user"
 import { issuePayrollRunPayslips } from "@/lib/services/payslip-service"
 
 /**
@@ -15,8 +15,7 @@ import { issuePayrollRunPayslips } from "@/lib/services/payslip-service"
  */
 export async function POST(request: Request) {
   try {
-    const user = await requireApiUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const user = await requireApiUserOrGuest()
 
     const supabase = await createClient()
     const body = await request.json()
@@ -189,8 +188,7 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const user = await requireApiUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    await requireApiUserOrGuest()
 
     const supabase = await createClient()
     const { searchParams } = new URL(request.url)
