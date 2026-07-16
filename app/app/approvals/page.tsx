@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import useSWR, { mutate } from "swr"
+import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -10,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { CheckCircle2, XCircle, Clock, Loader2, Users, Banknote, AlertTriangle } from "lucide-react"
+import { CheckCircle2, XCircle, Clock, Loader2, Users, Banknote, AlertTriangle, RefreshCw } from "lucide-react"
 import { format } from "date-fns"
 
 const STATUS_COLORS: Record<string, string> = {
@@ -27,11 +28,24 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 export default function ApprovalsPage() {
   const { toast } = useToast()
   const [tab, setTab]     = useState("payroll")
+  const [companyId, setCompanyId] = useState("")
   const [actioning, setActioning] = useState<string | null>(null)
   const [rejectDialog, setRejectDialog] = useState<{ id: string; type: "payroll" | "leave" | "overtime"; label: string } | null>(null)
   const [rejectReason, setRejectReason] = useState("")
 
-  const { data: payrollData, isLoading: payrollLoading } = useSWR("/api/payroll/runs?status=pending", fetcher)
+  useEffect(() => {
+    const supabase = createClient()
+    void supabase.from("companies").select("id").limit(1).maybeSingle().then(({ data }) => {
+      if (data?.id) setCompanyId(data.id)
+    })
+  }, [])
+
+  const payrollKey = companyId
+    ? `/api/payroll/runs?company_id=${companyId}&status=pending`
+    : "/api/payroll/runs?status=pending"
+  const { data: payrollData, isLoading: payrollLoading } = useSWR(payrollKey, fetcher, {
+    refreshInterval: 15000,
+  })
   const { data: leaveData,   isLoading: leaveLoading   } = useSWR("/api/leave?status=pending", fetcher)
   const { data: overtimeData,isLoading: otLoading      } = useSWR("/api/overtime?status=pending", fetcher)
 
@@ -39,7 +53,8 @@ export default function ApprovalsPage() {
   const leaveRequests: any[] = leaveData?.requests   ?? leaveData?.data     ?? []
   const otRequests:    any[] = overtimeData?.requests ?? overtimeData?.data ?? []
 
-  const totalPending = payrollRuns.filter(r => ["draft","processing","pending"].includes(r.status)).length
+  const pendingStatuses = ["draft", "processing", "pending", "completed", "partial"]
+  const totalPending = payrollRuns.filter(r => pendingStatuses.includes(r.status)).length
                      + leaveRequests.length + otRequests.length
 
   const handlePayrollApprove = async (id: string) => {
@@ -53,7 +68,7 @@ export default function ApprovalsPage() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Failed")
       toast({ title: "Payroll approved", description: "Payroll run has been approved for payment." })
-      mutate("/api/payroll/runs?status=pending")
+      mutate(payrollKey)
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" })
     } finally { setActioning(null) }
@@ -105,7 +120,12 @@ export default function ApprovalsPage() {
         res = await fetch("/api/payroll/approve", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ payroll_run_id: rejectDialog.id, action: "reject", notes: rejectReason }),
+          body: JSON.stringify({
+            payroll_run_id: rejectDialog.id,
+            action: "reject",
+            rejection_reason: rejectReason,
+            notes: rejectReason,
+          }),
         })
       } else if (rejectDialog.type === "leave") {
         res = await fetch(`/api/leave/${rejectDialog.id}`, {
@@ -124,7 +144,7 @@ export default function ApprovalsPage() {
       if (!res.ok) throw new Error(json.error || "Failed")
       toast({ title: "Rejected", description: `${rejectDialog.label} has been rejected.` })
       setRejectDialog(null); setRejectReason("")
-      mutate("/api/payroll/runs?status=pending")
+      mutate(payrollKey)
       mutate("/api/leave?status=pending")
       mutate("/api/overtime?status=pending")
     } catch (err: any) {
@@ -140,21 +160,26 @@ export default function ApprovalsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Approvals</h1>
-          <p className="text-sm text-muted-foreground">Review and approve payroll runs, leave, and overtime requests.</p>
+          <p className="text-sm text-muted-foreground">Review and approve payroll runs, leave, and overtime requests from the database.</p>
         </div>
-        {totalPending > 0 && (
-          <Badge className="bg-yellow-100 text-yellow-800 gap-1">
-            <AlertTriangle className="h-3.5 w-3.5" /> {totalPending} pending
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => mutate(payrollKey)}>
+            <RefreshCw className="h-3.5 w-3.5 mr-1" /> Sync
+          </Button>
+          {totalPending > 0 && (
+            <Badge className="bg-yellow-100 text-yellow-800 gap-1">
+              <AlertTriangle className="h-3.5 w-3.5" /> {totalPending} pending
+            </Badge>
+          )}
+        </div>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="payroll" className="gap-1">
             <Banknote className="h-3.5 w-3.5" />
-            Payroll {payrollRuns.filter(r => ["draft","processing","pending"].includes(r.status)).length > 0 &&
-              `(${payrollRuns.filter(r => ["draft","processing","pending"].includes(r.status)).length})`}
+            Payroll {payrollRuns.filter(r => pendingStatuses.includes(r.status)).length > 0 &&
+              `(${payrollRuns.filter(r => pendingStatuses.includes(r.status)).length})`}
           </TabsTrigger>
           <TabsTrigger value="leave" className="gap-1">
             <Users className="h-3.5 w-3.5" />
@@ -194,7 +219,7 @@ export default function ApprovalsPage() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Badge className={STATUS_COLORS[run.status] || ""}>{run.status}</Badge>
-                      {["draft","processing","pending"].includes(run.status) && (
+                      {pendingStatuses.includes(run.status) && (
                         <>
                           <Button size="sm" variant="outline" className="text-green-700 border-green-300"
                             disabled={actioning === run.id}

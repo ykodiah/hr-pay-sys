@@ -271,7 +271,7 @@ export class PayrollService extends BaseService {
              )`,
           )
           .eq("company_id", companyId)
-          .eq("status", "Active"),
+          .in("status", ["Active", "active", "ACTIVE"]),
         client
           .from("payroll_pay_inputs")
           .select("*")
@@ -279,18 +279,20 @@ export class PayrollService extends BaseService {
           .eq("pay_period", payPeriod),
         client
           .from("employee_loans")
-          .select("employee_id, monthly_payment, status")
+          .select("employee_id, monthly_payment, status, auto_deduct")
           .eq("company_id", companyId)
           .in("status", ["active", "approved"]),
       ])
 
       if (empRes.error) throw empRes.error
+      // loans / pay_inputs failures are non-fatal — continue with master financials only
 
       const inputsByEmployee = new Map(
         (inputsRes.data ?? []).map((row: any) => [row.employee_id, row]),
       )
       const loansByEmployee = new Map<string, number>()
       for (const loan of loansRes.data ?? []) {
+        if (loan.auto_deduct === false) continue
         const prev = loansByEmployee.get(loan.employee_id) ?? 0
         loansByEmployee.set(loan.employee_id, prev + Number(loan.monthly_payment ?? 0))
       }

@@ -109,60 +109,74 @@ export default function PayrollHistoryPage() {
 
   const supabase = createClient()
 
-  useEffect(() => {
-    const fetchPayrollHistory = async () => {
-      setIsLoading(true)
+  const [deductionTotals, setDeductionTotals] = useState({
+    paye: 0,
+    ssnit: 0,
+    tier3: 0,
+    other: 0,
+  })
 
-      try {
-        const { data: subsidiariesData } = await supabase.from("subsidiaries").select("id, name").eq("status", "active")
+  const fetchPayrollHistory = async () => {
+    setIsLoading(true)
 
-        if (subsidiariesData) {
-          setSubsidiaries(subsidiariesData)
-        }
+    try {
+      const [{ data: subsidiariesData }, runsRes] = await Promise.all([
+        supabase.from("subsidiaries").select("id, name").eq("status", "active"),
+        fetch("/api/payroll/runs?limit=200", { cache: "no-store" }),
+      ])
 
-        const { data, error } = await supabase.from("payroll_runs").select("*").order("pay_date", { ascending: false })
-
-        if (error) {
-          console.error("Error fetching payroll runs:", error)
-          toast({
-            title: "Error",
-            description: "Failed to load payroll history. Please try again.",
-            variant: "destructive",
-          })
-          setIsLoading(false)
-          return
-        }
-
-        // Count employees for each payroll run
-        const runsWithCounts = await Promise.all(
-          (data || []).map(async (run) => {
-            const { count } = await supabase
-              .from("payroll_items")
-              .select("*", { count: "exact", head: true })
-              .eq("payroll_run_id", run.id)
-
-            return {
-              ...run,
-              employee_count: count || 0,
-            }
-          }),
-        )
-
-        setPayrollRuns(runsWithCounts)
-        setFilteredRuns(runsWithCounts)
-      } catch (err) {
-        console.error("Unexpected error:", err)
-        toast({
-          title: "Error",
-          description: "An unexpected error occurred.",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoading(false)
+      if (subsidiariesData) {
+        setSubsidiaries(subsidiariesData)
       }
-    }
 
-    fetchPayrollHistory()
+      const runsJson = await runsRes.json()
+      if (!runsRes.ok) {
+        throw new Error(runsJson.error || "Failed to load payroll history")
+      }
+
+      const runsWithCounts = (runsJson.runs ?? runsJson.data ?? []) as PayrollRun[]
+      setPayrollRuns(runsWithCounts)
+      setFilteredRuns(runsWithCounts)
+
+      // Real deduction breakdown from payslips (not estimated ratios)
+      const runIds = runsWithCounts.map((r) => r.id).filter(Boolean)
+      if (runIds.length > 0) {
+        const { data: slips } = await supabase
+          .from("payslips")
+          .select("paye_tax, ssnit_employee, tier2_employee, tier3_employee, loan_deduction, advance_deduction, other_deductions")
+          .in("payroll_run_id", runIds.slice(0, 50))
+
+        const totals = (slips ?? []).reduce(
+          (acc, s: any) => ({
+            paye: acc.paye + Number(s.paye_tax ?? 0),
+            ssnit: acc.ssnit + Number(s.ssnit_employee ?? 0) + Number(s.tier2_employee ?? 0),
+            tier3: acc.tier3 + Number(s.tier3_employee ?? 0),
+            other:
+              acc.other +
+              Number(s.loan_deduction ?? 0) +
+              Number(s.advance_deduction ?? 0) +
+              Number(s.other_deductions ?? 0),
+          }),
+          { paye: 0, ssnit: 0, tier3: 0, other: 0 },
+        )
+        setDeductionTotals(totals)
+      } else {
+        setDeductionTotals({ paye: 0, ssnit: 0, tier3: 0, other: 0 })
+      }
+    } catch (err) {
+      console.error("Unexpected error:", err)
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "An unexpected error occurred.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void fetchPayrollHistory()
   }, [])
 
   // Filter payroll runs
@@ -234,14 +248,16 @@ export default function PayrollHistoryPage() {
     }))
 
   const deductionBreakdown =
-    filteredRuns.length > 0
+    deductionTotals.paye + deductionTotals.ssnit + deductionTotals.tier3 + deductionTotals.other > 0
       ? [
-          { name: "PAYE Tax", value: Math.round(totalDeductions * 0.45), color: "#ef4444" },
-          { name: "SSNIT", value: Math.round(totalDeductions * 0.35), color: "#3b82f6" },
-          { name: "Tier 3", value: Math.round(totalDeductions * 0.15), color: "#8b5cf6" },
-          { name: "Other", value: Math.round(totalDeductions * 0.05), color: "#6b7280" },
+          { name: "PAYE Tax", value: Math.round(deductionTotals.paye), color: "#ef4444" },
+          { name: "SSNIT / Tier 2", value: Math.round(deductionTotals.ssnit), color: "#3b82f6" },
+          { name: "Tier 3", value: Math.round(deductionTotals.tier3), color: "#8b5cf6" },
+          { name: "Other", value: Math.round(deductionTotals.other), color: "#6b7280" },
         ]
-      : []
+      : filteredRuns.length > 0
+        ? [{ name: "Total Deductions", value: Math.round(totalDeductions), color: "#6b7280" }]
+        : []
 
   // Pagination
   const totalPages = Math.ceil(filteredRuns.length / itemsPerPage)
@@ -296,47 +312,11 @@ export default function PayrollHistoryPage() {
   }
 
   const handleRefresh = async () => {
-    setIsLoading(true)
-
-    try {
-      const { data, error } = await supabase.from("payroll_runs").select("*").order("pay_date", { ascending: false })
-
-      if (error) {
-        console.error("Error refreshing payroll runs:", error)
-        toast({
-          title: "Error",
-          description: "Failed to refresh payroll history.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      const runsWithCounts = await Promise.all(
-        (data || []).map(async (run) => {
-          const { count } = await supabase
-            .from("payroll_items")
-            .select("*", { count: "exact", head: true })
-            .eq("payroll_run_id", run.id)
-
-          return {
-            ...run,
-            employee_count: count || 0,
-          }
-        }),
-      )
-
-      setPayrollRuns(runsWithCounts)
-      setFilteredRuns(runsWithCounts)
-
-      toast({
-        title: "Refreshed",
-        description: "Payroll history has been updated.",
-      })
-    } catch (err) {
-      console.error("Unexpected error:", err)
-    } finally {
-      setIsLoading(false)
-    }
+    await fetchPayrollHistory()
+    toast({
+      title: "Refreshed",
+      description: "Payroll history synced from the database.",
+    })
   }
 
   const downloadTextFile = (content: string, filename: string, mime = "text/csv;charset=utf-8") => {

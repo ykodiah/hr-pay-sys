@@ -1,28 +1,27 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { requireApiUser } from "@/lib/auth/api-user"
 
 /**
  * POST /api/payroll/approve
  * Body: { payroll_run_id, action: "hr_review" | "finance_review" | "approve" | "reject", notes?, rejection_reason? }
- *
- * Workflow stages:
- *   pending → hr_review → finance_review → approved → locked
- *   any stage → rejected
  */
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await requireApiUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+    const supabase = await createClient()
     const body = await request.json()
     const { payroll_run_id, action, notes, rejection_reason } = body
+    const reason = rejection_reason ?? notes ?? null
 
     if (!payroll_run_id || !action) {
       return NextResponse.json({ error: "payroll_run_id and action required" }, { status: 400 })
     }
 
     const now = new Date().toISOString()
+    const actorId = user.isDemo ? null : user.id
 
     let updatePayload: Record<string, any> = { updated_at: now }
     let auditAction = action
@@ -31,9 +30,9 @@ export async function POST(request: Request) {
       case "hr_review":
         updatePayload = {
           ...updatePayload,
-          approval_stage:   "hr_reviewed",
-          hr_reviewed_by:   user.id,
-          hr_reviewed_at:   now,
+          approval_stage: "hr_reviewed",
+          hr_reviewed_by: actorId,
+          hr_reviewed_at: now,
         }
         auditAction = "hr_reviewed"
         break
@@ -41,8 +40,8 @@ export async function POST(request: Request) {
       case "finance_review":
         updatePayload = {
           ...updatePayload,
-          approval_stage:      "finance_reviewed",
-          finance_reviewed_by: user.id,
+          approval_stage: "finance_reviewed",
+          finance_reviewed_by: actorId,
           finance_reviewed_at: now,
         }
         auditAction = "finance_reviewed"
@@ -51,10 +50,10 @@ export async function POST(request: Request) {
       case "approve":
         updatePayload = {
           ...updatePayload,
-          status:          "approved",
-          approval_stage:  "approved",
-          approved_by:     user.id,
-          approved_at:     now,
+          status: "approved",
+          approval_stage: "approved",
+          approved_by: actorId,
+          approved_at: now,
         }
         auditAction = "approved"
         break
@@ -62,11 +61,11 @@ export async function POST(request: Request) {
       case "reject":
         updatePayload = {
           ...updatePayload,
-          status:           "rejected",
-          approval_stage:   "rejected",
-          rejected_by:      user.id,
-          rejected_at:      now,
-          rejection_reason: rejection_reason ?? null,
+          status: "rejected",
+          approval_stage: "rejected",
+          rejected_by: actorId,
+          rejected_at: now,
+          rejection_reason: reason,
         }
         auditAction = "rejected"
         break
@@ -78,7 +77,6 @@ export async function POST(request: Request) {
         )
     }
 
-    // Update the payroll run
     const { error: updateError } = await supabase
       .from("payroll_runs")
       .update(updatePayload)
@@ -86,12 +84,11 @@ export async function POST(request: Request) {
 
     if (updateError) throw new Error(updateError.message)
 
-    // Write audit record
     await supabase.from("payroll_approval_audit").insert({
       payroll_run_id,
-      action:   auditAction,
-      actor_id: user.id,
-      notes:    notes ?? rejection_reason ?? null,
+      action: auditAction,
+      actor_id: actorId,
+      notes: notes ?? reason ?? null,
     })
 
     return NextResponse.json({ success: true, action: auditAction })
@@ -102,10 +99,10 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await requireApiUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+    const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     const payroll_run_id = searchParams.get("payroll_run_id")
 

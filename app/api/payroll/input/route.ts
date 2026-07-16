@@ -1,10 +1,15 @@
 /**
  * GET  /api/payroll/input?company_id=&pay_period=
  * POST /api/payroll/input  — upsert pay inputs; optionally sync to employee_financial
+ *
+ * Loads employees from `employees`, master pay from `employee_financial`,
+ * period overrides from `payroll_pay_inputs`, and loan defaults from `employee_loans`.
  */
 
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+
+const ACTIVE_STATUSES = ["Active", "active", "ACTIVE"]
 
 export async function GET(request: Request) {
   try {
@@ -17,20 +22,21 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "company_id and pay_period are required" }, { status: 400 })
     }
 
-    // Load master financial + any period inputs in parallel for fast sync
+    // Parallel fetch from respective tables for fast sync
     const [employeesRes, inputsRes, loansRes] = await Promise.all([
       supabase
         .from("employees")
         .select(
-          `id, first_name, last_name, employee_id, department, status,
+          `id, first_name, last_name, employee_id, department, position, status, subsidiary_id,
            financial:employee_financial(
              monthly_salary, transport_allowance, housing_allowance, medical_allowance,
              meal_allowance, communication_allowance, uniform_allowance, other_allowances,
-             tier2_employee_contribution, tier3_contribution
+             tier2_employee_contribution, tier3_contribution,
+             bank_name, bank_account_number, ssnit_number
            )`,
         )
         .eq("company_id", companyId)
-        .eq("status", "Active")
+        .in("status", ACTIVE_STATUSES)
         .order("first_name"),
       supabase
         .from("payroll_pay_inputs")
@@ -39,34 +45,71 @@ export async function GET(request: Request) {
         .eq("pay_period", payPeriod),
       supabase
         .from("employee_loans")
-        .select("employee_id, monthly_payment, status, remaining_balance")
+        .select("employee_id, monthly_payment, remaining_balance, status, auto_deduct")
         .eq("company_id", companyId)
         .in("status", ["active", "approved"]),
     ])
 
+    let employees: any[] = employeesRes.data ?? []
+
     if (employeesRes.error) {
-      return NextResponse.json({ error: employeesRes.error.message }, { status: 500 })
+      // Fallback without relational embed if join shape differs
+      const fallback = await supabase
+        .from("employees")
+        .select("id, first_name, last_name, employee_id, department, position, status, subsidiary_id")
+        .eq("company_id", companyId)
+        .in("status", ACTIVE_STATUSES)
+        .order("first_name")
+
+      if (fallback.error) {
+        return NextResponse.json({ error: fallback.error.message }, { status: 500 })
+      }
+
+      const empIds = (fallback.data ?? []).map((e) => e.id)
+      const { data: financials } = empIds.length
+        ? await supabase.from("employee_financial").select("*").in("employee_id", empIds)
+        : { data: [] as any[] }
+
+      const finByEmp = new Map((financials ?? []).map((f: any) => [f.employee_id, f]))
+      employees = (fallback.data ?? []).map((e) => ({
+        ...e,
+        financial: finByEmp.get(e.id) ?? null,
+      }))
     }
+
+    const warnings: string[] = []
+    if (inputsRes.error) warnings.push(`pay_inputs: ${inputsRes.error.message}`)
+    if (loansRes.error) warnings.push(`loans: ${loansRes.error.message}`)
 
     const inputsByEmployee = new Map(
       (inputsRes.data ?? []).map((row) => [row.employee_id, row]),
     )
-    const loansByEmployee = new Map<string, number>()
+    const loansByEmployee = new Map<string, { payment: number; balance: number }>()
     for (const loan of loansRes.data ?? []) {
-      const prev = loansByEmployee.get(loan.employee_id) ?? 0
-      loansByEmployee.set(loan.employee_id, prev + Number(loan.monthly_payment ?? 0))
+      if (loan.auto_deduct === false) continue
+      const prev = loansByEmployee.get(loan.employee_id) ?? { payment: 0, balance: 0 }
+      loansByEmployee.set(loan.employee_id, {
+        payment: prev.payment + Number(loan.monthly_payment ?? 0),
+        balance: prev.balance + Number(loan.remaining_balance ?? 0),
+      })
     }
 
-    const rows = (employeesRes.data ?? []).map((emp) => {
+    const rows = employees.map((emp: any) => {
       const fin = Array.isArray(emp.financial) ? emp.financial[0] : emp.financial
       const input = inputsByEmployee.get(emp.id)
-      const loanDefault = loansByEmployee.get(emp.id) ?? 0
+      const loan = loansByEmployee.get(emp.id)
 
       return {
         employee_id: emp.id,
         employee_code: emp.employee_id,
         full_name: `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim(),
-        department: emp.department,
+        department: emp.department ?? null,
+        position: emp.position ?? null,
+        status: emp.status ?? null,
+        subsidiary_id: emp.subsidiary_id ?? null,
+        bank_name: fin?.bank_name ?? null,
+        account_number: fin?.bank_account_number ?? null,
+        ssnit_number: fin?.ssnit_number ?? null,
         master: {
           basic_salary: Number(fin?.monthly_salary ?? 0),
           transport_allowance: Number(fin?.transport_allowance ?? 0),
@@ -92,14 +135,14 @@ export async function GET(request: Request) {
               other_allowances: input.other_allowances,
               overtime_amount: Number(input.overtime_amount ?? 0),
               bonus_amount: Number(input.bonus_amount ?? 0),
-              loan_deduction: Number(input.loan_deduction ?? 0),
+              loan_deduction: Number(input.loan_deduction ?? loan?.payment ?? 0),
               advance_deduction: Number(input.advance_deduction ?? 0),
               other_deductions: Number(input.other_deductions ?? 0),
               tier2_applicable: input.tier2_applicable ?? true,
               tier3_applicable: input.tier3_applicable ?? false,
               tier3_employee_rate: Number(input.tier3_employee_rate ?? 0),
               apply_to_master: Boolean(input.apply_to_master),
-              notes: input.notes,
+              notes: input.notes ?? "",
               status: input.status,
             }
           : {
@@ -114,7 +157,7 @@ export async function GET(request: Request) {
               other_allowances: null,
               overtime_amount: 0,
               bonus_amount: 0,
-              loan_deduction: loanDefault,
+              loan_deduction: loan?.payment ?? 0,
               advance_deduction: 0,
               other_deductions: 0,
               tier2_applicable: true,
@@ -124,6 +167,7 @@ export async function GET(request: Request) {
               notes: "",
               status: "draft",
             },
+        loan_balance: loan?.balance ?? 0,
       }
     })
 
@@ -135,6 +179,8 @@ export async function GET(request: Request) {
       meta: {
         employee_count: rows.length,
         inputs_saved: inputsRes.data?.length ?? 0,
+        loans_linked: loansByEmployee.size,
+        warnings,
         fetched_at: new Date().toISOString(),
       },
     })
@@ -202,7 +248,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Sync selected rows back to employee_financial master
     const masterSyncErrors: string[] = []
     for (const row of upserts) {
       if (!row.apply_to_master) continue
