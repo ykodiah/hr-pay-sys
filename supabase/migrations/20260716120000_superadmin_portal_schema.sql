@@ -426,9 +426,9 @@ INSERT INTO public.superadmin_settings (key, value, value_type, description, is_
 ON CONFLICT DO NOTHING;
 
 -- ============================================================================
--- Create seed superadmin user (admin@superadmin.local with password hashed)
--- Password: Admin@123456 (hashed with bcrypt)
+-- Create seed superadmin user (admin@akwaabahrpay.com with password hashed)
+-- Password: Demo@12345 (hashed with bcrypt, 12 rounds)
 -- ============================================================================
 INSERT INTO public.superadmin_users (email, password_hash, first_name, last_name, role, status) VALUES
-  ('admin@superadmin.local', '$2b$12$8QJx3Lj1p7KzQxG8cNqZOePV8vPj0C1O1p7p7Q1q1q1q1q1q1q1q', 'System', 'Admin', 'admin', 'active')
+  ('admin@akwaabahrpay.com', '$2b$12$vaN3lAjBABcJuAnOtAOLYO4gjeZ.4E76tztPVVAYLpz2Y3bnbmsJ2', 'System', 'Admin', 'admin', 'active')
 ON CONFLICT (email) DO NOTHING;

@@ -6,7 +6,7 @@ import Link from 'next/link'
 
 export default function SuperadminLoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState('admin@superadmin.local')
+  const [email, setEmail] = useState('admin@akwaabahrpay.com')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -87,7 +87,7 @@ export default function SuperadminLoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@superadmin.local"
+                placeholder="admin@akwaabahrpay.com"
                 className="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition"
                 required
               />
