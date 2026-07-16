@@ -83,10 +83,24 @@ export async function PATCH(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     if (body.action === "accept" && data.application_id) {
+      const { data: app } = await client
+        .from("recruitment_applications")
+        .select("id, status")
+        .eq("id", data.application_id)
+        .maybeSingle()
+
       await client
         .from("recruitment_applications")
-        .update({ status: "offer", updated_at: new Date().toISOString() })
+        .update({ status: "hired", updated_at: new Date().toISOString() })
         .eq("id", data.application_id)
+
+      await client.from("recruitment_application_history").insert({
+        application_id: data.application_id,
+        from_status: app?.status ?? "offer",
+        to_status: "hired",
+        changed_by: user.isDemo ? null : user.id,
+        notes: "Offer accepted",
+      })
     }
 
     return NextResponse.json({ success: true, offer: data })

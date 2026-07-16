@@ -42,17 +42,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
-import { createClient } from "@/lib/supabase/client"
-
-type ApiError = { message: string }
-type CompanyRow = { id: string }
-type SupabaseCompanyClient = {
-  from: (table: "companies") => {
-    select: (columns: "id") => {
-      limit: (count: number) => Promise<{ data: CompanyRow[] | null; error: ApiError | null }>
-    }
-  }
-}
 
 type Metrics = {
   active_jobs: number
@@ -175,6 +164,7 @@ type OnboardingTask = {
   title: string
   description: string | null
   assigned_to: string | null
+  assigned_department?: string | null
   department: string | null
   status: string | null
   due_date: string | null
@@ -505,25 +495,16 @@ export default function RecruitmentPage() {
   const [interviewForm, setInterviewForm] = useState<InterviewForm>(initialInterviewForm)
   const hasLoadedRef = useRef(false)
 
-  const resolveCompanyId = useCallback(async () => {
-    const supabase = createClient() as unknown as SupabaseCompanyClient
-    const { data, error } = await supabase.from("companies").select("id").limit(1)
-    if (error) throw new Error(error.message)
-    const resolvedId = data?.[0]?.id
-    if (!resolvedId) throw new Error("No company record was found for this account.")
-    setCompanyId(resolvedId)
-    return resolvedId
-  }, [])
-
   const loadRecruitment = useCallback(
     async (knownCompanyId?: string | null) => {
       setLoading(true)
       setLoadError(null)
       try {
-        const resolvedId = knownCompanyId || companyId || (await resolveCompanyId())
-        const response = await fetch(`/api/recruitment?company_id=${encodeURIComponent(resolvedId)}`, {
-          cache: "no-store",
-        })
+        const resolvedId = knownCompanyId || companyId || ""
+        const url = resolvedId
+          ? `/api/recruitment?company_id=${encodeURIComponent(resolvedId)}`
+          : "/api/recruitment"
+        const response = await fetch(url, { cache: "no-store" })
         const body = (await response.json()) as RecruitmentResponse
         if (!response.ok || body.error) {
           throw new Error(body.error || "Failed to load recruitment data.")
@@ -547,7 +528,7 @@ export default function RecruitmentPage() {
         setLoading(false)
       }
     },
-    [companyId, resolveCompanyId],
+    [companyId],
   )
 
   useEffect(() => {
@@ -1390,7 +1371,9 @@ export default function RecruitmentPage() {
                     <SelectItem value="pending_approval">Pending approval</SelectItem>
                     <SelectItem value="approved">Approved</SelectItem>
                     <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="closed">Closed</SelectItem>
+                    <SelectItem value="filled">Filled</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -2145,7 +2128,9 @@ export default function RecruitmentPage() {
                                     <p className="font-medium">{task.title}</p>
                                     <p className="text-xs text-muted-foreground">{task.description || task.task_type || "Onboarding task"}</p>
                                   </TableCell>
-                                  <TableCell>{task.assigned_to || task.department || "Unassigned"}</TableCell>
+                                  <TableCell>
+                                    {task.assigned_department || task.assigned_to || task.department || "Unassigned"}
+                                  </TableCell>
                                   <TableCell>{formatDate(task.due_date)}</TableCell>
                                   <TableCell>
                                     <Badge variant="outline" className={statusClass(task.status)}>

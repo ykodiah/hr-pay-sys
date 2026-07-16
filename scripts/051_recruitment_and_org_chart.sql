@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS public.organizational_charts (
   preview_image TEXT,
   source_employee_count INT NOT NULL DEFAULT 0,
   source_hash TEXT,
+  scope TEXT NOT NULL DEFAULT 'all',
   is_active BOOLEAN NOT NULL DEFAULT false,
   created_by UUID,
   updated_by UUID,
@@ -41,7 +42,8 @@ ALTER TABLE public.organizational_charts
   ADD COLUMN IF NOT EXISTS updated_by UUID,
   ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now(),
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now(),
-  ADD COLUMN IF NOT EXISTS user_id UUID; -- legacy alias some UIs wrote
+  ADD COLUMN IF NOT EXISTS user_id UUID, -- legacy alias some UIs wrote
+  ADD COLUMN IF NOT EXISTS scope TEXT DEFAULT 'all';
 
 CREATE INDEX IF NOT EXISTS idx_org_charts_company ON public.organizational_charts(company_id);
 CREATE INDEX IF NOT EXISTS idx_org_charts_subsidiary ON public.organizational_charts(subsidiary_id);
@@ -234,6 +236,12 @@ CREATE INDEX IF NOT EXISTS idx_recruit_apps_company ON public.recruitment_applic
 CREATE INDEX IF NOT EXISTS idx_recruit_interviews_company ON public.recruitment_interviews(company_id, scheduled_at);
 CREATE INDEX IF NOT EXISTS idx_recruit_offers_company ON public.recruitment_offers(company_id, status);
 CREATE INDEX IF NOT EXISTS idx_recruit_onboarding_company ON public.recruitment_onboarding_checklists(company_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_recruit_jobs_company_slug
+  ON public.recruitment_job_postings(company_id, slug)
+  WHERE slug IS NOT NULL AND slug <> '';
+CREATE INDEX IF NOT EXISTS idx_recruit_jobs_published
+  ON public.recruitment_job_postings(status, published_at DESC)
+  WHERE status = 'published';
 
 DO $$
 DECLARE t TEXT;

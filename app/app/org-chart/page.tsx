@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { toast } from "@/hooks/use-toast"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -27,6 +26,7 @@ import {
   Loader2,
   Trash2,
   Sparkles,
+  AlertTriangle,
 } from "lucide-react"
 
 type OrgChart = {
@@ -36,15 +36,25 @@ type OrgChart = {
   chart_type: string
   chart_style: string
   subsidiary_id?: string | null
+  scope?: string | null
   chart_data: any
   preview_image?: string | null
   source_employee_count?: number
+  source_hash?: string | null
   is_active?: boolean
+  is_stale?: boolean
   created_at?: string
   updated_at?: string
 }
 
 type Subsidiary = { id: string; name: string }
+
+function chartPreviewSrc(chart: Pick<OrgChart, "preview_image" | "chart_data" | "name"> | null | undefined) {
+  if (!chart) return null
+  if (chart.preview_image) return chart.preview_image
+  // Fallback: if API returned SVG data URL inside chart_data (rare), ignore; otherwise no client rebuild
+  return null
+}
 
 export default function OrgChartPage() {
   const [companyId, setCompanyId] = useState("")
@@ -70,24 +80,16 @@ export default function OrgChartPage() {
   const load = useCallback(async (cid?: string) => {
     setLoading(true)
     try {
-      let id = cid || companyId
-      if (!id) {
-        const supabase = createClient()
-        const { data } = await supabase.from("companies").select("id").limit(1).maybeSingle()
-        id = data?.id || ""
-        if (id) setCompanyId(id)
-      }
-      if (!id) throw new Error("No company found")
-
-      const res = await fetch(`/api/org-charts?company_id=${encodeURIComponent(id)}`, {
-        cache: "no-store",
-      })
+      const id = cid || companyId
+      const url = id ? `/api/org-charts?company_id=${encodeURIComponent(id)}` : "/api/org-charts"
+      const res = await fetch(url, { cache: "no-store" })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Failed to load org charts")
 
+      setCompanyId(json.company_id || id || "")
       setCharts(json.charts ?? [])
       setSubsidiaries(json.subsidiaries ?? [])
-      setEmployeeCount((json.employees ?? []).length)
+      setEmployeeCount(json.employee_count ?? (json.employees ?? []).length)
       setSyncedAt(json.meta?.fetched_at ?? new Date().toISOString())
     } catch (err) {
       toast({
@@ -115,7 +117,7 @@ export default function OrgChartPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          company_id: companyId,
+          company_id: companyId || undefined,
           name,
           description,
           chart_type: chartType,
@@ -133,7 +135,7 @@ export default function OrgChartPage() {
         setPreview(null)
         setName("")
         setDescription("")
-        await load(companyId)
+        await load(companyId || json.chart?.company_id)
       } else {
         setPreview({
           chart_data: json.chart_data,
@@ -183,6 +185,7 @@ export default function OrgChartPage() {
   }
 
   const handleDelete = async (id: string) => {
+    if (!window.confirm("Delete this org chart?")) return
     const res = await fetch(`/api/org-charts/${id}`, { method: "DELETE" })
     const json = await res.json()
     if (!res.ok) {
@@ -197,11 +200,32 @@ export default function OrgChartPage() {
     window.open(`/api/org-charts/${id}?format=${format}`, "_blank")
   }
 
+  const openPreview = async (chart: OrgChart) => {
+    if (chart.preview_image) {
+      setViewChart(chart)
+      return
+    }
+    try {
+      const res = await fetch(`/api/org-charts/${chart.id}`, { cache: "no-store" })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Failed to load chart")
+      setViewChart(json.chart as OrgChart)
+    } catch (err) {
+      toast({
+        title: "Preview unavailable",
+        description: err instanceof Error ? err.message : "Could not open preview",
+        variant: "destructive",
+      })
+    }
+  }
+
   const scopeLabel = useMemo(() => {
     if (scope === "all") return "Entire company"
     if (scope === "parent") return "Parent company only"
     return subsidiaries.find((s) => s.id === scope)?.name || "Subsidiary"
   }, [scope, subsidiaries])
+
+  const viewSrc = chartPreviewSrc(viewChart)
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -281,11 +305,11 @@ export default function OrgChartPage() {
                 </select>
               </div>
               <div className="md:col-span-2 flex flex-wrap gap-2">
-                <Button onClick={() => handleGenerate(false)} disabled={saving || !companyId}>
+                <Button onClick={() => handleGenerate(false)} disabled={saving}>
                   {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
                   Preview
                 </Button>
-                <Button variant="outline" onClick={() => handleGenerate(true)} disabled={saving || !companyId}>
+                <Button variant="outline" onClick={() => handleGenerate(true)} disabled={saving}>
                   <Save className="h-4 w-4 mr-2" />
                   Generate & Save
                 </Button>
@@ -303,6 +327,9 @@ export default function OrgChartPage() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={preview.preview_image} alt="Org chart preview" className="w-full rounded-md border bg-slate-50" />
                 )}
+                <p className="text-sm text-muted-foreground">
+                  {(preview.chart_data?.edges?.length ?? 0)} reporting lines · type {preview.chart_data?.type || chartType}
+                </p>
                 <Button onClick={() => handleGenerate(true)} disabled={saving}>
                   <Save className="h-4 w-4 mr-2" /> Save this chart
                 </Button>
@@ -327,18 +354,25 @@ export default function OrgChartPage() {
               <Card key={chart.id}>
                 <CardContent className="p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold">{chart.name}</p>
                       {chart.is_active && <Badge className="bg-emerald-100 text-emerald-800">Active</Badge>}
+                      {chart.is_stale && (
+                        <Badge variant="outline" className="border-amber-300 text-amber-800">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Stale
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {chart.chart_type} · {chart.chart_style} · {chart.source_employee_count ?? 0} people
+                      {chart.chart_type} · {chart.chart_style} · scope {chart.scope || chart.subsidiary_id || "all"} ·{" "}
+                      {chart.source_employee_count ?? 0} people
                       {chart.updated_at ? ` · updated ${new Date(chart.updated_at).toLocaleDateString()}` : ""}
                     </p>
                     {chart.description && <p className="text-sm mt-1">{chart.description}</p>}
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setViewChart(chart)}>
+                    <Button size="sm" variant="outline" onClick={() => void openPreview(chart)}>
                       <Eye className="h-4 w-4 mr-1" /> Preview
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => download(chart.id, "csv")}>
@@ -374,15 +408,20 @@ export default function OrgChartPage() {
           <DialogHeader>
             <DialogTitle>{viewChart?.name}</DialogTitle>
           </DialogHeader>
-          {viewChart?.preview_image ? (
+          {viewSrc ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={viewChart.preview_image} alt={viewChart.name} className="w-full rounded-md border" />
+            <img src={viewSrc} alt={viewChart?.name || "Org chart"} className="w-full rounded-md border" />
           ) : (
-            <p className="text-sm text-muted-foreground">No preview image stored.</p>
+            <p className="text-sm text-muted-foreground">
+              No preview image stored. Use Refresh to regenerate from current employees.
+            </p>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => viewChart && download(viewChart.id, "csv")}>
               Download CSV
+            </Button>
+            <Button variant="outline" onClick={() => viewChart && download(viewChart.id, "svg")}>
+              Download SVG
             </Button>
             <Button onClick={() => setViewChart(null)}>Close</Button>
           </DialogFooter>

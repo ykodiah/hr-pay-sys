@@ -37,7 +37,19 @@ export async function updateSession(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  const publicPaths = ["/", "/about", "/contact", "/careers", "/help", "/api-docs", "/auth", "/login", "/privacy", "/terms"]
+  const publicPaths = [
+    "/",
+    "/about",
+    "/contact",
+    "/careers",
+    "/help",
+    "/api-docs",
+    "/auth",
+    "/login",
+    "/privacy",
+    "/terms",
+    "/api/careers",
+  ]
   const isPublicPath = publicPaths.some(
     (path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(path + "/"),
   )

@@ -1,15 +1,155 @@
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { MapPin, Clock, Users, Briefcase } from "lucide-react"
-import Link from "next/link"
+"use client"
 
-export default function CareersPage() {
+import { Suspense, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
+import { useSearchParams } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { MapPin, Briefcase, Loader2, ArrowLeft, Building2 } from "lucide-react"
+
+type PublicJob = {
+  id: string
+  company_id: string
+  company_name?: string | null
+  slug?: string | null
+  title: string
+  description?: string | null
+  requirements?: unknown
+  benefits?: unknown
+  salary_min?: number | null
+  salary_max?: number | null
+  currency?: string | null
+  location?: string | null
+  department?: string | null
+  employment_type?: string | null
+  published_at?: string | null
+  views_count?: number | null
+}
+
+function asList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean)
+  if (typeof value === "string" && value.trim()) {
+    return value
+      .split(/\n|,/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+  }
+  return []
+}
+
+function salaryLabel(job: PublicJob) {
+  const min = Number(job.salary_min || 0)
+  const max = Number(job.salary_max || 0)
+  const currency = job.currency || "GHS"
+  if (!min && !max) return "Competitive"
+  if (min && max) return `${currency} ${min.toLocaleString()} – ${max.toLocaleString()}`
+  return `${currency} ${(min || max).toLocaleString()}`
+}
+
+function CareersContent() {
+  const searchParams = useSearchParams()
+  const jobKey = searchParams.get("job") || ""
+
+  const [jobs, setJobs] = useState<PublicJob[]>([])
+  const [selected, setSelected] = useState<PublicJob | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [form, setForm] = useState({
+    candidate_name: "",
+    email: "",
+    phone: "",
+    location: "",
+    experience_text: "",
+    skills: "",
+    education: "",
+    previous_company: "",
+    cover_letter: "",
+  })
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      setError(null)
+      setSuccess(null)
+      try {
+        if (jobKey) {
+          const res = await fetch(`/api/careers/jobs?job=${encodeURIComponent(jobKey)}`, { cache: "no-store" })
+          const json = await res.json()
+          if (!res.ok) throw new Error(json.error || "Job not found")
+          if (!cancelled) {
+            setSelected(json.job)
+            setJobs([json.job])
+          }
+        } else {
+          const res = await fetch("/api/careers/jobs", { cache: "no-store" })
+          const json = await res.json()
+          if (!res.ok) throw new Error(json.error || "Failed to load jobs")
+          if (!cancelled) {
+            setJobs(json.jobs ?? [])
+            setSelected(null)
+          }
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load careers")
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [jobKey])
+
+  const requirements = useMemo(() => asList(selected?.requirements), [selected])
+  const benefits = useMemo(() => asList(selected?.benefits), [selected])
+
+  const submitApplication = async () => {
+    if (!selected) return
+    setSubmitting(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const res = await fetch("/api/careers/applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          job_id: selected.id,
+          ...form,
+          source: "careers",
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Application failed")
+      setSuccess(`Application submitted for ${json.job_title || selected.title}.`)
+      setForm({
+        candidate_name: "",
+        email: "",
+        phone: "",
+        location: "",
+        experience_text: "",
+        skills: "",
+        education: "",
+        previous_company: "",
+        cover_letter: "",
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not submit application")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
-      {/* Header */}
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#ecfdf5,_#ffffff_55%)]">
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
@@ -17,285 +157,202 @@ export default function CareersPage() {
               </div>
               <span className="text-xl font-bold text-gray-900">AkwaabaHRPay</span>
             </Link>
-            <nav className="hidden md:flex space-x-8">
-              <Link href="/#features" className="text-gray-600 hover:text-emerald-600 transition-colors">
-                Features
-              </Link>
-              <Link href="/#pricing" className="text-gray-600 hover:text-emerald-600 transition-colors">
-                Pricing
-              </Link>
-              <Link href="/about" className="text-gray-600 hover:text-emerald-600 transition-colors">
-                About
-              </Link>
-            </nav>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center gap-3">
               <Link href="/login">
-                <Button variant="ghost" className="text-gray-600">
-                  Sign In
-                </Button>
+                <Button variant="ghost">Sign In</Button>
               </Link>
-              <Link href="/setup">
-                <Button className="bg-emerald-600 hover:bg-emerald-700">Get Started</Button>
+              <Link href="/careers">
+                <Button className="bg-emerald-600 hover:bg-emerald-700">Open roles</Button>
               </Link>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="py-20 lg:py-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <Badge className="mb-4 bg-emerald-100 text-emerald-800">Join Our Team</Badge>
-            <h1 className="text-4xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
-              Build the Future of
-              <span className="text-emerald-600 block">HR Technology</span>
-            </h1>
-            <p className="text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
-              Join our mission to transform how businesses in Ghana manage their most valuable asset - their people.
-              We're looking for passionate individuals who want to make a real impact on the African business landscape.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Why Join Us */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">Why AkwaabaHRPay?</h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              We offer more than just a job - we provide a platform to grow, innovate, and make a difference.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            <Card className="p-6 text-center hover:shadow-lg transition-shadow">
-              <CardContent className="p-0">
-                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Users className="w-8 h-8 text-emerald-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Collaborative Culture</h3>
-                <p className="text-gray-600 leading-relaxed">
-                  Work with a diverse, talented team that values collaboration, creativity, and continuous learning. We
-                  believe the best ideas come from working together.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="p-6 text-center hover:shadow-lg transition-shadow">
-              <CardContent className="p-0">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Briefcase className="w-8 h-8 text-blue-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Growth Opportunities</h3>
-                <p className="text-gray-600 leading-relaxed">
-                  Advance your career with clear progression paths, mentorship programs, and opportunities to lead
-                  projects that impact thousands of businesses across Ghana.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="p-6 text-center hover:shadow-lg transition-shadow">
-              <CardContent className="p-0">
-                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <MapPin className="w-8 h-8 text-purple-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Flexible Work</h3>
-                <p className="text-gray-600 leading-relaxed">
-                  Enjoy flexible working arrangements with options for remote work, flexible hours, and a healthy
-                  work-life balance that supports your personal and professional goals.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Current Openings */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">Current Openings</h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              We're currently reviewing our hiring needs. Check back soon for exciting opportunities!
-            </p>
-          </div>
-
-          <Card className="p-12 text-center max-w-2xl mx-auto">
-            <CardContent className="p-0">
-              <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Clock className="w-10 h-10 text-emerald-600" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">No Open Positions Currently</h3>
-              <p className="text-gray-600 leading-relaxed mb-8">
-                We're not actively hiring at the moment, but we're always interested in connecting with talented
-                individuals who are passionate about HR technology and want to make an impact in Ghana's business
-                ecosystem.
-              </p>
-              <div className="space-y-4">
-                <p className="text-sm text-gray-500">
-                  Interested in future opportunities? Send us your resume and we'll keep you in mind for upcoming roles.
-                </p>
-                <Link href="/contact">
-                  <Button className="bg-emerald-600 hover:bg-emerald-700">Send Your Resume</Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* Benefits */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">Benefits & Perks</h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              We take care of our team so they can focus on building amazing products.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="bg-emerald-50 p-6 rounded-lg">
-              <h4 className="font-semibold text-gray-900 mb-2">Competitive Salary</h4>
-              <p className="text-gray-600 text-sm">Market-competitive compensation with performance bonuses</p>
-            </div>
-            <div className="bg-blue-50 p-6 rounded-lg">
-              <h4 className="font-semibold text-gray-900 mb-2">Health Insurance</h4>
-              <p className="text-gray-600 text-sm">Comprehensive health coverage for you and your family</p>
-            </div>
-            <div className="bg-purple-50 p-6 rounded-lg">
-              <h4 className="font-semibold text-gray-900 mb-2">Professional Development</h4>
-              <p className="text-gray-600 text-sm">Training budget and conference attendance opportunities</p>
-            </div>
-            <div className="bg-orange-50 p-6 rounded-lg">
-              <h4 className="font-semibold text-gray-900 mb-2">Flexible Hours</h4>
-              <p className="text-gray-600 text-sm">Work when you're most productive with core collaboration hours</p>
-            </div>
-            <div className="bg-green-50 p-6 rounded-lg">
-              <h4 className="font-semibold text-gray-900 mb-2">Remote Work</h4>
-              <p className="text-gray-600 text-sm">Option to work remotely with quarterly team meetups</p>
-            </div>
-            <div className="bg-red-50 p-6 rounded-lg">
-              <h4 className="font-semibold text-gray-900 mb-2">Equity Options</h4>
-              <p className="text-gray-600 text-sm">Share in the company's success with stock options</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="py-20 bg-emerald-600">
-        <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">Ready to Make an Impact?</h2>
-          <p className="text-xl text-emerald-100 mb-8">
-            Even if we don't have current openings, we'd love to hear from talented individuals.
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+        <section className="space-y-3">
+          <Badge className="bg-emerald-100 text-emerald-800">Careers</Badge>
+          <h1 className="text-4xl font-bold tracking-tight text-gray-900">
+            {selected ? selected.title : "Open positions"}
+          </h1>
+          <p className="text-lg text-gray-600 max-w-3xl">
+            {selected
+              ? `${selected.company_name || "Company"} · Live role from the recruitment database`
+              : "Browse published job postings synced from recruitment. Apply in one step."}
           </p>
-          <Link href="/contact">
-            <Button size="lg" className="bg-white text-emerald-600 hover:bg-gray-100 text-lg px-8 py-4">
-              Get In Touch
-            </Button>
-          </Link>
-        </div>
-      </section>
+        </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">A</span>
-                </div>
-                <span className="text-xl font-bold">AkwaabaHRPay</span>
+        {loading && (
+          <div className="py-20 flex items-center justify-center gap-2 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" /> Loading roles…
+          </div>
+        )}
+
+        {error && !loading && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700">{error}</div>
+        )}
+
+        {success && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800">{success}</div>
+        )}
+
+        {!loading && !selected && (
+          <div className="grid gap-4">
+            {jobs.length === 0 ? (
+              <div className="rounded-xl border bg-white p-10 text-center text-gray-600">
+                No published roles right now. Check back soon.
               </div>
-              <p className="text-gray-400 text-sm">
-                Professional HR & Payroll software built specifically for Ghanaian businesses.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Product</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li>
-                  <Link href="/#features" className="hover:text-white transition-colors">
-                    Features
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/#pricing" className="hover:text-white transition-colors">
-                    Pricing
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/features/security" className="hover:text-white transition-colors">
-                    Security
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/#integrations" className="hover:text-white transition-colors">
-                    Integrations
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Support</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li>
-                  <Link href="/help" className="hover:text-white transition-colors">
-                    Help Center
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/contact" className="hover:text-white transition-colors">
-                    Contact Us
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/training" className="hover:text-white transition-colors">
-                    Training
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/api-docs" className="hover:text-white transition-colors">
-                    API Docs
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li>
-                  <Link href="/about" className="hover:text-white transition-colors">
-                    About
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/careers" className="hover:text-white transition-colors text-emerald-400">
-                    Careers
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/privacy" className="hover:text-white transition-colors">
-                    Privacy
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/terms" className="hover:text-white transition-colors">
-                    Terms
-                  </Link>
-                </li>
-              </ul>
-            </div>
+            ) : (
+              jobs.map((job) => (
+                <Link
+                  key={job.id}
+                  href={`/careers?job=${encodeURIComponent(job.slug || job.id)}`}
+                  className="rounded-xl border bg-white p-5 hover:border-emerald-300 hover:shadow-sm transition"
+                >
+                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">{job.title}</h2>
+                      <p className="text-sm text-gray-600 flex flex-wrap gap-3 mt-1">
+                        <span className="inline-flex items-center gap-1">
+                          <Building2 className="h-4 w-4" />
+                          {job.company_name || "Company"}
+                        </span>
+                        {job.department && <span>{job.department}</span>}
+                        {job.location && (
+                          <span className="inline-flex items-center gap-1">
+                            <MapPin className="h-4 w-4" />
+                            {job.location}
+                          </span>
+                        )}
+                        {job.employment_type && (
+                          <span className="inline-flex items-center gap-1">
+                            <Briefcase className="h-4 w-4" />
+                            {job.employment_type}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="text-sm font-medium text-emerald-700">{salaryLabel(job)}</div>
+                  </div>
+                </Link>
+              ))
+            )}
           </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
-            <p>&copy; 2025 AkwaabaHRPay. Made with ❤️ in Ghana.</p>
+        )}
+
+        {!loading && selected && (
+          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <section className="rounded-xl border bg-white p-6 space-y-5">
+              <Link href="/careers" className="inline-flex items-center gap-1 text-sm text-emerald-700 hover:underline">
+                <ArrowLeft className="h-4 w-4" /> All roles
+              </Link>
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600 flex flex-wrap gap-3">
+                  <span>{selected.company_name || "Company"}</span>
+                  {selected.department && <span>{selected.department}</span>}
+                  {selected.location && <span>{selected.location}</span>}
+                  {selected.employment_type && <span>{selected.employment_type}</span>}
+                  <span>{salaryLabel(selected)}</span>
+                </p>
+                <p className="text-gray-700 whitespace-pre-wrap">
+                  {selected.description || "No description provided."}
+                </p>
+              </div>
+              {requirements.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-2">Requirements</h3>
+                  <ul className="list-disc pl-5 space-y-1 text-gray-700">
+                    {requirements.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {benefits.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-2">Benefits</h3>
+                  <ul className="list-disc pl-5 space-y-1 text-gray-700">
+                    {benefits.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </section>
+
+            <section className="rounded-xl border bg-white p-6 space-y-4 h-fit">
+              <h3 className="text-lg font-semibold">Apply now</h3>
+              <div className="space-y-2">
+                <Label>Full name</Label>
+                <Input
+                  value={form.candidate_name}
+                  onChange={(e) => setForm((f) => ({ ...f, candidate_name: e.target.value }))}
+                  placeholder="Ama Mensah"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                  placeholder="ama@example.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Location</Label>
+                <Input value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Skills (comma separated)</Label>
+                <Input value={form.skills} onChange={(e) => setForm((f) => ({ ...f, skills: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Experience</Label>
+                <Textarea
+                  rows={3}
+                  value={form.experience_text}
+                  onChange={(e) => setForm((f) => ({ ...f, experience_text: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Cover letter</Label>
+                <Textarea
+                  rows={4}
+                  value={form.cover_letter}
+                  onChange={(e) => setForm((f) => ({ ...f, cover_letter: e.target.value }))}
+                />
+              </div>
+              <Button
+                className="w-full bg-emerald-600 hover:bg-emerald-700"
+                disabled={submitting || !form.candidate_name || !form.email}
+                onClick={() => void submitApplication()}
+              >
+                {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Submit application
+              </Button>
+            </section>
           </div>
-        </div>
-      </footer>
+        )}
+      </main>
     </div>
+  )
+}
+
+export default function CareersPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-muted-foreground gap-2">
+          <Loader2 className="h-5 w-5 animate-spin" /> Loading careers…
+        </div>
+      }
+    >
+      <CareersContent />
+    </Suspense>
   )
 }

@@ -7,8 +7,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { requireApiUser } from "@/lib/auth/api-user"
 import { resolveCompanyId } from "@/lib/employees/resolve-company"
-import { ACTIVE_EMPLOYEE_STATUSES } from "@/lib/employees/status"
 import { buildOrgChartData, buildPreviewSvg, hashEmployeeSet } from "@/lib/org-chart/builder"
+import { fetchAllOrgEmployees } from "@/lib/org-chart/fetch-employees"
 
 export async function GET(req: NextRequest) {
   try {
@@ -33,23 +33,25 @@ export async function GET(req: NextRequest) {
     const { data, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    const [{ data: subsidiaries }, { data: employees }] = await Promise.all([
+    const [{ data: subsidiaries }, empResult] = await Promise.all([
       client.from("subsidiaries").select("id, name, status").eq("company_id", companyId).eq("status", "active"),
-      client
-        .from("employees")
-        .select(
-          "id, first_name, last_name, full_name, display_name, position, department, subsidiary_id, direct_supervisor, head_of_department, special_role, employee_id",
-        )
-        .eq("company_id", companyId)
-        .in("status", [...ACTIVE_EMPLOYEE_STATUSES]),
+      fetchAllOrgEmployees(client, companyId),
     ])
+    if (empResult.error) return NextResponse.json({ error: empResult.error }, { status: 500 })
+
+    const currentHash = hashEmployeeSet(empResult.employees)
+    const charts = (data ?? []).map((chart) => ({
+      ...chart,
+      is_stale: Boolean(chart.source_hash && chart.source_hash !== currentHash),
+    }))
 
     return NextResponse.json({
       success: true,
-      charts: data ?? [],
+      charts,
       subsidiaries: subsidiaries ?? [],
-      employees: employees ?? [],
+      employee_count: empResult.employees.length,
       company_id: companyId,
+      source_hash: currentHash,
       meta: { fetched_at: new Date().toISOString() },
     })
   } catch (err) {
@@ -72,22 +74,16 @@ export async function POST(req: NextRequest) {
     }
 
     const scope = body.scope || body.subsidiary_id || "all"
-    const { data: employees, error: empErr } = await client
-      .from("employees")
-      .select(
-        "id, first_name, last_name, full_name, display_name, position, department, subsidiary_id, direct_supervisor, head_of_department, special_role, employee_id",
-      )
-      .eq("company_id", companyId)
-      .in("status", [...ACTIVE_EMPLOYEE_STATUSES])
-    if (empErr) return NextResponse.json({ error: empErr.message }, { status: 500 })
+    const { employees, error: empErr } = await fetchAllOrgEmployees(client, companyId)
+    if (empErr) return NextResponse.json({ error: empErr }, { status: 500 })
 
-    const chartData = buildOrgChartData(employees ?? [], {
+    const chartData = buildOrgChartData(employees, {
       chartType: body.chart_type,
       chartStyle: body.chart_style,
       scope,
     })
     const preview = buildPreviewSvg(chartData, body.name)
-    const sourceHash = hashEmployeeSet(employees ?? [])
+    const sourceHash = hashEmployeeSet(employees)
 
     if (body.save === false) {
       return NextResponse.json({
@@ -97,6 +93,7 @@ export async function POST(req: NextRequest) {
         preview_image: preview,
         source_employee_count: chartData.nodes.length,
         source_hash: sourceHash,
+        scope,
       })
     }
 
@@ -104,6 +101,7 @@ export async function POST(req: NextRequest) {
     const payload = {
       company_id: companyId,
       subsidiary_id: subsidiaryId,
+      scope,
       name: body.name,
       description: body.description ?? null,
       chart_type: body.chart_type ?? "hierarchical",
