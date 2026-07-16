@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
+import { createClient } from "@/lib/supabase/client"
 import { TrendingUp, Users, DollarSign, Calculator, Download, RefreshCw } from "lucide-react"
+import type { ReportType } from "@/lib/services/reports/types"
 
 const basicMetrics = {
   totalPayroll: 325000,
@@ -15,29 +17,68 @@ const basicMetrics = {
   avgSalary: 6019,
 }
 
-const simpleReports = [
+const simpleReports: {
+  id: number
+  name: string
+  description: string
+  category: string
+  status: string
+  reportType: ReportType
+}[] = [
   {
     id: 1,
     name: "Monthly Payroll Summary",
-    description: "Complete payroll breakdown with 2024 PAYE calculations",
+    description: "Complete payroll breakdown with PAYE, SSNIT, and net pay",
     category: "Payroll",
     status: "active",
-    records: 54,
-    totalAmount: "GHS 325,000",
+    reportType: "payroll_summary",
   },
   {
     id: 2,
     name: "PAYE Tax Report",
-    description: "Tax calculations using 2024 Ghana tax bands",
-    category: "Tax",
+    description: "Tax calculations using current Ghana PAYE bands",
+    category: "Compliance",
     status: "active",
-    records: 54,
-    totalAmount: "GHS 48,700",
+    reportType: "paye",
+  },
+  {
+    id: 3,
+    name: "Bank Payment Advice",
+    description: "Net salary payment instructions by bank account",
+    category: "Banking",
+    status: "active",
+    reportType: "bank_advice",
+  },
+  {
+    id: 4,
+    name: "Cost to Company",
+    description: "Employer cost including statutory contributions",
+    category: "Financial",
+    status: "active",
+    reportType: "cost_to_company",
   },
 ]
 
+function currentPayPeriod(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+}
+
 export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState("overview")
+  const [companyId, setCompanyId] = useState("")
+  const [downloadingId, setDownloadingId] = useState<number | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    void supabase
+      .from("companies")
+      .select("id")
+      .limit(1)
+      .then(({ data }) => {
+        if (data?.[0]?.id) setCompanyId(data[0].id)
+      })
+  }, [])
 
   const handleRefreshData = () => {
     toast({
@@ -46,11 +87,57 @@ export default function AnalyticsPage() {
     })
   }
 
-  const handleDownloadReport = (reportId: number) => {
-    toast({
-      title: "Download Started",
-      description: "Report is being generated.",
-    })
+  const handleDownloadReport = async (reportId: number, reportType: ReportType) => {
+    if (!companyId) {
+      toast({
+        variant: "destructive",
+        title: "Company required",
+        description: "Load a company before downloading reports.",
+      })
+      return
+    }
+
+    setDownloadingId(reportId)
+    try {
+      const payPeriod = currentPayPeriod()
+      const res = await fetch("/api/reports/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_id: companyId,
+          report_type: reportType,
+          pay_period: payPeriod,
+        }),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json.error ?? "Download failed")
+      }
+
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      const filename =
+        res.headers.get("content-disposition")?.match(/filename="(.+)"/)?.[1] ??
+        `${reportType}-${payPeriod}.csv`
+      a.href = url
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(url)
+
+      toast({
+        title: "Download ready",
+        description: "CSV includes report title, period metadata, and column headings.",
+      })
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Download failed",
+        description: err instanceof Error ? err.message : "Could not generate report",
+      })
+    } finally {
+      setDownloadingId(null)
+    }
   }
 
   return (
@@ -65,9 +152,9 @@ export default function AnalyticsPage() {
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => (window.location.href = "/app/reports")}>
             <Download className="w-4 h-4 mr-2" />
-            Export
+            All Reports
           </Button>
         </div>
       </div>
@@ -189,7 +276,9 @@ export default function AnalyticsPage() {
           <div className="space-y-4">
             <div>
               <h2 className="text-xl font-semibold">Available Reports</h2>
-              <p className="text-gray-600">Generate and download payroll reports</p>
+              <p className="text-gray-600">
+                Download compliance, financial, and banking reports as CSV with headings
+              </p>
             </div>
 
             <div className="grid gap-4">
@@ -204,17 +293,17 @@ export default function AnalyticsPage() {
                           <Badge className="bg-green-100 text-green-700">{report.status}</Badge>
                         </div>
                         <p className="text-gray-600 mb-3">{report.description}</p>
-                        <div className="flex items-center space-x-6 text-sm text-gray-500">
-                          <span>{report.records} records</span>
-                          <span>{report.totalAmount}</span>
-                        </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Button variant="outline" size="sm">
-                          Preview
+                        <Button variant="outline" size="sm" onClick={() => (window.location.href = "/app/reports")}>
+                          Open Designer
                         </Button>
-                        <Button size="sm" onClick={() => handleDownloadReport(report.id)}>
-                          Download
+                        <Button
+                          size="sm"
+                          disabled={downloadingId === report.id}
+                          onClick={() => handleDownloadReport(report.id, report.reportType)}
+                        >
+                          {downloadingId === report.id ? "Downloading…" : "Download CSV"}
                         </Button>
                       </div>
                     </div>

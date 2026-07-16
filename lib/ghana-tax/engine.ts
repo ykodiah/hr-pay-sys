@@ -1,15 +1,18 @@
 /**
  * Ghana Tax Calculation Engine
  *
- * Implements GRA Income Tax (Amendment) Act, 2023 (Act 1094) rules for:
- *   - PAYE (Pay As You Earn) using progressive annual bands
- *   - SSNIT Tier 1 (5.5% employee / 13% employer)
- *   - SSNIT Tier 2 / NHIA (5% employee / 5% employer)
+ * Implements:
+ *   - GRA PAYE rates effective 1 January 2024 (monthly progressive bands)
+ *   - National Pensions Act 766 contribution split:
+ *       Employee 5.5% total → Tier 1 (SSNIT) 0.5% + Tier 2 5%
+ *       Employer 13% total  → Tier 1 (SSNIT) 13%  + Tier 2 0%
+ *       Combined 18.5% → Tier 1 13.5% + Tier 2 5%
  *   - Voluntary Tier 3 provident fund
- *   - Standard tax reliefs (CRA, marriage, old-age, disability, education)
+ *   - Overtime taxed at marginal PAYE rate (remitted with PAYE)
+ *   - Bonus final withholding at 5% (when within GRA bonus rules)
+ *   - Non-tax deductions (loans, advances, other) after statutory tax
  *
  * All monetary values are in GHS.
- * All calculations are annual; monthly values are divided by 12.
  */
 
 // ---------------------------------------------------------------------------
@@ -18,24 +21,28 @@
 
 export interface PAYEBand {
   band_order: number
-  rate: number          // percentage, e.g. 5 = 5%
-  threshold_amount: number  // annual GHS amount this band covers
+  rate: number
+  threshold_amount: number
   is_remaining_amount: boolean
   description: string
 }
 
 export interface SSNITRates {
-  employee_rate: number   // e.g. 5.5
-  employer_rate: number   // e.g. 13
+  /** Tier 1 employee share (Act 766 default: 0.5) */
+  employee_rate: number
+  /** Tier 1 employer share (Act 766 default: 13) */
+  employer_rate: number
 }
 
 export interface Tier2Rates {
-  employee_rate: number   // e.g. 5
-  employer_rate: number   // e.g. 5
+  /** Tier 2 employee share (Act 766 default: 5) */
+  employee_rate: number
+  /** Tier 2 employer share (Act 766 default: 0 — funded from employee 5%) */
+  employer_rate: number
 }
 
 export interface Tier3Rates {
-  employee_rate: number   // e.g. 0 (voluntary, company configures)
+  employee_rate: number
   employer_rate: number
 }
 
@@ -44,6 +51,7 @@ export interface TaxRates {
   ssnit: SSNITRates
   tier2: Tier2Rates
   tier3: Tier3Rates
+  paye_bands_are_monthly?: boolean
 }
 
 export interface TaxReliefItem {
@@ -52,10 +60,14 @@ export interface TaxReliefItem {
   annual_amount: number
 }
 
+export interface OtherDeductionsInput {
+  loan?: number
+  advance?: number
+  other?: number
+}
+
 export interface EmployeePayInput {
-  /** Monthly basic salary */
   monthly_basic: number
-  /** Monthly allowances (transport, housing, medical, etc.) */
   monthly_allowances: {
     transport?: number
     housing?: number
@@ -65,16 +77,18 @@ export interface EmployeePayInput {
     uniform?: number
     other?: number
   }
-  /** Monthly overtime earnings (taxed separately in Ghana) */
+  /** Overtime earnings for the period — taxed at marginal PAYE rate */
   monthly_overtime?: number
-  /** Monthly bonus (taxed separately) */
+  /** Bonus — 5% final WHT when within GRA bonus rules */
   monthly_bonus?: number
-  /** Whether Tier 2 is applicable for this employee */
+  /** Tier 2 is mandatory under Act 766 for most employees (default true) */
   tier2_applicable?: boolean
-  /** Whether Tier 3 is applicable / opted-in */
   tier3_applicable?: boolean
-  /** Tax reliefs the employee is entitled to (annual totals) */
+  /** Optional per-employee provident fund / Tier 3 rate override (0–16.5). */
+  tier3_employee_rate?: number
   annual_tax_reliefs?: TaxReliefItem[]
+  /** Non-tax deductions applied after statutory tax to arrive at net */
+  other_deductions?: OtherDeductionsInput
 }
 
 export interface PAYEBandBreakdown {
@@ -86,95 +100,122 @@ export interface PAYEBandBreakdown {
 }
 
 export interface TaxCalculationResult {
-  // --- Earnings ---
   monthly_basic: number
   monthly_allowances_total: number
   monthly_gross: number
   annual_gross: number
 
-  // --- SSNIT ---
   monthly_ssnit_employee: number
   monthly_ssnit_employer: number
   annual_ssnit_employee: number
   annual_ssnit_employer: number
 
-  // --- Tier 2 ---
   monthly_tier2_employee: number
   monthly_tier2_employer: number
 
-  // --- Tier 3 ---
+  /** Total employee pension deducted (Tier1 + Tier2) — Act 766: 5.5% of basic */
+  monthly_pension_employee: number
+  /** Total employer pension cost (Tier1 + Tier2) — Act 766: 13% of basic */
+  monthly_pension_employer: number
+
   monthly_tier3_employee: number
   monthly_tier3_employer: number
 
-  // --- PAYE ---
-  annual_taxable_income: number    // gross - SSNIT employee - reliefs
+  monthly_taxable_income: number
+  annual_taxable_income: number
   annual_tax_reliefs: number
   annual_paye_tax: number
+  /** Base PAYE on chargeable income (excludes OT/bonus tax) */
   monthly_paye_tax: number
-  effective_tax_rate: number       // % of gross
+  /**
+   * Total income tax to remit as PAYE to GRA:
+   * base PAYE + overtime tax (marginal) + bonus WHT
+   */
+  monthly_total_paye_withheld: number
+  effective_tax_rate: number
   paye_band_breakdown: PAYEBandBreakdown[]
 
-  // --- Totals ---
+  monthly_loan_deduction: number
+  monthly_advance_deduction: number
+  monthly_other_deduction: number
+
+  monthly_statutory_deductions: number
   monthly_total_employee_deductions: number
   monthly_net_pay: number
   monthly_total_employer_cost: number
 
-  // --- Overtime (taxed at marginal rate) ---
   monthly_overtime: number
   monthly_overtime_tax: number
 
-  // --- Bonus ---
   monthly_bonus: number
   monthly_bonus_tax: number
 }
 
 // ---------------------------------------------------------------------------
-// GRA 2025 default bands (fallback when DB is unavailable)
+// GRA PAYE bands effective 1 Jan 2024
 // ---------------------------------------------------------------------------
 
-export const GRA_2025_PAYE_BANDS: PAYEBand[] = [
-  { band_order: 1, rate: 0,    threshold_amount:   4380,   is_remaining_amount: false, description: "0% on first GHS 4,380" },
-  { band_order: 2, rate: 5,    threshold_amount:   1200,   is_remaining_amount: false, description: "5% on next GHS 1,200" },
-  { band_order: 3, rate: 10,   threshold_amount:   1880,   is_remaining_amount: false, description: "10% on next GHS 1,880" },
-  { band_order: 4, rate: 17.5, threshold_amount:  36720,   is_remaining_amount: false, description: "17.5% on next GHS 36,720" },
-  { band_order: 5, rate: 25,   threshold_amount:  49120,   is_remaining_amount: false, description: "25% on next GHS 49,120" },
-  { band_order: 6, rate: 30,   threshold_amount: 199240,   is_remaining_amount: false, description: "30% on next GHS 199,240" },
-  { band_order: 7, rate: 35,   threshold_amount:      0,   is_remaining_amount: true,  description: "35% on remaining amount" },
+export const GRA_MONTHLY_PAYE_BANDS: PAYEBand[] = [
+  { band_order: 1, rate: 0, threshold_amount: 490, is_remaining_amount: false, description: "0% on first GHS 490" },
+  { band_order: 2, rate: 5, threshold_amount: 110, is_remaining_amount: false, description: "5% on next GHS 110" },
+  { band_order: 3, rate: 10, threshold_amount: 130, is_remaining_amount: false, description: "10% on next GHS 130" },
+  { band_order: 4, rate: 17.5, threshold_amount: 3166.67, is_remaining_amount: false, description: "17.5% on next GHS 3,166.67" },
+  { band_order: 5, rate: 25, threshold_amount: 16000, is_remaining_amount: false, description: "25% on next GHS 16,000" },
+  { band_order: 6, rate: 30, threshold_amount: 30520, is_remaining_amount: false, description: "30% on next GHS 30,520" },
+  { band_order: 7, rate: 35, threshold_amount: 0, is_remaining_amount: true, description: "35% on amount exceeding GHS 50,416.67" },
 ]
 
-export const GRA_2025_SSNIT: SSNITRates    = { employee_rate: 5.5,  employer_rate: 13 }
-export const GRA_2025_TIER2: Tier2Rates    = { employee_rate: 5,    employer_rate: 5  }
-export const GRA_2025_TIER3: Tier3Rates    = { employee_rate: 0,    employer_rate: 0  }
+export const GRA_2025_PAYE_BANDS: PAYEBand[] = [
+  { band_order: 1, rate: 0, threshold_amount: 5880, is_remaining_amount: false, description: "0% on first GHS 5,880" },
+  { band_order: 2, rate: 5, threshold_amount: 1320, is_remaining_amount: false, description: "5% on next GHS 1,320" },
+  { band_order: 3, rate: 10, threshold_amount: 1560, is_remaining_amount: false, description: "10% on next GHS 1,560" },
+  { band_order: 4, rate: 17.5, threshold_amount: 38000, is_remaining_amount: false, description: "17.5% on next GHS 38,000" },
+  { band_order: 5, rate: 25, threshold_amount: 192000, is_remaining_amount: false, description: "25% on next GHS 192,000" },
+  { band_order: 6, rate: 30, threshold_amount: 366240, is_remaining_amount: false, description: "30% on next GHS 366,240" },
+  { band_order: 7, rate: 35, threshold_amount: 0, is_remaining_amount: true, description: "35% on amount exceeding GHS 605,000" },
+]
+
+const OBSOLETE_FIRST_BAND_THRESHOLDS = new Set([365, 402, 4380, 4824])
+
+/**
+ * Act 766 defaults — Tier 1 + Tier 2 split of the 18.5% contribution.
+ * Employee paycheck deduction = 0.5% + 5% = 5.5% (never 10.5%).
+ */
+export const GRA_2025_SSNIT: SSNITRates = { employee_rate: 0.5, employer_rate: 13 }
+export const GRA_2025_TIER2: Tier2Rates = { employee_rate: 5, employer_rate: 0 }
+export const GRA_2025_TIER3: Tier3Rates = { employee_rate: 0, employer_rate: 0 }
+
+export const DEFAULT_TAX_RATES: TaxRates = {
+  paye_bands: GRA_MONTHLY_PAYE_BANDS,
+  ssnit: GRA_2025_SSNIT,
+  tier2: GRA_2025_TIER2,
+  tier3: GRA_2025_TIER3,
+  paye_bands_are_monthly: true,
+}
 
 // ---------------------------------------------------------------------------
 // Core helpers
 // ---------------------------------------------------------------------------
 
-/** Round to 2 decimal places (banker-safe) */
-function round2(n: number): number {
+export function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100
 }
 
-/** Apply progressive PAYE bands to an annual taxable income. Returns total tax + breakdown. */
 export function applyPayeBands(
-  annualTaxableIncome: number,
-  bands: PAYEBand[]
+  taxableIncome: number,
+  bands: PAYEBand[],
 ): { totalTax: number; breakdown: PAYEBandBreakdown[] } {
   const sortedBands = [...bands].sort((a, b) => a.band_order - b.band_order)
-  let remaining = Math.max(0, annualTaxableIncome)
+  let remaining = Math.max(0, taxableIncome)
   let totalTax = 0
   const breakdown: PAYEBandBreakdown[] = []
 
   for (const band of sortedBands) {
     if (remaining <= 0) break
 
-    let taxableInBand: number
-
-    if (band.is_remaining_amount) {
-      taxableInBand = remaining
-    } else {
-      taxableInBand = Math.min(remaining, band.threshold_amount)
-    }
+    const taxableInBand = band.is_remaining_amount
+      ? remaining
+      : Math.min(remaining, band.threshold_amount)
 
     const taxInBand = round2(taxableInBand * (band.rate / 100))
     totalTax += taxInBand
@@ -192,109 +233,207 @@ export function applyPayeBands(
   return { totalTax: round2(totalTax), breakdown }
 }
 
+export function normalizePayeBands(bands: PAYEBand[] | null | undefined): {
+  bands: PAYEBand[]
+  isMonthly: boolean
+} {
+  if (!bands || bands.length === 0) {
+    return { bands: GRA_MONTHLY_PAYE_BANDS, isMonthly: true }
+  }
+
+  const sorted = [...bands].sort((a, b) => a.band_order - b.band_order)
+  const first = sorted.find((b) => !b.is_remaining_amount)
+
+  if (first && OBSOLETE_FIRST_BAND_THRESHOLDS.has(Number(first.threshold_amount))) {
+    return { bands: GRA_MONTHLY_PAYE_BANDS, isMonthly: true }
+  }
+
+  const isMonthly = first != null && Number(first.threshold_amount) <= 1000
+  return { bands: sorted, isMonthly }
+}
+
+/**
+ * Fix legacy configs that stored SSNIT as 5.5%/13% AND Tier 2 as 5%/5%
+ * (double-counting employee to 10.5% / employer to 18%).
+ */
+export function normalizePensionRates(ssnit: SSNITRates, tier2: Tier2Rates): {
+  ssnit: SSNITRates
+  tier2: Tier2Rates
+} {
+  const empTotal = Number(ssnit.employee_rate) + Number(tier2.employee_rate)
+  const erTotal = Number(ssnit.employer_rate) + Number(tier2.employer_rate)
+
+  // Classic wrong seed: 5.5 + 5 employee, 13 + 5 employer
+  if (empTotal >= 10 || erTotal >= 17) {
+    return { ssnit: { ...GRA_2025_SSNIT }, tier2: { ...GRA_2025_TIER2 } }
+  }
+
+  // Legacy "all 5.5% under SSNIT, Tier2 also 5/5"
+  if (Number(ssnit.employee_rate) >= 5 && Number(tier2.employee_rate) >= 5) {
+    return { ssnit: { ...GRA_2025_SSNIT }, tier2: { ...GRA_2025_TIER2 } }
+  }
+
+  // Legacy single-bucket: SSNIT 5.5/13 with Tier2 0 — expand to Act 766 split
+  if (
+    Number(ssnit.employee_rate) === 5.5 &&
+    Number(ssnit.employer_rate) === 13 &&
+    Number(tier2.employee_rate) === 0
+  ) {
+    return { ssnit: { ...GRA_2025_SSNIT }, tier2: { ...GRA_2025_TIER2 } }
+  }
+
+  return { ssnit, tier2 }
+}
+
+export function calculateMonthlyPaye(
+  monthlyTaxableIncome: number,
+  bands: PAYEBand[] = GRA_MONTHLY_PAYE_BANDS,
+): { monthlyTax: number; breakdown: PAYEBandBreakdown[] } {
+  const { totalTax, breakdown } = applyPayeBands(monthlyTaxableIncome, bands)
+  return { monthlyTax: totalTax, breakdown }
+}
+
 // ---------------------------------------------------------------------------
-// Main calculation function
+// Main calculation
 // ---------------------------------------------------------------------------
 
 export function calculateGhanaTax(
   input: EmployeePayInput,
-  rates: TaxRates
+  rates: TaxRates,
 ): TaxCalculationResult {
-  // --- 1. Monthly earnings ---
+  const pension = normalizePensionRates(rates.ssnit, rates.tier2)
+  const ssnitRates = pension.ssnit
+  const tier2Rates = pension.tier2
+
   const monthlyAllowancesBreakdown = input.monthly_allowances ?? {}
   const monthlyAllowancesTotal = round2(
-    (monthlyAllowancesBreakdown.transport     ?? 0) +
-    (monthlyAllowancesBreakdown.housing       ?? 0) +
-    (monthlyAllowancesBreakdown.medical       ?? 0) +
-    (monthlyAllowancesBreakdown.meal          ?? 0) +
-    (monthlyAllowancesBreakdown.communication ?? 0) +
-    (monthlyAllowancesBreakdown.uniform       ?? 0) +
-    (monthlyAllowancesBreakdown.other         ?? 0)
+    (monthlyAllowancesBreakdown.transport ?? 0) +
+      (monthlyAllowancesBreakdown.housing ?? 0) +
+      (monthlyAllowancesBreakdown.medical ?? 0) +
+      (monthlyAllowancesBreakdown.meal ?? 0) +
+      (monthlyAllowancesBreakdown.communication ?? 0) +
+      (monthlyAllowancesBreakdown.uniform ?? 0) +
+      (monthlyAllowancesBreakdown.other ?? 0),
   )
-  const monthlyGross   = round2(input.monthly_basic + monthlyAllowancesTotal)
-  const annualGross    = round2(monthlyGross * 12)
+  const monthlyGross = round2(input.monthly_basic + monthlyAllowancesTotal)
+  const annualGross = round2(monthlyGross * 12)
   const monthlyOvertime = round2(input.monthly_overtime ?? 0)
-  const monthlyBonus    = round2(input.monthly_bonus ?? 0)
+  const monthlyBonus = round2(input.monthly_bonus ?? 0)
 
-  // --- 2. SSNIT (Tier 1) ---
-  // Applied on basic salary only (GRA guidance: contributions based on basic)
-  const monthlySsnitEmployee = round2(input.monthly_basic * (rates.ssnit.employee_rate / 100))
-  const monthlySsnitEmployer = round2(input.monthly_basic * (rates.ssnit.employer_rate / 100))
-  const annualSsnitEmployee  = round2(monthlySsnitEmployee * 12)
-  const annualSsnitEmployer  = round2(monthlySsnitEmployer * 12)
+  // Act 766: Tier 1 (SSNIT) on basic
+  const monthlySsnitEmployee = round2(input.monthly_basic * (ssnitRates.employee_rate / 100))
+  const monthlySsnitEmployer = round2(input.monthly_basic * (ssnitRates.employer_rate / 100))
 
-  // --- 3. Tier 2 ---
-  const tier2Applicable = input.tier2_applicable !== false  // default true
+  // Tier 2 on basic (mandatory for most employees)
+  const tier2Applicable = input.tier2_applicable !== false
   const monthlyTier2Employee = tier2Applicable
-    ? round2(input.monthly_basic * (rates.tier2.employee_rate / 100))
+    ? round2(input.monthly_basic * (tier2Rates.employee_rate / 100))
     : 0
   const monthlyTier2Employer = tier2Applicable
-    ? round2(input.monthly_basic * (rates.tier2.employer_rate / 100))
+    ? round2(input.monthly_basic * (tier2Rates.employer_rate / 100))
     : 0
 
-  // --- 4. Tier 3 ---
+  const monthlyPensionEmployee = round2(monthlySsnitEmployee + monthlyTier2Employee)
+  const monthlyPensionEmployer = round2(monthlySsnitEmployer + monthlyTier2Employer)
+
+  // Tier 3 / Provident Fund voluntary — employee rate capped at 16.5%
   const tier3Applicable = input.tier3_applicable === true
+  const tier3EmployeeRate = Math.min(
+    16.5,
+    Math.max(
+      0,
+      Number(
+        input.tier3_employee_rate != null && input.tier3_employee_rate !== undefined
+          ? input.tier3_employee_rate
+          : rates.tier3.employee_rate,
+      ),
+    ),
+  )
   const monthlyTier3Employee = tier3Applicable
-    ? round2(input.monthly_basic * (rates.tier3.employee_rate / 100))
+    ? round2(input.monthly_basic * (tier3EmployeeRate / 100))
     : 0
   const monthlyTier3Employer = tier3Applicable
     ? round2(input.monthly_basic * (rates.tier3.employer_rate / 100))
     : 0
 
-  // --- 5. PAYE taxable income ---
-  // Annual gross - annual SSNIT employee contribution - annual Tier 3 employee (if applicable) - reliefs
   const annualTaxReliefs = round2(
-    (input.annual_tax_reliefs ?? []).reduce((sum, r) => sum + (r.annual_amount ?? 0), 0)
+    (input.annual_tax_reliefs ?? []).reduce((sum, r) => sum + (r.annual_amount ?? 0), 0),
   )
-  const annualTaxableIncome = round2(
-    Math.max(0, annualGross - annualSsnitEmployee - annualTaxReliefs)
+  const monthlyTaxReliefs = round2(annualTaxReliefs / 12)
+
+  // Chargeable income: cash emoluments − employee pension (5.5%) − employee Tier 3 − reliefs
+  const monthlyTaxableIncome = round2(
+    Math.max(
+      0,
+      monthlyGross - monthlyPensionEmployee - monthlyTier3Employee - monthlyTaxReliefs,
+    ),
   )
+  const annualTaxableIncome = round2(monthlyTaxableIncome * 12)
 
-  // --- 6. Apply PAYE bands ---
-  const { totalTax: annualPayeTax, breakdown: payeBandBreakdown } = applyPayeBands(
-    annualTaxableIncome,
-    rates.paye_bands
-  )
-  const monthlyPayeTax = round2(annualPayeTax / 12)
+  const { bands: payeBands, isMonthly } = normalizePayeBands(rates.paye_bands)
+  const useMonthly = rates.paye_bands_are_monthly ?? isMonthly
 
-  // --- 7. Effective tax rate ---
-  const effectiveTaxRate = annualGross > 0
-    ? round2((annualPayeTax / annualGross) * 100)
-    : 0
+  let monthlyPayeTax: number
+  let annualPayeTax: number
+  let payeBandBreakdown: PAYEBandBreakdown[]
 
-  // --- 8. Overtime tax (taxed at marginal rate — rate of the highest band reached) ---
-  let overtimeTax = 0
-  if (monthlyOvertime > 0) {
-    const annualWithOvertime = annualTaxableIncome + (monthlyOvertime * 12)
-    const { totalTax: taxWithOvertime } = applyPayeBands(annualWithOvertime, rates.paye_bands)
-    overtimeTax = round2((taxWithOvertime - annualPayeTax) / 12)
+  if (useMonthly) {
+    const result = applyPayeBands(monthlyTaxableIncome, payeBands)
+    monthlyPayeTax = result.totalTax
+    annualPayeTax = round2(monthlyPayeTax * 12)
+    payeBandBreakdown = result.breakdown
+  } else {
+    const result = applyPayeBands(annualTaxableIncome, payeBands)
+    annualPayeTax = result.totalTax
+    monthlyPayeTax = round2(annualPayeTax / 12)
+    payeBandBreakdown = result.breakdown
   }
 
-  // --- 9. Bonus tax (taxed at 5% flat rate per GRA directive for performance bonuses) ---
+  // Overtime: taxed at marginal PAYE rate on the additional amount.
+  // This IS income tax and is remitted to GRA together with PAYE
+  // (shown separately on payslips for transparency).
+  let overtimeTax = 0
+  if (monthlyOvertime > 0) {
+    if (useMonthly) {
+      const withOt = applyPayeBands(monthlyTaxableIncome + monthlyOvertime, payeBands)
+      overtimeTax = round2(withOt.totalTax - monthlyPayeTax)
+    } else {
+      const withOt = applyPayeBands(annualTaxableIncome + monthlyOvertime * 12, payeBands)
+      overtimeTax = round2((withOt.totalTax - annualPayeTax) / 12)
+    }
+  }
+
+  // Bonus: 5% final withholding when within GRA bonus rules
   const bonusTax = round2(monthlyBonus * 0.05)
 
-  // --- 10. Total employee deductions ---
+  const monthlyTotalPayeWithheld = round2(monthlyPayeTax + overtimeTax + bonusTax)
+
+  const monthlyLoan = round2(input.other_deductions?.loan ?? 0)
+  const monthlyAdvance = round2(input.other_deductions?.advance ?? 0)
+  const monthlyOther = round2(input.other_deductions?.other ?? 0)
+
+  const monthlyStatutoryDeductions = round2(
+    monthlyPensionEmployee + monthlyTier3Employee + monthlyTotalPayeWithheld,
+  )
+
   const monthlyTotalEmployeeDeductions = round2(
-    monthlySsnitEmployee +
-    monthlyTier2Employee +
-    monthlyTier3Employee +
-    monthlyPayeTax +
-    overtimeTax +
-    bonusTax
+    monthlyStatutoryDeductions + monthlyLoan + monthlyAdvance + monthlyOther,
   )
 
-  // --- 11. Net pay ---
   const monthlyNetPay = round2(
-    monthlyGross + monthlyOvertime + monthlyBonus - monthlyTotalEmployeeDeductions
+    monthlyGross + monthlyOvertime + monthlyBonus - monthlyTotalEmployeeDeductions,
   )
 
-  // --- 12. Total employer cost ---
   const monthlyTotalEmployerCost = round2(
-    monthlyGross +
-    monthlySsnitEmployer +
-    monthlyTier2Employer +
-    monthlyTier3Employer
+    monthlyGross + monthlyOvertime + monthlyBonus + monthlyPensionEmployer + monthlyTier3Employer,
   )
+
+  const effectiveTaxRate =
+    monthlyGross + monthlyOvertime + monthlyBonus > 0
+      ? round2(
+          (monthlyTotalPayeWithheld / (monthlyGross + monthlyOvertime + monthlyBonus)) * 100,
+        )
+      : 0
 
   return {
     monthly_basic: input.monthly_basic,
@@ -304,22 +443,32 @@ export function calculateGhanaTax(
 
     monthly_ssnit_employee: monthlySsnitEmployee,
     monthly_ssnit_employer: monthlySsnitEmployer,
-    annual_ssnit_employee: annualSsnitEmployee,
-    annual_ssnit_employer: annualSsnitEmployer,
+    annual_ssnit_employee: round2(monthlySsnitEmployee * 12),
+    annual_ssnit_employer: round2(monthlySsnitEmployer * 12),
 
     monthly_tier2_employee: monthlyTier2Employee,
     monthly_tier2_employer: monthlyTier2Employer,
 
+    monthly_pension_employee: monthlyPensionEmployee,
+    monthly_pension_employer: monthlyPensionEmployer,
+
     monthly_tier3_employee: monthlyTier3Employee,
     monthly_tier3_employer: monthlyTier3Employer,
 
+    monthly_taxable_income: monthlyTaxableIncome,
     annual_taxable_income: annualTaxableIncome,
     annual_tax_reliefs: annualTaxReliefs,
     annual_paye_tax: annualPayeTax,
     monthly_paye_tax: monthlyPayeTax,
+    monthly_total_paye_withheld: monthlyTotalPayeWithheld,
     effective_tax_rate: effectiveTaxRate,
     paye_band_breakdown: payeBandBreakdown,
 
+    monthly_loan_deduction: monthlyLoan,
+    monthly_advance_deduction: monthlyAdvance,
+    monthly_other_deduction: monthlyOther,
+
+    monthly_statutory_deductions: monthlyStatutoryDeductions,
     monthly_total_employee_deductions: monthlyTotalEmployeeDeductions,
     monthly_net_pay: monthlyNetPay,
     monthly_total_employer_cost: monthlyTotalEmployerCost,

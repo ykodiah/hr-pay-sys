@@ -2,6 +2,7 @@ import { BaseService } from "./base-service"
 import type { PayrollRun, PayrollItem, CreatePayrollRunInput, UpdatePayrollRunInput, ServiceResponse } from "./types"
 import { calculateEmployeeTax, getTaxRates } from "@/lib/ghana-tax/tax-config-service"
 import type { EmployeePayInput, TaxCalculationResult } from "@/lib/ghana-tax/engine"
+import { sumCompLines } from "@/lib/payroll/employee-comp-extras"
 
 export class PayrollService extends BaseService {
   async getPayrollRuns(
@@ -171,8 +172,7 @@ export class PayrollService extends BaseService {
       const taxYear = new Date().getFullYear()
       const taxResult = await calculateEmployeeTax(input, companyId, employeeId, taxYear)
 
-      // Build the payroll_items update payload
-      const itemPayload = {
+      const fullPayload: Record<string, unknown> = {
         employee_id: employeeId,
         payroll_run_id: payrollRunId,
         basic_salary: taxResult.monthly_basic,
@@ -184,9 +184,14 @@ export class PayrollService extends BaseService {
         tier2_employer: taxResult.monthly_tier2_employer,
         tier3_employee: taxResult.monthly_tier3_employee,
         tier3_employer: taxResult.monthly_tier3_employer,
-        paye_taxable_income: taxResult.annual_taxable_income / 12,
+        paye_taxable_income: taxResult.monthly_taxable_income ?? taxResult.annual_taxable_income / 12,
         tax_relief_total: taxResult.annual_tax_reliefs / 12,
-        tax_deduction: taxResult.monthly_paye_tax + taxResult.monthly_overtime_tax + taxResult.monthly_bonus_tax,
+        tax_deduction: taxResult.monthly_total_paye_withheld,
+        loan_deduction: taxResult.monthly_loan_deduction,
+        advance_deduction: taxResult.monthly_advance_deduction,
+        other_deductions: taxResult.monthly_other_deduction,
+        overtime_pay: taxResult.monthly_overtime,
+        bonus_pay: taxResult.monthly_bonus,
         total_deductions: taxResult.monthly_total_employee_deductions,
         net_pay: taxResult.monthly_net_pay,
         tax_year: taxYear,
@@ -197,6 +202,32 @@ export class PayrollService extends BaseService {
         updated_at: new Date().toISOString(),
       }
 
+      // Progressive fallbacks for older payroll_items schemas
+      const payloads: Record<string, unknown>[] = [
+        fullPayload,
+        {
+          employee_id: employeeId,
+          payroll_run_id: payrollRunId,
+          basic_salary: fullPayload.basic_salary,
+          gross_pay: fullPayload.gross_pay,
+          total_deductions: fullPayload.total_deductions,
+          net_pay: fullPayload.net_pay,
+          tax_deduction: fullPayload.tax_deduction,
+          ssnit_employee: fullPayload.ssnit_employee,
+          loan_deduction: fullPayload.loan_deduction,
+          overtime_pay: fullPayload.overtime_pay,
+          updated_at: fullPayload.updated_at,
+        },
+        {
+          employee_id: employeeId,
+          payroll_run_id: payrollRunId,
+          basic_salary: fullPayload.basic_salary,
+          gross_pay: fullPayload.gross_pay,
+          total_deductions: fullPayload.total_deductions,
+          net_pay: fullPayload.net_pay,
+        },
+      ]
+
       const { data: existingItem } = await client
         .from("payroll_items")
         .select("id")
@@ -204,29 +235,49 @@ export class PayrollService extends BaseService {
         .eq("employee_id", employeeId)
         .maybeSingle()
 
-      let payrollItem: PayrollItem
+      let payrollItem: PayrollItem | null = null
+      let lastError: string | null = null
 
-      if (existingItem?.id) {
-        const { data, error } = await client
-          .from("payroll_items")
-          .update(itemPayload)
-          .eq("id", existingItem.id)
-          .select()
-          .single()
-        if (error) throw error
-        payrollItem = data
-      } else {
-        const { data, error } = await client
-          .from("payroll_items")
-          .insert(itemPayload)
-          .select()
-          .single()
-        if (error) throw error
-        payrollItem = data
+      for (const itemPayload of payloads) {
+        if (existingItem?.id) {
+          const { data, error } = await client
+            .from("payroll_items")
+            .update(itemPayload)
+            .eq("id", existingItem.id)
+            .select()
+            .single()
+          if (!error && data) {
+            payrollItem = data
+            break
+          }
+          lastError = error?.message || lastError
+        } else {
+          const { data, error } = await client
+            .from("payroll_items")
+            .insert(itemPayload)
+            .select()
+            .single()
+          if (!error && data) {
+            payrollItem = data
+            break
+          }
+          lastError = error?.message || lastError
+        }
       }
 
-      // Create / update draft payslip
-      await this.upsertPayslip(client, payrollItem, taxResult, companyId)
+      if (!payrollItem) {
+        throw new Error(lastError || "Failed to save payroll item")
+      }
+
+      // Payslip is best-effort — do not fail the whole employee if vault/table drifts
+      try {
+        await this.upsertPayslip(client, payrollItem, taxResult, companyId)
+      } catch (slipErr) {
+        console.warn(
+          "[payroll] payslip upsert failed:",
+          slipErr instanceof Error ? slipErr.message : slipErr,
+        )
+      }
 
       return { payrollItem, taxResult }
     }, "CALC_EMPLOYEE_TAX_ERROR")
@@ -241,27 +292,89 @@ export class PayrollService extends BaseService {
     companyId: string
   ): Promise<ServiceResponse<{ processed: number; errors: string[] }>> {
     return this.handleRequest(async (client) => {
-      // Fetch all active employees with financial data for this company
-      const { data: employees, error: empError } = await client
-        .from("employees")
-        .select(
-          `id, first_name, last_name, tier2_applicable:employee_financial(tier2_employee_contribution),
-           financial:employee_financial(
-             monthly_salary,
-             transport_allowance, housing_allowance, medical_allowance,
-             meal_allowance, communication_allowance, uniform_allowance, other_allowances,
-             tier2_employee_contribution, tier2_employer_contribution, tier3_contribution
-           )`
-        )
-        .eq("company_id", companyId)
-        .eq("status", "Active")
+      // Resolve pay period for this run so we can merge Pay Inputs
+      const { data: run } = await client
+        .from("payroll_runs")
+        .select("pay_period_start, pay_period_end")
+        .eq("id", payrollRunId)
+        .maybeSingle()
 
-      if (empError) throw empError
+      const payPeriod = run?.pay_period_start
+        ? String(run.pay_period_start).slice(0, 7)
+        : new Date().toISOString().slice(0, 7)
+
+      // Parallel fetch: employees + period pay inputs + loans + card allowances/deductions
+      const [empRes, inputsRes, loansRes, allowRes, dedRes] = await Promise.all([
+        client
+          .from("employees")
+          .select(
+            `id, first_name, last_name, preferred_name, employee_id, position, department,
+             profile_picture, ssnit_number,
+             financial:employee_financial(
+               monthly_salary,
+               transport_allowance, housing_allowance, medical_allowance,
+               meal_allowance, communication_allowance, uniform_allowance, other_allowances,
+               tier2_employee_contribution, tier2_employer_contribution, tier3_contribution,
+               provident_fund_enrolled, provident_fund_rate,
+               bank_name, bank_account_number
+             )`,
+          )
+          .eq("company_id", companyId)
+          .in("status", ["Active", "active", "ACTIVE"]),
+        client
+          .from("payroll_pay_inputs")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("pay_period", payPeriod),
+        client
+          .from("employee_loans")
+          .select("employee_id, monthly_payment, status, auto_deduct")
+          .eq("company_id", companyId)
+          .in("status", ["active", "approved"]),
+        client
+          .from("employee_allowances")
+          .select("employee_id, amount, percentage, calculation_type, effective_date, end_date, is_active, recurring")
+          .eq("is_active", true),
+        client
+          .from("employee_deductions")
+          .select("employee_id, amount, percentage, calculation_type, effective_date, end_date, is_active, recurring")
+          .eq("is_active", true),
+      ])
+
+      if (empRes.error) throw empRes.error
+      // loans / pay_inputs / card comps failures are non-fatal — continue with master financials
+
+      const inputsByEmployee = new Map(
+        (inputsRes.data ?? []).map((row: any) => [row.employee_id, row]),
+      )
+      const loansByEmployee = new Map<string, number>()
+      for (const loan of loansRes.data ?? []) {
+        if (loan.auto_deduct === false) continue
+        const prev = loansByEmployee.get(loan.employee_id) ?? 0
+        loansByEmployee.set(loan.employee_id, prev + Number(loan.monthly_payment ?? 0))
+      }
+
+      const cardAllowByEmp = new Map<string, any[]>()
+      for (const row of allowRes.data ?? []) {
+        const list = cardAllowByEmp.get(row.employee_id) ?? []
+        list.push(row)
+        cardAllowByEmp.set(row.employee_id, list)
+      }
+      const cardDedByEmp = new Map<string, any[]>()
+      for (const row of dedRes.data ?? []) {
+        const list = cardDedByEmp.get(row.employee_id) ?? []
+        list.push(row)
+        cardDedByEmp.set(row.employee_id, list)
+      }
+
+      const asOf = run?.pay_period_end
+        ? String(run.pay_period_end).slice(0, 10)
+        : new Date().toISOString().slice(0, 10)
 
       const errors: string[] = []
       let processed = 0
 
-      for (const emp of employees ?? []) {
+      for (const emp of empRes.data ?? []) {
         try {
           const fin = Array.isArray(emp.financial) ? emp.financial[0] : emp.financial
           if (!fin) {
@@ -269,22 +382,63 @@ export class PayrollService extends BaseService {
             continue
           }
 
+          const period = inputsByEmployee.get(emp.id)
+          const pick = (override: unknown, master: unknown) =>
+            override != null && override !== "" ? Number(override) : Number(master ?? 0)
+
+          const monthlyBasic = pick(period?.basic_salary, fin.monthly_salary)
+          const cardAllowTotal = sumCompLines(cardAllowByEmp.get(emp.id), monthlyBasic, asOf)
+          const cardDedTotal = sumCompLines(cardDedByEmp.get(emp.id), monthlyBasic, asOf)
+
+          // Period override for other_allowances replaces master; card allowances always add
+          const masterOther = pick(period?.other_allowances, fin.other_allowances)
+          const periodOtherDed = Number(period?.other_deductions ?? 0)
+
           const input: EmployeePayInput = {
-            monthly_basic: Number(fin.monthly_salary ?? 0),
+            monthly_basic: monthlyBasic,
             monthly_allowances: {
-              transport: Number(fin.transport_allowance ?? 0),
-              housing: Number(fin.housing_allowance ?? 0),
-              medical: Number(fin.medical_allowance ?? 0),
-              meal: Number(fin.meal_allowance ?? 0),
-              communication: Number(fin.communication_allowance ?? 0),
-              uniform: Number(fin.uniform_allowance ?? 0),
-              other: Number(fin.other_allowances ?? 0),
+              transport: pick(period?.transport_allowance, fin.transport_allowance),
+              housing: pick(period?.housing_allowance, fin.housing_allowance),
+              medical: pick(period?.medical_allowance, fin.medical_allowance),
+              meal: pick(period?.meal_allowance, fin.meal_allowance),
+              communication: pick(period?.communication_allowance, fin.communication_allowance),
+              uniform: pick(period?.uniform_allowance, fin.uniform_allowance),
+              other: masterOther + cardAllowTotal,
             },
-            tier2_applicable: Number(fin.tier2_employee_contribution ?? 0) > 0,
-            tier3_applicable: Number(fin.tier3_contribution ?? 0) > 0,
+            monthly_overtime: Number(period?.overtime_amount ?? 0),
+            monthly_bonus: Number(period?.bonus_amount ?? 0),
+            tier2_applicable: period?.tier2_applicable ?? true,
+            tier3_applicable:
+              period?.tier3_applicable ??
+              (Boolean(fin.provident_fund_enrolled) ||
+                Number(fin.provident_fund_rate ?? 0) > 0 ||
+                Number(fin.tier3_contribution ?? 0) > 0),
+            tier3_employee_rate: Number(
+              period?.tier3_employee_rate ??
+                fin.provident_fund_rate ??
+                0,
+            ),
+            other_deductions: {
+              loan:
+                Number(period?.loan_deduction ?? 0) ||
+                Number(loansByEmployee.get(emp.id) ?? 0),
+              advance: Number(period?.advance_deduction ?? 0),
+              other: periodOtherDed + cardDedTotal,
+            },
           }
 
-          await this.calculateAndSaveEmployeeTax(payrollRunId, emp.id, companyId, input)
+          const saveResult = await this.calculateAndSaveEmployeeTax(
+            payrollRunId,
+            emp.id,
+            companyId,
+            input,
+          )
+          if (!saveResult.success) {
+            errors.push(
+              `${emp.first_name} ${emp.last_name}: ${saveResult.error?.message ?? "tax/save failed"}`,
+            )
+            continue
+          }
           processed++
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unknown error"
@@ -359,6 +513,24 @@ export class PayrollService extends BaseService {
       ? new Date(run.pay_period_start).toISOString().slice(0, 7)
       : new Date().toISOString().slice(0, 7)
 
+    const [{ data: emp }, { data: company }] = await Promise.all([
+      client
+        .from("employees")
+        .select(
+          `first_name, last_name, preferred_name, employee_id, position, department, ssnit_number,
+           financial:employee_financial(bank_name, bank_account_number, ssnit_number)`,
+        )
+        .eq("id", payrollItem.employee_id)
+        .maybeSingle(),
+      client.from("companies").select("name").eq("id", companyId).maybeSingle(),
+    ])
+
+    const fin = Array.isArray(emp?.financial) ? emp?.financial?.[0] : emp?.financial
+    const empName =
+      emp?.preferred_name ||
+      `${emp?.first_name || ""} ${emp?.last_name || ""}`.trim() ||
+      "Employee"
+
     const payslipPayload = {
       payroll_item_id: payrollItem.id,
       payroll_run_id: payrollItem.payroll_run_id,
@@ -368,6 +540,14 @@ export class PayrollService extends BaseService {
       pay_period_start: run.pay_period_start,
       pay_period_end: run.pay_period_end,
       pay_date: run.pay_date,
+      snapshot_employee_name: empName,
+      snapshot_employee_id_no: emp?.employee_id || null,
+      snapshot_position: emp?.position || null,
+      snapshot_department: emp?.department || null,
+      snapshot_ssnit_number: fin?.ssnit_number || emp?.ssnit_number || null,
+      snapshot_bank_name: fin?.bank_name || null,
+      snapshot_account_number: fin?.bank_account_number || null,
+      snapshot_company_name: company?.name || null,
       basic_salary: tax.monthly_basic,
       transport_allowance: (payrollItem.allowances as any)?.transport ?? 0,
       housing_allowance: (payrollItem.allowances as any)?.housing ?? 0,
@@ -386,7 +566,12 @@ export class PayrollService extends BaseService {
       tier3_employer: tax.monthly_tier3_employer,
       paye_taxable_income: tax.annual_taxable_income / 12,
       tax_relief_total: tax.annual_tax_reliefs / 12,
-      paye_tax: tax.monthly_paye_tax + tax.monthly_overtime_tax + tax.monthly_bonus_tax,
+      paye_tax: tax.monthly_total_paye_withheld,
+      overtime_tax: tax.monthly_overtime_tax,
+      bonus_tax: tax.monthly_bonus_tax,
+      loan_deduction: tax.monthly_loan_deduction,
+      advance_deduction: tax.monthly_advance_deduction,
+      other_deductions: tax.monthly_other_deduction,
       total_deductions: tax.monthly_total_employee_deductions,
       net_pay: tax.monthly_net_pay,
       total_employer_cost: tax.monthly_total_employer_cost,
@@ -395,8 +580,39 @@ export class PayrollService extends BaseService {
       updated_at: new Date().toISOString(),
     }
 
-    await client
+    let { error } = await client
       .from("payslips")
       .upsert(payslipPayload, { onConflict: "payroll_item_id" })
+
+    if (error) {
+      // Fallback without snapshot / optional columns
+      const minimal = {
+        payroll_item_id: payslipPayload.payroll_item_id,
+        payroll_run_id: payslipPayload.payroll_run_id,
+        employee_id: payslipPayload.employee_id,
+        company_id: payslipPayload.company_id,
+        pay_period: payslipPayload.pay_period,
+        pay_period_start: payslipPayload.pay_period_start,
+        pay_period_end: payslipPayload.pay_period_end,
+        pay_date: payslipPayload.pay_date,
+        basic_salary: payslipPayload.basic_salary,
+        gross_pay: payslipPayload.gross_pay,
+        ssnit_employee: payslipPayload.ssnit_employee,
+        tier3_employee: payslipPayload.tier3_employee,
+        paye_tax: payslipPayload.paye_tax,
+        loan_deduction: payslipPayload.loan_deduction,
+        total_deductions: payslipPayload.total_deductions,
+        net_pay: payslipPayload.net_pay,
+        status: "draft",
+        updated_at: payslipPayload.updated_at,
+      }
+      const retry = await client.from("payslips").upsert(minimal, { onConflict: "payroll_item_id" })
+      error = retry.error
+      if (error) {
+        // Last resort: plain insert
+        const ins = await client.from("payslips").insert(minimal)
+        if (ins.error) throw ins.error
+      }
+    }
   }
 }

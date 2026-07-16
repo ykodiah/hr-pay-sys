@@ -1,4 +1,8 @@
 import { createClient } from "@/lib/supabase/server"
+import { calcMonthlyPayment } from "@/lib/services/loan-calculations"
+
+export { calcMonthlyPayment, buildAmortizationPreview } from "@/lib/services/loan-calculations"
+export type { AmortizationPreviewRow } from "@/lib/services/loan-calculations"
 
 export type LoanStatus = "pending" | "approved" | "active" | "completed" | "rejected" | "defaulted" | "cancelled"
 
@@ -61,53 +65,6 @@ export interface CreateLoanInput {
   auto_deduct?: boolean
   notes?: string
   created_by?: string
-}
-
-/** Calculate monthly payment using reducing-balance (PMT formula). */
-export function calcMonthlyPayment(principal: number, annualRate: number, months: number): number {
-  if (annualRate === 0) return Math.round((principal / months) * 100) / 100
-  const r = annualRate / 100 / 12
-  return Math.round((principal * r * Math.pow(1 + r, months)) / (Math.pow(1 + r, months) - 1) * 100) / 100
-}
-
-/** Generate a client-side amortization preview (no DB write). */
-export function buildAmortizationPreview(
-  principal: number,
-  annualRate: number,
-  months: number,
-  startDate: string,
-): Omit<AmortizationRow, "id" | "loan_id" | "paid_amount" | "paid_date" | "status" | "payslip_id">[] {
-  const monthlyRate = annualRate / 100 / 12
-  const payment = calcMonthlyPayment(principal, annualRate, months)
-  let balance = principal
-  const rows = []
-  let due = new Date(startDate)
-
-  for (let i = 1; i <= months; i++) {
-    const interest = Math.round(balance * monthlyRate * 100) / 100
-    let principalPortion = Math.round((payment - interest) * 100) / 100
-    let actualPayment = payment
-
-    if (i === months) {
-      principalPortion = balance
-      actualPayment = balance + interest
-    }
-
-    balance = Math.max(0, Math.round((balance - principalPortion) * 100) / 100)
-
-    rows.push({
-      month_number: i,
-      due_date: due.toISOString().split("T")[0],
-      payment_amount: Math.round(actualPayment * 100) / 100,
-      principal_portion: principalPortion,
-      interest_portion: interest,
-      balance_remaining: balance,
-    })
-
-    due = new Date(due.getFullYear(), due.getMonth() + 1, due.getDate())
-  }
-
-  return rows
 }
 
 /** Create a new loan application and generate its amortization schedule. */

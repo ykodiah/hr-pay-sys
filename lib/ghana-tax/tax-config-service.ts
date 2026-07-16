@@ -8,10 +8,12 @@
 
 import { createClient } from "@/lib/supabase/server"
 import {
-  GRA_2025_PAYE_BANDS,
+  GRA_MONTHLY_PAYE_BANDS,
   GRA_2025_SSNIT,
   GRA_2025_TIER2,
   GRA_2025_TIER3,
+  normalizePayeBands,
+  normalizePensionRates,
   type PAYEBand,
   type SSNITRates,
   type Tier2Rates,
@@ -21,6 +23,7 @@ import {
   type EmployeePayInput,
   type TaxCalculationResult,
   calculateGhanaTax,
+  DEFAULT_TAX_RATES,
 } from "./engine"
 
 // ---------------------------------------------------------------------------
@@ -56,7 +59,7 @@ export async function getTaxRates(
     .eq("is_active", true)
     .order("band_order", { ascending: true })
 
-  const payeBands: PAYEBand[] =
+  const rawBands: PAYEBand[] =
     !bandError && bandRows && bandRows.length > 0
       ? bandRows.map((r) => ({
           band_order: r.band_order,
@@ -65,7 +68,10 @@ export async function getTaxRates(
           is_remaining_amount: r.is_remaining_amount ?? false,
           description: r.description ?? "",
         }))
-      : GRA_2025_PAYE_BANDS
+      : GRA_MONTHLY_PAYE_BANDS
+
+  // Replace obsolete pre-2024 band tables and detect monthly vs annual widths
+  const { bands: payeBands, isMonthly } = normalizePayeBands(rawBands)
 
   // Fetch SSNIT / Tier 2 / Tier 3 rates
   const { data: rateRows, error: rateError } = await supabase
@@ -90,7 +96,16 @@ export async function getTaxRates(
     }
   }
 
-  return { paye_bands: payeBands, ssnit, tier2, tier3 }
+  // Collapse legacy double-count configs (5.5% SSNIT + 5% Tier2) to Act 766 split
+  const pension = normalizePensionRates(ssnit, tier2)
+
+  return {
+    paye_bands: payeBands,
+    ssnit: pension.ssnit,
+    tier2: pension.tier2,
+    tier3,
+    paye_bands_are_monthly: isMonthly,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -140,15 +155,22 @@ export async function calculateEmployeeTax(
 ): Promise<TaxCalculationResult> {
   const year = taxYear ?? new Date().getFullYear()
 
-  const [rates, reliefs] = await Promise.all([
-    getTaxRates(companyId, year),
-    getEmployeeTaxReliefs(employeeId, year),
-  ])
+  // Never block payroll on slow tax-config tables — fall back to GRA defaults
+  const withTimeout = async <T,>(p: Promise<T>, ms: number, fallback: T): Promise<T> => {
+    try {
+      return await Promise.race([
+        p,
+        new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+      ])
+    } catch {
+      return fallback
+    }
+  }
 
-  return calculateGhanaTax(
-    { ...input, annual_tax_reliefs: reliefs },
-    rates
-  )
+  const rates = await withTimeout(getTaxRates(companyId, year), 3000, DEFAULT_TAX_RATES)
+  const reliefs = await withTimeout(getEmployeeTaxReliefs(employeeId, year), 2000, [] as TaxReliefItem[])
+
+  return calculateGhanaTax({ ...input, annual_tax_reliefs: reliefs }, rates)
 }
 
 // ---------------------------------------------------------------------------

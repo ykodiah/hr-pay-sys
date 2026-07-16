@@ -36,6 +36,16 @@ import {
 
 import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
 import { useToast } from "@/hooks/use-toast"
+import {
+  employeeToFormData,
+  extractOrgOptions,
+  formToApiPayload,
+  listDisplayName,
+  listEmployeeCode,
+  listMonthlySalary,
+  toSelectedFinancialRows,
+  toUploadedDocumentsState,
+} from "@/lib/employees/form-mapper"
 // import { EmployeeProfile } from "@/components/employee-profile"
 
 const isDemoMode = () => {
@@ -220,12 +230,11 @@ const initialEmployees = [
 
 const departments = ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
 
-const MAIN_COMPANY_ID = "f44f079e-1779-446d-9194-199994111111"
-
 export default function EmployeesPage() {
   const { currencySymbol, formatAmount } = useCurrency()
 
   const [employees, setEmployees] = useState<any[]>([])
+  const [companyId, setCompanyId] = useState<string>("")
   const [showAddEmployee, setShowAddEmployee] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -303,8 +312,11 @@ export default function EmployeesPage() {
     educationalLevel: "",
     gender: "",
     bankName: "",
+    bankBranch: "",
     bankAccount: "",
     ghanaCard: "",
+    providentFundEnrolled: "No",
+    providentFundRate: "",
     documents: [],
     profilePicture: "",
     profilePictureFile: null,
@@ -477,56 +489,26 @@ export default function EmployeesPage() {
 
   const loadParentCompanyData = useCallback(() => {
     console.log("[v0] Loading parent company data...")
-
-    if (companySettings) {
-      const companyDivisions = Array.isArray(companySettings.divisions)
-        ? companySettings.divisions
-        : companySettings.divisions
-          ? JSON.parse(companySettings.divisions)
-          : ["Head Office", "Regional Office"]
-
-      const companyDepartments = Array.isArray(companySettings.departments)
-        ? companySettings.departments
-        : companySettings.departments
-          ? JSON.parse(companySettings.departments)
-          : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
-
-      const companyLocations = Array.isArray(companySettings.locations)
-        ? companySettings.locations
-        : companySettings.locations
-          ? JSON.parse(companySettings.locations)
-          : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
-
-      setDivisions(companyDivisions)
-      setDepartments(companyDepartments)
-      setLocations(companyLocations)
-
-      console.log("[v0] Parent company data loaded:", {
-        divisions: companyDivisions,
-        departments: companyDepartments,
-        locations: companyLocations,
-      })
-    } else {
-      console.log("[v0] No company settings available, using defaults")
-      setDivisions(["Head Office", "Regional Office"])
-      setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
-      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-    }
+    const org = extractOrgOptions(companySettings, companySettings?.settings_data)
+    setDivisions(org.divisions)
+    setDepartments(org.departments)
+    setLocations(org.locations)
+    console.log("[v0] Parent company data loaded:", org)
   }, [companySettings])
 
-  const loadSubsidiaries = async () => {
+  const loadSubsidiaries = async (cid?: string) => {
     try {
-      if (isDemoMode()) {
-        console.log("[v0] Demo mode: Using mock subsidiaries")
-        setSubsidiaries(mockSubsidiaries)
-        return
-      }
-
       const supabase = createClient()
-      const { data, error } = await supabase.from("subsidiaries").select("*").eq("status", "active")
+      let query = supabase.from("subsidiaries").select("*").eq("status", "active")
+      if (cid) query = query.eq("company_id", cid)
+      const { data, error } = await query
 
       if (error) {
         console.error("Error loading subsidiaries:", error)
+        if (isDemoMode()) {
+          setSubsidiaries(mockSubsidiaries)
+          return
+        }
         toast({
           title: "Error",
           description: "Failed to load subsidiaries from database.",
@@ -535,21 +517,25 @@ export default function EmployeesPage() {
         return
       }
 
-      setSubsidiaries(data || [])
+      setSubsidiaries(data?.length ? data : isDemoMode() ? mockSubsidiaries : [])
     } catch (error) {
       console.error("Error loading subsidiaries:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load subsidiaries. Please try again.",
-        variant: "destructive",
-      })
+      if (isDemoMode()) setSubsidiaries(mockSubsidiaries)
+      else {
+        toast({
+          title: "Error",
+          description: "Failed to load subsidiaries. Please try again.",
+          variant: "destructive",
+        })
+      }
     }
   }
 
   useEffect(() => {
-    loadEmployees()
-    loadSubsidiaries()
-    loadCompanyData()
+    void (async () => {
+      const cid = await loadCompanyData()
+      await Promise.all([loadEmployees(cid), loadSubsidiaries(cid)])
+    })()
   }, [])
 
   useEffect(() => {
@@ -573,121 +559,144 @@ export default function EmployeesPage() {
     }
   }, [])
 
-  const generateEmployeeId = useCallback(() => {
-    // Get company name initials
+  const buildEmployeeIdPrefix = useCallback(() => {
     const companyName = companySettings?.name || "AKHR"
-    let letterPart = ""
-
     if (formData.hasSubsidiary === "Yes" && formData.subsidiary) {
-      // Get subsidiary name
       const selectedSubsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
       if (selectedSubsidiary) {
-        // First 2 initials of parent company
         const companyInitials = companyName
           .split(" ")
-          .map((word) => word[0])
+          .map((word: string) => word[0])
           .join("")
           .toUpperCase()
           .slice(0, 2)
-
-        // First 2 initials of subsidiary
         const subsidiaryInitials = selectedSubsidiary.name
           .split(" ")
-          .map((word) => word[0])
+          .map((word: string) => word[0])
           .join("")
           .toUpperCase()
           .slice(0, 2)
-
-        letterPart = (companyInitials + subsidiaryInitials).slice(0, 4).padEnd(4, "X")
-      } else {
-        // Fallback to company initials
-        letterPart = companyName
-          .split(" ")
-          .map((word) => word[0])
-          .join("")
-          .toUpperCase()
-          .slice(0, 4)
-          .padEnd(4, "X")
+        return (companyInitials + subsidiaryInitials).slice(0, 4).padEnd(4, "X")
       }
-    } else {
-      // Use first 4 initials of parent company
-      letterPart = companyName
-        .split(" ")
-        .map((word) => word[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 4)
-        .padEnd(4, "X")
     }
+    return companyName
+      .split(" ")
+      .map((word: string) => word[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 4)
+      .padEnd(4, "X")
+  }, [companySettings, formData.hasSubsidiary, formData.subsidiary, subsidiaries])
 
-    // Generate sequential 4-digit number based on existing employees
-    const numberPart = String(employees.length + 1).padStart(4, "0")
-
-    return `${letterPart}${numberPart}`
-  }, [companySettings, formData.hasSubsidiary, formData.subsidiary, subsidiaries, employees.length])
-
+  // Sequential employee ID from DB (max existing suffix + 1), not list length
   useEffect(() => {
-    const newEmployeeId = generateEmployeeId()
-    console.log("[v0] Generating Employee ID:", {
-      hasSubsidiary: formData.hasSubsidiary,
-      subsidiary: formData.subsidiary,
-      newEmployeeId,
-    })
-    setFormData((prev: any) => ({
-      ...prev,
-      employeeId: newEmployeeId,
-    }))
-  }, [formData.hasSubsidiary, formData.subsidiary, generateEmployeeId])
+    if (isEditDialogOpen && selectedEmployee?.employee_id) return
+    if (!isAddDialogOpen) return
+    if (!companyId) return
+
+    let cancelled = false
+    const prefix = buildEmployeeIdPrefix()
+    ;(async () => {
+      try {
+        const res = await fetch(
+          `/api/employees/next-id?company_id=${encodeURIComponent(companyId)}&prefix=${encodeURIComponent(prefix)}`,
+          { cache: "no-store" },
+        )
+        const json = await res.json()
+        if (cancelled) return
+        if (res.ok && json.employee_id) {
+          setFormData((prev: any) => ({ ...prev, employeeId: json.employee_id }))
+          return
+        }
+      } catch {
+        /* fall through */
+      }
+      if (cancelled) return
+      // Local fallback: max numeric suffix for prefix among loaded employees
+      let max = 0
+      for (const emp of employees) {
+        const code = String(emp.employee_id || "")
+        if (!code.startsWith(prefix)) continue
+        const num = Number(code.slice(prefix.length))
+        if (Number.isFinite(num) && num > max) max = num
+      }
+      setFormData((prev: any) => ({
+        ...prev,
+        employeeId: `${prefix}${String(max + 1).padStart(4, "0")}`,
+      }))
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    companyId,
+    buildEmployeeIdPrefix,
+    isEditDialogOpen,
+    isAddDialogOpen,
+    selectedEmployee,
+    formData.hasSubsidiary,
+    formData.subsidiary,
+    employees,
+  ])
   // </CHANGE>
 
   const loadCompanyData = async () => {
     try {
       console.log("[v0] Loading company data...")
-      const supabase = createClient()
-
-      // Load company settings
-      const { data, error } = await supabase.from("companies").select("*").eq("id", MAIN_COMPANY_ID).maybeSingle()
-
-      if (error) {
-        console.error("[v0] Error loading company data:", error)
-      } else if (data) {
-        setCompanySettings(data)
-        console.log("[v0] Company data loaded:", data)
-
-        const companyDivisions = Array.isArray(data.divisions)
-          ? data.divisions
-          : data.divisions
-            ? JSON.parse(data.divisions)
-            : ["Head Office", "Regional Office"]
-
-        const companyDepartments = Array.isArray(data.departments)
-          ? data.departments
-          : data.departments
-            ? JSON.parse(data.departments)
-            : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
-
-        const companyLocations = Array.isArray(data.locations)
-          ? data.locations
-          : data.locations
-            ? JSON.parse(data.locations)
-            : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
-
-        setDivisions(companyDivisions)
-        setDepartments(companyDepartments)
-        setLocations(companyLocations)
-
-        console.log("[v0] Set company divisions:", companyDivisions)
-        console.log("[v0] Set company departments:", companyDepartments)
-        console.log("[v0] Set company locations:", companyLocations)
-      } else {
-        console.log("[v0] No company data found, using default values")
-        setDivisions(["Head Office", "Regional Office"])
-        setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
-        setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+      const metaRes = await fetch("/api/employees/meta", { cache: "no-store" })
+      const meta = await metaRes.json()
+      if (metaRes.ok && meta.company_id) {
+        setCompanyId(meta.company_id)
+        setCompanySettings({
+          ...(meta.company || {}),
+          id: meta.company_id,
+          name: meta.company?.name,
+          divisions: meta.divisions,
+          departments: meta.departments,
+          locations: meta.locations,
+        })
+        setDivisions(meta.divisions || [])
+        setDepartments(meta.departments || [])
+        setLocations(meta.locations || [])
+        if (Array.isArray(meta.allowances) && meta.allowances.length) {
+          setCompanyAllowances(meta.allowances)
+        }
+        if (Array.isArray(meta.deductions) && meta.deductions.length) {
+          setCompanyDeductions(meta.deductions)
+        }
+        if (Array.isArray(meta.subsidiaries)) {
+          setSubsidiaries(meta.subsidiaries)
+        }
+        return meta.company_id as string
       }
+
+      // Fallback: companies + company_settings
+      const supabase = createClient()
+      const { data, error } = await supabase.from("companies").select("*").limit(1).maybeSingle()
+      if (error) console.error("[v0] Error loading company data:", error)
+      if (data) {
+        const { data: settings } = await supabase
+          .from("company_settings")
+          .select("settings_data")
+          .eq("company_id", data.id)
+          .maybeSingle()
+        const org = extractOrgOptions(data, settings?.settings_data)
+        setCompanySettings({ ...data, ...org })
+        setCompanyId(data.id)
+        setDivisions(org.divisions)
+        setDepartments(org.departments)
+        setLocations(org.locations)
+        return data.id as string
+      }
+
+      setDivisions(["Head Office", "Regional Office"])
+      setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
+      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
     } catch (error) {
       console.error("[v0] Error in loadCompanyData:", error)
     }
+    return ""
   }
 
   useEffect(() => {
@@ -696,358 +705,165 @@ export default function EmployeesPage() {
       subsidiary: formData.subsidiary,
     })
 
-    // If "Yes" is selected and a subsidiary is chosen, load subsidiary data
     if (formData.hasSubsidiary === "Yes" && formData.subsidiary) {
       const selectedSubsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
       if (selectedSubsidiary) {
-        console.log("[v0] Loading subsidiary data:", selectedSubsidiary.name)
-
-        const subDivisions = Array.isArray(selectedSubsidiary.divisions)
-          ? selectedSubsidiary.divisions
-          : selectedSubsidiary.divisions
-            ? JSON.parse(selectedSubsidiary.divisions)
-            : []
-
-        const subDepartments = Array.isArray(selectedSubsidiary.departments)
-          ? selectedSubsidiary.departments
-          : selectedSubsidiary.departments
-            ? JSON.parse(selectedSubsidiary.departments)
-            : []
-
-        const subLocations = Array.isArray(selectedSubsidiary.locations)
-          ? selectedSubsidiary.locations
-          : selectedSubsidiary.locations
-            ? JSON.parse(selectedSubsidiary.locations)
-            : []
-
-        setDivisions(subDivisions)
-        setDepartments(subDepartments)
-        setLocations(subLocations)
-
-        console.log("[v0] Set subsidiary divisions:", subDivisions)
-        console.log("[v0] Set subsidiary departments:", subDepartments)
-        console.log("[v0] Set subsidiary locations:", subLocations)
+        const org = extractOrgOptions(selectedSubsidiary)
+        setDivisions(org.divisions)
+        setDepartments(org.departments)
+        setLocations(org.locations)
       }
+    } else {
+      loadParentCompanyData()
     }
-    // If "No" is selected or no subsidiary is chosen, load parent company data
-    else if (companySettings) {
-      console.log("[v0] Loading parent company data (no subsidiary selected)")
-
-      const companyDivisions = Array.isArray(companySettings.divisions)
-        ? companySettings.divisions
-        : companySettings.divisions
-          ? JSON.parse(companySettings.divisions)
-          : ["Head Office", "Regional Office"]
-
-      const companyDepartments = Array.isArray(companySettings.departments)
-        ? companySettings.departments
-        : companySettings.departments
-          ? JSON.parse(companySettings.departments)
-          : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
-
-      const companyLocations = Array.isArray(companySettings.locations)
-        ? companySettings.locations
-        : companySettings.locations
-          ? JSON.parse(companySettings.locations)
-          : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
-
-      setDivisions(companyDivisions)
-      setDepartments(companyDepartments)
-      setLocations(companyLocations)
-
-      console.log("[v0] Set company divisions:", companyDivisions)
-      console.log("[v0] Set company departments:", companyDepartments)
-      console.log("[v0] Set company locations:", companyLocations)
-    }
-  }, [formData.hasSubsidiary, formData.subsidiary, subsidiaries, companySettings])
+  }, [formData.hasSubsidiary, formData.subsidiary, subsidiaries, loadParentCompanyData])
   // </CHANGE>
 
   // Load supervisors and heads of department based on department selection
   useEffect(() => {
     const loadSupervisorsAndHeads = () => {
-      console.log("[v0] Loading supervisors and heads for department:", formData.department)
+      const activeEmployees = employees.filter(
+        (emp) => String(emp.status ?? "").toLowerCase() === "active",
+      )
+      const departmentEmployees = formData.department
+        ? activeEmployees.filter((emp) => emp.department === formData.department)
+        : activeEmployees
 
-      // Filter employees based on department and special roles
-      const departmentEmployees = employees.filter(
-        (emp) => emp.department === formData.department && emp.status === "Active",
+      const roleOf = (emp: any) => String(emp.special_role || emp.specialRole || "").toLowerCase()
+      const supervisorsList = departmentEmployees.filter(
+        (emp) => roleOf(emp).includes("supervisor") || roleOf(emp).includes("direct"),
+      )
+      const headsList = departmentEmployees.filter(
+        (emp) => roleOf(emp).includes("head") || roleOf(emp).includes("hod"),
       )
 
-      // Get employees with "Direct Supervisor" special role
-      const supervisorsList = departmentEmployees.filter((emp) => emp.specialRole === "Direct Supervisor")
+      // Prefer role-matched; else all department (or all active) employees
+      let finalSupervisors = supervisorsList.length > 0 ? supervisorsList : departmentEmployees
+      let finalHeads = headsList.length > 0 ? headsList : departmentEmployees
 
-      // Get employees with "Head of Department" special role
-      const headsList = departmentEmployees.filter((emp) => emp.specialRole === "Head of Department")
-
-      // If no specific roles found, show all department employees as options
-      const finalSupervisors = supervisorsList.length > 0 ? supervisorsList : departmentEmployees
-      const finalHeads = headsList.length > 0 ? headsList : departmentEmployees
+      // Always include currently saved supervisor/HOD so edit form can show the value
+      const ensureIncluded = (list: any[], id: string | undefined | null) => {
+        if (!id) return list
+        if (list.some((e) => e.id === id)) return list
+        const found = employees.find((e) => e.id === id)
+        return found ? [found, ...list] : list
+      }
+      finalSupervisors = ensureIncluded(
+        finalSupervisors,
+        formData.directSupervisor || selectedEmployee?.direct_supervisor,
+      )
+      finalHeads = ensureIncluded(
+        finalHeads,
+        formData.headOfDepartment || selectedEmployee?.head_of_department,
+      )
 
       setSupervisors(finalSupervisors)
       setHeadsOfDepartment(finalHeads)
-
-      console.log("[v0] Loaded supervisors:", finalSupervisors.length)
-      console.log("[v0] Loaded heads of department:", finalHeads.length)
-
-      // Show "No data" message if no employees found
-      if (departmentEmployees.length === 0) {
-        console.log("[v0] No employees found for department:", formData.department)
-        setSupervisors([])
-        setHeadsOfDepartment([])
-      }
     }
 
-    if (formData.department && employees.length > 0) {
+    if (employees.length > 0) {
       loadSupervisorsAndHeads()
     }
-  }, [formData.department, employees])
+  }, [
+    formData.department,
+    formData.directSupervisor,
+    formData.headOfDepartment,
+    employees,
+    selectedEmployee,
+  ])
 
   // Removed the duplicate loadParentCompanyData function. The useCallback version above is used.
 
-  const loadEmployees = async () => {
+  const loadEmployees = async (cid?: string) => {
     try {
       console.log("[v0] Loading employees from database...")
+      setIsLoading(true)
 
-      if (isDemoMode()) {
-        console.log("[v0] Demo mode: Using mock employees")
-        setEmployees(mockEmployees)
-        setIsLoading(false)
+      const params = new URLSearchParams()
+      if (cid || companyId) params.set("company_id", cid || companyId)
+      params.set("include_financial", "true")
+      params.set("limit", "1000")
+
+      const res = await fetch(`/api/employees?${params.toString()}`, { cache: "no-store" })
+      const json = await res.json()
+
+      if (!res.ok) {
+        // Fallback: direct supabase query scoped by company when available
+        const supabase = createClient()
+        let query = supabase
+          .from("employees")
+          .select(`*, subsidiaries:subsidiary_id(name, id), financial:employee_financial(*)`)
+          .order("created_at", { ascending: false })
+        if (cid || companyId) query = query.eq("company_id", cid || companyId)
+        const { data, error } = await query
+        if (error) throw new Error(json.error || error.message)
+        const rows = data || []
+        if (!rows.length && isDemoMode()) {
+          setEmployees(mockEmployees)
+        } else {
+          setEmployees(rows)
+        }
         return
       }
 
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("employees")
-        .select(`
-          *,
-          subsidiaries (
-            name,
-            id
-          )
-        `)
-        .order("created_at", { ascending: false })
-
-      if (error) {
-        console.error("Error loading employees:", error)
+      const rows = json.employees ?? json.data ?? []
+      if (json.meta?.company_id && !companyId) setCompanyId(json.meta.company_id)
+      if (!rows.length && isDemoMode()) {
+        console.log("[v0] No DB employees yet — demo fallback list")
+        setEmployees(mockEmployees)
+      } else {
+        console.log("[v0] Loaded employees:", rows.length)
+        setEmployees(rows)
+      }
+    } catch (error) {
+      console.error("Error loading employees:", error)
+      if (isDemoMode()) {
+        setEmployees(mockEmployees)
+      } else {
         toast({
           title: "Error",
           description: "Failed to load employees from database.",
           variant: "destructive",
         })
-        return
       }
-
-      console.log("[v0] Loaded employees:", data?.length || 0)
-      setEmployees(data || [])
-    } catch (error) {
-      console.error("Error loading employees:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load employees from database.",
-        variant: "destructive",
-      })
     } finally {
       setIsLoading(false)
+      setLoading(false)
     }
   }
 
   const handleAddEmployee = async (employeeData: any) => {
     try {
       console.log("[v0] Adding employee:", employeeData)
-
-      if (isDemoMode()) {
-        console.log("[v0] Demo mode: Simulating employee creation")
-        const newEmployee = {
-          id: String(mockEmployees.length + 1),
-          employee_id: `AKHR${String(mockEmployees.length + 1).padStart(4, "0")}`,
-          first_name: employeeData.firstName,
-          last_name: employeeData.lastName,
-          full_name: `${employeeData.firstName} ${employeeData.lastName}`,
-          display_name: `${employeeData.firstName} ${employeeData.lastName}`,
-          personal_email: employeeData.personalEmail,
-          corporate_email: employeeData.corporateEmail,
-          phone: employeeData.phone,
-          position: employeeData.position,
-          department: employeeData.department,
-          location: employeeData.location,
-          status: "Active",
-          date_of_joining: employeeData.dateOfJoining,
-          contract_type: employeeData.contractType || "Permanent",
-          subsidiaries: { name: "Demo Office", id: "1" },
-          created_at: new Date().toISOString(),
-        }
-
-        mockEmployees.push(newEmployee)
-        setEmployees([...mockEmployees])
-        setShowAddEmployee(false)
-
+      const payload = formToApiPayload(employeeData, companyId || companySettings?.id)
+      if (!payload.company_id && !companyId) {
         toast({
-          title: "Success",
-          description: "Employee added successfully (Demo Mode)",
-        })
-        return
-      }
-
-      const supabase = createClient()
-
-      // Generate employee ID
-      const companyName = "Akwaaba Technologies Ltd" // This should come from company settings
-      const subsidiary = subsidiaries.find((s) => s.id === employeeData.subsidiary_id)
-
-      let employeeId = ""
-      if (subsidiary) {
-        const companyInitials = companyName
-          .split(" ")
-          .slice(0, 2)
-          .map((word) => word.substring(0, 2))
-          .join("")
-          .toUpperCase()
-        const subsidiaryInitials = subsidiary.name
-          .split(" ")
-          .slice(0, 2)
-          .map((word) => word.substring(0, 2))
-          .join("")
-          .toUpperCase()
-        const sequence = String(employees.length + 1).padStart(4, "0")
-        employeeId = `${companyInitials}${subsidiaryInitials}${sequence}`
-      } else {
-        const companyInitials = companyName
-          .split(" ")
-          .slice(0, 4)
-          .map((word) => word.substring(0, 1))
-          .join("")
-          .toUpperCase()
-        const sequence = String(employees.length + 1).padStart(4, "0")
-        employeeId = `${companyInitials}${sequence}`
-      }
-
-      const employeeRecord = {
-        employee_id: employeeId,
-        prefix: employeeData.prefix || null,
-        first_name: employeeData.firstName,
-        other_names: employeeData.otherNames || null,
-        last_name: employeeData.lastName,
-        full_name: employeeData.fullName,
-        display_name: employeeData.displayName,
-        marital_status: employeeData.maritalStatus || null,
-        gender: employeeData.gender || null,
-        personal_email: employeeData.personalEmail,
-        corporate_email: employeeData.corporateEmail || null,
-        phone: employeeData.phone,
-        date_of_birth: employeeData.dateOfBirth || null,
-        address: employeeData.address || null,
-        educational_level: employeeData.educationalLevel || null,
-        emergency_contact_name: employeeData.emergencyContactName || null,
-        emergency_contact_tel: employeeData.emergencyContactTel || null,
-        position: employeeData.position,
-        special_role: employeeData.specialRole || null,
-        subsidiary_id: employeeData.subsidiary || null,
-        division: employeeData.division || null,
-        department: employeeData.department,
-        location: employeeData.location,
-        contract_type: employeeData.contractType || "Permanent",
-        date_of_joining: employeeData.dateOfJoining || null,
-        date_of_exit: employeeData.dateOfExit || null,
-        status: employeeData.status || "Active",
-        inactive_reason: employeeData.inactiveReason || null, // Added inactive_reason
-        probation_period: employeeData.probationPeriod ? Number.parseInt(employeeData.probationPeriod) : null,
-        confirmation_date: employeeData.confirmationDate || null,
-        notice_period: employeeData.noticePeriod || null,
-        direct_supervisor: employeeData.directSupervisor || null,
-        head_of_department: employeeData.headOfDepartment || null,
-        ghana_card_number: employeeData.ghanaCard || null,
-        profile_picture: employeeData.profilePicture || null,
-        company_id: "00000000-0000-0000-0000-000000000001", // Main company ID
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-
-      // Insert employee record
-      const { data: employeeResult, error: employeeError } = await supabase
-        .from("employees")
-        .insert([employeeRecord])
-        .select()
-        .single()
-
-      if (employeeError) {
-        console.error("Error adding employee:", employeeError)
-        toast({
-          title: "Error",
-          description: "Failed to add employee to database.",
+          title: "Company required",
+          description: "No company found in the database. Create a company first.",
           variant: "destructive",
         })
         return
       }
 
-      console.log("[v0] Employee added successfully:", employeeResult)
+      const res = await fetch("/api/employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Failed to add employee")
 
-      const financialRecord = {
-        employee_id: employeeResult.id,
-        annual_salary: employeeData.annualSalary ? Number.parseFloat(employeeData.annualSalary) : null,
-        monthly_salary: employeeData.salary ? Number.parseFloat(employeeData.salary) : null,
-        transport_allowance: employeeData.transportAllowance
-          ? Number.parseFloat(employeeData.transportAllowance)
-          : null,
-        housing_allowance: employeeData.housingAllowance ? Number.parseFloat(employeeData.housingAllowance) : null,
-        medical_allowance: employeeData.medicalAllowance ? Number.parseFloat(employeeData.medicalAllowance) : null,
-        meal_allowance: employeeData.mealAllowance ? Number.parseFloat(employeeData.mealAllowance) : null,
-        uniform_allowance: employeeData.uniformAllowance ? Number.parseFloat(employeeData.uniformAllowance) : null,
-        communication_allowance: employeeData.communicationAllowance
-          ? Number.parseFloat(employeeData.communicationAllowance)
-          : null,
-        other_allowances: employeeData.otherAllowances ? Number.parseFloat(employeeData.otherAllowances) : null,
-        tax_deduction: employeeData.taxDeduction ? Number.parseFloat(employeeData.taxDeduction) : null,
-        ssnit_number: employeeData.ssnit || null,
-        tier3_contribution: employeeData.tier3 ? Number.parseFloat(employeeData.tier3) : null,
-        loan_deduction: employeeData.loanDeduction ? Number.parseFloat(employeeData.loanDeduction) : null,
-        advance_deduction: employeeData.advanceDeduction ? Number.parseFloat(employeeData.advanceDeduction) : null,
-        other_deductions: employeeData.otherDeductions ? Number.parseFloat(employeeData.otherDeductions) : null,
-        bank_name: employeeData.bankName || null,
-        bank_account_number: employeeData.bankAccount || null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-
-      const { error: financialError } = await supabase.from("employee_financial").insert([financialRecord])
-
-      if (financialError) {
-        console.error("Error adding financial data:", financialError)
-        // Don't fail the entire operation, just log the error
-      }
-
-      if (employeeData.documents && employeeData.documents.length > 0) {
-        const documentRecords = employeeData.documents.map((doc: any) => ({
-          employee_id: employeeResult.id,
-          document_type: doc.type,
-          document_name: doc.name,
-          file_path: doc.path || null,
-          file_size: doc.size || null,
-          upload_date: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }))
-
-        const { error: documentsError } = await supabase.from("employee_documents").insert(documentRecords)
-
-        if (documentsError) {
-          console.error("Error adding documents:", documentsError)
-          // Don't fail the entire operation, just log the error
-        }
-      }
-
-      // Immediately update local state
-      setEmployees((prev) => [employeeResult, ...prev])
-
+      await loadEmployees(companyId || json.employee?.company_id || payload.company_id)
+      setIsAddDialogOpen(false)
       toast({
         title: "Success",
-        description: `Employee ${employeeData.displayName} has been added successfully!`,
+        description: `Employee ${payload.display_name} has been added successfully!`,
       })
-
-      setIsAddDialogOpen(false)
     } catch (error) {
       console.error("Error adding employee:", error)
       toast({
         title: "Error",
-        description: "Failed to add employee. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to add employee. Please try again.",
         variant: "destructive",
       })
     }
@@ -1055,101 +871,66 @@ export default function EmployeesPage() {
 
   const handleEditEmployee = async (employeeData: any) => {
     try {
-      if (isDemoMode()) {
-        console.log("[v0] Demo mode: Simulating employee update")
-        const updatedEmployees = mockEmployees.map((emp) =>
-          emp.id === selectedEmployee.id
-            ? { ...emp, ...employeeData, full_name: `${employeeData.firstName} ${employeeData.lastName}` }
-            : emp,
-        )
-        setEmployees(updatedEmployees)
-        setShowEditDialog(false)
-        setSelectedEmployee(null)
-
-        toast({
-          title: "Success",
-          description: "Employee updated successfully (Demo Mode)",
-        })
+      if (!selectedEmployee?.id) {
+        toast({ title: "Error", description: "No employee selected.", variant: "destructive" })
         return
       }
 
-      const supabase = createClient()
+      const payload = formToApiPayload(employeeData, companyId || companySettings?.id)
+      const res = await fetch(`/api/employees/${selectedEmployee.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Failed to update employee")
 
-      const updatedEmployee = {
-        prefix: employeeData.prefix,
-        first_name: employeeData.firstName,
-        other_names: employeeData.otherNames,
-        last_name: employeeData.lastName,
-        display_name: employeeData.displayName,
-        personal_email: employeeData.personalEmail,
-        corporate_email: employeeData.corporateEmail,
-        phone_number: employeeData.phone,
-        address: employeeData.address,
-        date_of_birth: employeeData.dateOfBirth || null,
-        gender: employeeData.gender,
-        marital_status: employeeData.maritalStatus,
-        educational_level: employeeData.educationalLevel,
-        emergency_contact_name: employeeData.emergencyContactName,
-        emergency_contact_tel: employeeData.emergencyContactTel,
-        department: employeeData.department,
-        position: employeeData.position,
-        special_role: employeeData.specialRole, // Update special role
-        subsidiary_id: employeeData.subsidiary, // Update subsidiary
-        has_subsidiary: employeeData.hasSubsidiary, // Update hasSubsidiary
-        division: employeeData.division,
-        location: employeeData.location,
-        contract_type: employeeData.contractType,
-        date_of_joining: employeeData.dateOfJoining || null,
-        date_of_exit: employeeData.dateOfExit || null,
-        status: employeeData.status || "Active",
-        inactive_reason: employeeData.inactiveReason || null, // Update inactive reason
-        probation_period: employeeData.probationPeriod ? Number.parseInt(employeeData.probationPeriod) : null,
-        confirmation_date: employeeData.confirmationDate || null,
-        notice_period: employeeData.noticePeriod || null,
-        direct_supervisor: employeeData.directSupervisor,
-        head_of_department: employeeData.headOfDepartment,
-        ghana_card_number: employeeData.ghanaCard || null,
-        salary: Number.parseFloat(employeeData.salary) || 0,
-        // ... include other fields as needed
-      }
-
-      const { error } = await supabase.from("employees").update(updatedEmployee).eq("id", selectedEmployee.id)
-
-      if (error) {
-        console.error("Error updating employee:", error)
-        toast({
-          title: "Error",
-          description: "Failed to update employee in database.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      // Reload employees from database
-      await loadEmployees()
-
+      await loadEmployees(companyId)
       setIsEditDialogOpen(false)
+      setSelectedEmployee(null)
       toast({
         title: "Employee Updated Successfully",
-        description: `${employeeData.displayName} has been successfully updated.`,
+        description: `${payload.display_name} has been successfully updated.`,
       })
     } catch (error) {
       console.error("Error updating employee:", error)
       toast({
         title: "Error",
-        description: "Failed to update employee in database.",
+        description: error instanceof Error ? error.message : "Failed to update employee in database.",
         variant: "destructive",
       })
     }
   }
 
-  const handleDeleteEmployee = (employeeId: number) => {
-    setEmployees(employees.filter((emp) => emp.id !== employeeId))
-    toast({
-      title: "Employee Removed",
-      description: "Employee has been successfully removed from the system.",
-      variant: "destructive",
-    })
+  const handleDeleteEmployee = async (employeeId: string | number) => {
+    try {
+      if (isDemoMode() && String(employeeId).length < 10) {
+        setEmployees(employees.filter((emp) => emp.id !== employeeId))
+        toast({
+          title: "Employee Removed",
+          description: "Employee removed (demo).",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const res = await fetch(`/api/employees/${employeeId}`, { method: "DELETE" })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Failed to deactivate employee")
+
+      await loadEmployees(companyId)
+      toast({
+        title: "Employee Deactivated",
+        description: "Employee status set to Inactive in the database.",
+        variant: "destructive",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Could not deactivate employee",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleImportEmployees = async (importedData: any[], filename?: string) => {
@@ -1157,12 +938,17 @@ export default function EmployeesPage() {
       const res = await fetch("/api/employees/bulk-import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: importedData, filename: filename || "import.csv" }),
+        body: JSON.stringify({
+          rows: importedData,
+          filename: filename || "import.csv",
+          company_id: companyId || companySettings?.id,
+        }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Import failed")
 
       setIsImportDialogOpen(false)
+      await loadEmployees(companyId)
       toast({
         title: "Import Successful",
         description: `${json.success_rows} of ${json.total_rows} employees imported successfully.${json.error_rows > 0 ? ` ${json.error_rows} rows had errors.` : ""}`,
@@ -1363,7 +1149,10 @@ export default function EmployeesPage() {
     const searchLower = searchTerm.toLowerCase()
     const matchesSearch =
       !searchTerm ||
+      listDisplayName(employee).toLowerCase().includes(searchLower) ||
+      listEmployeeCode(employee).toLowerCase().includes(searchLower) ||
       employee.display_name?.toLowerCase().includes(searchLower) ||
+      employee.full_name?.toLowerCase().includes(searchLower) ||
       employee.employee_id?.toLowerCase().includes(searchLower) ||
       employee.personal_email?.toLowerCase().includes(searchLower) ||
       employee.corporate_email?.toLowerCase().includes(searchLower) ||
@@ -1376,6 +1165,7 @@ export default function EmployeesPage() {
       employee.first_name?.toLowerCase().includes(searchLower) ||
       employee.last_name?.toLowerCase().includes(searchLower) ||
       employee.other_names?.toLowerCase().includes(searchLower) ||
+      employee.phone?.toLowerCase().includes(searchLower) ||
       employee.phone_number?.toLowerCase().includes(searchLower) ||
       employee.ghana_card_number?.toLowerCase().includes(searchLower)
 
@@ -1448,6 +1238,9 @@ export default function EmployeesPage() {
                 employees={employees}
                 selectedEmployee={selectedEmployee}
                 companySettings={companySettings}
+                companyAllowancesCatalog={companyAllowances}
+                companyDeductionsCatalog={companyDeductions}
+                companyId={companyId}
               />
             </DialogContent>
           </Dialog>
@@ -1600,29 +1393,33 @@ export default function EmployeesPage() {
                         <div className="flex items-center space-x-4">
                           <Avatar className="w-12 h-12">
                             <AvatarImage
-                              src={`https://api.dicebear.com/7.x/initials/svg?seed=${employee.display_name}`}
+                              src={
+                                employee.profile_picture ||
+                                employee.profilePicture ||
+                                `https://api.dicebear.com/7.x/initials/svg?seed=${listDisplayName(employee)}`
+                              }
                             />
                             <AvatarFallback className="bg-emerald-100 text-emerald-700">
-                              {employee.display_name
+                              {listDisplayName(employee)
                                 ?.split(" ")
                                 .map((n: string) => n[0])
                                 .join("")}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <h3 className="font-semibold text-lg">{employee.display_name}</h3>
+                            <h3 className="font-semibold text-lg">{listDisplayName(employee)}</h3>
                             <p className="text-gray-600">{employee.position}</p>
                             <div className="flex items-center space-x-4 mt-1">
                               <span className="text-sm text-gray-500">{employee.department}</span>
                               <span className="text-sm text-gray-500">•</span>
-                              <span className="text-sm text-gray-500">ID: {employee.employeeId}</span>
+                              <span className="text-sm text-gray-500">ID: {listEmployeeCode(employee)}</span>
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center space-x-6">
                           <div className="text-right">
                             <p className="text-sm text-gray-500">Monthly Salary</p>
-                            <p className="text-sm font-medium">{formatAmount(employee.salary || 0)}</p>
+                            <p className="text-sm font-medium">{formatAmount(listMonthlySalary(employee))}</p>
                           </div>
                           <div className="text-right">
                             <p className="text-sm text-gray-500">Status</p>
@@ -1645,8 +1442,16 @@ export default function EmployeesPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedEmployee(employee)
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch(`/api/employees/${employee.id}?include_financial=true`, {
+                                      cache: "no-store",
+                                    })
+                                    const json = await res.json()
+                                    setSelectedEmployee(json.employee || employee)
+                                  } catch {
+                                    setSelectedEmployee(employee)
+                                  }
                                   setIsEditDialogOpen(true)
                                 }}
                               >
@@ -1654,8 +1459,16 @@ export default function EmployeesPage() {
                                 View Details
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedEmployee(employee)
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch(`/api/employees/${employee.id}?include_financial=true`, {
+                                      cache: "no-store",
+                                    })
+                                    const json = await res.json()
+                                    setSelectedEmployee(json.employee || employee)
+                                  } catch {
+                                    setSelectedEmployee(employee)
+                                  }
                                   setIsEditDialogOpen(true)
                                 }}
                               >
@@ -1710,9 +1523,14 @@ export default function EmployeesPage() {
               subsidiaries={subsidiaries}
               setFormData={setFormData}
               formData={formData}
+              supervisors={supervisors}
+              headsOfDepartment={headsOfDepartment}
               employees={employees}
               selectedEmployee={selectedEmployee}
               companySettings={companySettings}
+              companyAllowancesCatalog={companyAllowances}
+              companyDeductionsCatalog={companyDeductions}
+              companyId={companyId}
             />
           )}
         </DialogContent>
@@ -2361,6 +2179,9 @@ function AddEmployeeForm({
   companySettings,
   supervisors = [],
   headsOfDepartment = [],
+  companyAllowancesCatalog = [],
+  companyDeductionsCatalog = [],
+  companyId = "",
 }: {
   employee?: any
   onSubmit: (data: any) => void
@@ -2373,6 +2194,9 @@ function AddEmployeeForm({
   companySettings: any
   supervisors?: any[]
   headsOfDepartment?: any[]
+  companyAllowancesCatalog?: any[]
+  companyDeductionsCatalog?: any[]
+  companyId?: string
 }) {
   const [divisions, setDivisions] = useState<string[]>([])
   const [departments, setDepartments] = useState<string[]>([])
@@ -2390,22 +2214,30 @@ function AddEmployeeForm({
   const [phoneCountryCode, setPhoneCountryCode] = useState("+233")
   const [emergencyCountryCode, setEmergencyCountryCode] = useState("+233")
 
-  const [companyAllowances, setCompanyAllowances] = useState([
-    { code: "TRANS", description: "Transport Allowance", taxable: true, recurring: true },
-    { code: "HOUSE", description: "Housing Allowance", taxable: true, recurring: true },
-    { code: "MED", description: "Medical Allowance", taxable: false, recurring: true },
-    { code: "MEAL", description: "Meal Allowance", taxable: false, recurring: true },
-    { code: "UNIFORM", description: "Uniform Allowance", taxable: false, recurring: true },
-    { code: "COMM", description: "Communication Allowance", taxable: false, recurring: true },
-  ])
+  const [companyAllowances, setCompanyAllowances] = useState(
+    companyAllowancesCatalog.length
+      ? companyAllowancesCatalog
+      : [
+          { code: "TRANS", description: "Transport Allowance", taxable: true, recurring: true },
+          { code: "HOUSE", description: "Housing Allowance", taxable: true, recurring: true },
+          { code: "MED", description: "Medical Allowance", taxable: false, recurring: true },
+          { code: "MEAL", description: "Meal Allowance", taxable: false, recurring: true },
+          { code: "UNIFORM", description: "Uniform Allowance", taxable: false, recurring: true },
+          { code: "COMM", description: "Communication Allowance", taxable: false, recurring: true },
+        ],
+  )
 
-  const [companyDeductions, setCompanyDeductions] = useState([
-    { code: "TAX", description: "Tax Deduction", recurring: true },
-    { code: "SSNIT", description: "SSNIT Deduction", recurring: true },
-    { code: "TIER3", description: "Tier 3 Contribution", recurring: true },
-    { code: "LOAN", description: "Loan Deduction", recurring: true },
-    { code: "ADVANCE", description: "Advance Deduction", recurring: true },
-  ])
+  const [companyDeductions, setCompanyDeductions] = useState(
+    companyDeductionsCatalog.length
+      ? companyDeductionsCatalog
+      : [
+          { code: "TAX", description: "Tax Deduction", recurring: true, taxable: false },
+          { code: "SSNIT", description: "SSNIT Deduction", recurring: true, taxable: false },
+          { code: "TIER3", description: "Tier 3 Contribution", recurring: true, taxable: false },
+          { code: "LOAN", description: "Loan Deduction", recurring: true, taxable: false },
+          { code: "ADVANCE", description: "Advance Deduction", recurring: true, taxable: false },
+        ],
+  )
 
   const [selectedAllowances, setSelectedAllowances] = useState<
     Array<{
@@ -2559,42 +2391,171 @@ function AddEmployeeForm({
 
   const loadParentCompanyData = useCallback(() => {
     console.log("[v0] Loading parent company data...")
-
-    if (companySettings) {
-      const companyDivisions = Array.isArray(companySettings.divisions)
-        ? companySettings.divisions
-        : companySettings.divisions
-          ? JSON.parse(companySettings.divisions)
-          : ["Head Office", "Regional Office"]
-
-      const companyDepartments = Array.isArray(companySettings.departments)
-        ? companySettings.departments
-        : companySettings.departments
-          ? JSON.parse(companySettings.departments)
-          : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
-
-      const companyLocations = Array.isArray(companySettings.locations)
-        ? companySettings.locations
-        : companySettings.locations
-          ? JSON.parse(companySettings.locations)
-          : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
-
-      setDivisions(companyDivisions)
-      setDepartments(companyDepartments)
-      setLocations(companyLocations)
-
-      console.log("[v0] Parent company data loaded:", {
-        divisions: companyDivisions,
-        departments: companyDepartments,
-        locations: companyLocations,
-      })
-    } else {
-      console.log("[v0] No company settings available, using defaults")
-      setDivisions(["Head Office", "Regional Office"])
-      setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
-      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-    }
+    const org = extractOrgOptions(companySettings, companySettings?.settings_data)
+    setDivisions(org.divisions)
+    setDepartments(org.departments)
+    setLocations(org.locations)
+    console.log("[v0] Parent company data loaded:", org)
   }, [companySettings])
+
+  // Load parent org options + payroll catalogs when form opens / 2a = No
+  useEffect(() => {
+    const loadMeta = async () => {
+      try {
+        const qs = companyId ? `?company_id=${encodeURIComponent(companyId)}` : ""
+        const res = await fetch(`/api/employees/meta${qs}`, { cache: "no-store" })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || "meta failed")
+        setDivisions(json.divisions || [])
+        setDepartments(json.departments || [])
+        setLocations(json.locations || [])
+        if (json.allowances?.length) setCompanyAllowances(json.allowances)
+        if (json.deductions?.length) setCompanyDeductions(json.deductions)
+      } catch {
+        loadParentCompanyData()
+        if (companyAllowancesCatalog?.length) setCompanyAllowances(companyAllowancesCatalog)
+        if (companyDeductionsCatalog?.length) setCompanyDeductions(companyDeductionsCatalog)
+      }
+    }
+    void loadMeta()
+  }, [companyId, loadParentCompanyData, companyAllowancesCatalog, companyDeductionsCatalog])
+
+  useEffect(() => {
+    if (formData.hasSubsidiary !== "Yes") {
+      loadParentCompanyData()
+    }
+  }, [formData.hasSubsidiary, loadParentCompanyData])
+
+  // Document upload handlers (must live inside this form — UI binds to these)
+  const formatFileSize = (bytes: number) => {
+    if (!bytes) return "0 Bytes"
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return `${Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
+  }
+
+  const handleFileSelect = async (documentType: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const doc = requiredDocuments.find((d) => d.id === documentType)
+    if (!doc) return
+
+    const acceptedTypes = doc.acceptTypes.split(",").map((type) => type.trim())
+    const fileExtension = "." + (file.name.split(".").pop()?.toLowerCase() || "")
+    const isValidType = acceptedTypes.some((type) =>
+      type.startsWith(".") ? fileExtension === type : file.type.includes(type.replace(".", "")),
+    )
+    if (!isValidType) {
+      toast({
+        title: "Invalid File Type",
+        description: `Please select a file with one of these types: ${doc.acceptTypes}`,
+        variant: "destructive",
+      })
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File Too Large", description: "Please select a file smaller than 10MB", variant: "destructive" })
+      return
+    }
+
+    setUploadingDocuments((prev) => [...prev, documentType])
+    setUploadProgress((prev) => ({ ...prev, [documentType]: 10 }))
+    try {
+      const body = new FormData()
+      body.append("file", file)
+      body.append("document_type", documentType)
+      body.append("employee_id", selectedEmployee?.id || formData.employeeId || "temp-id")
+      body.append(
+        "employee_name",
+        `${formData.firstName || ""} ${formData.lastName || ""}`.trim() || "New Employee",
+      )
+      if (companyId) body.append("company_id", companyId)
+      body.append("notes", `Uploaded during employee onboarding - ${doc.title}`)
+
+      setUploadProgress((prev) => ({ ...prev, [documentType]: 55 }))
+      const res = await fetch("/api/employees/documents/upload", { method: "POST", body })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Upload failed")
+
+      setUploadProgress((prev) => ({ ...prev, [documentType]: 100 }))
+      const uploadedDoc = {
+        id: json.document.id,
+        vaultDocumentId: json.document.vault_document_id || json.document.id,
+        documentType,
+        fileName: json.document.fileName || file.name,
+        fileSize: json.document.fileSize || file.size,
+        fileType: json.document.fileType || file.type,
+        fileUrl: json.document.fileUrl,
+        file_content: json.document.file_content || null,
+        uploadDate: new Date(json.document.uploadDate || Date.now()),
+        uploadedBy: json.document.uploadedBy || "HR Admin",
+      }
+      setUploadedDocuments((prev) => {
+        const filtered = prev.filter((d) => d.documentType !== documentType)
+        return [...filtered, uploadedDoc]
+      })
+
+      // Passport picture becomes the employee profile photo across the system
+      if (
+        (documentType === "passport-picture" || documentType === "passport_picture") &&
+        uploadedDoc.fileUrl
+      ) {
+        setFormData((prev: any) => ({ ...prev, profilePicture: uploadedDoc.fileUrl }))
+        const empUuid = selectedEmployee?.id
+        if (empUuid && String(empUuid).length > 20) {
+          fetch(`/api/employees/${empUuid}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ profile_picture: uploadedDoc.fileUrl }),
+          }).catch(() => {})
+        }
+      }
+
+      toast({ title: "Upload Successful", description: `${file.name} saved to document vault` })
+    } catch (error) {
+      console.error("Upload error:", error)
+      toast({
+        title: "Upload Failed",
+        description: error instanceof Error ? error.message : "Failed to upload document. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setUploadingDocuments((prev) => prev.filter((d) => d !== documentType))
+      setUploadProgress((prev) => ({ ...prev, [documentType]: 0 }))
+      event.target.value = ""
+    }
+  }
+
+  const handleUploadClick = (documentType: string) => {
+    const existing = fileInputRefs.current[documentType]
+    if (existing) {
+      existing.value = ""
+      existing.click()
+      return
+    }
+    const tempInput = document.createElement("input")
+    tempInput.type = "file"
+    const doc = requiredDocuments.find((d) => d.id === documentType)
+    if (doc) tempInput.accept = doc.acceptTypes
+    tempInput.onchange = (e) => handleFileSelect(documentType, e as any)
+    tempInput.click()
+  }
+
+  const handleRemoveDocument = (documentType: string) => {
+    setUploadedDocuments((prev) => prev.filter((d) => d.documentType !== documentType))
+    toast({ title: "Document Removed", description: "Document has been removed successfully" })
+  }
+
+  const handleReplaceDocument = (documentType: string) => {
+    handleUploadClick(documentType)
+  }
+
+  const handlePreviewDocument = (document: any) => {
+    setPreviewDocument(document)
+    setIsPreviewOpen(true)
+  }
 
   // Filtered lists for searchable dropdowns
   const filteredDepartments = departments.filter((dept) =>
@@ -2796,98 +2757,26 @@ function AddEmployeeForm({
 
   useEffect(() => {
     if (employee) {
-      setFormData({
-        prefix: employee.prefix || "",
-        firstName: employee.first_name || "",
-        otherNames: employee.other_names || "",
-        lastName: employee.last_name || "",
-        maritalStatus: employee.marital_status || "",
-        corporateEmail: employee.corporate_email || "",
-        personalEmail: employee.personal_email || "",
-        phone: employee.phone || "",
-        position: employee.position || "",
-        subsidiary: employee.subsidiary_id || "",
-        hasSubsidiary: employee.subsidiary_id ? "Yes" : "No", // Set based on existing data
-        specialRole: employee.special_role || "No Role", // Set based on existing data
-        division: employee.division || "",
-        department: employee.department || "",
-        location: employee.location || "",
-        contractType: employee.contract_type || "Permanent",
-        dateOfJoining: employee.date_of_joining || "",
-        dateOfExit: employee.date_of_exit || "",
-        status: employee.status || "Active",
-        inactiveReason: employee.inactive_reason || "", // Set based on existing data
-        probationPeriod: employee.probation_period || "6",
-        confirmationDate: employee.confirmation_date || "",
-        noticePeriod: employee.noticePeriod || "",
-        directSupervisor: employee.direct_supervisor || "",
-        headOfDepartment: employee.headOfDepartment || "",
-        annualSalary: employee.annual_salary || "",
-        salary: employee.salary || "",
-        transportAllowance: employee.transport_allowance || "",
-        housingAllowance: employee.housing_allowance || "",
-        medicalAllowance: employee.medical_allowance || "",
-        mealAllowance: employee.meal_allowance || "",
-        uniformAllowance: employee.uniform_allowance || "",
-        communicationAllowance: employee.communication_allowance || "",
-        otherAllowances: employee.other_allowances || "",
-        taxDeduction: employee.tax_deduction || "",
-        ssnit: employee.ssnit_number || "",
-        tier3: employee.tier3_contribution || "",
-        loanDeduction: employee.loan_deduction || "",
-        advanceDeduction: employee.advance_deduction || "",
-        otherDeductions: employee.other_deductions || "",
-        startDate: employee.start_date || "",
-        dateOfBirth: employee.date_of_birth || "",
-        address: employee.address || "",
-        emergencyContactName: employee.emergency_contact_name || "",
-        emergencyContactTel: employee.emergency_contact_tel || "",
-        educationalLevel: employee.educational_level || "",
-        gender: employee.gender || "",
-        bankName: employee.bank_name || "",
-        bankAccount: employee.bank_account_number || "",
-        ghanaCard: employee.ghana_card_number || "",
-        documents: employee.documents || [],
-        profilePicture: employee.profile_picture || "",
-        profilePictureFile: null,
-      })
+      setFormData(employeeToFormData(employee))
+      setSelectedAllowances(toSelectedFinancialRows(employee.allowances))
+      setSelectedDeductions(toSelectedFinancialRows(employee.deductions))
+      setUploadedDocuments(toUploadedDocumentsState(employee.documents))
     }
-  }, [employee])
+  }, [employee, setFormData])
 
   useEffect(() => {
-    if (formData.subsidiary) {
+    if (formData.hasSubsidiary === "Yes" && formData.subsidiary) {
       const selectedSubsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
       if (selectedSubsidiary) {
-        console.log("[v0] Loading subsidiary data:", selectedSubsidiary.name)
-
-        const subDivisions = Array.isArray(selectedSubsidiary.divisions)
-          ? selectedSubsidiary.divisions
-          : selectedSubsidiary.divisions
-            ? JSON.parse(selectedSubsidiary.divisions)
-            : []
-
-        const subDepartments = Array.isArray(selectedSubsidiary.departments)
-          ? selectedSubsidiary.departments
-          : selectedSubsidiary.departments
-            ? JSON.parse(selectedSubsidiary.departments)
-            : []
-
-        const subLocations = Array.isArray(selectedSubsidiary.locations)
-          ? selectedSubsidiary.locations
-          : selectedSubsidiary.locations
-            ? JSON.parse(selectedSubsidiary.locations)
-            : []
-
-        setDivisions(subDivisions)
-        setDepartments(subDepartments)
-        setLocations(subLocations)
-
-        console.log("[v0] Set subsidiary divisions:", subDivisions)
-        console.log("[v0] Set subsidiary departments:", subDepartments)
-        console.log("[v0] Set subsidiary locations:", subLocations)
+        const org = extractOrgOptions(selectedSubsidiary)
+        setDivisions(org.divisions)
+        setDepartments(org.departments)
+        setLocations(org.locations)
       }
+    } else if (formData.hasSubsidiary !== "Yes") {
+      loadParentCompanyData()
     }
-  }, [formData.subsidiary, subsidiaries])
+  }, [formData.subsidiary, formData.hasSubsidiary, subsidiaries, loadParentCompanyData])
 
   const validateForm = () => {
     let isValid = true
@@ -2954,12 +2843,28 @@ function AddEmployeeForm({
       isValid = false
     }
 
-    if (!formData.annualSalary) {
-      newErrors.annualSalary = "Annual salary is required"
+    const monthly = Number(formData.salary)
+    const annual = Number(formData.annualSalary)
+    if ((!formData.salary && !formData.annualSalary) || (Number.isNaN(monthly) && Number.isNaN(annual))) {
+      newErrors.salary = "Monthly or annual salary is required"
       isValid = false
-    } else if (isNaN(Number(formData.annualSalary)) || Number(formData.annualSalary) <= 0) {
-      newErrors.annualSalary = "Annual salary must be a valid positive number"
+    } else if (formData.salary && (Number.isNaN(monthly) || monthly < 0)) {
+      newErrors.salary = "Monthly salary must be a valid number"
       isValid = false
+    } else if (formData.annualSalary && (Number.isNaN(annual) || annual < 0)) {
+      newErrors.annualSalary = "Annual salary must be a valid number"
+      isValid = false
+    }
+
+    if (formData.providentFundEnrolled === "Yes") {
+      const pfRate = Number(formData.providentFundRate)
+      if (!formData.providentFundRate || Number.isNaN(pfRate) || pfRate <= 0) {
+        newErrors.providentFundRate = "Enter a provident fund rate greater than 0"
+        isValid = false
+      } else if (pfRate > 16.5) {
+        newErrors.providentFundRate = "Provident fund rate cannot exceed 16.5%"
+        isValid = false
+      }
     }
 
     setErrors(newErrors)
@@ -2968,46 +2873,43 @@ function AddEmployeeForm({
 
   const handleSubmit = async () => {
     if (validateForm()) {
-      const fullName = `${formData.firstName} ${formData.otherNames} ${formData.lastName}`
-      const displayName = `${formData.firstName} ${formData.lastName}`
+      const fullName = `${formData.firstName} ${formData.otherNames || ""} ${formData.lastName}`.replace(/\s+/g, " ").trim()
+      const displayName = `${formData.firstName} ${formData.lastName}`.trim()
+      const monthly =
+        formData.salary && Number(formData.salary) > 0
+          ? formData.salary
+          : formData.annualSalary
+            ? String(Number(formData.annualSalary) / 12)
+            : formData.salary
+      const annual =
+        formData.annualSalary && Number(formData.annualSalary) > 0
+          ? formData.annualSalary
+          : monthly
+            ? String(Number(monthly) * 12)
+            : formData.annualSalary
 
       const employeeData = {
         ...formData,
-        fullName: fullName,
-        displayName: displayName,
-        employeeId: formData.employeeId, // Ensure employeeId is passed
-      }
-
-      // Save uploaded documents to document vault
-      if (uploadedDocuments.length > 0) {
-        try {
-          const documentService = CentralDocumentService.getInstance()
-
-          // Update all uploaded documents with final employee information
-          for (const doc of uploadedDocuments) {
-            await documentService.uploadDocument({
-              file: new File([], doc.fileName, { type: doc.fileType }), // Create a placeholder file
-              employeeId: formData.employeeId || "temp-id",
-              employeeName: displayName,
-              documentType: doc.documentType,
-              source: "employee-onboarding",
-              uploadedBy: "HR Admin",
-              notes: `Employee onboarding document - ${doc.fileName}`,
-            })
-          }
-
-          toast({
-            title: "Documents Saved",
-            description: `${uploadedDocuments.length} documents have been saved to the document vault`,
-          })
-        } catch (error) {
-          console.error("Error saving documents:", error)
-          toast({
-            title: "Document Save Warning",
-            description: "Employee created but some documents may not have been saved to the vault",
-            variant: "destructive",
-          })
-        }
+        fullName,
+        displayName,
+        employeeId: formData.employeeId,
+        salary: monthly,
+        annualSalary: annual,
+        selectedAllowances,
+        selectedDeductions,
+        uploadedDocuments,
+        documents: uploadedDocuments.map((d) => ({
+          documentType: d.documentType,
+          fileName: d.fileName,
+          fileSize: d.fileSize,
+          fileType: d.fileType,
+          fileUrl: d.fileUrl,
+          file_url: d.fileUrl,
+          file_content: d.file_content || null,
+          vaultDocumentId: d.vaultDocumentId || d.id,
+          vault_document_id: d.vaultDocumentId || d.id,
+          uploadedBy: d.uploadedBy,
+        })),
       }
 
       onSubmit(employeeData)
@@ -3021,10 +2923,9 @@ function AddEmployeeForm({
   }
 
   const handleInputChange = (field: string, value: any) => {
-    setFormData({ ...formData, [field]: value })
-    // Clear error for this field when user starts typing
+    setFormData((prev: any) => ({ ...prev, [field]: value }))
     if (errors[field]) {
-      setErrors({ ...errors, [field]: "" })
+      setErrors((prev) => ({ ...prev, [field]: "" }))
     }
   }
 
@@ -3705,12 +3606,14 @@ function AddEmployeeForm({
                 value={formData.hasSubsidiary}
                 onValueChange={(value) => {
                   console.log("[v0] hasSubsidiary changed to:", value)
-                  handleInputChange("hasSubsidiary", value)
+                  setFormData((prev: any) => ({
+                    ...prev,
+                    hasSubsidiary: value,
+                    subsidiary: value === "No" ? "" : prev.subsidiary,
+                  }))
                   if (value === "No") {
                     console.log("[v0] Clearing subsidiary selection and loading parent company data")
-                    handleInputChange("subsidiary", "")
                     loadParentCompanyData()
-                    // </CHANGE>
                   }
                 }}
               >
@@ -4249,6 +4152,17 @@ function AddEmployeeForm({
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="bankBranch">Bank Branch</Label>
+                <Input
+                  type="text"
+                  id="bankBranch"
+                  value={formData.bankBranch || ""}
+                  onChange={(e) => handleInputChange("bankBranch", e.target.value)}
+                  placeholder="e.g. Accra Main"
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="bankAccount">Bank Account Number</Label>
                 <Input
                   type="text"
@@ -4279,6 +4193,67 @@ function AddEmployeeForm({
                   onChange={(e) => handleInputChange("ghanaCard", e.target.value)}
                   placeholder="GHA-123456789-0"
                 />
+              </div>
+            </div>
+
+            {/* Provident Fund / Tier 3 */}
+            <div className="space-y-4 rounded-lg border border-blue-100 bg-blue-50/40 p-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Provident Fund</h3>
+                <p className="text-sm text-muted-foreground">
+                  Optional Tier 3 contribution used in PAYE/payroll computation (max 16.5% of basic).
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="providentFundEnrolled">Contribute to Provident Fund?</Label>
+                  <Select
+                    value={formData.providentFundEnrolled || "No"}
+                    onValueChange={(value) => {
+                      setFormData((prev: any) => ({
+                        ...prev,
+                        providentFundEnrolled: value,
+                        providentFundRate: value === "No" ? "" : prev.providentFundRate || "",
+                      }))
+                    }}
+                  >
+                    <SelectTrigger id="providentFundEnrolled">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {formData.providentFundEnrolled === "Yes" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="providentFundRate">Employee PF Rate (%)</Label>
+                    <Input
+                      type="number"
+                      id="providentFundRate"
+                      min={0}
+                      max={16.5}
+                      step={0.1}
+                      value={formData.providentFundRate || ""}
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        const n = Number(raw)
+                        if (raw !== "" && Number.isFinite(n) && n > 16.5) {
+                          handleInputChange("providentFundRate", "16.5")
+                          return
+                        }
+                        handleInputChange("providentFundRate", raw)
+                      }}
+                      placeholder="e.g. 5"
+                      className={errors.providentFundRate ? "border-red-500" : ""}
+                    />
+                    <p className="text-xs text-muted-foreground">Maximum allowed rate is 16.5%.</p>
+                    {errors.providentFundRate && (
+                      <p className="text-red-500 text-sm">{errors.providentFundRate}</p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -5053,7 +5028,7 @@ function AddEmployeeForm({
 
       {/* Document Preview Dialog */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Document Preview</DialogTitle>
           </DialogHeader>
@@ -5061,7 +5036,7 @@ function AddEmployeeForm({
             <div className="space-y-4">
               <div className="flex items-center space-x-4">
                 <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                  {previewDocument.fileType.startsWith("image/") ? (
+                  {(previewDocument.fileType || "").startsWith("image/") ? (
                     <img
                       src={previewDocument.fileUrl || "/placeholder.svg"}
                       alt={previewDocument.fileName}
@@ -5081,13 +5056,30 @@ function AddEmployeeForm({
                 </div>
               </div>
 
-              {previewDocument.fileType.startsWith("image/") && (
-                <div className="border rounded-lg p-4">
+              {(previewDocument.fileType || "").startsWith("image/") && previewDocument.fileUrl ? (
+                <div className="border rounded-lg p-4 bg-slate-50">
                   <img
-                    src={previewDocument.fileUrl || "/placeholder.svg"}
+                    src={previewDocument.fileUrl}
                     alt={previewDocument.fileName}
-                    className="max-w-full h-auto rounded"
+                    className="max-w-full max-h-[60vh] h-auto rounded mx-auto"
                   />
+                </div>
+              ) : (previewDocument.fileType || "").includes("pdf") && previewDocument.fileUrl ? (
+                <div className="border rounded-lg overflow-hidden bg-slate-50">
+                  <iframe
+                    title={previewDocument.fileName}
+                    src={previewDocument.fileUrl}
+                    className="w-full h-[60vh]"
+                  />
+                </div>
+              ) : previewDocument.fileUrl ? (
+                <div className="rounded-lg border bg-slate-50 p-4 text-sm text-muted-foreground">
+                  Preview is not available for this file type. Use Download to open{" "}
+                  <span className="font-medium text-foreground">{previewDocument.fileName}</span>.
+                </div>
+              ) : (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                  No stored file URL was found for this attachment.
                 </div>
               )}
 
@@ -5097,12 +5089,24 @@ function AddEmployeeForm({
                 </Button>
                 <Button
                   onClick={() => {
-                    // In production, this would trigger actual download
+                    if (!previewDocument.fileUrl) {
+                      toast({
+                        title: "Download unavailable",
+                        description: "No file URL is stored for this document.",
+                        variant: "destructive",
+                      })
+                      return
+                    }
+                    const a = document.createElement("a")
+                    a.href = previewDocument.fileUrl
+                    a.download = previewDocument.fileName || "document"
+                    a.target = "_blank"
+                    a.rel = "noopener noreferrer"
+                    a.click()
                     toast({
                       title: "Download Started",
-                      description: `${previewDocument.fileName} is being downloaded.`,
+                      description: `${previewDocument.fileName} is opening.`,
                     })
-                    setIsPreviewOpen(false)
                   }}
                 >
                   <Download className="w-4 h-4 mr-2" />

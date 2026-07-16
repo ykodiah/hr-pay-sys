@@ -109,60 +109,74 @@ export default function PayrollHistoryPage() {
 
   const supabase = createClient()
 
-  useEffect(() => {
-    const fetchPayrollHistory = async () => {
-      setIsLoading(true)
+  const [deductionTotals, setDeductionTotals] = useState({
+    paye: 0,
+    ssnit: 0,
+    tier3: 0,
+    other: 0,
+  })
 
-      try {
-        const { data: subsidiariesData } = await supabase.from("subsidiaries").select("id, name").eq("status", "active")
+  const fetchPayrollHistory = async () => {
+    setIsLoading(true)
 
-        if (subsidiariesData) {
-          setSubsidiaries(subsidiariesData)
-        }
+    try {
+      const [{ data: subsidiariesData }, runsRes] = await Promise.all([
+        supabase.from("subsidiaries").select("id, name").eq("status", "active"),
+        fetch("/api/payroll/runs?limit=200", { cache: "no-store" }),
+      ])
 
-        const { data, error } = await supabase.from("payroll_runs").select("*").order("pay_date", { ascending: false })
-
-        if (error) {
-          console.error("Error fetching payroll runs:", error)
-          toast({
-            title: "Error",
-            description: "Failed to load payroll history. Please try again.",
-            variant: "destructive",
-          })
-          setIsLoading(false)
-          return
-        }
-
-        // Count employees for each payroll run
-        const runsWithCounts = await Promise.all(
-          (data || []).map(async (run) => {
-            const { count } = await supabase
-              .from("payroll_items")
-              .select("*", { count: "exact", head: true })
-              .eq("payroll_run_id", run.id)
-
-            return {
-              ...run,
-              employee_count: count || 0,
-            }
-          }),
-        )
-
-        setPayrollRuns(runsWithCounts)
-        setFilteredRuns(runsWithCounts)
-      } catch (err) {
-        console.error("Unexpected error:", err)
-        toast({
-          title: "Error",
-          description: "An unexpected error occurred.",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoading(false)
+      if (subsidiariesData) {
+        setSubsidiaries(subsidiariesData)
       }
-    }
 
-    fetchPayrollHistory()
+      const runsJson = await runsRes.json()
+      if (!runsRes.ok) {
+        throw new Error(runsJson.error || "Failed to load payroll history")
+      }
+
+      const runsWithCounts = (runsJson.runs ?? runsJson.data ?? []) as PayrollRun[]
+      setPayrollRuns(runsWithCounts)
+      setFilteredRuns(runsWithCounts)
+
+      // Real deduction breakdown from payslips (not estimated ratios)
+      const runIds = runsWithCounts.map((r) => r.id).filter(Boolean)
+      if (runIds.length > 0) {
+        const { data: slips } = await supabase
+          .from("payslips")
+          .select("paye_tax, ssnit_employee, tier2_employee, tier3_employee, loan_deduction, advance_deduction, other_deductions")
+          .in("payroll_run_id", runIds.slice(0, 50))
+
+        const totals = (slips ?? []).reduce(
+          (acc, s: any) => ({
+            paye: acc.paye + Number(s.paye_tax ?? 0),
+            ssnit: acc.ssnit + Number(s.ssnit_employee ?? 0) + Number(s.tier2_employee ?? 0),
+            tier3: acc.tier3 + Number(s.tier3_employee ?? 0),
+            other:
+              acc.other +
+              Number(s.loan_deduction ?? 0) +
+              Number(s.advance_deduction ?? 0) +
+              Number(s.other_deductions ?? 0),
+          }),
+          { paye: 0, ssnit: 0, tier3: 0, other: 0 },
+        )
+        setDeductionTotals(totals)
+      } else {
+        setDeductionTotals({ paye: 0, ssnit: 0, tier3: 0, other: 0 })
+      }
+    } catch (err) {
+      console.error("Unexpected error:", err)
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "An unexpected error occurred.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void fetchPayrollHistory()
   }, [])
 
   // Filter payroll runs
@@ -234,14 +248,16 @@ export default function PayrollHistoryPage() {
     }))
 
   const deductionBreakdown =
-    filteredRuns.length > 0
+    deductionTotals.paye + deductionTotals.ssnit + deductionTotals.tier3 + deductionTotals.other > 0
       ? [
-          { name: "PAYE Tax", value: Math.round(totalDeductions * 0.45), color: "#ef4444" },
-          { name: "SSNIT", value: Math.round(totalDeductions * 0.35), color: "#3b82f6" },
-          { name: "Tier 3", value: Math.round(totalDeductions * 0.15), color: "#8b5cf6" },
-          { name: "Other", value: Math.round(totalDeductions * 0.05), color: "#6b7280" },
+          { name: "PAYE Tax", value: Math.round(deductionTotals.paye), color: "#ef4444" },
+          { name: "SSNIT / Tier 2", value: Math.round(deductionTotals.ssnit), color: "#3b82f6" },
+          { name: "Tier 3", value: Math.round(deductionTotals.tier3), color: "#8b5cf6" },
+          { name: "Other", value: Math.round(deductionTotals.other), color: "#6b7280" },
         ]
-      : []
+      : filteredRuns.length > 0
+        ? [{ name: "Total Deductions", value: Math.round(totalDeductions), color: "#6b7280" }]
+        : []
 
   // Pagination
   const totalPages = Math.ceil(filteredRuns.length / itemsPerPage)
@@ -296,62 +312,175 @@ export default function PayrollHistoryPage() {
   }
 
   const handleRefresh = async () => {
-    setIsLoading(true)
+    await fetchPayrollHistory()
+    toast({
+      title: "Refreshed",
+      description: "Payroll history synced from the database.",
+    })
+  }
 
-    try {
-      const { data, error } = await supabase.from("payroll_runs").select("*").order("pay_date", { ascending: false })
+  const downloadTextFile = (content: string, filename: string, mime = "text/csv;charset=utf-8") => {
+    const blob = new Blob(["\uFEFF" + content], { type: mime })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
-      if (error) {
-        console.error("Error refreshing payroll runs:", error)
+  const handleExportAll = (format: "excel" | "csv" | "pdf") => {
+    if (format === "pdf") {
+      const approved = payrollRuns.find((r) => r.status === "approved") || payrollRuns[0]
+      if (approved) {
+        window.open(`/api/payroll/runs/${approved.id}/pdf`, "_blank", "noopener,noreferrer")
         toast({
-          title: "Error",
-          description: "Failed to refresh payroll history.",
-          variant: "destructive",
+          title: "PDF register opened",
+          description: "Use Print → Save as PDF. For a specific run, use that row’s export menu.",
+        })
+        return
+      }
+    }
+    const columns = [
+      "Pay Period Start",
+      "Pay Period End",
+      "Pay Date",
+      "Status",
+      "Employees",
+      "Gross Pay (GHS)",
+      "Total Deductions (GHS)",
+      "Net Pay (GHS)",
+    ]
+    const rows = filteredRuns.map((run) => [
+      run.pay_period_start ?? "",
+      run.pay_period_end ?? "",
+      run.pay_date ?? "",
+      run.status ?? "",
+      String(run.employee_count ?? 0),
+      String(Number(run.total_gross_pay ?? 0).toFixed(2)),
+      String(Number(run.total_deductions ?? 0).toFixed(2)),
+      String(Number(run.total_net_pay ?? 0).toFixed(2)),
+    ])
+    const csv = [
+      `"Payroll History Export"`,
+      `"Generated At","${new Date().toISOString()}"`,
+      "",
+      columns.map((c) => `"${c}"`).join(","),
+      ...rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")),
+    ].join("\n")
+
+    downloadTextFile(csv, `payroll-history-${new Date().toISOString().slice(0, 10)}.csv`)
+    toast({
+      title: "Download ready",
+      description: `Payroll history exported as ${format === "pdf" ? "CSV (PDF preview not available)" : format.toUpperCase()} with headings.`,
+    })
+  }
+
+  const handleExportSingle = async (run: PayrollRun, format: "excel" | "csv" | "pdf") => {
+    try {
+      if (format === "pdf") {
+        window.open(`/api/payroll/runs/${run.id}/pdf`, "_blank", "noopener,noreferrer")
+        toast({
+          title: "PDF register opened",
+          description: "Use Print → Save as PDF in the browser dialog.",
         })
         return
       }
 
-      const runsWithCounts = await Promise.all(
-        (data || []).map(async (run) => {
-          const { count } = await supabase
-            .from("payroll_items")
-            .select("*", { count: "exact", head: true })
-            .eq("payroll_run_id", run.id)
+      if ((run as any).company_id) {
+        const period =
+          (run as any).pay_period ||
+          (run.pay_period_start ? String(run.pay_period_start).slice(0, 7) : new Date().toISOString().slice(0, 7))
+        const res = await fetch("/api/reports/download", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            company_id: (run as any).company_id,
+            report_type: "payroll_summary",
+            pay_period: period,
+            payroll_run_id: run.id,
+          }),
+        })
+        if (res.ok) {
+          const blob = await res.blob()
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement("a")
+          a.href = url
+          a.download = `payroll-summary-${period}.csv`
+          a.click()
+          URL.revokeObjectURL(url)
+          toast({
+            title: "Download ready",
+            description: `Payroll summary for ${formatDate(run.pay_period_start)} exported with headings.`,
+          })
+          return
+        }
+      }
 
-          return {
-            ...run,
-            employee_count: count || 0,
-          }
-        }),
-      )
-
-      setPayrollRuns(runsWithCounts)
-      setFilteredRuns(runsWithCounts)
-
+      // Fallback: export payroll_items for this run with headings
+      const { data: items } = await supabase.from("payroll_items").select("*").eq("payroll_run_id", run.id)
+      const columns = [
+        "Employee ID",
+        "Basic Salary (GHS)",
+        "Gross Pay (GHS)",
+        "PAYE (GHS)",
+        "SSNIT Employee (GHS)",
+        "Total Deductions (GHS)",
+        "Net Pay (GHS)",
+      ]
+      const rows = (items ?? []).map((item: any) => [
+        item.employee_id ?? "",
+        Number(item.basic_salary ?? 0).toFixed(2),
+        Number(item.gross_pay ?? 0).toFixed(2),
+        Number(item.tax_deduction ?? item.paye_tax ?? 0).toFixed(2),
+        Number(item.ssnit_employee ?? 0).toFixed(2),
+        Number(item.total_deductions ?? 0).toFixed(2),
+        Number(item.net_pay ?? 0).toFixed(2),
+      ])
+      const csv = [
+        `"Payroll Run Export"`,
+        `"Pay Period","${run.pay_period_start ?? ""} - ${run.pay_period_end ?? ""}"`,
+        `"Generated At","${new Date().toISOString()}"`,
+        "",
+        columns.map((c) => `"${c}"`).join(","),
+        ...rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")),
+      ].join("\n")
+      downloadTextFile(csv, `payroll-run-${run.id.slice(0, 8)}.csv`)
       toast({
-        title: "Refreshed",
-        description: "Payroll history has been updated.",
+        title: "Download ready",
+        description: `Exported as ${format.toUpperCase()} with column headings.`,
       })
     } catch (err) {
-      console.error("Unexpected error:", err)
-    } finally {
-      setIsLoading(false)
+      toast({
+        title: "Export failed",
+        description: err instanceof Error ? err.message : "Could not export payroll run",
+        variant: "destructive",
+      })
     }
   }
 
-  const handleExportAll = (format: "excel" | "csv" | "pdf") => {
-    toast({
-      title: "Export Started",
-      description: `Payroll history is being exported to ${format.toUpperCase()}.`,
-    })
-    // Implementation would generate the file here
-  }
-
-  const handleExportSingle = (run: PayrollRun, format: "excel" | "csv" | "pdf") => {
-    toast({
-      title: "Export Started",
-      description: `Exporting payroll for ${formatDate(run.pay_period_start)} - ${formatDate(run.pay_period_end)} as ${format.toUpperCase()}`,
-    })
+  const handleDownloadPayslip = async (employeeId: string, runId: string) => {
+    try {
+      const res = await fetch(`/api/payroll/runs/${runId}/payslips`, { cache: "no-store" })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Failed to load payslips")
+      const slip = (json.payslips || []).find((p: any) => p.employee_id === employeeId)
+      if (!slip?.id) {
+        toast({
+          title: "Payslip not found",
+          description: "Approve the payroll run to issue payslips, or re-process the period.",
+          variant: "destructive",
+        })
+        return
+      }
+      window.open(`/api/payslips/${slip.id}/pdf`, "_blank", "noopener,noreferrer")
+    } catch (err) {
+      toast({
+        title: "Download failed",
+        description: err instanceof Error ? err.message : "Could not open payslip",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleViewDetails = async (run: PayrollRun) => {
@@ -685,6 +814,37 @@ export default function PayrollHistoryPage() {
                                     <SelectItem value="pdf">PDF</SelectItem>
                                   </SelectContent>
                                 </Select>
+                                {run.status === "approved" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 text-xs"
+                                    onClick={async () => {
+                                      try {
+                                        const res = await fetch(`/api/payroll/runs/${run.id}/mark-paid`, {
+                                          method: "POST",
+                                          credentials: "include",
+                                        })
+                                        const json = await res.json()
+                                        if (!res.ok) throw new Error(json.error || "Failed")
+                                        toast({
+                                          title: "Marked as paid",
+                                          description: "Payroll run status set to paid after disbursement.",
+                                        })
+                                        fetchPayrollHistory()
+                                      } catch (err) {
+                                        toast({
+                                          title: "Could not mark paid",
+                                          description:
+                                            err instanceof Error ? err.message : "Try again after approval",
+                                          variant: "destructive",
+                                        })
+                                      }
+                                    }}
+                                  >
+                                    Mark Paid
+                                  </Button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -1031,6 +1191,7 @@ export default function PayrollHistoryPage() {
                           <th className="text-right py-2 px-3 text-xs font-semibold text-gray-700">Gross Pay</th>
                           <th className="text-right py-2 px-3 text-xs font-semibold text-gray-700">Deductions</th>
                           <th className="text-right py-2 px-3 text-xs font-semibold text-gray-700">Net Pay</th>
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-gray-700">Payslip</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1048,6 +1209,18 @@ export default function PayrollHistoryPage() {
                             </td>
                             <td className="py-2 px-3 text-right font-semibold text-emerald-600">
                               {formatCurrency(item.net_pay || 0)}
+                            </td>
+                            <td className="py-2 px-3 text-right">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  selectedRun && handleDownloadPayslip(item.employee_id, selectedRun.id)
+                                }
+                              >
+                                <Download className="h-3.5 w-3.5 mr-1" />
+                                PDF
+                              </Button>
                             </td>
                           </tr>
                         ))}

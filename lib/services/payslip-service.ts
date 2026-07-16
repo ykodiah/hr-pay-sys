@@ -99,15 +99,24 @@ export async function createPayslip(
 
   const r = input.tax_result
 
-  const totalAllowances = r.monthly_allowances_total
+  // Net must include loans/advances/other and OT/bonus tax (not just engine statutory net)
+  const loan = input.loan_deduction ?? r.monthly_loan_deduction ?? 0
+  const advance = input.advance_deduction ?? r.monthly_advance_deduction ?? 0
+  const other = input.other_deductions ?? r.monthly_other_deduction ?? 0
+  const totalPaye =
+    r.monthly_total_paye_withheld ??
+    r.monthly_paye_tax + (r.monthly_overtime_tax ?? 0) + (r.monthly_bonus_tax ?? 0)
+  const pensionEmployee =
+    r.monthly_pension_employee ?? r.monthly_ssnit_employee + r.monthly_tier2_employee
   const totalDeductions =
-    r.monthly_ssnit_employee +
-    r.monthly_tier2_employee +
+    pensionEmployee +
     r.monthly_tier3_employee +
-    r.monthly_paye_tax +
-    (input.loan_deduction ?? 0) +
-    (input.advance_deduction ?? 0) +
-    (input.other_deductions ?? 0)
+    totalPaye +
+    loan +
+    advance +
+    other
+  const grossPay = r.monthly_gross + (r.monthly_overtime ?? 0) + (r.monthly_bonus ?? 0)
+  const netPay = Math.round((grossPay - totalDeductions + Number.EPSILON) * 100) / 100
 
   const row = {
     payroll_run_id: input.payroll_run_id,
@@ -119,15 +128,15 @@ export async function createPayslip(
     pay_period_end: input.pay_period_end,
     pay_date: input.pay_date,
     basic_salary: r.monthly_basic,
-    transport_allowance: r.monthly_allowances_total > 0 ? (r.monthly_gross - r.monthly_basic) : 0,
+    transport_allowance: r.monthly_allowances_total > 0 ? r.monthly_gross - r.monthly_basic : 0,
     housing_allowance: 0,
     medical_allowance: 0,
     meal_allowance: 0,
     communication_allowance: 0,
-    other_allowances: totalAllowances,
+    other_allowances: r.monthly_allowances_total,
     overtime_pay: r.monthly_overtime ?? 0,
     bonus_pay: r.monthly_bonus ?? 0,
-    gross_pay: r.monthly_gross,
+    gross_pay: grossPay,
     ssnit_employee: r.monthly_ssnit_employee,
     ssnit_employer: r.monthly_ssnit_employer,
     tier2_employee: r.monthly_tier2_employee,
@@ -136,15 +145,25 @@ export async function createPayslip(
     tier3_employer: r.monthly_tier3_employer,
     paye_taxable_income: r.annual_taxable_income / 12,
     tax_relief_total: r.annual_tax_reliefs / 12,
-    paye_tax: r.monthly_paye_tax,
-    loan_deduction: input.loan_deduction ?? 0,
-    advance_deduction: input.advance_deduction ?? 0,
-    other_deductions: input.other_deductions ?? 0,
-    total_deductions: totalDeductions,
-    net_pay: r.monthly_net_pay,
+    // Total PAYE remittance includes OT tax + bonus WHT
+    paye_tax: totalPaye,
+    overtime_tax: r.monthly_overtime_tax ?? 0,
+    bonus_tax: r.monthly_bonus_tax ?? 0,
+    loan_deduction: loan,
+    advance_deduction: advance,
+    other_deductions: other,
+    total_deductions: Math.round((totalDeductions + Number.EPSILON) * 100) / 100,
+    net_pay: netPay,
     total_employer_cost: r.monthly_total_employer_cost,
     loan_balance: input.loan_balance ?? 0,
-    calculation_breakdown: r as unknown as object,
+    calculation_breakdown: {
+      ...r,
+      monthly_loan_deduction: loan,
+      monthly_advance_deduction: advance,
+      monthly_other_deduction: other,
+      monthly_total_paye_withheld: totalPaye,
+      monthly_net_pay: netPay,
+    } as unknown as object,
     status: "draft",
   }
 
@@ -252,14 +271,19 @@ export async function issuePayrollRunPayslips(
 ): Promise<{ issued: number; alreadyIssued: number; error: string | null }> {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
-    .rpc("issue_payroll_run_payslips", { p_payroll_run_id: payrollRunId })
-    .single()
+  const { data, error } = await supabase.rpc("issue_payroll_run_payslips", {
+    p_payroll_run_id: payrollRunId,
+  })
 
   if (error) return { issued: 0, alreadyIssued: 0, error: error.message }
 
-  const result = data as { issued: number; already_issued: number }
-  return { issued: result.issued, alreadyIssued: result.already_issued, error: null }
+  const row = Array.isArray(data) ? data[0] : data
+  const result = (row ?? {}) as { issued?: number; already_issued?: number }
+  return {
+    issued: Number(result.issued ?? 0),
+    alreadyIssued: Number(result.already_issued ?? 0),
+    error: null,
+  }
 }
 
 // ---------------------------------------------------------------------------

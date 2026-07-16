@@ -18,6 +18,7 @@ export type ReportType =
   | "allowances"
   | "provident_fund"
   | "payroll_summary"
+  | "custom"
 
 export const REPORT_LABELS: Record<ReportType, string> = {
   paye:             "PAYE Tax Report (GRA)",
@@ -30,9 +31,10 @@ export const REPORT_LABELS: Record<ReportType, string> = {
   allowances:       "Allowances Report",
   provident_fund:   "Provident Fund (Tier 3)",
   payroll_summary:  "Monthly Payroll Summary",
+  custom:           "Custom Report",
 }
 
-export const REPORT_CATEGORIES: Record<ReportType, "compliance" | "payroll" | "finance"> = {
+export const REPORT_CATEGORIES: Record<ReportType, "compliance" | "payroll" | "finance" | "custom"> = {
   paye:            "compliance",
   ssnit_tier1:     "compliance",
   ssnit_tier2:     "compliance",
@@ -43,6 +45,7 @@ export const REPORT_CATEGORIES: Record<ReportType, "compliance" | "payroll" | "f
   allowances:      "payroll",
   provident_fund:  "compliance",
   payroll_summary: "payroll",
+  custom:          "custom",
 }
 
 // ─── Source row from v_payroll_report_summary ────────────────────────────────

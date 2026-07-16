@@ -1,7 +1,11 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import useSWR, { mutate } from "swr"
+import { createClient } from "@/lib/supabase/client"
+import { CUSTOM_FIELD_CATALOG } from "@/lib/services/reports/field-catalog"
+import type { ReportColumn } from "@/lib/services/reports/types"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -51,14 +55,14 @@ const REPORT_DEFINITIONS: ReportDefinition[] = [
   },
   {
     type:        "ssnit_tier1",
-    description: "Tier 1 employee (5.5%) and employer (13%) contributions with SSNIT numbers.",
+    description: "Tier 1 employee (0.5%) and employer (13%) contributions with SSNIT numbers.",
     authority:   "SSNIT",
     frequency:   "Monthly",
   },
   {
     type:        "ssnit_tier2",
-    description: "Tier 2 NHIA employee (5%) and employer (5%) contributions.",
-    authority:   "SSNIT / NHIA",
+    description: "Tier 2 occupational pension — employee 5% of basic (Act 766).",
+    authority:   "Licensed Trustee / SSNIT",
     frequency:   "Monthly",
   },
   {
@@ -97,6 +101,12 @@ const REPORT_DEFINITIONS: ReportDefinition[] = [
     authority:   "Finance",
     frequency:   "Monthly",
   },
+  {
+    type:        "deductions",
+    description: "Non-tax deductions register — loans, advances, and other recoveries.",
+    authority:   "Finance / Payroll",
+    frequency:   "Monthly",
+  },
 ]
 
 const CATEGORY_META = {
@@ -108,18 +118,25 @@ const CATEGORY_META = {
     badge: "bg-blue-100 text-blue-700",
   },
   payroll: {
-    label: "Payroll Reports",
+    label: "Payroll / Financial Reports",
     icon: Wallet,
     color: "text-amber-600",
     bg:    "bg-amber-50",
     badge: "bg-amber-100 text-amber-700",
   },
   finance: {
-    label: "Finance Reports",
+    label: "Banking & Finance Reports",
     icon: Landmark,
     color: "text-emerald-600",
     bg:    "bg-emerald-50",
     badge: "bg-emerald-100 text-emerald-700",
+  },
+  custom: {
+    label: "Custom Reports",
+    icon: FileText,
+    color: "text-purple-600",
+    bg:    "bg-purple-50",
+    badge: "bg-purple-100 text-purple-700",
   },
 }
 
@@ -185,7 +202,7 @@ function ReportCard({
   period:      string
   history:     ComplianceReportRecord[]
   onGenerate:  (type: ReportType) => void
-  onDownload:  (type: ReportType) => void
+  onDownload:  (type: ReportType, format?: "csv" | "pdf") => void
   generating:  boolean
   downloading: boolean
 }) {
@@ -255,7 +272,7 @@ function ReportCard({
             size="sm"
             variant="outline"
             className="h-8 text-xs px-2"
-            onClick={() => onDownload(def.type)}
+            onClick={() => onDownload(def.type, "csv")}
             disabled={downloading}
             title="Download CSV"
           >
@@ -264,6 +281,17 @@ function ReportCard({
             ) : (
               <Download className="h-3 w-3" />
             )}
+            <span className="ml-1">CSV</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs px-2"
+            onClick={() => onDownload(def.type, "pdf")}
+            disabled={downloading}
+            title="Download PDF"
+          >
+            PDF
           </Button>
         </div>
       </CardContent>
@@ -275,7 +303,7 @@ function ReportCard({
 
 export default function ComplianceReportsPage() {
   const [period,      setPeriod]      = useState<string>(() => getPeriodOptions()[0])
-  const [companyId,   setCompanyId]   = useState<string>("demo-company")
+  const [companyId,   setCompanyId]   = useState<string>("")
   const [activeTab,   setActiveTab]   = useState("reports")
   const [generating,  setGenerating]  = useState<ReportType | "all" | null>(null)
   const [downloading, setDownloading] = useState<ReportType | null>(null)
@@ -283,50 +311,103 @@ export default function ComplianceReportsPage() {
   const [fileDialogId,  setFileDialogId]  = useState<string | null>(null)
   const [submissionRef, setSubmissionRef] = useState("")
 
+  useEffect(() => {
+    if (typeof document !== "undefined" && !document.cookie.includes("demo-session=active")) {
+      document.cookie = "demo-session=active; path=/; max-age=86400; SameSite=Lax"
+    }
+    const supabase = createClient()
+    void supabase
+      .from("companies")
+      .select("id, name")
+      .limit(5)
+      .then(({ data }) => {
+        if (data?.[0]?.id) setCompanyId((prev) => prev || data[0].id)
+      })
+  }, [])
+
   // ── Fetch company list (to populate the company selector) ────────────────
   const { data: companiesData } = useSWR("/api/subsidiaries", fetcher)
   const companies: { id: string; name: string }[] = companiesData?.data ?? []
 
+  // Custom report designer state
+  const [customName, setCustomName] = useState("")
+  const [customDescription, setCustomDescription] = useState("")
+  const [customCategory, setCustomCategory] = useState<"compliance" | "financial" | "banking" | "payroll" | "custom">("custom")
+  const [selectedFields, setSelectedFields] = useState<string[]>([
+    "employee_id_no",
+    "employee_name",
+    "gross_pay",
+    "paye_tax",
+    "net_pay",
+  ])
+  const [customSaving, setCustomSaving] = useState(false)
+  const [customRunning, setCustomRunning] = useState(false)
+  const customKey = companyId ? `/api/reports/custom?company_id=${companyId}` : null
+  const { data: customData, mutate: mutateCustom } = useSWR(customKey, fetcher)
+  const savedCustomDefs = customData?.definitions ?? []
+
   // ── Fetch history for the selected period ────────────────────────────────
-  const historyKey = `/api/reports?company_id=${companyId}&pay_period=${period}&limit=50`
+  const historyKey = companyId
+    ? `/api/reports?company_id=${companyId}&pay_period=${period}&limit=50`
+    : null
   const { data: historyData, isLoading: historyLoading } = useSWR(historyKey, fetcher)
   const history: ComplianceReportRecord[] = historyData?.data ?? []
 
   // ── Generate a single report ─────────────────────────────────────────────
   const handleGenerate = useCallback(async (type: ReportType) => {
+    if (!companyId) {
+      toast({ title: "Company required", description: "Select or load a company first.", variant: "destructive" })
+      return
+    }
     setGenerating(type)
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 45000)
     try {
       const res = await fetch("/api/reports", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        signal: controller.signal,
         body:    JSON.stringify({ company_id: companyId, report_type: type, pay_period: period }),
       })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? "Failed to generate")
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error ?? `Failed to generate (${res.status})`)
 
       setPreviewReport(json.data)
-      mutate(historyKey)
+      if (historyKey) mutate(historyKey)
       toast({ title: "Report generated", description: `${REPORT_LABELS[type]} — ${json.data.row_count} employees` })
     } catch (err) {
-      toast({ title: "Generation failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" })
+      const msg =
+        err instanceof Error
+          ? err.name === "AbortError"
+            ? "Timed out. Process & approve payroll for this period first, then retry."
+            : err.message
+          : "Unknown error"
+      toast({ title: "Generation failed", description: msg, variant: "destructive" })
     } finally {
+      clearTimeout(timer)
       setGenerating(null)
     }
   }, [companyId, period, historyKey])
 
   // ── Generate all reports for the period ──────────────────────────────────
   const handleGenerateAll = useCallback(async () => {
+    if (!companyId) {
+      toast({ title: "Company required", description: "Select or load a company first.", variant: "destructive" })
+      return
+    }
     setGenerating("all")
     try {
       const res = await fetch("/api/reports", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body:    JSON.stringify({ company_id: companyId, pay_period: period, generate_all: true }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? "Failed to generate")
 
-      mutate(historyKey)
+      if (historyKey) mutate(historyKey)
       toast({ title: "All reports generated", description: `${json.count} reports generated for ${fmtPeriod(period)}` })
     } catch (err) {
       toast({ title: "Generation failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" })
@@ -335,32 +416,74 @@ export default function ComplianceReportsPage() {
     }
   }, [companyId, period, historyKey])
 
-  // ── Download CSV ──────────────────────────────────────────────────────────
-  const handleDownload = useCallback(async (type: ReportType) => {
+  // ── Download CSV / PDF ────────────────────────────────────────────────────
+  const handleDownload = useCallback(async (type: ReportType, format: "csv" | "pdf" = "csv") => {
+    if (!companyId) {
+      toast({ title: "Company required", description: "Select or load a company first.", variant: "destructive" })
+      return
+    }
     setDownloading(type)
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 45000)
     try {
       const res = await fetch("/api/reports/download", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ company_id: companyId, report_type: type, pay_period: period }),
+        credentials: "include",
+        signal: controller.signal,
+        body:    JSON.stringify({
+          company_id: companyId,
+          report_type: type,
+          pay_period: period,
+          format,
+        }),
       })
       if (!res.ok) {
-        const json = await res.json()
-        throw new Error(json.error ?? "Download failed")
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json.error ?? `Download failed (${res.status})`)
       }
-      const blob     = await res.blob()
-      const url      = URL.createObjectURL(blob)
-      const a        = document.createElement("a")
-      const filename = res.headers.get("content-disposition")?.match(/filename="(.+)"/)?.[1]
-                    ?? `${type}-${period}.csv`
-      a.href         = url
-      a.download     = filename
-      a.click()
-      URL.revokeObjectURL(url)
-      mutate(historyKey)
+      if (format === "pdf") {
+        const html = await res.text()
+        const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }))
+        const opened = window.open(url, "_blank", "noopener,noreferrer")
+        if (!opened) {
+          // Popup blocked — force download as HTML file
+          const a = document.createElement("a")
+          a.href = url
+          a.download = `${type}-${period}.html`
+          a.click()
+        }
+        setTimeout(() => URL.revokeObjectURL(url), 60_000)
+        toast({
+          title: "PDF opened",
+          description: `${REPORT_LABELS[type]} — Print → Save as PDF. Company letterhead + AkwaabaHRPay footer included.`,
+        })
+      } else {
+        const blob     = await res.blob()
+        const url      = URL.createObjectURL(blob)
+        const a        = document.createElement("a")
+        const filename = res.headers.get("content-disposition")?.match(/filename="(.+)"/)?.[1]
+                      ?? `${type}-${period}.csv`
+        a.href         = url
+        a.download     = filename
+        a.click()
+        URL.revokeObjectURL(url)
+        toast({
+          title: "Download ready",
+          description: `${REPORT_LABELS[type]} CSV includes company details and AkwaabaHRPay brand footer.`,
+        })
+      }
+      if (historyKey) mutate(historyKey)
     } catch (err) {
-      toast({ title: "Download failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" })
+      const msg =
+        err instanceof Error
+          ? err.name === "AbortError"
+            ? "Timed out. Process & approve payroll for this period, then retry download."
+            : err.message
+          : "Unknown error"
+      toast({ title: "Download failed", description: msg, variant: "destructive" })
     } finally {
+      clearTimeout(timer)
       setDownloading(null)
     }
   }, [companyId, period, historyKey])
@@ -378,7 +501,7 @@ export default function ComplianceReportsPage() {
         const json = await res.json()
         throw new Error(json.error)
       }
-      mutate(historyKey)
+      if (historyKey) mutate(historyKey)
       toast({ title: "Report filed", description: `Reference: ${submissionRef}` })
       setFileDialogId(null)
       setSubmissionRef("")
@@ -458,8 +581,9 @@ export default function ComplianceReportsPage() {
 
       {/* ── Tabs ── */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full sm:w-auto">
+        <TabsList className="w-full sm:w-auto flex-wrap h-auto">
           <TabsTrigger value="reports" className="text-sm">Report Catalogue</TabsTrigger>
+          <TabsTrigger value="custom" className="text-sm">Custom Designer</TabsTrigger>
           <TabsTrigger value="history" className="text-sm">
             History
             {history.length > 0 && (
@@ -502,6 +626,237 @@ export default function ComplianceReportsPage() {
               </div>
             )
           })}
+        </TabsContent>
+
+        {/* ── Custom Designer tab ── */}
+        <TabsContent value="custom" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Design a custom report</CardTitle>
+              <CardDescription>
+                Choose fields for compliance, financial, banking, or payroll extracts.
+                Downloads always include a title block and column headings.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Report name</Label>
+                  <Input
+                    value={customName}
+                    onChange={(e) => setCustomName(e.target.value)}
+                    placeholder="e.g. Department Net Pay Extract"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <Select value={customCategory} onValueChange={(v: any) => setCustomCategory(v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="compliance">Compliance</SelectItem>
+                      <SelectItem value="financial">Financial</SelectItem>
+                      <SelectItem value="banking">Banking</SelectItem>
+                      <SelectItem value="payroll">Payroll</SelectItem>
+                      <SelectItem value="custom">Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Input
+                  value={customDescription}
+                  onChange={(e) => setCustomDescription(e.target.value)}
+                  placeholder="Optional notes for this report type"
+                />
+              </div>
+
+              <div>
+                <Label className="mb-2 block">Columns (select headings)</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-72 overflow-y-auto border rounded-lg p-3">
+                  {CUSTOM_FIELD_CATALOG.map((field) => {
+                    const checked = selectedFields.includes(field.key)
+                    return (
+                      <label
+                        key={field.key}
+                        className="flex items-start gap-2 text-sm rounded-md px-2 py-1.5 hover:bg-muted/60 cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(val) => {
+                            setSelectedFields((prev) =>
+                              val ? [...prev, field.key] : prev.filter((k) => k !== field.key),
+                            )
+                          }}
+                        />
+                        <span>
+                          <span className="font-medium">{field.label}</span>
+                          <span className="block text-xs text-muted-foreground capitalize">{field.source}</span>
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  disabled={!companyId || !customName || selectedFields.length === 0 || customSaving}
+                  onClick={async () => {
+                    setCustomSaving(true)
+                    try {
+                      const columns: ReportColumn[] = selectedFields.map((key) => {
+                        const f = CUSTOM_FIELD_CATALOG.find((c) => c.key === key)!
+                        return { key: f.key, label: f.label, type: f.type }
+                      })
+                      const res = await fetch("/api/reports/custom", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          action: "save",
+                          definition: {
+                            company_id: companyId,
+                            name: customName,
+                            description: customDescription,
+                            category: customCategory,
+                            data_source: "payroll",
+                            columns,
+                          },
+                        }),
+                      })
+                      const json = await res.json()
+                      if (!res.ok) throw new Error(json.error || "Save failed")
+                      mutateCustom()
+                      toast({ title: "Custom report saved", description: customName })
+                    } catch (err) {
+                      toast({
+                        title: "Save failed",
+                        description: err instanceof Error ? err.message : "Unknown error",
+                        variant: "destructive",
+                      })
+                    } finally {
+                      setCustomSaving(false)
+                    }
+                  }}
+                >
+                  {customSaving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Save report type
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={!companyId || selectedFields.length === 0 || customRunning}
+                  onClick={async () => {
+                    setCustomRunning(true)
+                    try {
+                      const columns: ReportColumn[] = selectedFields.map((key) => {
+                        const f = CUSTOM_FIELD_CATALOG.find((c) => c.key === key)!
+                        return { key: f.key, label: f.label, type: f.type }
+                      })
+                      const res = await fetch("/api/reports/custom", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          action: "run",
+                          download: true,
+                          company_id: companyId,
+                          pay_period: period,
+                          definition: {
+                            company_id: companyId,
+                            name: customName || "Custom Report",
+                            description: customDescription,
+                            category: customCategory,
+                            data_source: "payroll",
+                            columns,
+                          },
+                        }),
+                      })
+                      if (!res.ok) {
+                        const json = await res.json()
+                        throw new Error(json.error || "Download failed")
+                      }
+                      const blob = await res.blob()
+                      const url = URL.createObjectURL(blob)
+                      const a = document.createElement("a")
+                      a.href = url
+                      a.download = `custom-report-${period}.csv`
+                      a.click()
+                      URL.revokeObjectURL(url)
+                      mutate(historyKey)
+                      toast({ title: "Download ready", description: "CSV includes title and column headings." })
+                    } catch (err) {
+                      toast({
+                        title: "Download failed",
+                        description: err instanceof Error ? err.message : "Unknown error",
+                        variant: "destructive",
+                      })
+                    } finally {
+                      setCustomRunning(false)
+                    }
+                  }}
+                >
+                  {customRunning ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                  Download CSV
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {savedCustomDefs.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Saved custom report types</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {savedCustomDefs.map((def: any) => (
+                  <div
+                    key={def.id}
+                    className="flex flex-wrap items-center justify-between gap-2 border rounded-lg px-3 py-2"
+                  >
+                    <div>
+                      <p className="font-medium text-sm">{def.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(def.columns?.length ?? 0)} columns · {def.category}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        const res = await fetch("/api/reports/custom", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            action: "run",
+                            download: true,
+                            company_id: companyId,
+                            pay_period: period,
+                            definition_id: def.id,
+                          }),
+                        })
+                        if (!res.ok) {
+                          const json = await res.json()
+                          toast({ title: "Download failed", description: json.error, variant: "destructive" })
+                          return
+                        }
+                        const blob = await res.blob()
+                        const url = URL.createObjectURL(blob)
+                        const a = document.createElement("a")
+                        a.href = url
+                        a.download = `${def.name.replace(/\s+/g, "-").toLowerCase()}-${period}.csv`
+                        a.click()
+                        URL.revokeObjectURL(url)
+                      }}
+                    >
+                      <Download className="h-3.5 w-3.5 mr-1" />
+                      Download
+                    </Button>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* ── History tab ── */}

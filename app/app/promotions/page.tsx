@@ -32,6 +32,7 @@ import { toast, useToast } from "@/hooks/use-toast"
 import {
   createPromotionCase as createPromotionCaseMutation,
   getPromotionEmployees,
+  loadPromotionEmployees,
   listPromotionCases,
   persistPromotionCase as syncPromotionCase,
   type PromotionEmployeeProfile,
@@ -75,7 +76,7 @@ export default function PromotionsPage() {
   const { formatAmount } = useCurrency()
   const { toast: pushToast } = useToast()
 
-  const promotionEmployees = useMemo(() => getPromotionEmployees(), [])
+  const [promotionEmployees, setPromotionEmployees] = useState(() => getPromotionEmployees())
   const [cases, setCases] = useState<PromotionCase[]>([])
   const [isLoadingCases, setIsLoadingCases] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -96,6 +97,8 @@ export default function PromotionsPage() {
   useEffect(() => {
     const bootstrap = async () => {
       try {
+        const employees = await loadPromotionEmployees()
+        setPromotionEmployees(employees)
         const payload = await listPromotionCases()
         setCases(payload)
       } catch (error) {

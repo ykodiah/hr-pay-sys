@@ -89,37 +89,53 @@ export default function SelfServiceDashboard() {
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Button className="h-20 flex-col space-y-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
-              <Calendar className="w-6 h-6" />
-              <span>Request Leave</span>
+            <Button asChild className="h-20 flex-col space-y-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
+              <a href="/self-service/leave">
+                <Calendar className="w-6 h-6" />
+                <span>Request Leave</span>
+              </a>
             </Button>
-            <Button variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
-              <FileText className="w-6 h-6" />
-              <span>View Payslips</span>
+            <Button asChild variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
+              <a href="/self-service/payslips">
+                <FileText className="w-6 h-6" />
+                <span>View Payslips</span>
+              </a>
             </Button>
-            <Button variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
-              <CreditCard className="w-6 h-6" />
-              <span>Apply for Loan</span>
+            <Button asChild variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
+              <a href="/self-service/loans">
+                <CreditCard className="w-6 h-6" />
+                <span>Apply for Loan</span>
+              </a>
             </Button>
-            <Button variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
-              <User className="w-6 h-6" />
-              <span>Update Profile</span>
+            <Button asChild variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
+              <a href="/self-service/profile">
+                <User className="w-6 h-6" />
+                <span>Update Profile</span>
+              </a>
             </Button>
-            <Button variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
-              <Target className="w-6 h-6" />
-              <span>View Goals</span>
+            <Button asChild variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
+              <a href="/self-service/goals">
+                <Target className="w-6 h-6" />
+                <span>View Goals</span>
+              </a>
             </Button>
-            <Button variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
-              <GraduationCap className="w-6 h-6" />
-              <span>Browse Courses</span>
+            <Button asChild variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
+              <a href="/self-service/courses">
+                <GraduationCap className="w-6 h-6" />
+                <span>Browse Courses</span>
+              </a>
             </Button>
-            <Button variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
-              <Award className="w-6 h-6" />
-              <span>Performance</span>
+            <Button asChild variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
+              <a href="/self-service/performance">
+                <Award className="w-6 h-6" />
+                <span>Performance</span>
+              </a>
             </Button>
-            <Button variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
-              <Settings className="w-6 h-6" />
-              <span>Settings</span>
+            <Button asChild variant="outline" className="h-20 flex-col space-y-2 bg-transparent">
+              <a href="/self-service/settings">
+                <Settings className="w-6 h-6" />
+                <span>Settings</span>
+              </a>
             </Button>
           </div>
         </CardContent>

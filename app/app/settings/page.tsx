@@ -7,7 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import TaxReliefManager from "@/components/tax-relief-manager"
+import GhanaTaxSettings from "@/components/ghana-tax-settings"
 import { createClient } from "@/lib/supabase/client"
+import { calculateMonthlyPaye, round2 as roundMoney } from "@/lib/ghana-tax/engine"
 import {
   Building2,
   Users,
@@ -458,16 +460,17 @@ export default function SettingsPage() {
     { code: "LOAN", description: "Loan Deduction", recurring: true, amount: 0, percentage: 0, type: "FIXED" },
   ])
 
+  // Act 766: Tier 1 (SSNIT) 0.5% ee / 13% er — Tier 2 is separate (5% ee / 0% er)
   const [ssnitRates, setSsnitRates] = useState({
-    employee: 5.5,
+    employee: 0.5,
     employer: 13,
-    total: 18.5,
+    total: 13.5,
   })
 
   const [tier2Rates, setTier2Rates] = useState({
-    employee: 5.5,
-    employer: 5.5,
-    total: 11,
+    employee: 5,
+    employer: 0,
+    total: 5,
   })
 
   const [tier3Rates, setTier3Rates] = useState({
@@ -532,25 +535,27 @@ export default function SettingsPage() {
       apiEndpoint: "https://api.gra.gov.gh/tax-rates",
       lastUpdated: "2024-01-01",
       version: "2024.1",
+      // GRA monthly PAYE bands effective 1 Jan 2024 (display + calculator source of truth)
       taxBands: [
         { rate: 0, from: 0, to: 490, cumulativeTax: 0 },
-        { rate: 5, from: 491, to: 600, cumulativeTax: 0 },
-        { rate: 10, from: 601, to: 730, cumulativeTax: 5.5 },
-        { rate: 17.5, from: 731, to: 3896.67, cumulativeTax: 18.5 },
-        { rate: 25, from: 3896.68, to: 19896.67, cumulativeTax: 572.54 },
-        { rate: 30, from: 19896.68, to: 50416.67, cumulativeTax: 4572.54 },
-        { rate: 35, from: 50416.68, to: Number.POSITIVE_INFINITY, cumulativeTax: 13728.54 },
+        { rate: 5, from: 490, to: 600, cumulativeTax: 0 },
+        { rate: 10, from: 600, to: 730, cumulativeTax: 5.5 },
+        { rate: 17.5, from: 730, to: 3896.67, cumulativeTax: 18.5 },
+        { rate: 25, from: 3896.67, to: 19896.67, cumulativeTax: 572.67 },
+        { rate: 30, from: 19896.67, to: 50416.67, cumulativeTax: 4572.67 },
+        { rate: 35, from: 50416.67, to: Number.POSITIVE_INFINITY, cumulativeTax: 13728.67 },
       ],
       socialSecurity: {
-        employee: 5.5,
+        // Act 766 Tier 1 (SSNIT) portion — employee total pension is 5.5% with Tier 2
+        employee: 0.5,
         employer: 13.0,
-        total: 18.5,
+        total: 13.5,
         cap: 2000000, // Annual cap in GHS
       },
       tier2: {
-        employee: 5.5,
-        employer: 5.5,
-        total: 11.0,
+        employee: 5.0,
+        employer: 0,
+        total: 5.0,
       },
       tier3: {
         employee: 5.0,
@@ -1026,18 +1031,28 @@ export default function SettingsPage() {
     const config = getCurrencyConfig(currency)
     if (!config) return 0
 
-    let tax = 0
-    let remainingIncome = income
-
-    for (const band of config.taxBands) {
-      if (remainingIncome <= 0) break
-
-      const bandIncome = band.to ? Math.min(remainingIncome, band.to - (band.from || 0)) : remainingIncome
-      tax += (bandIncome * band.rate) / 100
-      remainingIncome -= bandIncome
+    // Ghana PAYE: use the shared GRA monthly engine so Settings matches Payroll
+    if (currency === "ghs") {
+      return roundMoney(calculateMonthlyPaye(Math.max(0, income)).monthlyTax)
     }
 
-    return tax
+    let tax = 0
+    let remainingIncome = Math.max(0, income)
+    const bands = [...config.taxBands].sort((a: any, b: any) => (a.from || 0) - (b.from || 0))
+
+    for (let i = 0; i < bands.length; i++) {
+      if (remainingIncome <= 0) break
+      const band = bands[i]
+      const bandStart = band.from || 0
+      const bandEnd = band.to == null || !Number.isFinite(band.to) ? Number.POSITIVE_INFINITY : band.to
+      const bandWidth = bandEnd - bandStart
+      if (bandWidth <= 0 && Number.isFinite(bandEnd)) continue
+      const taxableInBand = Number.isFinite(bandWidth) ? Math.min(remainingIncome, bandWidth) : remainingIncome
+      tax += (taxableInBand * band.rate) / 100
+      remainingIncome -= taxableInBand
+    }
+
+    return Math.round(tax * 100) / 100
   }
 
   const validateTaxBands = (bands: any[]) => {
@@ -1993,6 +2008,8 @@ export default function SettingsPage() {
       const [
         { data: structuredGrades, error: structuredError },
         { data: unstructured, error: unstructuredError },
+        { data: allowanceRows },
+        { data: deductionRows },
       ] = await Promise.all([
         supabase
           .from("salary_grades")
@@ -2006,10 +2023,48 @@ export default function SettingsPage() {
           )
           .eq("company_id", targetCompanyId)
           .order("created_at", { ascending: true }),
+        supabase
+          .from("payroll_allowances")
+          .select("code, description, taxable, recurring, amount, percentage, type, is_active")
+          .eq("company_id", targetCompanyId)
+          .eq("is_active", true)
+          .order("code"),
+        supabase
+          .from("payroll_deductions")
+          .select("code, description, taxable, recurring, amount, percentage, type, is_active")
+          .eq("company_id", targetCompanyId)
+          .eq("is_active", true)
+          .order("code"),
       ])
 
       if (structuredError) throw structuredError
       if (unstructuredError) throw unstructuredError
+
+      if (allowanceRows?.length) {
+        setAllowances(
+          allowanceRows.map((a) => ({
+            code: a.code,
+            description: a.description,
+            taxable: Boolean(a.taxable),
+            recurring: a.recurring !== false,
+            amount: Number(a.amount || 0),
+            percentage: Number(a.percentage || 0),
+            type: a.type || "FIXED",
+          })),
+        )
+      }
+      if (deductionRows?.length) {
+        setDeductions(
+          deductionRows.map((d) => ({
+            code: d.code,
+            description: d.description,
+            recurring: d.recurring !== false,
+            amount: Number(d.amount || 0),
+            percentage: Number(d.percentage || 0),
+            type: d.type || "FIXED",
+          })),
+        )
+      }
 
       if (structuredGrades) {
         setSalaryGrades(
@@ -4146,18 +4201,61 @@ Format the response in a professional, actionable manner for HR decision-makers.
     console.log("[v0] Saving payroll configuration...")
 
     try {
-      // Simulate save operation
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const supabase = createClient()
+      const companyId = companyData?.id
+      if (!companyId || String(companyId).startsWith("demo-")) {
+        await new Promise((resolve) => setTimeout(resolve, 400))
+        toast({ title: "Success", description: "Payroll configuration saved (demo)." })
+        return
+      }
+
+      const allowanceRows = allowances.map((a) => ({
+        company_id: companyId,
+        code: a.code,
+        description: a.description,
+        taxable: Boolean(a.taxable),
+        recurring: a.recurring !== false,
+        amount: Number(a.amount || 0),
+        percentage: Number(a.percentage || 0),
+        type: a.type || "FIXED",
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      }))
+      const deductionRows = deductions.map((d) => ({
+        company_id: companyId,
+        code: d.code,
+        description: d.description,
+        taxable: Boolean((d as any).taxable),
+        recurring: d.recurring !== false,
+        amount: Number(d.amount || 0),
+        percentage: Number(d.percentage || 0),
+        type: d.type || "FIXED",
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      }))
+
+      if (allowanceRows.length) {
+        const { error } = await supabase
+          .from("payroll_allowances")
+          .upsert(allowanceRows, { onConflict: "company_id,code" })
+        if (error) throw error
+      }
+      if (deductionRows.length) {
+        const { error } = await supabase
+          .from("payroll_deductions")
+          .upsert(deductionRows, { onConflict: "company_id,code" })
+        if (error) throw error
+      }
 
       toast({
         title: "Success",
-        description: "Payroll configuration saved successfully",
+        description: "Payroll allowances and deductions saved to database.",
       })
     } catch (error) {
       console.error("Error saving payroll config:", error)
       toast({
         title: "Error",
-        description: "Failed to save payroll configuration",
+        description: error instanceof Error ? error.message : "Failed to save payroll configuration",
         variant: "destructive",
       })
     } finally {
@@ -7128,6 +7226,11 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 Save Payroll Configuration
               </Button>
             </div>
+
+            {/* Ghana tax engine — PAYE bands, SSNIT rates, live preview */}
+            {companyData?.id && (
+              <GhanaTaxSettings companyId={companyData.id} taxYear={new Date().getFullYear()} />
+            )}
 
             {/* Enhanced Tax Reliefs Section */}
             <TaxReliefManager 

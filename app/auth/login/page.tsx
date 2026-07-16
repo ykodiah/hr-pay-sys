@@ -10,8 +10,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Logo } from "@/components/logo"
-import { Eye, EyeOff, Mail, Lock, AlertCircle, Zap } from "lucide-react"
+import { Eye, EyeOff, Mail, Lock, AlertCircle, Zap, ArrowLeft } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+
+const DEMO_PASSWORD = "demo123"
+const DEMO_ADMIN_EMAIL = "admin@akwaabahrpay.com"
+const DEMO_EMPLOYEE_EMAIL = "employee@akwaabahrpay.com"
+
+function setDemoSessionCookie() {
+  document.cookie = "demo-session=active; path=/; max-age=86400; SameSite=Lax"
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -21,77 +29,99 @@ export default function LoginPage() {
   const [error, setError] = useState("")
   const router = useRouter()
 
+  const enterDemoMode = (userType: "admin" | "employee", demoEmail: string, fullName: string) => {
+    localStorage.setItem(
+      "demo_user",
+      JSON.stringify({
+        email: demoEmail,
+        type: userType,
+        name: fullName,
+      }),
+    )
+    setDemoSessionCookie()
+    router.push(userType === "admin" ? "/app" : "/self-service")
+  }
+
   const handleDemoBypass = async (userType: "admin" | "employee") => {
     setIsLoading(true)
     setError("")
 
+    const isAdmin = userType === "admin"
+    const demoEmail = isAdmin ? DEMO_ADMIN_EMAIL : DEMO_EMPLOYEE_EMAIL
+    const fullName = isAdmin ? "Admin User" : "Demo Employee"
+
     try {
       const supabase = createClient()
 
-      // Create demo company if it doesn't exist
-      let { data: company } = await supabase.from("companies").select("id").eq("name", "Akwaaba HR Pay Demo").single()
+      // Prefer a real Supabase Auth session when demo users exist
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: demoEmail,
+        password: DEMO_PASSWORD,
+      })
 
-      if (!company) {
-        const { data: newCompany } = await supabase
-          .from("companies")
-          .insert({
-            name: "Akwaaba HR Pay Demo",
-            industry: "Technology",
-            address: "Accra, Ghana",
-            phone: "+233 20 123 4567",
-            email: "demo@akwaabahrpay.com",
-          })
-          .select("id")
-          .single()
-        company = newCompany
+      if (!authError && authData.user) {
+        setDemoSessionCookie()
+        localStorage.setItem(
+          "demo_user",
+          JSON.stringify({
+            email: demoEmail,
+            type: userType,
+            name: fullName,
+          }),
+        )
+        router.push(isAdmin ? "/app" : "/self-service")
+        return
       }
 
-      // Create demo employee record
-      const isAdmin = userType === "admin"
-      const demoEmail = isAdmin ? "admin@akwaabahrpay.com" : "employee@akwaabahrpay.com"
+      // Fall back to cookie-based demo access when Auth users are not seeded
+      try {
+        let { data: company } = await supabase.from("companies").select("id").eq("name", "Akwaaba HR Pay Demo").single()
 
-      const employeeData = {
-        employee_id: isAdmin ? "EMP001" : "EMP002",
-        first_name: isAdmin ? "Admin" : "Demo",
-        last_name: isAdmin ? "User" : "Employee",
-        full_name: isAdmin ? "Admin User" : "Demo Employee",
-        phone: "+233 20 123 4567",
-        department: isAdmin ? "Administration" : "Human Resources",
-        position: isAdmin ? "System Administrator" : "HR Assistant",
-        location: "Accra Office",
-        company_id: company?.id,
-        corporate_email: demoEmail,
-        status: "active",
-        hire_date: new Date().toISOString().split("T")[0],
-        salary: isAdmin ? 8000 : 3500,
-        currency: "GHS",
+        if (!company) {
+          const { data: newCompany } = await supabase
+            .from("companies")
+            .insert({
+              name: "Akwaaba HR Pay Demo",
+              industry: "Technology",
+              address: "Accra, Ghana",
+              phone: "+233 20 123 4567",
+              email: "demo@akwaabahrpay.com",
+            })
+            .select("id")
+            .single()
+          company = newCompany
+        }
+
+        if (company?.id) {
+          await supabase.from("employees").upsert(
+            {
+              employee_id: isAdmin ? "EMP001" : "EMP002",
+              first_name: isAdmin ? "Admin" : "Demo",
+              last_name: isAdmin ? "User" : "Employee",
+              full_name: fullName,
+              phone: "+233 20 123 4567",
+              department: isAdmin ? "Administration" : "Human Resources",
+              position: isAdmin ? "System Administrator" : "HR Assistant",
+              location: "Accra Office",
+              company_id: company.id,
+              corporate_email: demoEmail,
+              status: "active",
+              hire_date: new Date().toISOString().split("T")[0],
+              salary: isAdmin ? 8000 : 3500,
+              currency: "GHS",
+            },
+            { onConflict: "corporate_email" },
+          )
+        }
+      } catch (profileError) {
+        console.warn("[v0] Demo profile setup skipped:", profileError)
       }
 
-      await supabase.from("employees").upsert(employeeData, { onConflict: "corporate_email" })
-
-      console.log(`[v0] Demo ${userType} profile created, redirecting to ${isAdmin ? "admin" : "employee"} portal`)
-
-      localStorage.setItem(
-        "demo_user",
-        JSON.stringify({
-          email: demoEmail,
-          type: userType,
-          name: employeeData.full_name,
-        }),
-      )
-
-      // Set demo session cookie for middleware
-      document.cookie = "demo-session=active; path=/; max-age=86400" // 24 hours
-
-      // Redirect to appropriate portal based on user type
-      if (isAdmin) {
-        router.push("/app")
-      } else {
-        router.push("/self-service")
-      }
+      enterDemoMode(userType, demoEmail, fullName)
     } catch (error: any) {
       console.error("[v0] Demo bypass error:", error)
-      setError(`Failed to setup demo ${userType} profile: ${error.message}`)
+      // Still allow demo entry if Supabase client/env issues block profile setup
+      enterDemoMode(userType, demoEmail, fullName)
     } finally {
       setIsLoading(false)
     }
@@ -105,31 +135,29 @@ export default function LoginPage() {
     try {
       const supabase = createClient()
 
-      console.log("[v0] Attempting login with:", { email, hasPassword: !!password })
-
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (authError) {
-        console.error("[v0] Auth error:", authError.message)
-
+        if (
+          authError.message === "Invalid login credentials" &&
+          (email === DEMO_ADMIN_EMAIL || email === DEMO_EMPLOYEE_EMAIL) &&
+          password === DEMO_PASSWORD
+        ) {
+          // Known demo accounts: fall back to cookie demo when Auth users are not seeded
+          const userType = email === DEMO_ADMIN_EMAIL ? "admin" : "employee"
+          enterDemoMode(userType, email, userType === "admin" ? "Admin User" : "Demo Employee")
+          return
+        }
         if (authError.message === "Invalid login credentials") {
-          if (email.includes("@akwaabahrpay.com")) {
-            setError(
-              "Demo user not found in Supabase Auth. Use the 'Quick Demo Access' buttons below for instant access.",
-            )
-          } else {
-            setError("Invalid email or password. Please check your credentials and try again.")
-          }
+          setError("Invalid email or password. Please check your credentials and try again.")
         } else {
           setError(authError.message)
         }
         return
       }
-
-      console.log("[v0] Login successful:", { user: data.user?.email })
 
       const { data: employee, error: employeeError } = await supabase
         .from("employees")
@@ -138,7 +166,6 @@ export default function LoginPage() {
         .single()
 
       if (employeeError && data.user?.email?.includes("@akwaabahrpay.com")) {
-        console.log("[v0] Demo user missing employee profile, redirecting to setup")
         router.push("/auth/setup-profile")
         return
       }
@@ -162,17 +189,27 @@ export default function LoginPage() {
 
   const fillDemoCredentials = (type: "admin" | "employee") => {
     if (type === "admin") {
-      setEmail("admin@akwaabahrpay.com")
-      setPassword("demo123")
+      setEmail(DEMO_ADMIN_EMAIL)
+      setPassword(DEMO_PASSWORD)
     } else {
-      setEmail("employee@akwaabahrpay.com")
-      setPassword("demo123")
+      setEmail(DEMO_EMPLOYEE_EMAIL)
+      setPassword(DEMO_PASSWORD)
     }
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/5 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+        <div className="mb-6">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to home
+          </Link>
+        </div>
+
         <div className="text-center mb-8">
           <Logo variant="full" size="lg" />
           <p className="text-muted-foreground mt-2">Sign in to your account</p>
