@@ -125,40 +125,57 @@ async function persistRowsFromWorksheet(
 
       const itemId = uid("pi")
       const ssnitEmployer = n(ssnit * (13 / 5.5))
-      // Build only the columns that actually exist in payroll_items table
-      const itemPayload: Record<string, any> = {
+      // Build ONLY the columns that actually exist in payroll_items table
+      // Reference: all numeric columns with defaults don't need to be specified
+      const itemPayload = {
         id: itemId,
         payroll_run_id: runId,
         employee_id: row.employeeId,
         company_id: companyId,
         pay_period: payPeriod,
         basic_salary: basic,
-        overtime_pay: overtime,
-        bonus_pay: bonus,
+        allowances: { other: allowances }, // JSONB format
+        deductions: {}, // JSONB format
         gross_pay: gross,
+        tax_deduction: paye,
         ssnit_employee: ssnit,
         ssnit_employer: ssnitEmployer,
+        total_deductions: totalDeductions,
+        net_pay: net,
         tier2_employee: 0,
         tier2_employer: 0,
         tier3_employee: pf,
         tier3_employer: 0,
-        tax_deduction: paye, // original column
-        paye_tax: paye, // new column
+        paye_taxable_income: taxable,
+        tax_relief_total: 0,
+        overtime_pay: overtime,
+        bonus_pay: bonus,
+        calculation_breakdown: { allowances },
+        tax_year: new Date().getFullYear(),
         loan_deduction: loan,
         advance_deduction: advance,
         other_deductions: other,
-        total_deductions: totalDeductions,
-        net_pay: net,
-        taxable_income: taxable,
-        paye_taxable_income: taxable,
-        calculation_breakdown: { allowances },
         status: "calculated",
-        updated_at: new Date().toISOString(),
+        paye_tax: paye,
+        taxable_income: taxable,
       }
 
-      const { error: itemErr } = await client.from("payroll_items").insert(itemPayload)
+      const { data: insertedItem, error: itemErr } = await client
+        .from("payroll_items")
+        .insert([itemPayload])
+        .select()
+        .single()
+      
       if (itemErr) {
-        const empError = `${row.name || row.employeeId}: ${itemErr.message}`
+        const empError = `${row.name || row.employeeId}: payroll_item insert failed: ${itemErr.message}`
+        errors.push(empError)
+        employeeErrors[row.employeeId] = empError
+        console.error(`[v0] Payroll item insert error for ${row.employeeId}:`, itemErr)
+        continue
+      }
+
+      if (!insertedItem) {
+        const empError = `${row.name || row.employeeId}: payroll_item insert returned empty`
         errors.push(empError)
         employeeErrors[row.employeeId] = empError
         continue
@@ -194,14 +211,21 @@ async function persistRowsFromWorksheet(
         total_deductions: totalDeductions,
         net_pay: net,
         status: "draft",
-        updated_at: new Date().toISOString(),
+        viewed_at: null,
+        issued_at: null,
       }
 
-      const { error: slipErr } = await client.from("payslips").insert(payslipPayload)
+      const { data: insertedSlip, error: slipErr } = await client
+        .from("payslips")
+        .insert([payslipPayload])
+        .select()
+        .single()
+      
       if (slipErr) {
-        const empError = `${row.name || row.employeeId}: payslip ${slipErr.message}`
+        const empError = `${row.name || row.employeeId}: payslip insert failed: ${slipErr.message}`
         errors.push(empError)
         employeeErrors[row.employeeId] = empError
+        console.error(`[v0] Payslip insert error for ${row.employeeId}:`, slipErr)
         // item already saved — still count as processed
       }
 
@@ -231,21 +255,33 @@ async function persistRowsFromWorksheet(
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireApiUserOrGuest()
+    await requireApiUserOrGuest()
 
     const body = await req.json()
     const {
       company_id,
       pay_period,
       payroll_run_id,
-      submit_for_approval = true,
-      rows,
+      submit_for_approval = false,
+      rows = [],
     } = body as {
       company_id: string
       pay_period: string
       payroll_run_id?: string
       submit_for_approval?: boolean
-      rows?: ProcessRow[]
+      rows: ProcessRow[]
+    }
+
+    console.log(`[v0] Process payroll - received ${rows.length} rows for ${pay_period}`)
+    if (rows.length > 0) {
+      console.log(
+        `[v0] First row:`,
+        rows[0] ? { empId: rows[0].employeeId, name: rows[0].name, gross: rows[0].grossPay } : "none",
+      )
+    }
+
+    if (!company_id || !pay_period) {
+      return NextResponse.json({ error: "company_id and pay_period are required" }, { status: 400 })
     }
 
     if (!company_id || !pay_period) {
