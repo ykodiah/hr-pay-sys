@@ -2008,6 +2008,8 @@ export default function SettingsPage() {
       const [
         { data: structuredGrades, error: structuredError },
         { data: unstructured, error: unstructuredError },
+        { data: allowanceRows },
+        { data: deductionRows },
       ] = await Promise.all([
         supabase
           .from("salary_grades")
@@ -2021,10 +2023,48 @@ export default function SettingsPage() {
           )
           .eq("company_id", targetCompanyId)
           .order("created_at", { ascending: true }),
+        supabase
+          .from("payroll_allowances")
+          .select("code, description, taxable, recurring, amount, percentage, type, is_active")
+          .eq("company_id", targetCompanyId)
+          .eq("is_active", true)
+          .order("code"),
+        supabase
+          .from("payroll_deductions")
+          .select("code, description, taxable, recurring, amount, percentage, type, is_active")
+          .eq("company_id", targetCompanyId)
+          .eq("is_active", true)
+          .order("code"),
       ])
 
       if (structuredError) throw structuredError
       if (unstructuredError) throw unstructuredError
+
+      if (allowanceRows?.length) {
+        setAllowances(
+          allowanceRows.map((a) => ({
+            code: a.code,
+            description: a.description,
+            taxable: Boolean(a.taxable),
+            recurring: a.recurring !== false,
+            amount: Number(a.amount || 0),
+            percentage: Number(a.percentage || 0),
+            type: a.type || "FIXED",
+          })),
+        )
+      }
+      if (deductionRows?.length) {
+        setDeductions(
+          deductionRows.map((d) => ({
+            code: d.code,
+            description: d.description,
+            recurring: d.recurring !== false,
+            amount: Number(d.amount || 0),
+            percentage: Number(d.percentage || 0),
+            type: d.type || "FIXED",
+          })),
+        )
+      }
 
       if (structuredGrades) {
         setSalaryGrades(
@@ -4161,18 +4201,61 @@ Format the response in a professional, actionable manner for HR decision-makers.
     console.log("[v0] Saving payroll configuration...")
 
     try {
-      // Simulate save operation
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const supabase = createClient()
+      const companyId = companyData?.id
+      if (!companyId || String(companyId).startsWith("demo-")) {
+        await new Promise((resolve) => setTimeout(resolve, 400))
+        toast({ title: "Success", description: "Payroll configuration saved (demo)." })
+        return
+      }
+
+      const allowanceRows = allowances.map((a) => ({
+        company_id: companyId,
+        code: a.code,
+        description: a.description,
+        taxable: Boolean(a.taxable),
+        recurring: a.recurring !== false,
+        amount: Number(a.amount || 0),
+        percentage: Number(a.percentage || 0),
+        type: a.type || "FIXED",
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      }))
+      const deductionRows = deductions.map((d) => ({
+        company_id: companyId,
+        code: d.code,
+        description: d.description,
+        taxable: Boolean((d as any).taxable),
+        recurring: d.recurring !== false,
+        amount: Number(d.amount || 0),
+        percentage: Number(d.percentage || 0),
+        type: d.type || "FIXED",
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      }))
+
+      if (allowanceRows.length) {
+        const { error } = await supabase
+          .from("payroll_allowances")
+          .upsert(allowanceRows, { onConflict: "company_id,code" })
+        if (error) throw error
+      }
+      if (deductionRows.length) {
+        const { error } = await supabase
+          .from("payroll_deductions")
+          .upsert(deductionRows, { onConflict: "company_id,code" })
+        if (error) throw error
+      }
 
       toast({
         title: "Success",
-        description: "Payroll configuration saved successfully",
+        description: "Payroll allowances and deductions saved to database.",
       })
     } catch (error) {
       console.error("Error saving payroll config:", error)
       toast({
         title: "Error",
-        description: "Failed to save payroll configuration",
+        description: error instanceof Error ? error.message : "Failed to save payroll configuration",
         variant: "destructive",
       })
     } finally {

@@ -36,6 +36,14 @@ import {
 
 import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
 import { useToast } from "@/hooks/use-toast"
+import {
+  employeeToFormData,
+  extractOrgOptions,
+  formToApiPayload,
+  listDisplayName,
+  listEmployeeCode,
+  listMonthlySalary,
+} from "@/lib/employees/form-mapper"
 // import { EmployeeProfile } from "@/components/employee-profile"
 
 const isDemoMode = () => {
@@ -476,41 +484,11 @@ export default function EmployeesPage() {
 
   const loadParentCompanyData = useCallback(() => {
     console.log("[v0] Loading parent company data...")
-
-    if (companySettings) {
-      const companyDivisions = Array.isArray(companySettings.divisions)
-        ? companySettings.divisions
-        : companySettings.divisions
-          ? JSON.parse(companySettings.divisions)
-          : ["Head Office", "Regional Office"]
-
-      const companyDepartments = Array.isArray(companySettings.departments)
-        ? companySettings.departments
-        : companySettings.departments
-          ? JSON.parse(companySettings.departments)
-          : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
-
-      const companyLocations = Array.isArray(companySettings.locations)
-        ? companySettings.locations
-        : companySettings.locations
-          ? JSON.parse(companySettings.locations)
-          : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
-
-      setDivisions(companyDivisions)
-      setDepartments(companyDepartments)
-      setLocations(companyLocations)
-
-      console.log("[v0] Parent company data loaded:", {
-        divisions: companyDivisions,
-        departments: companyDepartments,
-        locations: companyLocations,
-      })
-    } else {
-      console.log("[v0] No company settings available, using defaults")
-      setDivisions(["Head Office", "Regional Office"])
-      setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
-      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-    }
+    const org = extractOrgOptions(companySettings, companySettings?.settings_data)
+    setDivisions(org.divisions)
+    setDepartments(org.departments)
+    setLocations(org.locations)
+    console.log("[v0] Parent company data loaded:", org)
   }, [companySettings])
 
   const loadSubsidiaries = async (cid?: string) => {
@@ -630,6 +608,8 @@ export default function EmployeesPage() {
   }, [companySettings, formData.hasSubsidiary, formData.subsidiary, subsidiaries, employees.length])
 
   useEffect(() => {
+    // Only auto-generate for add flow — never overwrite an existing employee's code while editing
+    if (isEditDialogOpen && selectedEmployee?.employee_id) return
     const newEmployeeId = generateEmployeeId()
     console.log("[v0] Generating Employee ID:", {
       hasSubsidiary: formData.hasSubsidiary,
@@ -640,52 +620,61 @@ export default function EmployeesPage() {
       ...prev,
       employeeId: newEmployeeId,
     }))
-  }, [formData.hasSubsidiary, formData.subsidiary, generateEmployeeId])
+  }, [formData.hasSubsidiary, formData.subsidiary, generateEmployeeId, isEditDialogOpen, selectedEmployee])
   // </CHANGE>
 
   const loadCompanyData = async () => {
     try {
       console.log("[v0] Loading company data...")
-      const supabase = createClient()
-
-      // Prefer first available company from DB (no hardcoded company UUID)
-      const { data, error } = await supabase.from("companies").select("*").limit(1).maybeSingle()
-
-      if (error) {
-        console.error("[v0] Error loading company data:", error)
-      } else if (data) {
-        setCompanySettings(data)
-        setCompanyId(data.id)
-        console.log("[v0] Company data loaded:", data)
-
-        const companyDivisions = Array.isArray(data.divisions)
-          ? data.divisions
-          : data.divisions
-            ? JSON.parse(data.divisions)
-            : ["Head Office", "Regional Office"]
-
-        const companyDepartments = Array.isArray(data.departments)
-          ? data.departments
-          : data.departments
-            ? JSON.parse(data.departments)
-            : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
-
-        const companyLocations = Array.isArray(data.locations)
-          ? data.locations
-          : data.locations
-            ? JSON.parse(data.locations)
-            : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
-
-        setDivisions(companyDivisions)
-        setDepartments(companyDepartments)
-        setLocations(companyLocations)
-        return data.id as string
-      } else {
-        console.log("[v0] No company data found, using default values")
-        setDivisions(["Head Office", "Regional Office"])
-        setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
-        setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+      const metaRes = await fetch("/api/employees/meta", { cache: "no-store" })
+      const meta = await metaRes.json()
+      if (metaRes.ok && meta.company_id) {
+        setCompanyId(meta.company_id)
+        setCompanySettings({
+          ...(meta.company || {}),
+          id: meta.company_id,
+          name: meta.company?.name,
+          divisions: meta.divisions,
+          departments: meta.departments,
+          locations: meta.locations,
+        })
+        setDivisions(meta.divisions || [])
+        setDepartments(meta.departments || [])
+        setLocations(meta.locations || [])
+        if (Array.isArray(meta.allowances) && meta.allowances.length) {
+          setCompanyAllowances(meta.allowances)
+        }
+        if (Array.isArray(meta.deductions) && meta.deductions.length) {
+          setCompanyDeductions(meta.deductions)
+        }
+        if (Array.isArray(meta.subsidiaries)) {
+          setSubsidiaries(meta.subsidiaries)
+        }
+        return meta.company_id as string
       }
+
+      // Fallback: companies + company_settings
+      const supabase = createClient()
+      const { data, error } = await supabase.from("companies").select("*").limit(1).maybeSingle()
+      if (error) console.error("[v0] Error loading company data:", error)
+      if (data) {
+        const { data: settings } = await supabase
+          .from("company_settings")
+          .select("settings_data")
+          .eq("company_id", data.id)
+          .maybeSingle()
+        const org = extractOrgOptions(data, settings?.settings_data)
+        setCompanySettings({ ...data, ...org })
+        setCompanyId(data.id)
+        setDivisions(org.divisions)
+        setDepartments(org.departments)
+        setLocations(org.locations)
+        return data.id as string
+      }
+
+      setDivisions(["Head Office", "Regional Office"])
+      setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
+      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
     } catch (error) {
       console.error("[v0] Error in loadCompanyData:", error)
     }
@@ -698,70 +687,18 @@ export default function EmployeesPage() {
       subsidiary: formData.subsidiary,
     })
 
-    // If "Yes" is selected and a subsidiary is chosen, load subsidiary data
     if (formData.hasSubsidiary === "Yes" && formData.subsidiary) {
       const selectedSubsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
       if (selectedSubsidiary) {
-        console.log("[v0] Loading subsidiary data:", selectedSubsidiary.name)
-
-        const subDivisions = Array.isArray(selectedSubsidiary.divisions)
-          ? selectedSubsidiary.divisions
-          : selectedSubsidiary.divisions
-            ? JSON.parse(selectedSubsidiary.divisions)
-            : []
-
-        const subDepartments = Array.isArray(selectedSubsidiary.departments)
-          ? selectedSubsidiary.departments
-          : selectedSubsidiary.departments
-            ? JSON.parse(selectedSubsidiary.departments)
-            : []
-
-        const subLocations = Array.isArray(selectedSubsidiary.locations)
-          ? selectedSubsidiary.locations
-          : selectedSubsidiary.locations
-            ? JSON.parse(selectedSubsidiary.locations)
-            : []
-
-        setDivisions(subDivisions)
-        setDepartments(subDepartments)
-        setLocations(subLocations)
-
-        console.log("[v0] Set subsidiary divisions:", subDivisions)
-        console.log("[v0] Set subsidiary departments:", subDepartments)
-        console.log("[v0] Set subsidiary locations:", subLocations)
+        const org = extractOrgOptions(selectedSubsidiary)
+        setDivisions(org.divisions)
+        setDepartments(org.departments)
+        setLocations(org.locations)
       }
+    } else {
+      loadParentCompanyData()
     }
-    // If "No" is selected or no subsidiary is chosen, load parent company data
-    else if (companySettings) {
-      console.log("[v0] Loading parent company data (no subsidiary selected)")
-
-      const companyDivisions = Array.isArray(companySettings.divisions)
-        ? companySettings.divisions
-        : companySettings.divisions
-          ? JSON.parse(companySettings.divisions)
-          : ["Head Office", "Regional Office"]
-
-      const companyDepartments = Array.isArray(companySettings.departments)
-        ? companySettings.departments
-        : companySettings.departments
-          ? JSON.parse(companySettings.departments)
-          : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
-
-      const companyLocations = Array.isArray(companySettings.locations)
-        ? companySettings.locations
-        : companySettings.locations
-          ? JSON.parse(companySettings.locations)
-          : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
-
-      setDivisions(companyDivisions)
-      setDepartments(companyDepartments)
-      setLocations(companyLocations)
-
-      console.log("[v0] Set company divisions:", companyDivisions)
-      console.log("[v0] Set company departments:", companyDepartments)
-      console.log("[v0] Set company locations:", companyLocations)
-    }
-  }, [formData.hasSubsidiary, formData.subsidiary, subsidiaries, companySettings])
+  }, [formData.hasSubsidiary, formData.subsidiary, subsidiaries, loadParentCompanyData])
   // </CHANGE>
 
   // Load supervisors and heads of department based on department selection
@@ -870,115 +807,8 @@ export default function EmployeesPage() {
   const handleAddEmployee = async (employeeData: any) => {
     try {
       console.log("[v0] Adding employee:", employeeData)
-
-      if (isDemoMode()) {
-        console.log("[v0] Demo mode: Simulating employee creation")
-        const newEmployee = {
-          id: String(mockEmployees.length + 1),
-          employee_id: `AKHR${String(mockEmployees.length + 1).padStart(4, "0")}`,
-          first_name: employeeData.firstName,
-          last_name: employeeData.lastName,
-          full_name: `${employeeData.firstName} ${employeeData.lastName}`,
-          display_name: `${employeeData.firstName} ${employeeData.lastName}`,
-          personal_email: employeeData.personalEmail,
-          corporate_email: employeeData.corporateEmail,
-          phone: employeeData.phone,
-          position: employeeData.position,
-          department: employeeData.department,
-          location: employeeData.location,
-          status: "Active",
-          date_of_joining: employeeData.dateOfJoining,
-          contract_type: employeeData.contractType || "Permanent",
-          subsidiaries: { name: "Demo Office", id: "1" },
-          created_at: new Date().toISOString(),
-        }
-
-        mockEmployees.push(newEmployee)
-        setEmployees([...mockEmployees])
-        setShowAddEmployee(false)
-
-        toast({
-          title: "Success",
-          description: "Employee added successfully (Demo Mode)",
-        })
-        return
-      }
-
-      const supabase = createClient()
-
-      // Generate employee ID
-      const companyName = "Akwaaba Technologies Ltd" // This should come from company settings
-      const subsidiary = subsidiaries.find((s) => s.id === employeeData.subsidiary_id)
-
-      let employeeId = ""
-      if (subsidiary) {
-        const companyInitials = companyName
-          .split(" ")
-          .slice(0, 2)
-          .map((word) => word.substring(0, 2))
-          .join("")
-          .toUpperCase()
-        const subsidiaryInitials = subsidiary.name
-          .split(" ")
-          .slice(0, 2)
-          .map((word) => word.substring(0, 2))
-          .join("")
-          .toUpperCase()
-        const sequence = String(employees.length + 1).padStart(4, "0")
-        employeeId = `${companyInitials}${subsidiaryInitials}${sequence}`
-      } else {
-        const companyInitials = companyName
-          .split(" ")
-          .slice(0, 4)
-          .map((word) => word.substring(0, 1))
-          .join("")
-          .toUpperCase()
-        const sequence = String(employees.length + 1).padStart(4, "0")
-        employeeId = `${companyInitials}${sequence}`
-      }
-
-      const employeeRecord = {
-        employee_id: employeeId,
-        prefix: employeeData.prefix || null,
-        first_name: employeeData.firstName,
-        other_names: employeeData.otherNames || null,
-        last_name: employeeData.lastName,
-        full_name: employeeData.fullName,
-        display_name: employeeData.displayName,
-        marital_status: employeeData.maritalStatus || null,
-        gender: employeeData.gender || null,
-        personal_email: employeeData.personalEmail,
-        corporate_email: employeeData.corporateEmail || null,
-        phone: employeeData.phone,
-        date_of_birth: employeeData.dateOfBirth || null,
-        address: employeeData.address || null,
-        educational_level: employeeData.educationalLevel || null,
-        emergency_contact_name: employeeData.emergencyContactName || null,
-        emergency_contact_tel: employeeData.emergencyContactTel || null,
-        position: employeeData.position,
-        special_role: employeeData.specialRole || null,
-        subsidiary_id: employeeData.subsidiary || null,
-        division: employeeData.division || null,
-        department: employeeData.department,
-        location: employeeData.location,
-        contract_type: employeeData.contractType || "Permanent",
-        date_of_joining: employeeData.dateOfJoining || null,
-        date_of_exit: employeeData.dateOfExit || null,
-        status: employeeData.status || "Active",
-        inactive_reason: employeeData.inactiveReason || null, // Added inactive_reason
-        probation_period: employeeData.probationPeriod ? Number.parseInt(employeeData.probationPeriod) : null,
-        confirmation_date: employeeData.confirmationDate || null,
-        notice_period: employeeData.noticePeriod || null,
-        direct_supervisor: employeeData.directSupervisor || null,
-        head_of_department: employeeData.headOfDepartment || null,
-        ghana_card_number: employeeData.ghanaCard || null,
-        profile_picture: employeeData.profilePicture || null,
-        company_id: companyId || companySettings?.id,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-
-      if (!employeeRecord.company_id) {
+      const payload = formToApiPayload(employeeData, companyId || companySettings?.id)
+      if (!payload.company_id && !companyId) {
         toast({
           title: "Company required",
           description: "No company found in the database. Create a company first.",
@@ -987,93 +817,25 @@ export default function EmployeesPage() {
         return
       }
 
-      // Insert employee record
-      const { data: employeeResult, error: employeeError } = await supabase
-        .from("employees")
-        .insert([employeeRecord])
-        .select()
-        .single()
+      const res = await fetch("/api/employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Failed to add employee")
 
-      if (employeeError) {
-        console.error("Error adding employee:", employeeError)
-        toast({
-          title: "Error",
-          description: "Failed to add employee to database.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      console.log("[v0] Employee added successfully:", employeeResult)
-
-      const financialRecord = {
-        employee_id: employeeResult.id,
-        annual_salary: employeeData.annualSalary ? Number.parseFloat(employeeData.annualSalary) : null,
-        monthly_salary: employeeData.salary ? Number.parseFloat(employeeData.salary) : null,
-        transport_allowance: employeeData.transportAllowance
-          ? Number.parseFloat(employeeData.transportAllowance)
-          : null,
-        housing_allowance: employeeData.housingAllowance ? Number.parseFloat(employeeData.housingAllowance) : null,
-        medical_allowance: employeeData.medicalAllowance ? Number.parseFloat(employeeData.medicalAllowance) : null,
-        meal_allowance: employeeData.mealAllowance ? Number.parseFloat(employeeData.mealAllowance) : null,
-        uniform_allowance: employeeData.uniformAllowance ? Number.parseFloat(employeeData.uniformAllowance) : null,
-        communication_allowance: employeeData.communicationAllowance
-          ? Number.parseFloat(employeeData.communicationAllowance)
-          : null,
-        other_allowances: employeeData.otherAllowances ? Number.parseFloat(employeeData.otherAllowances) : null,
-        tax_deduction: employeeData.taxDeduction ? Number.parseFloat(employeeData.taxDeduction) : null,
-        ssnit_number: employeeData.ssnit || null,
-        tier3_contribution: employeeData.tier3 ? Number.parseFloat(employeeData.tier3) : null,
-        loan_deduction: employeeData.loanDeduction ? Number.parseFloat(employeeData.loanDeduction) : null,
-        advance_deduction: employeeData.advanceDeduction ? Number.parseFloat(employeeData.advanceDeduction) : null,
-        other_deductions: employeeData.otherDeductions ? Number.parseFloat(employeeData.otherDeductions) : null,
-        bank_name: employeeData.bankName || null,
-        bank_account_number: employeeData.bankAccount || null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-
-      const { error: financialError } = await supabase.from("employee_financial").insert([financialRecord])
-
-      if (financialError) {
-        console.error("Error adding financial data:", financialError)
-        // Don't fail the entire operation, just log the error
-      }
-
-      if (employeeData.documents && employeeData.documents.length > 0) {
-        const documentRecords = employeeData.documents.map((doc: any) => ({
-          employee_id: employeeResult.id,
-          document_type: doc.type,
-          document_name: doc.name,
-          file_path: doc.path || null,
-          file_size: doc.size || null,
-          upload_date: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }))
-
-        const { error: documentsError } = await supabase.from("employee_documents").insert(documentRecords)
-
-        if (documentsError) {
-          console.error("Error adding documents:", documentsError)
-          // Don't fail the entire operation, just log the error
-        }
-      }
-
-      // Immediately update local state
-      setEmployees((prev) => [employeeResult, ...prev])
-
+      await loadEmployees(companyId || json.employee?.company_id || payload.company_id)
+      setIsAddDialogOpen(false)
       toast({
         title: "Success",
-        description: `Employee ${employeeData.displayName} has been added successfully!`,
+        description: `Employee ${payload.display_name} has been added successfully!`,
       })
-
-      setIsAddDialogOpen(false)
     } catch (error) {
       console.error("Error adding employee:", error)
       toast({
         title: "Error",
-        description: "Failed to add employee. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to add employee. Please try again.",
         variant: "destructive",
       })
     }
@@ -1081,133 +843,32 @@ export default function EmployeesPage() {
 
   const handleEditEmployee = async (employeeData: any) => {
     try {
-      if (isDemoMode()) {
-        console.log("[v0] Demo mode: Simulating employee update")
-        const updatedEmployees = mockEmployees.map((emp) =>
-          emp.id === selectedEmployee.id
-            ? { ...emp, ...employeeData, full_name: `${employeeData.firstName} ${employeeData.lastName}` }
-            : emp,
-        )
-        setEmployees(updatedEmployees)
-        setShowEditDialog(false)
-        setSelectedEmployee(null)
-
-        toast({
-          title: "Success",
-          description: "Employee updated successfully (Demo Mode)",
-        })
+      if (!selectedEmployee?.id) {
+        toast({ title: "Error", description: "No employee selected.", variant: "destructive" })
         return
       }
 
-      const supabase = createClient()
-
-      const updatedEmployee = {
-        prefix: employeeData.prefix,
-        first_name: employeeData.firstName,
-        other_names: employeeData.otherNames,
-        last_name: employeeData.lastName,
-        display_name: employeeData.displayName,
-        personal_email: employeeData.personalEmail,
-        corporate_email: employeeData.corporateEmail,
-        phone_number: employeeData.phone,
-        address: employeeData.address,
-        date_of_birth: employeeData.dateOfBirth || null,
-        gender: employeeData.gender,
-        marital_status: employeeData.maritalStatus,
-        educational_level: employeeData.educationalLevel,
-        emergency_contact_name: employeeData.emergencyContactName,
-        emergency_contact_tel: employeeData.emergencyContactTel,
-        department: employeeData.department,
-        position: employeeData.position,
-        special_role: employeeData.specialRole, // Update special role
-        subsidiary_id: employeeData.subsidiary, // Update subsidiary
-        has_subsidiary: employeeData.hasSubsidiary, // Update hasSubsidiary
-        division: employeeData.division,
-        location: employeeData.location,
-        contract_type: employeeData.contractType,
-        date_of_joining: employeeData.dateOfJoining || null,
-        date_of_exit: employeeData.dateOfExit || null,
-        status: employeeData.status || "Active",
-        inactive_reason: employeeData.inactiveReason || null, // Update inactive reason
-        probation_period: employeeData.probationPeriod ? Number.parseInt(employeeData.probationPeriod) : null,
-        confirmation_date: employeeData.confirmationDate || null,
-        notice_period: employeeData.noticePeriod || null,
-        direct_supervisor: employeeData.directSupervisor || null,
-        head_of_department: employeeData.headOfDepartment || null,
-        ghana_card_number: employeeData.ghanaCard || null,
-        salary: Number.parseFloat(employeeData.salary) || 0,
-        // ... include other fields as needed
-      }
-
-      // Never write salary onto employees table — sync financials separately
-      delete (updatedEmployee as any).salary
-      // phone column name in schema
-      updatedEmployee.phone = employeeData.phone
-      delete (updatedEmployee as any).phone_number
-
-      const { error } = await supabase.from("employees").update(updatedEmployee).eq("id", selectedEmployee.id)
-
-      if (error) {
-        console.error("Error updating employee:", error)
-        toast({
-          title: "Error",
-          description: "Failed to update employee in database.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      // Sync employee_financial from edit form
-      const monthly = Number.parseFloat(employeeData.salary) || 0
-      const financialPatch = {
-        employee_id: selectedEmployee.id,
-        monthly_salary: monthly,
-        annual_salary: employeeData.annualSalary
-          ? Number.parseFloat(employeeData.annualSalary)
-          : monthly > 0
-            ? monthly * 12
-            : null,
-        transport_allowance: employeeData.transportAllowance
-          ? Number.parseFloat(employeeData.transportAllowance)
-          : undefined,
-        housing_allowance: employeeData.housingAllowance
-          ? Number.parseFloat(employeeData.housingAllowance)
-          : undefined,
-        medical_allowance: employeeData.medicalAllowance
-          ? Number.parseFloat(employeeData.medicalAllowance)
-          : undefined,
-        meal_allowance: employeeData.mealAllowance ? Number.parseFloat(employeeData.mealAllowance) : undefined,
-        communication_allowance: employeeData.communicationAllowance
-          ? Number.parseFloat(employeeData.communicationAllowance)
-          : undefined,
-        uniform_allowance: employeeData.uniformAllowance
-          ? Number.parseFloat(employeeData.uniformAllowance)
-          : undefined,
-        other_allowances: employeeData.otherAllowances
-          ? Number.parseFloat(employeeData.otherAllowances)
-          : undefined,
-        bank_name: employeeData.bankName || undefined,
-        bank_account_number: employeeData.bankAccount || undefined,
-        ssnit_number: employeeData.ssnit || undefined,
-        updated_at: new Date().toISOString(),
-      }
-      Object.keys(financialPatch).forEach((k) => {
-        if ((financialPatch as any)[k] === undefined) delete (financialPatch as any)[k]
+      const payload = formToApiPayload(employeeData, companyId || companySettings?.id)
+      const res = await fetch(`/api/employees/${selectedEmployee.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       })
-      await supabase.from("employee_financial").upsert(financialPatch, { onConflict: "employee_id" })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Failed to update employee")
 
       await loadEmployees(companyId)
-
       setIsEditDialogOpen(false)
+      setSelectedEmployee(null)
       toast({
         title: "Employee Updated Successfully",
-        description: `${employeeData.displayName} has been successfully updated.`,
+        description: `${payload.display_name} has been successfully updated.`,
       })
     } catch (error) {
       console.error("Error updating employee:", error)
       toast({
         title: "Error",
-        description: "Failed to update employee in database.",
+        description: error instanceof Error ? error.message : "Failed to update employee in database.",
         variant: "destructive",
       })
     }
@@ -1460,7 +1121,10 @@ export default function EmployeesPage() {
     const searchLower = searchTerm.toLowerCase()
     const matchesSearch =
       !searchTerm ||
+      listDisplayName(employee).toLowerCase().includes(searchLower) ||
+      listEmployeeCode(employee).toLowerCase().includes(searchLower) ||
       employee.display_name?.toLowerCase().includes(searchLower) ||
+      employee.full_name?.toLowerCase().includes(searchLower) ||
       employee.employee_id?.toLowerCase().includes(searchLower) ||
       employee.personal_email?.toLowerCase().includes(searchLower) ||
       employee.corporate_email?.toLowerCase().includes(searchLower) ||
@@ -1473,6 +1137,7 @@ export default function EmployeesPage() {
       employee.first_name?.toLowerCase().includes(searchLower) ||
       employee.last_name?.toLowerCase().includes(searchLower) ||
       employee.other_names?.toLowerCase().includes(searchLower) ||
+      employee.phone?.toLowerCase().includes(searchLower) ||
       employee.phone_number?.toLowerCase().includes(searchLower) ||
       employee.ghana_card_number?.toLowerCase().includes(searchLower)
 
@@ -1545,6 +1210,9 @@ export default function EmployeesPage() {
                 employees={employees}
                 selectedEmployee={selectedEmployee}
                 companySettings={companySettings}
+                companyAllowancesCatalog={companyAllowances}
+                companyDeductionsCatalog={companyDeductions}
+                companyId={companyId}
               />
             </DialogContent>
           </Dialog>
@@ -1697,29 +1365,29 @@ export default function EmployeesPage() {
                         <div className="flex items-center space-x-4">
                           <Avatar className="w-12 h-12">
                             <AvatarImage
-                              src={`https://api.dicebear.com/7.x/initials/svg?seed=${employee.display_name}`}
+                              src={`https://api.dicebear.com/7.x/initials/svg?seed=${listDisplayName(employee)}`}
                             />
                             <AvatarFallback className="bg-emerald-100 text-emerald-700">
-                              {employee.display_name
+                              {listDisplayName(employee)
                                 ?.split(" ")
                                 .map((n: string) => n[0])
                                 .join("")}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <h3 className="font-semibold text-lg">{employee.display_name}</h3>
+                            <h3 className="font-semibold text-lg">{listDisplayName(employee)}</h3>
                             <p className="text-gray-600">{employee.position}</p>
                             <div className="flex items-center space-x-4 mt-1">
                               <span className="text-sm text-gray-500">{employee.department}</span>
                               <span className="text-sm text-gray-500">•</span>
-                              <span className="text-sm text-gray-500">ID: {employee.employeeId}</span>
+                              <span className="text-sm text-gray-500">ID: {listEmployeeCode(employee)}</span>
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center space-x-6">
                           <div className="text-right">
                             <p className="text-sm text-gray-500">Monthly Salary</p>
-                            <p className="text-sm font-medium">{formatAmount(employee.salary || 0)}</p>
+                            <p className="text-sm font-medium">{formatAmount(listMonthlySalary(employee))}</p>
                           </div>
                           <div className="text-right">
                             <p className="text-sm text-gray-500">Status</p>
@@ -1742,8 +1410,16 @@ export default function EmployeesPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedEmployee(employee)
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch(`/api/employees/${employee.id}?include_financial=true`, {
+                                      cache: "no-store",
+                                    })
+                                    const json = await res.json()
+                                    setSelectedEmployee(json.employee || employee)
+                                  } catch {
+                                    setSelectedEmployee(employee)
+                                  }
                                   setIsEditDialogOpen(true)
                                 }}
                               >
@@ -1751,8 +1427,16 @@ export default function EmployeesPage() {
                                 View Details
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedEmployee(employee)
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch(`/api/employees/${employee.id}?include_financial=true`, {
+                                      cache: "no-store",
+                                    })
+                                    const json = await res.json()
+                                    setSelectedEmployee(json.employee || employee)
+                                  } catch {
+                                    setSelectedEmployee(employee)
+                                  }
                                   setIsEditDialogOpen(true)
                                 }}
                               >
@@ -1810,6 +1494,9 @@ export default function EmployeesPage() {
               employees={employees}
               selectedEmployee={selectedEmployee}
               companySettings={companySettings}
+              companyAllowancesCatalog={companyAllowances}
+              companyDeductionsCatalog={companyDeductions}
+              companyId={companyId}
             />
           )}
         </DialogContent>
@@ -2458,6 +2145,9 @@ function AddEmployeeForm({
   companySettings,
   supervisors = [],
   headsOfDepartment = [],
+  companyAllowancesCatalog = [],
+  companyDeductionsCatalog = [],
+  companyId = "",
 }: {
   employee?: any
   onSubmit: (data: any) => void
@@ -2470,6 +2160,9 @@ function AddEmployeeForm({
   companySettings: any
   supervisors?: any[]
   headsOfDepartment?: any[]
+  companyAllowancesCatalog?: any[]
+  companyDeductionsCatalog?: any[]
+  companyId?: string
 }) {
   const [divisions, setDivisions] = useState<string[]>([])
   const [departments, setDepartments] = useState<string[]>([])
@@ -2487,22 +2180,30 @@ function AddEmployeeForm({
   const [phoneCountryCode, setPhoneCountryCode] = useState("+233")
   const [emergencyCountryCode, setEmergencyCountryCode] = useState("+233")
 
-  const [companyAllowances, setCompanyAllowances] = useState([
-    { code: "TRANS", description: "Transport Allowance", taxable: true, recurring: true },
-    { code: "HOUSE", description: "Housing Allowance", taxable: true, recurring: true },
-    { code: "MED", description: "Medical Allowance", taxable: false, recurring: true },
-    { code: "MEAL", description: "Meal Allowance", taxable: false, recurring: true },
-    { code: "UNIFORM", description: "Uniform Allowance", taxable: false, recurring: true },
-    { code: "COMM", description: "Communication Allowance", taxable: false, recurring: true },
-  ])
+  const [companyAllowances, setCompanyAllowances] = useState(
+    companyAllowancesCatalog.length
+      ? companyAllowancesCatalog
+      : [
+          { code: "TRANS", description: "Transport Allowance", taxable: true, recurring: true },
+          { code: "HOUSE", description: "Housing Allowance", taxable: true, recurring: true },
+          { code: "MED", description: "Medical Allowance", taxable: false, recurring: true },
+          { code: "MEAL", description: "Meal Allowance", taxable: false, recurring: true },
+          { code: "UNIFORM", description: "Uniform Allowance", taxable: false, recurring: true },
+          { code: "COMM", description: "Communication Allowance", taxable: false, recurring: true },
+        ],
+  )
 
-  const [companyDeductions, setCompanyDeductions] = useState([
-    { code: "TAX", description: "Tax Deduction", recurring: true },
-    { code: "SSNIT", description: "SSNIT Deduction", recurring: true },
-    { code: "TIER3", description: "Tier 3 Contribution", recurring: true },
-    { code: "LOAN", description: "Loan Deduction", recurring: true },
-    { code: "ADVANCE", description: "Advance Deduction", recurring: true },
-  ])
+  const [companyDeductions, setCompanyDeductions] = useState(
+    companyDeductionsCatalog.length
+      ? companyDeductionsCatalog
+      : [
+          { code: "TAX", description: "Tax Deduction", recurring: true, taxable: false },
+          { code: "SSNIT", description: "SSNIT Deduction", recurring: true, taxable: false },
+          { code: "TIER3", description: "Tier 3 Contribution", recurring: true, taxable: false },
+          { code: "LOAN", description: "Loan Deduction", recurring: true, taxable: false },
+          { code: "ADVANCE", description: "Advance Deduction", recurring: true, taxable: false },
+        ],
+  )
 
   const [selectedAllowances, setSelectedAllowances] = useState<
     Array<{
@@ -2656,42 +2357,151 @@ function AddEmployeeForm({
 
   const loadParentCompanyData = useCallback(() => {
     console.log("[v0] Loading parent company data...")
-
-    if (companySettings) {
-      const companyDivisions = Array.isArray(companySettings.divisions)
-        ? companySettings.divisions
-        : companySettings.divisions
-          ? JSON.parse(companySettings.divisions)
-          : ["Head Office", "Regional Office"]
-
-      const companyDepartments = Array.isArray(companySettings.departments)
-        ? companySettings.departments
-        : companySettings.departments
-          ? JSON.parse(companySettings.departments)
-          : ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
-
-      const companyLocations = Array.isArray(companySettings.locations)
-        ? companySettings.locations
-        : companySettings.locations
-          ? JSON.parse(companySettings.locations)
-          : ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]
-
-      setDivisions(companyDivisions)
-      setDepartments(companyDepartments)
-      setLocations(companyLocations)
-
-      console.log("[v0] Parent company data loaded:", {
-        divisions: companyDivisions,
-        departments: companyDepartments,
-        locations: companyLocations,
-      })
-    } else {
-      console.log("[v0] No company settings available, using defaults")
-      setDivisions(["Head Office", "Regional Office"])
-      setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
-      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-    }
+    const org = extractOrgOptions(companySettings, companySettings?.settings_data)
+    setDivisions(org.divisions)
+    setDepartments(org.departments)
+    setLocations(org.locations)
+    console.log("[v0] Parent company data loaded:", org)
   }, [companySettings])
+
+  // Load parent org options + payroll catalogs when form opens / 2a = No
+  useEffect(() => {
+    const loadMeta = async () => {
+      try {
+        const qs = companyId ? `?company_id=${encodeURIComponent(companyId)}` : ""
+        const res = await fetch(`/api/employees/meta${qs}`, { cache: "no-store" })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || "meta failed")
+        setDivisions(json.divisions || [])
+        setDepartments(json.departments || [])
+        setLocations(json.locations || [])
+        if (json.allowances?.length) setCompanyAllowances(json.allowances)
+        if (json.deductions?.length) setCompanyDeductions(json.deductions)
+      } catch {
+        loadParentCompanyData()
+        if (companyAllowancesCatalog?.length) setCompanyAllowances(companyAllowancesCatalog)
+        if (companyDeductionsCatalog?.length) setCompanyDeductions(companyDeductionsCatalog)
+      }
+    }
+    void loadMeta()
+  }, [companyId, loadParentCompanyData, companyAllowancesCatalog, companyDeductionsCatalog])
+
+  useEffect(() => {
+    if (formData.hasSubsidiary !== "Yes") {
+      loadParentCompanyData()
+    }
+  }, [formData.hasSubsidiary, loadParentCompanyData])
+
+  // Document upload handlers (must live inside this form — UI binds to these)
+  const formatFileSize = (bytes: number) => {
+    if (!bytes) return "0 Bytes"
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return `${Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
+  }
+
+  const handleFileSelect = async (documentType: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const doc = requiredDocuments.find((d) => d.id === documentType)
+    if (!doc) return
+
+    const acceptedTypes = doc.acceptTypes.split(",").map((type) => type.trim())
+    const fileExtension = "." + (file.name.split(".").pop()?.toLowerCase() || "")
+    const isValidType = acceptedTypes.some((type) =>
+      type.startsWith(".") ? fileExtension === type : file.type.includes(type.replace(".", "")),
+    )
+    if (!isValidType) {
+      toast({
+        title: "Invalid File Type",
+        description: `Please select a file with one of these types: ${doc.acceptTypes}`,
+        variant: "destructive",
+      })
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File Too Large", description: "Please select a file smaller than 10MB", variant: "destructive" })
+      return
+    }
+
+    setUploadingDocuments((prev) => [...prev, documentType])
+    setUploadProgress((prev) => ({ ...prev, [documentType]: 0 }))
+    try {
+      for (let progress = 0; progress <= 100; progress += 20) {
+        setUploadProgress((prev) => ({ ...prev, [documentType]: progress }))
+        await new Promise((resolve) => setTimeout(resolve, 40))
+      }
+
+      let documentId = `local-${documentType}-${Date.now()}`
+      try {
+        const documentService = CentralDocumentService.getInstance()
+        documentId = await documentService.uploadDocument({
+          file,
+          employeeId: formData.employeeId || formData.employee_id || "temp-id",
+          employeeName: `${formData.firstName || ""} ${formData.lastName || ""}`.trim() || "New Employee",
+          documentType,
+          source: "employee-onboarding",
+          uploadedBy: "HR Admin",
+          notes: `Uploaded during employee onboarding - ${doc.title}`,
+        })
+      } catch (uploadErr) {
+        console.warn("[v0] Document vault upload failed, keeping local attachment metadata", uploadErr)
+      }
+
+      const uploadedDoc = {
+        id: documentId,
+        documentType,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        uploadDate: new Date(),
+        uploadedBy: "HR Admin",
+      }
+      setUploadedDocuments((prev) => {
+        const filtered = prev.filter((d) => d.documentType !== documentType)
+        return [...filtered, uploadedDoc]
+      })
+      toast({ title: "Upload Successful", description: `${file.name} attached under ${doc.title}` })
+    } catch (error) {
+      console.error("Upload error:", error)
+      toast({ title: "Upload Failed", description: "Failed to upload document. Please try again.", variant: "destructive" })
+    } finally {
+      setUploadingDocuments((prev) => prev.filter((d) => d !== documentType))
+      setUploadProgress((prev) => ({ ...prev, [documentType]: 0 }))
+      event.target.value = ""
+    }
+  }
+
+  const handleUploadClick = (documentType: string) => {
+    const existing = fileInputRefs.current[documentType]
+    if (existing) {
+      existing.value = ""
+      existing.click()
+      return
+    }
+    const tempInput = document.createElement("input")
+    tempInput.type = "file"
+    const doc = requiredDocuments.find((d) => d.id === documentType)
+    if (doc) tempInput.accept = doc.acceptTypes
+    tempInput.onchange = (e) => handleFileSelect(documentType, e as any)
+    tempInput.click()
+  }
+
+  const handleRemoveDocument = (documentType: string) => {
+    setUploadedDocuments((prev) => prev.filter((d) => d.documentType !== documentType))
+    toast({ title: "Document Removed", description: "Document has been removed successfully" })
+  }
+
+  const handleReplaceDocument = (documentType: string) => {
+    handleUploadClick(documentType)
+  }
+
+  const handlePreviewDocument = (document: any) => {
+    setPreviewDocument(document)
+    setIsPreviewOpen(true)
+  }
 
   // Filtered lists for searchable dropdowns
   const filteredDepartments = departments.filter((dept) =>
@@ -2893,98 +2703,23 @@ function AddEmployeeForm({
 
   useEffect(() => {
     if (employee) {
-      setFormData({
-        prefix: employee.prefix || "",
-        firstName: employee.first_name || "",
-        otherNames: employee.other_names || "",
-        lastName: employee.last_name || "",
-        maritalStatus: employee.marital_status || "",
-        corporateEmail: employee.corporate_email || "",
-        personalEmail: employee.personal_email || "",
-        phone: employee.phone || "",
-        position: employee.position || "",
-        subsidiary: employee.subsidiary_id || "",
-        hasSubsidiary: employee.subsidiary_id ? "Yes" : "No", // Set based on existing data
-        specialRole: employee.special_role || "No Role", // Set based on existing data
-        division: employee.division || "",
-        department: employee.department || "",
-        location: employee.location || "",
-        contractType: employee.contract_type || "Permanent",
-        dateOfJoining: employee.date_of_joining || "",
-        dateOfExit: employee.date_of_exit || "",
-        status: employee.status || "Active",
-        inactiveReason: employee.inactive_reason || "", // Set based on existing data
-        probationPeriod: employee.probation_period || "6",
-        confirmationDate: employee.confirmation_date || "",
-        noticePeriod: employee.noticePeriod || "",
-        directSupervisor: employee.direct_supervisor || "",
-        headOfDepartment: employee.head_of_department || employee.headOfDepartment || "",
-        annualSalary: employee.annual_salary || "",
-        salary: employee.salary || "",
-        transportAllowance: employee.transport_allowance || "",
-        housingAllowance: employee.housing_allowance || "",
-        medicalAllowance: employee.medical_allowance || "",
-        mealAllowance: employee.meal_allowance || "",
-        uniformAllowance: employee.uniform_allowance || "",
-        communicationAllowance: employee.communication_allowance || "",
-        otherAllowances: employee.other_allowances || "",
-        taxDeduction: employee.tax_deduction || "",
-        ssnit: employee.ssnit_number || "",
-        tier3: employee.tier3_contribution || "",
-        loanDeduction: employee.loan_deduction || "",
-        advanceDeduction: employee.advance_deduction || "",
-        otherDeductions: employee.other_deductions || "",
-        startDate: employee.start_date || "",
-        dateOfBirth: employee.date_of_birth || "",
-        address: employee.address || "",
-        emergencyContactName: employee.emergency_contact_name || "",
-        emergencyContactTel: employee.emergency_contact_tel || "",
-        educationalLevel: employee.educational_level || "",
-        gender: employee.gender || "",
-        bankName: employee.bank_name || "",
-        bankAccount: employee.bank_account_number || "",
-        ghanaCard: employee.ghana_card_number || "",
-        documents: employee.documents || [],
-        profilePicture: employee.profile_picture || "",
-        profilePictureFile: null,
-      })
+      setFormData(employeeToFormData(employee))
     }
-  }, [employee])
+  }, [employee, setFormData])
 
   useEffect(() => {
-    if (formData.subsidiary) {
+    if (formData.hasSubsidiary === "Yes" && formData.subsidiary) {
       const selectedSubsidiary = subsidiaries.find((s) => s.id === formData.subsidiary)
       if (selectedSubsidiary) {
-        console.log("[v0] Loading subsidiary data:", selectedSubsidiary.name)
-
-        const subDivisions = Array.isArray(selectedSubsidiary.divisions)
-          ? selectedSubsidiary.divisions
-          : selectedSubsidiary.divisions
-            ? JSON.parse(selectedSubsidiary.divisions)
-            : []
-
-        const subDepartments = Array.isArray(selectedSubsidiary.departments)
-          ? selectedSubsidiary.departments
-          : selectedSubsidiary.departments
-            ? JSON.parse(selectedSubsidiary.departments)
-            : []
-
-        const subLocations = Array.isArray(selectedSubsidiary.locations)
-          ? selectedSubsidiary.locations
-          : selectedSubsidiary.locations
-            ? JSON.parse(selectedSubsidiary.locations)
-            : []
-
-        setDivisions(subDivisions)
-        setDepartments(subDepartments)
-        setLocations(subLocations)
-
-        console.log("[v0] Set subsidiary divisions:", subDivisions)
-        console.log("[v0] Set subsidiary departments:", subDepartments)
-        console.log("[v0] Set subsidiary locations:", subLocations)
+        const org = extractOrgOptions(selectedSubsidiary)
+        setDivisions(org.divisions)
+        setDepartments(org.departments)
+        setLocations(org.locations)
       }
+    } else if (formData.hasSubsidiary !== "Yes") {
+      loadParentCompanyData()
     }
-  }, [formData.subsidiary, subsidiaries])
+  }, [formData.subsidiary, formData.hasSubsidiary, subsidiaries, loadParentCompanyData])
 
   const validateForm = () => {
     let isValid = true
@@ -3051,11 +2786,16 @@ function AddEmployeeForm({
       isValid = false
     }
 
-    if (!formData.annualSalary) {
-      newErrors.annualSalary = "Annual salary is required"
+    const monthly = Number(formData.salary)
+    const annual = Number(formData.annualSalary)
+    if ((!formData.salary && !formData.annualSalary) || (Number.isNaN(monthly) && Number.isNaN(annual))) {
+      newErrors.salary = "Monthly or annual salary is required"
       isValid = false
-    } else if (isNaN(Number(formData.annualSalary)) || Number(formData.annualSalary) <= 0) {
-      newErrors.annualSalary = "Annual salary must be a valid positive number"
+    } else if (formData.salary && (Number.isNaN(monthly) || monthly < 0)) {
+      newErrors.salary = "Monthly salary must be a valid number"
+      isValid = false
+    } else if (formData.annualSalary && (Number.isNaN(annual) || annual < 0)) {
+      newErrors.annualSalary = "Annual salary must be a valid number"
       isValid = false
     }
 
@@ -3065,46 +2805,38 @@ function AddEmployeeForm({
 
   const handleSubmit = async () => {
     if (validateForm()) {
-      const fullName = `${formData.firstName} ${formData.otherNames} ${formData.lastName}`
-      const displayName = `${formData.firstName} ${formData.lastName}`
+      const fullName = `${formData.firstName} ${formData.otherNames || ""} ${formData.lastName}`.replace(/\s+/g, " ").trim()
+      const displayName = `${formData.firstName} ${formData.lastName}`.trim()
+      const monthly =
+        formData.salary && Number(formData.salary) > 0
+          ? formData.salary
+          : formData.annualSalary
+            ? String(Number(formData.annualSalary) / 12)
+            : formData.salary
+      const annual =
+        formData.annualSalary && Number(formData.annualSalary) > 0
+          ? formData.annualSalary
+          : monthly
+            ? String(Number(monthly) * 12)
+            : formData.annualSalary
 
       const employeeData = {
         ...formData,
-        fullName: fullName,
-        displayName: displayName,
-        employeeId: formData.employeeId, // Ensure employeeId is passed
-      }
-
-      // Save uploaded documents to document vault
-      if (uploadedDocuments.length > 0) {
-        try {
-          const documentService = CentralDocumentService.getInstance()
-
-          // Update all uploaded documents with final employee information
-          for (const doc of uploadedDocuments) {
-            await documentService.uploadDocument({
-              file: new File([], doc.fileName, { type: doc.fileType }), // Create a placeholder file
-              employeeId: formData.employeeId || "temp-id",
-              employeeName: displayName,
-              documentType: doc.documentType,
-              source: "employee-onboarding",
-              uploadedBy: "HR Admin",
-              notes: `Employee onboarding document - ${doc.fileName}`,
-            })
-          }
-
-          toast({
-            title: "Documents Saved",
-            description: `${uploadedDocuments.length} documents have been saved to the document vault`,
-          })
-        } catch (error) {
-          console.error("Error saving documents:", error)
-          toast({
-            title: "Document Save Warning",
-            description: "Employee created but some documents may not have been saved to the vault",
-            variant: "destructive",
-          })
-        }
+        fullName,
+        displayName,
+        employeeId: formData.employeeId,
+        salary: monthly,
+        annualSalary: annual,
+        selectedAllowances,
+        selectedDeductions,
+        uploadedDocuments,
+        documents: uploadedDocuments.map((d) => ({
+          documentType: d.documentType,
+          fileName: d.fileName,
+          fileSize: d.fileSize,
+          fileType: d.fileType,
+          uploadedBy: d.uploadedBy,
+        })),
       }
 
       onSubmit(employeeData)
@@ -3118,10 +2850,9 @@ function AddEmployeeForm({
   }
 
   const handleInputChange = (field: string, value: any) => {
-    setFormData({ ...formData, [field]: value })
-    // Clear error for this field when user starts typing
+    setFormData((prev: any) => ({ ...prev, [field]: value }))
     if (errors[field]) {
-      setErrors({ ...errors, [field]: "" })
+      setErrors((prev) => ({ ...prev, [field]: "" }))
     }
   }
 
@@ -3802,12 +3533,14 @@ function AddEmployeeForm({
                 value={formData.hasSubsidiary}
                 onValueChange={(value) => {
                   console.log("[v0] hasSubsidiary changed to:", value)
-                  handleInputChange("hasSubsidiary", value)
+                  setFormData((prev: any) => ({
+                    ...prev,
+                    hasSubsidiary: value,
+                    subsidiary: value === "No" ? "" : prev.subsidiary,
+                  }))
                   if (value === "No") {
                     console.log("[v0] Clearing subsidiary selection and loading parent company data")
-                    handleInputChange("subsidiary", "")
                     loadParentCompanyData()
-                    // </CHANGE>
                   }
                 }}
               >

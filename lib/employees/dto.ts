@@ -20,6 +20,7 @@ export type EmployeeDto = {
   id: string
   company_id: string | null
   employee_id: string | null
+  prefix?: string | null
   first_name: string | null
   last_name: string | null
   other_names?: string | null
@@ -38,9 +39,21 @@ export type EmployeeDto = {
   contract_type?: string | null
   date_of_joining?: string | null
   date_of_exit?: string | null
+  date_of_birth?: string | null
+  gender?: string | null
+  marital_status?: string | null
+  address?: string | null
   ghana_card_number?: string | null
   direct_supervisor?: string | null
   head_of_department?: string | null
+  emergency_contact_name?: string | null
+  emergency_contact_tel?: string | null
+  educational_level?: string | null
+  inactive_reason?: string | null
+  probation_period?: number | string | null
+  confirmation_date?: string | null
+  notice_period?: string | null
+  profile_picture?: string | null
   created_at?: string
   updated_at?: string
   financial?: EmployeeFinancialDto | null
@@ -81,6 +94,7 @@ export function mapEmployeeRow(row: any, includeFinancial = false): EmployeeDto 
     id: row.id,
     company_id: row.company_id ?? null,
     employee_id: row.employee_id ?? null,
+    prefix: row.prefix ?? null,
     first_name: row.first_name ?? null,
     last_name: row.last_name ?? null,
     other_names: row.other_names ?? null,
@@ -99,9 +113,21 @@ export function mapEmployeeRow(row: any, includeFinancial = false): EmployeeDto 
     contract_type: row.contract_type ?? null,
     date_of_joining: row.date_of_joining ?? row.hire_date ?? null,
     date_of_exit: row.date_of_exit ?? null,
+    date_of_birth: row.date_of_birth ?? null,
+    gender: row.gender ?? null,
+    marital_status: row.marital_status ?? null,
+    address: row.address ?? null,
     ghana_card_number: row.ghana_card_number ?? null,
     direct_supervisor: row.direct_supervisor ?? null,
     head_of_department: row.head_of_department ?? null,
+    emergency_contact_name: row.emergency_contact_name ?? null,
+    emergency_contact_tel: row.emergency_contact_tel ?? null,
+    educational_level: row.educational_level ?? null,
+    inactive_reason: row.inactive_reason ?? null,
+    probation_period: row.probation_period ?? null,
+    confirmation_date: row.confirmation_date ?? null,
+    notice_period: row.notice_period ?? null,
+    profile_picture: row.profile_picture ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
     subsidiaries: subsidiary ? { id: subsidiary.id, name: subsidiary.name } : null,

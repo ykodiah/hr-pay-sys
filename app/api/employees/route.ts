@@ -172,6 +172,10 @@ export async function POST(req: NextRequest) {
       emergency_contact_tel: body.emergency_contact_tel ?? null,
       educational_level: body.educational_level ?? null,
       inactive_reason: body.inactive_reason ?? null,
+      probation_period: body.probation_period != null ? Number(body.probation_period) : null,
+      confirmation_date: body.confirmation_date ?? null,
+      notice_period: body.notice_period ?? null,
+      profile_picture: body.profile_picture ?? null,
       updated_at: new Date().toISOString(),
     }
 
@@ -221,7 +225,68 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const mapped = mapEmployeeRow(created, false)
+    // Persist selected payroll allowances / deductions
+    if (Array.isArray(body.allowances) && body.allowances.length) {
+      const rows = body.allowances.map((a: any) => ({
+        employee_id: created.id,
+        allowance_id: a.id && String(a.id).length > 20 ? a.id : null,
+        code: a.code ?? null,
+        description: a.description ?? null,
+        taxable: Boolean(a.taxable),
+        recurring: a.recurring !== false,
+        amount: Number(a.amount ?? 0),
+        percentage: Number(a.percentage ?? 0),
+        calculation_type: String(a.calculationType || a.calculation_type || "AMOUNT").toUpperCase(),
+        effective_date: a.effectiveDate || a.effective_date || new Date().toISOString().slice(0, 10),
+        end_date: a.endDate || a.end_date || null,
+        is_active: true,
+      }))
+      await client.from("employee_allowances").insert(rows)
+    }
+
+    if (Array.isArray(body.deductions) && body.deductions.length) {
+      const rows = body.deductions.map((d: any) => ({
+        employee_id: created.id,
+        deduction_id: d.id && String(d.id).length > 20 ? d.id : null,
+        code: d.code ?? null,
+        description: d.description ?? null,
+        taxable: Boolean(d.taxable),
+        recurring: d.recurring !== false,
+        amount: Number(d.amount ?? 0),
+        percentage: Number(d.percentage ?? 0),
+        calculation_type: String(d.calculationType || d.calculation_type || "AMOUNT").toUpperCase(),
+        effective_date: d.effectiveDate || d.effective_date || new Date().toISOString().slice(0, 10),
+        end_date: d.endDate || d.end_date || null,
+        is_active: true,
+      }))
+      await client.from("employee_deductions").insert(rows)
+    }
+
+    if (Array.isArray(body.documents) && body.documents.length) {
+      const docs = body.documents.map((doc: any) => ({
+        employee_id: created.id,
+        document_type: doc.documentType || doc.document_type || doc.type || null,
+        document_name: doc.fileName || doc.document_name || doc.name || null,
+        file_name: doc.fileName || doc.file_name || doc.name || null,
+        file_path: doc.path || doc.file_path || null,
+        file_url: doc.url || doc.file_url || null,
+        file_size: doc.fileSize || doc.file_size || doc.size || null,
+        mime_type: doc.fileType || doc.mime_type || null,
+        upload_date: new Date().toISOString(),
+        uploaded_by: doc.uploadedBy || "HR Admin",
+        notes: doc.notes || null,
+      }))
+      await client.from("employee_documents").insert(docs)
+    }
+
+    // Return with financial for list consistency
+    const { data: fin } = await client
+      .from("employee_financial")
+      .select("*")
+      .eq("employee_id", created.id)
+      .maybeSingle()
+
+    const mapped = mapEmployeeRow({ ...created, financial: fin }, true)
     return NextResponse.json({ success: true, employee: mapped, data: mapped }, { status: 201 })
   } catch (err) {
     return NextResponse.json(

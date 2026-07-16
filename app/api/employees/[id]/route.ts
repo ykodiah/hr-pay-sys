@@ -100,6 +100,10 @@ export async function PATCH(
       "educational_level",
       "inactive_reason",
       "employee_id",
+      "probation_period",
+      "confirmation_date",
+      "notice_period",
+      "profile_picture",
     ] as const
 
     for (const key of fields) {
@@ -166,9 +170,74 @@ export async function PATCH(
       }
     }
 
+    if (Array.isArray(body.allowances)) {
+      await client.from("employee_allowances").delete().eq("employee_id", id)
+      if (body.allowances.length) {
+        const rows = body.allowances.map((a: any) => ({
+          employee_id: id,
+          allowance_id: a.id && String(a.id).length > 20 ? a.id : null,
+          code: a.code ?? null,
+          description: a.description ?? null,
+          taxable: Boolean(a.taxable),
+          recurring: a.recurring !== false,
+          amount: Number(a.amount ?? 0),
+          percentage: Number(a.percentage ?? 0),
+          calculation_type: String(a.calculationType || a.calculation_type || "AMOUNT").toUpperCase(),
+          effective_date: a.effectiveDate || a.effective_date || new Date().toISOString().slice(0, 10),
+          end_date: a.endDate || a.end_date || null,
+          is_active: true,
+        }))
+        await client.from("employee_allowances").insert(rows)
+      }
+    }
+
+    if (Array.isArray(body.deductions)) {
+      await client.from("employee_deductions").delete().eq("employee_id", id)
+      if (body.deductions.length) {
+        const rows = body.deductions.map((d: any) => ({
+          employee_id: id,
+          deduction_id: d.id && String(d.id).length > 20 ? d.id : null,
+          code: d.code ?? null,
+          description: d.description ?? null,
+          taxable: Boolean(d.taxable),
+          recurring: d.recurring !== false,
+          amount: Number(d.amount ?? 0),
+          percentage: Number(d.percentage ?? 0),
+          calculation_type: String(d.calculationType || d.calculation_type || "AMOUNT").toUpperCase(),
+          effective_date: d.effectiveDate || d.effective_date || new Date().toISOString().slice(0, 10),
+          end_date: d.endDate || d.end_date || null,
+          is_active: true,
+        }))
+        await client.from("employee_deductions").insert(rows)
+      }
+    }
+
+    if (Array.isArray(body.documents) && body.documents.length) {
+      const docs = body.documents.map((doc: any) => ({
+        employee_id: id,
+        document_type: doc.documentType || doc.document_type || doc.type || null,
+        document_name: doc.fileName || doc.document_name || doc.name || null,
+        file_name: doc.fileName || doc.file_name || doc.name || null,
+        file_path: doc.path || doc.file_path || null,
+        file_url: doc.url || doc.file_url || null,
+        file_size: doc.fileSize || doc.file_size || doc.size || null,
+        mime_type: doc.fileType || doc.mime_type || null,
+        upload_date: new Date().toISOString(),
+        uploaded_by: doc.uploadedBy || "HR Admin",
+        notes: doc.notes || null,
+      }))
+      await client.from("employee_documents").insert(docs)
+    }
+
+    const { data: fin } = await client
+      .from("employee_financial")
+      .select("*")
+      .eq("employee_id", id)
+      .maybeSingle()
+
     return NextResponse.json({
       success: true,
-      employee: mapEmployeeRow(updated, false),
+      employee: mapEmployeeRow({ ...updated, financial: fin }, true),
     })
   } catch (err) {
     return NextResponse.json(
