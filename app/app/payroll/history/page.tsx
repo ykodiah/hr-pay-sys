@@ -339,19 +339,124 @@ export default function PayrollHistoryPage() {
     }
   }
 
-  const handleExportAll = (format: "excel" | "csv" | "pdf") => {
-    toast({
-      title: "Export Started",
-      description: `Payroll history is being exported to ${format.toUpperCase()}.`,
-    })
-    // Implementation would generate the file here
+  const downloadTextFile = (content: string, filename: string, mime = "text/csv;charset=utf-8") => {
+    const blob = new Blob(["\uFEFF" + content], { type: mime })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
-  const handleExportSingle = (run: PayrollRun, format: "excel" | "csv" | "pdf") => {
+  const handleExportAll = (format: "excel" | "csv" | "pdf") => {
+    const columns = [
+      "Pay Period Start",
+      "Pay Period End",
+      "Pay Date",
+      "Status",
+      "Employees",
+      "Gross Pay (GHS)",
+      "Total Deductions (GHS)",
+      "Net Pay (GHS)",
+    ]
+    const rows = filteredRuns.map((run) => [
+      run.pay_period_start ?? "",
+      run.pay_period_end ?? "",
+      run.pay_date ?? "",
+      run.status ?? "",
+      String(run.employee_count ?? 0),
+      String(Number(run.total_gross_pay ?? 0).toFixed(2)),
+      String(Number(run.total_deductions ?? 0).toFixed(2)),
+      String(Number(run.total_net_pay ?? 0).toFixed(2)),
+    ])
+    const csv = [
+      `"Payroll History Export"`,
+      `"Generated At","${new Date().toISOString()}"`,
+      "",
+      columns.map((c) => `"${c}"`).join(","),
+      ...rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")),
+    ].join("\n")
+
+    downloadTextFile(csv, `payroll-history-${new Date().toISOString().slice(0, 10)}.csv`)
     toast({
-      title: "Export Started",
-      description: `Exporting payroll for ${formatDate(run.pay_period_start)} - ${formatDate(run.pay_period_end)} as ${format.toUpperCase()}`,
+      title: "Download ready",
+      description: `Payroll history exported as ${format === "pdf" ? "CSV (PDF preview not available)" : format.toUpperCase()} with headings.`,
     })
+  }
+
+  const handleExportSingle = async (run: PayrollRun, format: "excel" | "csv" | "pdf") => {
+    try {
+      if (run.company_id) {
+        const period =
+          (run as any).pay_period ||
+          (run.pay_period_start ? String(run.pay_period_start).slice(0, 7) : new Date().toISOString().slice(0, 7))
+        const res = await fetch("/api/reports/download", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            company_id: run.company_id,
+            report_type: "payroll_summary",
+            pay_period: period,
+            payroll_run_id: run.id,
+          }),
+        })
+        if (res.ok) {
+          const blob = await res.blob()
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement("a")
+          a.href = url
+          a.download = `payroll-summary-${period}.csv`
+          a.click()
+          URL.revokeObjectURL(url)
+          toast({
+            title: "Download ready",
+            description: `Payroll summary for ${formatDate(run.pay_period_start)} exported with headings.`,
+          })
+          return
+        }
+      }
+
+      // Fallback: export payroll_items for this run with headings
+      const { data: items } = await supabase.from("payroll_items").select("*").eq("payroll_run_id", run.id)
+      const columns = [
+        "Employee ID",
+        "Basic Salary (GHS)",
+        "Gross Pay (GHS)",
+        "PAYE (GHS)",
+        "SSNIT Employee (GHS)",
+        "Total Deductions (GHS)",
+        "Net Pay (GHS)",
+      ]
+      const rows = (items ?? []).map((item: any) => [
+        item.employee_id ?? "",
+        Number(item.basic_salary ?? 0).toFixed(2),
+        Number(item.gross_pay ?? 0).toFixed(2),
+        Number(item.tax_deduction ?? item.paye_tax ?? 0).toFixed(2),
+        Number(item.ssnit_employee ?? 0).toFixed(2),
+        Number(item.total_deductions ?? 0).toFixed(2),
+        Number(item.net_pay ?? 0).toFixed(2),
+      ])
+      const csv = [
+        `"Payroll Run Export"`,
+        `"Pay Period","${run.pay_period_start ?? ""} - ${run.pay_period_end ?? ""}"`,
+        `"Generated At","${new Date().toISOString()}"`,
+        "",
+        columns.map((c) => `"${c}"`).join(","),
+        ...rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")),
+      ].join("\n")
+      downloadTextFile(csv, `payroll-run-${run.id.slice(0, 8)}.csv`)
+      toast({
+        title: "Download ready",
+        description: `Exported as ${format.toUpperCase()} with column headings.`,
+      })
+    } catch (err) {
+      toast({
+        title: "Export failed",
+        description: err instanceof Error ? err.message : "Could not export payroll run",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleViewDetails = async (run: PayrollRun) => {

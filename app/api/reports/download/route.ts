@@ -7,13 +7,13 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { requireApiUser } from "@/lib/auth/api-user"
 import { generateReport } from "@/lib/services/reports/engine"
 import type { ReportType } from "@/lib/services/reports/types"
 
 export async function POST(req: NextRequest) {
   try {
-    const client = await createClient()
-    const { data: { user } } = await client.auth.getUser()
+    const user = await requireApiUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const body = await req.json()
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     if (!company_id || !report_type || (!pay_period && !payroll_run_id)) {
       return NextResponse.json(
         { error: "company_id, report_type, and pay_period or payroll_run_id are required" },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
@@ -34,16 +34,17 @@ export async function POST(req: NextRequest) {
         payroll_run_id,
         tax_year,
       },
-      user.id
+      user.isDemo ? undefined : user.id,
     )
 
     // Build a safe filename
-    const safePeriod   = (pay_period ?? report.pay_period).replace(/[^0-9-]/g, "")
-    const safeType     = report_type.replace(/_/g, "-")
-    const filename     = `${safeType}-${safePeriod}.csv`
+    const safePeriod = (pay_period ?? report.pay_period).replace(/[^0-9-]/g, "")
+    const safeType = report_type.replace(/_/g, "-")
+    const filename = `${safeType}-${safePeriod}.csv`
 
     // Log download in audit
     try {
+      const client = await createClient()
       const { data: saved } = await client
         .from("compliance_reports")
         .select("id")
@@ -56,11 +57,11 @@ export async function POST(req: NextRequest) {
 
       if (saved?.id) {
         await client.rpc("log_report_action", {
-          p_report_id:  saved.id,
-          p_action:     "downloaded",
-          p_actor_id:   user.id,
-          p_actor_name: null,
-          p_notes:      `format=csv`,
+          p_report_id: saved.id,
+          p_action: "downloaded",
+          p_actor_id: user.isDemo ? null : user.id,
+          p_actor_name: user.isDemo ? "Demo User" : null,
+          p_notes: `format=csv`,
         })
       }
     } catch {
@@ -70,9 +71,9 @@ export async function POST(req: NextRequest) {
     return new NextResponse(report.csv, {
       status: 200,
       headers: {
-        "Content-Type":        "text/csv; charset=utf-8",
+        "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="${filename}"`,
-        "Cache-Control":       "no-store",
+        "Cache-Control": "no-store",
       },
     })
   } catch (err) {

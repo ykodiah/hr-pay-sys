@@ -962,13 +962,92 @@ export default function PayrollPage() {
   const latestTransfer = transferHistory[0]
 
   const handleExportPayslips = (format: string) => {
-    // Placeholder function for exporting payslips
-    console.log(`Exporting payslips in ${format} format`)
+    const rows = (selectedCount > 0
+      ? employeePayroll.filter((e) => e.selected)
+      : employeePayroll
+    ).map((emp) => ({
+      employee_id: emp.employeeId ?? emp.id,
+      employee_name: emp.name,
+      department: emp.department ?? "",
+      position: emp.position ?? "",
+      basic_salary: Number(emp.basicSalary ?? 0),
+      allowances: Number(emp.allowances?.total ?? 0),
+      overtime: Number((emp.overtimeHours ?? 0) * (emp.overtimeRate ?? 0)),
+      gross_pay: Number(emp.grossPay ?? 0),
+      ssnit_employee: Number(emp.ssnit?.employee ?? 0),
+      paye_tax: Number(emp.paye ?? 0),
+      loans: Number(emp.deductions?.loans ?? 0),
+      advances: Number(emp.deductions?.advances ?? 0),
+      other_deductions: Number(emp.deductions?.other ?? 0) + Number(emp.deductions?.welfare ?? 0),
+      net_pay: Number(emp.netPay ?? 0),
+      status: emp.status ?? "",
+    }))
+
+    if (rows.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Nothing to export",
+        description: "Select employees or load payroll data first.",
+      })
+      return
+    }
+
+    const columns = [
+      { key: "employee_id", label: "Employee ID" },
+      { key: "employee_name", label: "Employee Name" },
+      { key: "department", label: "Department" },
+      { key: "position", label: "Position" },
+      { key: "basic_salary", label: "Basic Salary (GHS)" },
+      { key: "allowances", label: "Allowances (GHS)" },
+      { key: "overtime", label: "Overtime (GHS)" },
+      { key: "gross_pay", label: "Gross Pay (GHS)" },
+      { key: "ssnit_employee", label: "SSNIT Employee (GHS)" },
+      { key: "paye_tax", label: "PAYE Tax (GHS)" },
+      { key: "loans", label: "Loan Deduction (GHS)" },
+      { key: "advances", label: "Advance Deduction (GHS)" },
+      { key: "other_deductions", label: "Other Deductions (GHS)" },
+      { key: "net_pay", label: "Net Pay (GHS)" },
+      { key: "status", label: "Status" },
+    ]
+
+    const bom = "\uFEFF"
+    const meta = [
+      `"Payroll Payslip Export"`,
+      `"Pay Period","${selectedPeriod.replace(/"/g, '""')}"`,
+      `"Generated At","${new Date().toISOString()}"`,
+      `"Format","${format.toUpperCase()} (CSV with headings)"`,
+      "",
+    ]
+    const header = columns.map((c) => `"${c.label}"`).join(",")
+    const body = rows
+      .map((r) =>
+        columns
+          .map((c) => {
+            const val = (r as Record<string, unknown>)[c.key]
+            if (typeof val === "number") return String(Math.round(val * 100) / 100)
+            return `"${String(val ?? "").replace(/"/g, '""')}"`
+          })
+          .join(","),
+      )
+      .join("\n")
+
+    const csv = bom + [...meta, header, body].join("\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `payslips-${selectedPeriod.replace(/\s+/g, "-").toLowerCase()}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+
+    toast({
+      title: "Export ready",
+      description: `${rows.length} payslip rows downloaded as CSV with headings (${format.toUpperCase()}).`,
+    })
   }
 
   const handlePreviewReport = () => {
-    // Placeholder function for previewing report
-    console.log("Previewing report")
+    window.location.href = "/app/reports"
   }
 
   return (

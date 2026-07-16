@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { requireApiUser } from "@/lib/auth/api-user"
 import {
   generateReport,
   generateAllReports,
@@ -16,15 +16,14 @@ import type { ReportType } from "@/lib/services/reports/types"
 
 export async function GET(req: NextRequest) {
   try {
-    const client    = await createClient()
-    const { data: { user } } = await client.auth.getUser()
+    const user = await requireApiUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { searchParams } = new URL(req.url)
-    const companyId   = searchParams.get("company_id")
-    const reportType  = searchParams.get("report_type") as ReportType | null
-    const payPeriod   = searchParams.get("pay_period")
-    const limit       = Number(searchParams.get("limit") ?? 50)
+    const companyId = searchParams.get("company_id")
+    const reportType = searchParams.get("report_type") as ReportType | null
+    const payPeriod = searchParams.get("pay_period")
+    const limit = Number(searchParams.get("limit") ?? 50)
 
     if (!companyId) {
       return NextResponse.json({ error: "company_id is required" }, { status: 400 })
@@ -32,7 +31,7 @@ export async function GET(req: NextRequest) {
 
     const records = await listComplianceReports(companyId, {
       report_type: reportType ?? undefined,
-      pay_period:  payPeriod ?? undefined,
+      pay_period: payPeriod ?? undefined,
       limit,
     })
 
@@ -47,10 +46,10 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const client = await createClient()
-    const { data: { user } } = await client.auth.getUser()
+    const user = await requireApiUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+    const actorId = user.isDemo ? undefined : user.id
     const body = await req.json()
     const {
       company_id,
@@ -72,17 +71,17 @@ export async function POST(req: NextRequest) {
     }
 
     if (generate_all) {
-      const reports = await generateAllReports(company_id, pay_period, payroll_run_id, user.id)
+      const reports = await generateAllReports(company_id, pay_period, payroll_run_id, actorId)
       return NextResponse.json({
         success: true,
         count: reports.length,
         data: reports.map((r) => ({
-          report_type:  r.report_type,
-          report_name:  r.report_name,
-          pay_period:   r.pay_period,
-          row_count:    r.row_count,
+          report_type: r.report_type,
+          report_name: r.report_name,
+          pay_period: r.pay_period,
+          row_count: r.row_count,
           generated_at: r.generated_at,
-          summary:      r.summary,
+          summary: r.summary,
           // CSV omitted from bulk response — download individually
         })),
       })
@@ -90,7 +89,7 @@ export async function POST(req: NextRequest) {
 
     const report = await generateReport(
       { company_id, report_type, pay_period, payroll_run_id, tax_year },
-      user.id
+      actorId,
     )
 
     return NextResponse.json({ success: true, data: report })

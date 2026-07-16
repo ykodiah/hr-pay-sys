@@ -16,6 +16,9 @@ import type {
   ComplianceReportRecord,
 } from "./types"
 import { REPORT_LABELS } from "./types"
+import { toCSV } from "./csv"
+
+export { toCSV }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -23,21 +26,24 @@ function ghs(v: unknown): number {
   return Math.round(Number(v ?? 0) * 100) / 100
 }
 
-function toCSV(columns: ReportColumn[], rows: Record<string, unknown>[]): string {
-  const header = columns.map((c) => `"${c.label}"`).join(",")
-  const body = rows
-    .map((r) =>
-      columns
-        .map((c) => {
-          const val = r[c.key]
-          if (val === null || val === undefined) return '""'
-          if (c.type === "currency" || c.type === "number") return String(ghs(val))
-          return `"${String(val).replace(/"/g, '""')}"`
-        })
-        .join(",")
-    )
-    .join("\n")
-  return `${header}\n${body}`
+interface ReportMeta {
+  pay_period: string
+  generated_at: string
+  company_name: string
+}
+
+function withCsvMeta(
+  columns: ReportColumn[],
+  typedRows: Record<string, unknown>[],
+  meta: ReportMeta,
+  reportName: string,
+): string {
+  return toCSV(columns, typedRows, {
+    title: reportName,
+    company: meta.company_name,
+    period: meta.pay_period,
+    generatedAt: meta.generated_at,
+  })
 }
 
 // ─── Data fetcher ─────────────────────────────────────────────────────────────
@@ -49,6 +55,7 @@ async function fetchReportRows(
 ): Promise<PayrollReportRow[]> {
   const client = await createClient()
 
+  // Prefer the dedicated view; fall back to payslips join if the view is missing
   let query = client
     .from("v_payroll_report_summary")
     .select("*")
@@ -63,8 +70,95 @@ async function fetchReportRows(
   query = query.order("employee_name", { ascending: true })
 
   const { data, error } = await query
-  if (error) throw new Error(`Report data fetch failed: ${error.message}`)
-  return (data ?? []) as PayrollReportRow[]
+  if (!error) return (data ?? []) as PayrollReportRow[]
+
+  // Fallback path — joins payslips + employees + employee_financial
+  let payslipQuery = client
+    .from("payslips")
+    .select(
+      `*,
+       employee:employees(id, employee_id, first_name, last_name, department, position, ghana_card_number, hire_date, employment_type),
+       company:companies(name),
+       financial:employee_financial(bank_name, bank_account_number, ssnit_number, loan_amount, loan_balance)`,
+    )
+    .eq("company_id", companyId)
+
+  if (payrollRunId) payslipQuery = payslipQuery.eq("payroll_run_id", payrollRunId)
+  else if (payPeriod) payslipQuery = payslipQuery.eq("pay_period", payPeriod)
+
+  const { data: payslips, error: payslipError } = await payslipQuery
+  if (payslipError) {
+    throw new Error(`Report data fetch failed: ${error.message}; fallback: ${payslipError.message}`)
+  }
+
+  return (payslips ?? []).map((p: any) => {
+    const emp = Array.isArray(p.employee) ? p.employee[0] : p.employee
+    const fin = Array.isArray(p.financial) ? p.financial[0] : p.financial
+    const company = Array.isArray(p.company) ? p.company[0] : p.company
+    const totalAllowances =
+      Number(p.transport_allowance ?? 0) +
+      Number(p.housing_allowance ?? 0) +
+      Number(p.medical_allowance ?? 0) +
+      Number(p.meal_allowance ?? 0) +
+      Number(p.communication_allowance ?? 0) +
+      Number(p.other_allowances ?? 0)
+
+    return {
+      company_id: p.company_id,
+      payroll_run_id: p.payroll_run_id,
+      pay_period: p.pay_period,
+      pay_period_start: p.pay_period_start,
+      pay_period_end: p.pay_period_end,
+      pay_date: p.pay_date,
+      employee_id: p.employee_id,
+      employee_name: emp ? `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim() : null,
+      employee_id_no: emp?.employee_id ?? null,
+      position: emp?.position ?? null,
+      department: emp?.department ?? null,
+      ssnit_number: fin?.ssnit_number ?? null,
+      bank_name: fin?.bank_name ?? null,
+      account_number: fin?.bank_account_number ?? null,
+      company_name: company?.name ?? null,
+      ghana_card_number: emp?.ghana_card_number ?? null,
+      date_of_joining: emp?.hire_date ?? null,
+      contract_type: emp?.employment_type ?? null,
+      basic_salary: Number(p.basic_salary ?? 0),
+      transport_allowance: Number(p.transport_allowance ?? 0),
+      housing_allowance: Number(p.housing_allowance ?? 0),
+      medical_allowance: Number(p.medical_allowance ?? 0),
+      meal_allowance: Number(p.meal_allowance ?? 0),
+      communication_allowance: Number(p.communication_allowance ?? 0),
+      other_allowances: Number(p.other_allowances ?? 0),
+      overtime_pay: Number(p.overtime_pay ?? 0),
+      bonus_pay: Number(p.bonus_pay ?? 0),
+      total_allowances: totalAllowances,
+      gross_pay: Number(p.gross_pay ?? 0),
+      ssnit_employee: Number(p.ssnit_employee ?? 0),
+      ssnit_employer: Number(p.ssnit_employer ?? 0),
+      tier2_employee: Number(p.tier2_employee ?? 0),
+      tier2_employer: Number(p.tier2_employer ?? 0),
+      tier3_employee: Number(p.tier3_employee ?? 0),
+      tier3_employer: Number(p.tier3_employer ?? 0),
+      paye_taxable_income: Number(p.paye_taxable_income ?? 0),
+      tax_relief_total: Number(p.tax_relief_total ?? 0),
+      paye_tax: Number(p.paye_tax ?? 0),
+      loan_deduction: Number(p.loan_deduction ?? 0),
+      advance_deduction: Number(p.advance_deduction ?? 0),
+      other_deductions: Number(p.other_deductions ?? 0),
+      total_deductions: Number(p.total_deductions ?? 0),
+      net_pay: Number(p.net_pay ?? 0),
+      total_employer_cost: Number(p.total_employer_cost ?? 0),
+      cost_to_company:
+        Number(p.gross_pay ?? 0) +
+        Number(p.ssnit_employer ?? 0) +
+        Number(p.tier2_employer ?? 0) +
+        Number(p.tier3_employer ?? 0),
+      payslip_status: p.status ?? "draft",
+      loan_amount: fin?.loan_amount ?? null,
+      current_loan_balance: Number(p.loan_balance ?? fin?.loan_balance ?? 0),
+      current_loan_deduction: Number(p.loan_deduction ?? 0),
+    } as PayrollReportRow
+  })
 }
 
 // ─── Report generators ────────────────────────────────────────────────────────
@@ -113,7 +207,7 @@ function buildPAYEReport(
     columns,
     rows: typedRows,
     summary,
-    csv: toCSV(columns, typedRows),
+    csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.paye),
   }
 }
 
@@ -128,9 +222,9 @@ function buildSSNITTier1Report(
     { key: "ssnit_number",      label: "SSNIT Number",             type: "text" },
     { key: "department",        label: "Department",               type: "text" },
     { key: "insurable_earnings",label: "Insurable Earnings (GHS)", type: "currency" },
-    { key: "employee_contrib",  label: "Employee 5.5% (GHS)",      type: "currency" },
-    { key: "employer_contrib",  label: "Employer 13% (GHS)",       type: "currency" },
-    { key: "total_contrib",     label: "Total Contribution (GHS)", type: "currency" },
+    { key: "employee_contrib",  label: "Employee Tier 1 0.5% (GHS)", type: "currency" },
+    { key: "employer_contrib",  label: "Employer Tier 1 13% (GHS)",  type: "currency" },
+    { key: "total_contrib",     label: "Total Tier 1 (GHS)",         type: "currency" },
   ]
 
   const typedRows = rows.map((r) => ({
@@ -160,7 +254,7 @@ function buildSSNITTier1Report(
     columns,
     rows: typedRows,
     summary,
-    csv: toCSV(columns, typedRows),
+    csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.ssnit_tier1),
   }
 }
 
@@ -175,8 +269,8 @@ function buildSSNITTier2Report(
     { key: "ssnit_number",      label: "SSNIT Number",             type: "text" },
     { key: "department",        label: "Department",               type: "text" },
     { key: "insurable_earnings",label: "Insurable Earnings (GHS)", type: "currency" },
-    { key: "employee_contrib",  label: "Employee 5% (GHS)",        type: "currency" },
-    { key: "employer_contrib",  label: "Employer 5% (GHS)",        type: "currency" },
+    { key: "employee_contrib",  label: "Employee Tier 2 5% (GHS)", type: "currency" },
+    { key: "employer_contrib",  label: "Employer Tier 2 (GHS)",    type: "currency" },
     { key: "total_contrib",     label: "Total Tier 2 (GHS)",       type: "currency" },
   ]
 
@@ -207,7 +301,7 @@ function buildSSNITTier2Report(
     columns,
     rows: typedRows,
     summary,
-    csv: toCSV(columns, typedRows),
+    csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.ssnit_tier2),
   }
 }
 
@@ -249,7 +343,7 @@ function buildBankAdviceReport(
     columns,
     rows: typedRows,
     summary,
-    csv: toCSV(columns, typedRows),
+    csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.bank_advice),
   }
 }
 
@@ -301,7 +395,7 @@ function buildCTCReport(
     columns,
     rows: typedRows,
     summary,
-    csv: toCSV(columns, typedRows),
+    csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.cost_to_company),
   }
 }
 
@@ -349,7 +443,7 @@ function buildLoansReport(
     columns,
     rows: typedRows,
     summary,
-    csv: toCSV(columns, typedRows),
+    csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.loans),
   }
 }
 
@@ -400,7 +494,7 @@ function buildAllowancesReport(
     columns,
     rows: typedRows,
     summary,
-    csv: toCSV(columns, typedRows),
+    csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.allowances),
   }
 }
 
@@ -450,7 +544,7 @@ function buildProvidentFundReport(
     columns,
     rows: typedRows,
     summary,
-    csv: toCSV(columns, typedRows),
+    csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.provident_fund),
   }
 }
 
@@ -506,16 +600,54 @@ function buildPayrollSummaryReport(
     columns,
     rows: typedRows,
     summary,
-    csv: toCSV(columns, typedRows),
+    csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.payroll_summary),
   }
 }
 
-// ─── Meta helper type ─────────────────────────────────────────────────────────
+/** Report 10 — Other Deductions */
+function buildDeductionsReport(
+  rows: PayrollReportRow[],
+  meta: ReportMeta
+): GeneratedReport {
+  const columns: ReportColumn[] = [
+    { key: "employee_id_no",    label: "Employee ID",              type: "text" },
+    { key: "employee_name",     label: "Employee Name",            type: "text" },
+    { key: "department",        label: "Department",               type: "text" },
+    { key: "loan_deduction",    label: "Loan Deduction (GHS)",     type: "currency" },
+    { key: "advance_deduction", label: "Advance Deduction (GHS)",  type: "currency" },
+    { key: "other_deductions",  label: "Other Deductions (GHS)",   type: "currency" },
+    { key: "total_other",       label: "Total Non-Tax Ded. (GHS)", type: "currency" },
+    { key: "net_pay",           label: "Net Pay (GHS)",            type: "currency" },
+  ]
 
-interface ReportMeta {
-  pay_period:    string
-  generated_at:  string
-  company_name:  string
+  const typedRows = rows.map((r) => ({
+    employee_id_no:    r.employee_id_no ?? "",
+    employee_name:     r.employee_name ?? "",
+    department:        r.department ?? "",
+    loan_deduction:    ghs(r.loan_deduction),
+    advance_deduction: ghs(r.advance_deduction),
+    other_deductions:  ghs(r.other_deductions),
+    total_other:       ghs(r.loan_deduction) + ghs(r.advance_deduction) + ghs(r.other_deductions),
+    net_pay:           ghs(r.net_pay),
+  }))
+
+  const summary = {
+    total_employees: rows.length,
+    total_loans:     rows.reduce((s, r) => s + ghs(r.loan_deduction), 0),
+    total_advances:  rows.reduce((s, r) => s + ghs(r.advance_deduction), 0),
+    total_other:     rows.reduce((s, r) => s + ghs(r.other_deductions), 0),
+  }
+
+  return {
+    ...meta,
+    report_type: "deductions",
+    report_name: REPORT_LABELS.deductions,
+    row_count: rows.length,
+    columns,
+    rows: typedRows,
+    summary,
+    csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.deductions),
+  }
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -566,6 +698,7 @@ export async function generateReport(
     case "loans":           report = buildLoansReport(rows, meta);          break
     case "allowances":      report = buildAllowancesReport(rows, meta);     break
     case "provident_fund":  report = buildProvidentFundReport(rows, meta);  break
+    case "deductions":      report = buildDeductionsReport(rows, meta);     break
     case "payroll_summary":
     default:                report = buildPayrollSummaryReport(rows, meta); break
   }
@@ -619,7 +752,7 @@ export async function generateAllReports(
 ): Promise<GeneratedReport[]> {
   const allTypes: ReportType[] = [
     "payroll_summary", "paye", "ssnit_tier1", "ssnit_tier2",
-    "bank_advice", "cost_to_company", "loans", "allowances", "provident_fund",
+    "bank_advice", "cost_to_company", "loans", "allowances", "provident_fund", "deductions",
   ]
 
   const results = await Promise.allSettled(
