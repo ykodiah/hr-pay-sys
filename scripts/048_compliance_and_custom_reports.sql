@@ -2,7 +2,10 @@
 -- Safe to re-run (IF NOT EXISTS / OR REPLACE).
 
 -- ── Source view used by lib/services/reports/engine.ts ───────────────────────
-CREATE OR REPLACE VIEW public.v_payroll_report_summary AS
+-- DROP first: CREATE OR REPLACE VIEW cannot drop/rename columns (42P16).
+DROP VIEW IF EXISTS public.v_payroll_report_summary CASCADE;
+
+CREATE VIEW public.v_payroll_report_summary AS
 SELECT
   p.company_id,
   p.payroll_run_id,
