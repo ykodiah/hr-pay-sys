@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 86400, // 24 hours in seconds
-      path: '/superadmin',
+      path: '/', // Must be '/' so the cookie is sent to /api/superadmin/* verify calls
     })
 
     return response

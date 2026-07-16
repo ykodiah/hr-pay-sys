@@ -31,7 +31,9 @@ export default function SuperadminLoginPage() {
         return
       }
 
-      // Redirect to dashboard on success
+      // Redirect to dashboard on success — refresh first so the layout
+      // re-reads the newly-set cookie before navigating
+      router.refresh()
       router.push('/superadmin/dashboard')
     } catch (err: any) {
       setError(err.message || 'An error occurred')

@@ -1,28 +1,33 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { SuperAdminNavbar } from '@/components/superadmin/navbar'
 
 export default function SuperadminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
+  const checking = useRef(false)
 
   useEffect(() => {
     // Skip auth check for login page
-    if (pathname === '/superadmin/login') {
-      return
-    }
+    if (pathname === '/superadmin/login') return
+    // Prevent concurrent checks
+    if (checking.current) return
+    checking.current = true
 
-    // Check if user is authenticated
     const checkAuth = async () => {
-      const res = await fetch('/api/superadmin/auth/verify')
-      if (!res.ok) {
-        router.push('/superadmin/login')
+      try {
+        const res = await fetch('/api/superadmin/auth/verify', { cache: 'no-store' })
+        if (!res.ok) {
+          router.replace('/superadmin/login')
+        }
+      } finally {
+        checking.current = false
       }
     }
     checkAuth()
-  }, [router, pathname])
+  }, [pathname]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Don't show navbar on login page
   const isLoginPage = pathname === '/superadmin/login'
