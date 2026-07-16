@@ -125,14 +125,14 @@ async function persistRowsFromWorksheet(
 
       const itemId = uid("pi")
       const ssnitEmployer = n(ssnit * (13 / 5.5))
-      const itemPayload = {
+      // Build only the columns that actually exist in payroll_items table
+      const itemPayload: Record<string, any> = {
         id: itemId,
         payroll_run_id: runId,
         employee_id: row.employeeId,
         company_id: companyId,
         pay_period: payPeriod,
         basic_salary: basic,
-        allowances: { other: allowances },
         overtime_pay: overtime,
         bonus_pay: bonus,
         gross_pay: gross,
@@ -142,9 +142,8 @@ async function persistRowsFromWorksheet(
         tier2_employer: 0,
         tier3_employee: pf,
         tier3_employer: 0,
-        // both column names: original (tax_deduction) and new (paye_tax)
-        tax_deduction: paye,
-        paye_tax: paye,
+        tax_deduction: paye, // original column
+        paye_tax: paye, // new column
         loan_deduction: loan,
         advance_deduction: advance,
         other_deductions: other,
@@ -152,6 +151,7 @@ async function persistRowsFromWorksheet(
         net_pay: net,
         taxable_income: taxable,
         paye_taxable_income: taxable,
+        calculation_breakdown: { allowances },
         status: "calculated",
         updated_at: new Date().toISOString(),
       }

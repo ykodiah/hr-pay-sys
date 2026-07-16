@@ -721,6 +721,7 @@ export default function PayrollPage() {
     setProcessing(true)
     setLastProcessMessage(null)
     try {
+      const employeesToRun = selected.length ? selected : rows
       const res = await fetchWithTimeout(
         "/api/payroll/process",
         {
@@ -734,7 +735,7 @@ export default function PayrollPage() {
                 ? activeRun.id
                 : undefined,
             submit_for_approval: false,
-            rows: (selected.length ? selected : rows).map((r) => ({
+            rows: employeesToRun.map((r) => ({
               employeeId: r.employeeId,
               employeeCode: r.employeeCode,
               name: r.name,
@@ -772,8 +773,8 @@ export default function PayrollPage() {
         `${processed} employee(s) processed and saved. Payroll run is now complete.`,
       )
       toast({
-        title: "Payroll run complete",
-        description: `${processed} employee(s) saved${warnings.length ? ` with ${warnings.length} warning(s)` : ""}. View payslips and reports.`,
+        title: "✓ Payroll run complete",
+        description: `${processed} of ${employeesToRun.length} employee(s) saved${warnings.length ? ` with ${warnings.length} warning(s)` : ""}. View payslips and reports.`,
       })
       setTimeout(() => void loadWorksheet(companyId, payPeriod), 1500)
     } catch (err) {
