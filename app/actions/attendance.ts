@@ -708,7 +708,7 @@ export async function getAttendanceStats() {
     .from("employees")
     .select("id", { count: "exact" })
     .eq("company_id", employee.company_id)
-    .eq("status", "active")
+    .in("status", ["Active", "active", "ACTIVE"])
 
   // Get devices
   const { data: devices } = await supabase

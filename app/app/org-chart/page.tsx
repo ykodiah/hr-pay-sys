@@ -162,30 +162,35 @@ export default function OrganizationalChartPage() {
       console.log("[v0] Loading real data from database")
       const supabase = createClient()
 
-      // Load employees
-      const { data: employeesData, error: employeesError } = await supabase
-        .from("employees")
-        .select("*")
-        .eq("status", "Active")
+      const { data: company } = await supabase.from("companies").select("id").limit(1).maybeSingle()
+      const companyId = company?.id
 
-      if (employeesError) throw employeesError
-      setEmployees(employeesData || [])
+      // Load active employees via shared API (falls back to direct query)
+      const params = new URLSearchParams({ status: "active", limit: "1000" })
+      if (companyId) params.set("company_id", companyId)
+      const empRes = await fetch(`/api/employees?${params}`, { cache: "no-store" })
+      if (empRes.ok) {
+        const empJson = await empRes.json()
+        setEmployees(empJson.employees ?? empJson.data ?? [])
+      } else {
+        let empQuery = supabase.from("employees").select("*").in("status", ["Active", "active", "ACTIVE"])
+        if (companyId) empQuery = empQuery.eq("company_id", companyId)
+        const { data: employeesData, error: employeesError } = await empQuery
+        if (employeesError) throw employeesError
+        setEmployees(employeesData || [])
+      }
 
       // Load subsidiaries
-      const { data: subsidiariesData, error: subsidiariesError } = await supabase
-        .from("subsidiaries")
-        .select("*")
-        .eq("status", "active")
-
+      let subQuery = supabase.from("subsidiaries").select("*").eq("status", "active")
+      if (companyId) subQuery = subQuery.eq("company_id", companyId)
+      const { data: subsidiariesData, error: subsidiariesError } = await subQuery
       if (subsidiariesError) throw subsidiariesError
       setSubsidiaries(subsidiariesData || [])
 
       // Load existing org charts
-      const { data: chartsData, error: chartsError } = await supabase
-        .from("organizational_charts")
-        .select("*")
-        .order("created_at", { ascending: false })
-
+      let chartQuery = supabase.from("organizational_charts").select("*").order("created_at", { ascending: false })
+      if (companyId) chartQuery = chartQuery.eq("company_id", companyId)
+      const { data: chartsData, error: chartsError } = await chartQuery
       if (chartsError) throw chartsError
       setOrgCharts(chartsData || [])
     } catch (error) {

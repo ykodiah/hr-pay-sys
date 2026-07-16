@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -887,6 +887,27 @@ function NewDisciplinaryCaseForm({ onSubmit, onClose }: { onSubmit: (data: any) 
     assignedTo: "",
     witnesses: "",
   })
+  const [employeeOptions, setEmployeeOptions] = useState<
+    { id: string; employee_id: string | null; full_name: string }[]
+  >([])
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/employees?status=active&options=true&limit=500", { cache: "no-store" })
+        if (!res.ok) return
+        const json = await res.json()
+        const rows = (json.employees ?? json.data ?? []).map((e: any) => ({
+          id: e.id,
+          employee_id: e.employee_id,
+          full_name: e.full_name || `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim(),
+        }))
+        setEmployeeOptions(rows)
+      } catch {
+        /* keep empty */
+      }
+    })()
+  }, [])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -902,23 +923,32 @@ function NewDisciplinaryCaseForm({ onSubmit, onClose }: { onSubmit: (data: any) 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Employee ID *</Label>
-          <Input
+        <div className="space-y-2 md:col-span-2">
+          <Label>Employee *</Label>
+          <Select
             value={formData.employeeId}
-            onChange={(e) => setFormData((prev) => ({ ...prev, employeeId: e.target.value }))}
-            placeholder="EMP001"
-            required
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Employee Name *</Label>
-          <Input
-            value={formData.employeeName}
-            onChange={(e) => setFormData((prev) => ({ ...prev, employeeName: e.target.value }))}
-            placeholder="John Doe"
-            required
-          />
+            onValueChange={(value) => {
+              const selected = employeeOptions.find(
+                (e) => e.employee_id === value || e.id === value,
+              )
+              setFormData((prev) => ({
+                ...prev,
+                employeeId: selected?.employee_id || selected?.id || value,
+                employeeName: selected?.full_name || prev.employeeName,
+              }))
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={employeeOptions.length ? "Select employee from database" : "Loading employees…"} />
+            </SelectTrigger>
+            <SelectContent>
+              {employeeOptions.map((emp) => (
+                <SelectItem key={emp.id} value={emp.employee_id || emp.id}>
+                  {(emp.employee_id || emp.id.slice(0, 8)) + " — " + emp.full_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
       <div className="grid md:grid-cols-2 gap-4">

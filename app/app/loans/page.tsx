@@ -102,14 +102,22 @@ export default function AdminLoansPage() {
         setLoans(data.loans ?? [])
       }
 
-      // Load employees for new loan form
-      const { data: emps } = await supabase
-        .from("employees")
-        .select("id, first_name, last_name, employee_id, department")
-        .eq("company_id", cid)
-        .eq("status", "Active")
-        .order("first_name")
-      setEmployees(emps ?? [])
+      // Load employees for new loan form from shared employees API
+      const empParams = new URLSearchParams({ status: "active", options: "true", limit: "500" })
+      if (cid) empParams.set("company_id", cid)
+      const empRes = await fetch(`/api/employees?${empParams}`, { cache: "no-store" })
+      if (empRes.ok) {
+        const empJson = await empRes.json()
+        setEmployees(empJson.employees ?? empJson.data ?? [])
+      } else {
+        const { data: emps } = await supabase
+          .from("employees")
+          .select("id, first_name, last_name, employee_id, department")
+          .eq("company_id", cid)
+          .in("status", ["Active", "active", "ACTIVE"])
+          .order("first_name")
+        setEmployees(emps ?? [])
+      }
     } finally {
       setLoading(false)
     }

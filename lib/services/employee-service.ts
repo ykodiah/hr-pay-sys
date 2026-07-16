@@ -1,24 +1,48 @@
 import { BaseService } from "./base-service"
 import type { Employee, ServiceResponse, PaginatedResponse } from "./types"
+import { ACTIVE_EMPLOYEE_STATUSES, normalizeEmployeeStatus } from "@/lib/employees/status"
 
 export class EmployeeService extends BaseService {
   async getEmployeesByCompany(
     companyId: string,
-    options?: { page?: number; pageSize?: number; status?: string }
+    options?: { page?: number; pageSize?: number; status?: string; includeFinancial?: boolean }
   ): Promise<ServiceResponse<PaginatedResponse<Employee>>> {
-    const filters = [{ column: "company_id", operator: "eq" as const, value: companyId }]
+    return this.handleRequest(async (client) => {
+      const select = options?.includeFinancial
+        ? "*, financial:employee_financial(*)"
+        : "*"
+      let query = client
+        .from("employees")
+        .select(select, { count: "exact" })
+        .eq("company_id", companyId)
+        .order("created_at", { ascending: false })
 
-    if (options?.status && options.status !== "all") {
-      filters.push({ column: "status", operator: "eq" as const, value: options.status })
-    }
+      if (options?.status && options.status !== "all") {
+        if (options.status.toLowerCase() === "active") {
+          query = query.in("status", [...ACTIVE_EMPLOYEE_STATUSES])
+        } else {
+          query = query.eq("status", normalizeEmployeeStatus(options.status))
+        }
+      }
 
-    return this.handleListRequest<Employee>(
-      "employees",
-      "*",
-      filters,
-      [{ column: "created_at", order: "desc" }],
-      { page: options?.page, pageSize: options?.pageSize }
-    )
+      const page = options?.page ?? 1
+      const pageSize = options?.pageSize ?? 50
+      const from = (page - 1) * pageSize
+      const to = from + pageSize - 1
+      query = query.range(from, to)
+
+      const { data, error, count } = await query
+      if (error) throw error
+
+      const total = count ?? 0
+      return {
+        items: (data ?? []) as Employee[],
+        total,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      }
+    }, "GET_EMPLOYEES_ERROR")
   }
 
   async getEmployeeById(employeeId: string): Promise<ServiceResponse<Employee>> {
@@ -75,7 +99,7 @@ export class EmployeeService extends BaseService {
   }
 
   async deactivateEmployee(employeeId: string, reason?: string): Promise<ServiceResponse<Employee>> {
-    const updateData: any = { status: "inactive" }
+    const updateData: any = { status: "Inactive" }
     if (reason) updateData.inactive_reason = reason
 
     return this.updateEmployee(employeeId, updateData)
@@ -87,7 +111,7 @@ export class EmployeeService extends BaseService {
         .from("employees")
         .select("*")
         .eq("direct_supervisor", supervisorId)
-        .eq("status", "active")
+        .in("status", [...ACTIVE_EMPLOYEE_STATUSES])
 
       if (error) throw error
       return data || []
@@ -101,7 +125,7 @@ export class EmployeeService extends BaseService {
         .select("*")
         .eq("company_id", companyId)
         .eq("department", department)
-        .eq("status", "active")
+        .in("status", [...ACTIVE_EMPLOYEE_STATUSES])
 
       if (error) throw error
       return data || []

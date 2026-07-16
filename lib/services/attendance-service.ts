@@ -8,7 +8,7 @@ export class AttendanceService extends BaseService {
         .from("employees")
         .select("id")
         .eq("company_id", companyId)
-        .eq("status", "active")
+        .in("status", ["Active", "active", "ACTIVE"])
 
       if (!employees || employees.length === 0) return []
 
@@ -151,7 +151,7 @@ export class AttendanceService extends BaseService {
             .from("employees")
             .select("id")
             .eq("company_id", companyId)
-            .eq("status", "active")
+            .in("status", ["Active", "active", "ACTIVE"])
         ).data?.map((e: any) => e.id) || [])
         .gte("date", startDate)
         .lte("date", endDate)

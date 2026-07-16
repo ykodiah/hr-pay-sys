@@ -220,12 +220,11 @@ const initialEmployees = [
 
 const departments = ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
 
-const MAIN_COMPANY_ID = "f44f079e-1779-446d-9194-199994111111"
-
 export default function EmployeesPage() {
   const { currencySymbol, formatAmount } = useCurrency()
 
   const [employees, setEmployees] = useState<any[]>([])
+  const [companyId, setCompanyId] = useState<string>("")
   const [showAddEmployee, setShowAddEmployee] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -514,19 +513,19 @@ export default function EmployeesPage() {
     }
   }, [companySettings])
 
-  const loadSubsidiaries = async () => {
+  const loadSubsidiaries = async (cid?: string) => {
     try {
-      if (isDemoMode()) {
-        console.log("[v0] Demo mode: Using mock subsidiaries")
-        setSubsidiaries(mockSubsidiaries)
-        return
-      }
-
       const supabase = createClient()
-      const { data, error } = await supabase.from("subsidiaries").select("*").eq("status", "active")
+      let query = supabase.from("subsidiaries").select("*").eq("status", "active")
+      if (cid) query = query.eq("company_id", cid)
+      const { data, error } = await query
 
       if (error) {
         console.error("Error loading subsidiaries:", error)
+        if (isDemoMode()) {
+          setSubsidiaries(mockSubsidiaries)
+          return
+        }
         toast({
           title: "Error",
           description: "Failed to load subsidiaries from database.",
@@ -535,21 +534,25 @@ export default function EmployeesPage() {
         return
       }
 
-      setSubsidiaries(data || [])
+      setSubsidiaries(data?.length ? data : isDemoMode() ? mockSubsidiaries : [])
     } catch (error) {
       console.error("Error loading subsidiaries:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load subsidiaries. Please try again.",
-        variant: "destructive",
-      })
+      if (isDemoMode()) setSubsidiaries(mockSubsidiaries)
+      else {
+        toast({
+          title: "Error",
+          description: "Failed to load subsidiaries. Please try again.",
+          variant: "destructive",
+        })
+      }
     }
   }
 
   useEffect(() => {
-    loadEmployees()
-    loadSubsidiaries()
-    loadCompanyData()
+    void (async () => {
+      const cid = await loadCompanyData()
+      await Promise.all([loadEmployees(cid), loadSubsidiaries(cid)])
+    })()
   }, [])
 
   useEffect(() => {
@@ -645,13 +648,14 @@ export default function EmployeesPage() {
       console.log("[v0] Loading company data...")
       const supabase = createClient()
 
-      // Load company settings
-      const { data, error } = await supabase.from("companies").select("*").eq("id", MAIN_COMPANY_ID).maybeSingle()
+      // Prefer first available company from DB (no hardcoded company UUID)
+      const { data, error } = await supabase.from("companies").select("*").limit(1).maybeSingle()
 
       if (error) {
         console.error("[v0] Error loading company data:", error)
       } else if (data) {
         setCompanySettings(data)
+        setCompanyId(data.id)
         console.log("[v0] Company data loaded:", data)
 
         const companyDivisions = Array.isArray(data.divisions)
@@ -675,10 +679,7 @@ export default function EmployeesPage() {
         setDivisions(companyDivisions)
         setDepartments(companyDepartments)
         setLocations(companyLocations)
-
-        console.log("[v0] Set company divisions:", companyDivisions)
-        console.log("[v0] Set company departments:", companyDepartments)
-        console.log("[v0] Set company locations:", companyLocations)
+        return data.id as string
       } else {
         console.log("[v0] No company data found, using default values")
         setDivisions(["Head Office", "Regional Office"])
@@ -688,6 +689,7 @@ export default function EmployeesPage() {
     } catch (error) {
       console.error("[v0] Error in loadCompanyData:", error)
     }
+    return ""
   }
 
   useEffect(() => {
@@ -767,16 +769,20 @@ export default function EmployeesPage() {
     const loadSupervisorsAndHeads = () => {
       console.log("[v0] Loading supervisors and heads for department:", formData.department)
 
-      // Filter employees based on department and special roles
+      // Filter employees based on department and special roles (DB field: special_role)
       const departmentEmployees = employees.filter(
-        (emp) => emp.department === formData.department && emp.status === "Active",
+        (emp) =>
+          emp.department === formData.department &&
+          String(emp.status ?? "").toLowerCase() === "active",
       )
 
-      // Get employees with "Direct Supervisor" special role
-      const supervisorsList = departmentEmployees.filter((emp) => emp.specialRole === "Direct Supervisor")
-
-      // Get employees with "Head of Department" special role
-      const headsList = departmentEmployees.filter((emp) => emp.specialRole === "Head of Department")
+      const roleOf = (emp: any) => emp.special_role || emp.specialRole || ""
+      const supervisorsList = departmentEmployees.filter((emp) =>
+        String(roleOf(emp)).toLowerCase().includes("supervisor"),
+      )
+      const headsList = departmentEmployees.filter((emp) =>
+        String(roleOf(emp)).toLowerCase().includes("head"),
+      )
 
       // If no specific roles found, show all department employees as options
       const finalSupervisors = supervisorsList.length > 0 ? supervisorsList : departmentEmployees
@@ -803,50 +809,61 @@ export default function EmployeesPage() {
 
   // Removed the duplicate loadParentCompanyData function. The useCallback version above is used.
 
-  const loadEmployees = async () => {
+  const loadEmployees = async (cid?: string) => {
     try {
       console.log("[v0] Loading employees from database...")
+      setIsLoading(true)
 
-      if (isDemoMode()) {
-        console.log("[v0] Demo mode: Using mock employees")
-        setEmployees(mockEmployees)
-        setIsLoading(false)
+      const params = new URLSearchParams()
+      if (cid || companyId) params.set("company_id", cid || companyId)
+      params.set("include_financial", "true")
+      params.set("limit", "1000")
+
+      const res = await fetch(`/api/employees?${params.toString()}`, { cache: "no-store" })
+      const json = await res.json()
+
+      if (!res.ok) {
+        // Fallback: direct supabase query scoped by company when available
+        const supabase = createClient()
+        let query = supabase
+          .from("employees")
+          .select(`*, subsidiaries:subsidiary_id(name, id), financial:employee_financial(*)`)
+          .order("created_at", { ascending: false })
+        if (cid || companyId) query = query.eq("company_id", cid || companyId)
+        const { data, error } = await query
+        if (error) throw new Error(json.error || error.message)
+        const rows = data || []
+        if (!rows.length && isDemoMode()) {
+          setEmployees(mockEmployees)
+        } else {
+          setEmployees(rows)
+        }
         return
       }
 
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from("employees")
-        .select(`
-          *,
-          subsidiaries (
-            name,
-            id
-          )
-        `)
-        .order("created_at", { ascending: false })
-
-      if (error) {
-        console.error("Error loading employees:", error)
+      const rows = json.employees ?? json.data ?? []
+      if (json.meta?.company_id && !companyId) setCompanyId(json.meta.company_id)
+      if (!rows.length && isDemoMode()) {
+        console.log("[v0] No DB employees yet — demo fallback list")
+        setEmployees(mockEmployees)
+      } else {
+        console.log("[v0] Loaded employees:", rows.length)
+        setEmployees(rows)
+      }
+    } catch (error) {
+      console.error("Error loading employees:", error)
+      if (isDemoMode()) {
+        setEmployees(mockEmployees)
+      } else {
         toast({
           title: "Error",
           description: "Failed to load employees from database.",
           variant: "destructive",
         })
-        return
       }
-
-      console.log("[v0] Loaded employees:", data?.length || 0)
-      setEmployees(data || [])
-    } catch (error) {
-      console.error("Error loading employees:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load employees from database.",
-        variant: "destructive",
-      })
     } finally {
       setIsLoading(false)
+      setLoading(false)
     }
   }
 
@@ -956,9 +973,18 @@ export default function EmployeesPage() {
         head_of_department: employeeData.headOfDepartment || null,
         ghana_card_number: employeeData.ghanaCard || null,
         profile_picture: employeeData.profilePicture || null,
-        company_id: "00000000-0000-0000-0000-000000000001", // Main company ID
+        company_id: companyId || companySettings?.id,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+      }
+
+      if (!employeeRecord.company_id) {
+        toast({
+          title: "Company required",
+          description: "No company found in the database. Create a company first.",
+          variant: "destructive",
+        })
+        return
       }
 
       // Insert employee record
@@ -1113,6 +1139,12 @@ export default function EmployeesPage() {
         // ... include other fields as needed
       }
 
+      // Never write salary onto employees table — sync financials separately
+      delete (updatedEmployee as any).salary
+      // phone column name in schema
+      updatedEmployee.phone = employeeData.phone
+      delete (updatedEmployee as any).phone_number
+
       const { error } = await supabase.from("employees").update(updatedEmployee).eq("id", selectedEmployee.id)
 
       if (error) {
@@ -1125,8 +1157,46 @@ export default function EmployeesPage() {
         return
       }
 
-      // Reload employees from database
-      await loadEmployees()
+      // Sync employee_financial from edit form
+      const monthly = Number.parseFloat(employeeData.salary) || 0
+      const financialPatch = {
+        employee_id: selectedEmployee.id,
+        monthly_salary: monthly,
+        annual_salary: employeeData.annualSalary
+          ? Number.parseFloat(employeeData.annualSalary)
+          : monthly > 0
+            ? monthly * 12
+            : null,
+        transport_allowance: employeeData.transportAllowance
+          ? Number.parseFloat(employeeData.transportAllowance)
+          : undefined,
+        housing_allowance: employeeData.housingAllowance
+          ? Number.parseFloat(employeeData.housingAllowance)
+          : undefined,
+        medical_allowance: employeeData.medicalAllowance
+          ? Number.parseFloat(employeeData.medicalAllowance)
+          : undefined,
+        meal_allowance: employeeData.mealAllowance ? Number.parseFloat(employeeData.mealAllowance) : undefined,
+        communication_allowance: employeeData.communicationAllowance
+          ? Number.parseFloat(employeeData.communicationAllowance)
+          : undefined,
+        uniform_allowance: employeeData.uniformAllowance
+          ? Number.parseFloat(employeeData.uniformAllowance)
+          : undefined,
+        other_allowances: employeeData.otherAllowances
+          ? Number.parseFloat(employeeData.otherAllowances)
+          : undefined,
+        bank_name: employeeData.bankName || undefined,
+        bank_account_number: employeeData.bankAccount || undefined,
+        ssnit_number: employeeData.ssnit || undefined,
+        updated_at: new Date().toISOString(),
+      }
+      Object.keys(financialPatch).forEach((k) => {
+        if ((financialPatch as any)[k] === undefined) delete (financialPatch as any)[k]
+      })
+      await supabase.from("employee_financial").upsert(financialPatch, { onConflict: "employee_id" })
+
+      await loadEmployees(companyId)
 
       setIsEditDialogOpen(false)
       toast({
@@ -1143,13 +1213,35 @@ export default function EmployeesPage() {
     }
   }
 
-  const handleDeleteEmployee = (employeeId: number) => {
-    setEmployees(employees.filter((emp) => emp.id !== employeeId))
-    toast({
-      title: "Employee Removed",
-      description: "Employee has been successfully removed from the system.",
-      variant: "destructive",
-    })
+  const handleDeleteEmployee = async (employeeId: string | number) => {
+    try {
+      if (isDemoMode() && String(employeeId).length < 10) {
+        setEmployees(employees.filter((emp) => emp.id !== employeeId))
+        toast({
+          title: "Employee Removed",
+          description: "Employee removed (demo).",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const res = await fetch(`/api/employees/${employeeId}`, { method: "DELETE" })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Failed to deactivate employee")
+
+      await loadEmployees(companyId)
+      toast({
+        title: "Employee Deactivated",
+        description: "Employee status set to Inactive in the database.",
+        variant: "destructive",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Could not deactivate employee",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleImportEmployees = async (importedData: any[], filename?: string) => {
@@ -1157,12 +1249,17 @@ export default function EmployeesPage() {
       const res = await fetch("/api/employees/bulk-import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: importedData, filename: filename || "import.csv" }),
+        body: JSON.stringify({
+          rows: importedData,
+          filename: filename || "import.csv",
+          company_id: companyId || companySettings?.id,
+        }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Import failed")
 
       setIsImportDialogOpen(false)
+      await loadEmployees(companyId)
       toast({
         title: "Import Successful",
         description: `${json.success_rows} of ${json.total_rows} employees imported successfully.${json.error_rows > 0 ? ` ${json.error_rows} rows had errors.` : ""}`,

@@ -16,49 +16,11 @@ export type PromotionEmployeeProfile = {
   headOfDepartment: string
 }
 
-const EMPLOYEES: PromotionEmployeeProfile[] = [
-  {
-    id: "EMP002",
-    name: "Ama Osei",
-    department: "Human Resources",
-    grade: "G7",
-    step: 3,
-    tenureMonths: 30,
-    appraisalScore: 4.2,
-    trainingCompleted: true,
-    hasDisciplinary: false,
-    supervisor: "John Mensah",
-    headOfDepartment: "Akua Boateng",
-  },
-  {
-    id: "EMP003",
-    name: "Kofi Mensah",
-    department: "Marketing",
-    grade: "G6",
-    step: 5,
-    tenureMonths: 36,
-    appraisalScore: 4.7,
-    trainingCompleted: true,
-    hasDisciplinary: false,
-    supervisor: "Linda Asare",
-    headOfDepartment: "Yaw Darko",
-  },
-  {
-    id: "EMP014",
-    name: "Selorm Adjei",
-    department: "Finance",
-    grade: "G7",
-    step: 2,
-    tenureMonths: 20,
-    appraisalScore: 3.6,
-    trainingCompleted: false,
-    hasDisciplinary: false,
-    supervisor: "Paulina Owusu",
-    headOfDepartment: "Albert Owusu",
-  },
-]
+/** Fallback only when DB has no employees yet. */
+const FALLBACK_EMPLOYEES: PromotionEmployeeProfile[] = []
 
-let promotionStore: PromotionCase[] = buildSeedPromotionCases()
+let cachedEmployees: PromotionEmployeeProfile[] = []
+let promotionStore: PromotionCase[] = []
 
 const PROMOTIONS_API_BASE = (process.env.NEXT_PUBLIC_PROMOTIONS_API_URL ?? "/promotions").replace(/\/$/, "")
 
@@ -66,13 +28,55 @@ function promotionsEndpoint(path = "") {
   return `${PROMOTIONS_API_BASE}${path}`
 }
 
+function monthsSince(dateStr?: string | null): number {
+  if (!dateStr) return 12
+  const start = new Date(dateStr)
+  if (Number.isNaN(start.getTime())) return 12
+  const now = new Date()
+  return Math.max(0, (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()))
+}
+
+/** Load active employees from DB via shared employees API. */
+export async function loadPromotionEmployees(companyId?: string): Promise<PromotionEmployeeProfile[]> {
+  try {
+    const params = new URLSearchParams({ status: "active", limit: "500", options: "true" })
+    if (companyId) params.set("company_id", companyId)
+    const res = await fetch(`/api/employees?${params}`, { cache: "no-store" })
+    if (!res.ok) throw new Error("Failed to load employees")
+    const json = await res.json()
+    const rows = json.employees ?? json.data ?? []
+    cachedEmployees = rows.map((emp: any) => ({
+      id: emp.employee_id || emp.id,
+      name: emp.full_name || `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim(),
+      department: emp.department || "General",
+      grade: emp.grade || "G6",
+      step: Number(emp.step ?? 1),
+      tenureMonths: monthsSince(emp.date_of_joining),
+      appraisalScore: Number(emp.appraisal_score ?? 3.5),
+      trainingCompleted: Boolean(emp.training_completed ?? true),
+      hasDisciplinary: Boolean(emp.has_disciplinary ?? false),
+      supervisor: emp.direct_supervisor || "—",
+      headOfDepartment: emp.head_of_department || "—",
+      _uuid: emp.id,
+    }))
+    if (!promotionStore.length && cachedEmployees.length) {
+      promotionStore = buildSeedPromotionCases()
+    }
+    return cachedEmployees
+  } catch {
+    return cachedEmployees.length ? cachedEmployees : FALLBACK_EMPLOYEES
+  }
+}
+
 export function getPromotionEmployees() {
-  return EMPLOYEES
+  return cachedEmployees.length ? cachedEmployees : FALLBACK_EMPLOYEES
 }
 
 export function buildSeedPromotionCases(): PromotionCase[] {
-  const ama = EMPLOYEES[0]
-  const kofi = EMPLOYEES[1]
+  const source = cachedEmployees.length ? cachedEmployees : FALLBACK_EMPLOYEES
+  if (source.length < 1) return []
+  const ama = source[0]
+  const kofi = source[1] ?? source[0]
 
   const amaEligibility = evaluateEligibility(
     ama.grade,
@@ -97,8 +101,7 @@ export function buildSeedPromotionCases(): PromotionCase[] {
   const kofiDelta = computeSalaryDelta(kofi.grade, kofi.step, "G7", 2)
 
   return [
-    {
-      id: "PC-2025-001",
+    {      id: "PC-2025-001",
       employeeId: ama.id,
       employeeName: ama.name,
       department: ama.department,
