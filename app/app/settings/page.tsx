@@ -460,16 +460,17 @@ export default function SettingsPage() {
     { code: "LOAN", description: "Loan Deduction", recurring: true, amount: 0, percentage: 0, type: "FIXED" },
   ])
 
+  // Act 766: Tier 1 (SSNIT) 0.5% ee / 13% er — Tier 2 is separate (5% ee / 0% er)
   const [ssnitRates, setSsnitRates] = useState({
-    employee: 5.5,
+    employee: 0.5,
     employer: 13,
-    total: 18.5,
+    total: 13.5,
   })
 
   const [tier2Rates, setTier2Rates] = useState({
-    employee: 5.5,
-    employer: 5.5,
-    total: 11,
+    employee: 5,
+    employer: 0,
+    total: 5,
   })
 
   const [tier3Rates, setTier3Rates] = useState({
@@ -545,15 +546,16 @@ export default function SettingsPage() {
         { rate: 35, from: 50416.67, to: Number.POSITIVE_INFINITY, cumulativeTax: 13728.67 },
       ],
       socialSecurity: {
-        employee: 5.5,
+        // Act 766 Tier 1 (SSNIT) portion — employee total pension is 5.5% with Tier 2
+        employee: 0.5,
         employer: 13.0,
-        total: 18.5,
+        total: 13.5,
         cap: 2000000, // Annual cap in GHS
       },
       tier2: {
         employee: 5.0,
-        employer: 5.0,
-        total: 10.0,
+        employer: 0,
+        total: 5.0,
       },
       tier3: {
         employee: 5.0,

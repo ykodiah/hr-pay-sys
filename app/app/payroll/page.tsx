@@ -40,15 +40,26 @@ import {
   Bell,
 } from "lucide-react"
 
-import { calculateMonthlyPaye, round2 } from "@/lib/ghana-tax/engine"
+import {
+  calculateGhanaTax,
+  DEFAULT_TAX_RATES,
+  round2,
+} from "@/lib/ghana-tax/engine"
 
+/** Act 766 pension split: employee 5.5% (Tier1 0.5% + Tier2 5%), employer 13%. */
 const calculateSSNIT = (basicSalary: number) => {
-  const maxSSNITSalary = 4500 // Maximum SSNIT salary ceiling
-  const ssnitSalary = Math.min(basicSalary, maxSSNITSalary)
+  const result = calculateGhanaTax(
+    { monthly_basic: basicSalary, monthly_allowances: {}, tier2_applicable: true },
+    DEFAULT_TAX_RATES,
+  )
   return {
-    employee: round2(ssnitSalary * 0.055), // 5.5% on basic salary
-    employer: round2(ssnitSalary * 0.13), // 13% on basic salary
-    total: round2(ssnitSalary * 0.185),
+    employee: result.monthly_pension_employee,
+    employer: result.monthly_pension_employer,
+    tier1Employee: result.monthly_ssnit_employee,
+    tier1Employer: result.monthly_ssnit_employer,
+    tier2Employee: result.monthly_tier2_employee,
+    tier2Employer: result.monthly_tier2_employer,
+    total: round2(result.monthly_pension_employee + result.monthly_pension_employer),
   }
 }
 
@@ -59,15 +70,37 @@ const calculateTier3 = (basicSalary: number, contributionRate = 0.05) => {
 const calculatePAYE = (
   basicSalary: number,
   allowances: number,
-  ssnitEmployee: number,
+  _ssnitEmployee: number,
   tier3Employee: number,
   _tier3Employer: number = 0,
+  overtimePay: number = 0,
+  loanDeduction: number = 0,
+  advanceDeduction: number = 0,
+  otherDeduction: number = 0,
 ) => {
-  // Chargeable income: gross − employee SSNIT − employee Tier 3 only
-  // (Employer Tier 3 must never reduce the employee's PAYE base.)
-  const taxableIncome = Math.max(0, basicSalary + allowances - ssnitEmployee - tier3Employee)
-  const { monthlyTax } = calculateMonthlyPaye(taxableIncome)
-  return round2(monthlyTax)
+  const result = calculateGhanaTax(
+    {
+      monthly_basic: basicSalary,
+      monthly_allowances: { other: allowances },
+      monthly_overtime: overtimePay,
+      tier2_applicable: true,
+      tier3_applicable: tier3Employee > 0,
+      other_deductions: {
+        loan: loanDeduction,
+        advance: advanceDeduction,
+        other: otherDeduction,
+      },
+    },
+    {
+      ...DEFAULT_TAX_RATES,
+      tier3: {
+        employee_rate: basicSalary > 0 ? (tier3Employee / basicSalary) * 100 : 0,
+        employer_rate: 0,
+      },
+    },
+  )
+  // Return total PAYE withheld (base + OT tax); callers expecting a number still work
+  return result.monthly_total_paye_withheld
 }
 
 type TransferType = "permanent" | "temporary"
@@ -524,42 +557,50 @@ export default function PayrollPage() {
     const basicSalary = employee.basicSalary
     const allowancesTotal = employee.allowances.total
     const overtimePay = employee.overtimeHours * employee.overtimeRate
-    const grossPay = basicSalary + allowancesTotal + overtimePay
-
-    // Calculate SSNIT on basic salary only
-    const ssnit = calculateSSNIT(basicSalary)
-
-    // Calculate Tier 3 on basic salary only - check if employer contributes
     const tier3EmployeeRate = employee.tier3.employeeRate || 0
     const tier3EmployerRate = employee.tier3.employerRate || 0
-    const tier3Employee = tier3EmployeeRate > 0 ? calculateTier3(basicSalary, tier3EmployeeRate) : 0
-    const tier3Employer = tier3EmployerRate > 0 ? calculateTier3(basicSalary, tier3EmployerRate) : 0
+    const loan = Number(employee.deductions?.loans ?? 0)
+    const advance = Number(employee.deductions?.advances ?? 0)
+    const other =
+      Number(employee.deductions?.other ?? 0) + Number(employee.deductions?.welfare ?? 0)
 
-    // Calculate PAYE: (basic + allowances) - SSNIT Employee - Tier3 (employee + employer)
-    const paye = calculatePAYE(basicSalary, allowancesTotal, ssnit.employee, tier3Employee, tier3Employer)
-
-    // Only include applicable deductions
-    let totalDeductions = paye + ssnit.employee
-    if (tier3Employee > 0) totalDeductions += tier3Employee
-    if (employee.deductions.welfare > 0) totalDeductions += employee.deductions.welfare
-    if (employee.deductions.loans > 0) totalDeductions += employee.deductions.loans
-    if (employee.deductions.other > 0) totalDeductions += employee.deductions.other
-
-    const netPay = grossPay - totalDeductions
+    const tax = calculateGhanaTax(
+      {
+        monthly_basic: basicSalary,
+        monthly_allowances: { other: allowancesTotal },
+        monthly_overtime: overtimePay,
+        tier2_applicable: true,
+        tier3_applicable: tier3EmployeeRate > 0,
+        other_deductions: { loan, advance, other },
+      },
+      {
+        ...DEFAULT_TAX_RATES,
+        tier3: {
+          employee_rate: tier3EmployeeRate * 100,
+          employer_rate: tier3EmployerRate * 100,
+        },
+      },
+    )
 
     return {
       ...employee,
-      grossPay,
-      paye,
-      ssnit: { employee: ssnit.employee, employer: ssnit.employer },
+      grossPay: tax.monthly_gross + tax.monthly_overtime,
+      paye: tax.monthly_total_paye_withheld,
+      overtimeTax: tax.monthly_overtime_tax,
+      ssnit: {
+        employee: tax.monthly_pension_employee,
+        employer: tax.monthly_pension_employer,
+        tier1Employee: tax.monthly_ssnit_employee,
+        tier2Employee: tax.monthly_tier2_employee,
+      },
       tier3: {
         ...employee.tier3,
-        employee: tier3Employee,
-        employer: tier3Employer,
+        employee: tax.monthly_tier3_employee,
+        employer: tax.monthly_tier3_employer,
         employeeRate: tier3EmployeeRate,
         employerRate: tier3EmployerRate,
       },
-      netPay,
+      netPay: tax.monthly_net_pay,
       status: "Calculated",
     }
   }
@@ -1098,7 +1139,7 @@ export default function PayrollPage() {
               <CheckCircle className="w-6 h-6 text-emerald-600" />
               <div>
                 <p className="font-medium text-gray-900">SSNIT Contributions</p>
-                <p className="text-sm text-gray-600">13.5% employer + 5.5% employee</p>
+                <p className="text-sm text-gray-600">Act 766: 13% employer + 5.5% employee (Tier1 0.5% + Tier2 5%)</p>
               </div>
             </div>
             <div className="flex items-center space-x-3 p-4 bg-emerald-50 rounded-lg">
@@ -1731,46 +1772,53 @@ function EditEmployeePayrollForm({
   const [formData, setFormData] = useState(employee)
 
   const handleSave = () => {
-    // Recalculate payroll with updated data
     const basicSalary = formData.basicSalary
     const allowancesTotal = formData.allowances.total
     const overtimePay = formData.overtimeHours * formData.overtimeRate
-    const grossPay = basicSalary + allowancesTotal + overtimePay
-
-    // Calculate SSNIT on basic salary only
-    const ssnit = calculateSSNIT(basicSalary)
-
-    // Calculate Tier 3 on basic salary only - check if employer contributes
     const tier3EmployeeRate = formData.tier3.employeeRate || 0
     const tier3EmployerRate = formData.tier3.employerRate || 0
-    const tier3Employee = tier3EmployeeRate > 0 ? calculateTier3(basicSalary, tier3EmployeeRate) : 0
-    const tier3Employer = tier3EmployerRate > 0 ? calculateTier3(basicSalary, tier3EmployerRate) : 0
+    const loan = Number(formData.deductions?.loans ?? 0)
+    const advance = Number(formData.deductions?.advances ?? 0)
+    const other =
+      Number(formData.deductions?.other ?? 0) + Number(formData.deductions?.welfare ?? 0)
 
-    // Calculate PAYE: (basic + allowances) - SSNIT Employee - Tier3 (employee + employer)
-    const paye = calculatePAYE(basicSalary, allowancesTotal, ssnit.employee, tier3Employee, tier3Employer)
-
-    // Only include applicable deductions
-    let totalDeductions = paye + ssnit.employee
-    if (tier3Employee > 0) totalDeductions += tier3Employee
-    if (formData.deductions.welfare > 0) totalDeductions += formData.deductions.welfare
-    if (formData.deductions.loans > 0) totalDeductions += formData.deductions.loans
-    if (formData.deductions.other > 0) totalDeductions += formData.deductions.other
-
-    const netPay = grossPay - totalDeductions
+    const tax = calculateGhanaTax(
+      {
+        monthly_basic: basicSalary,
+        monthly_allowances: { other: allowancesTotal },
+        monthly_overtime: overtimePay,
+        tier2_applicable: true,
+        tier3_applicable: tier3EmployeeRate > 0,
+        other_deductions: { loan, advance, other },
+      },
+      {
+        ...DEFAULT_TAX_RATES,
+        tier3: {
+          employee_rate: tier3EmployeeRate * 100,
+          employer_rate: tier3EmployerRate * 100,
+        },
+      },
+    )
 
     const updatedEmployee = {
       ...formData,
-      grossPay,
-      paye,
-      ssnit: { employee: ssnit.employee, employer: ssnit.employer },
+      grossPay: tax.monthly_gross + tax.monthly_overtime,
+      paye: tax.monthly_total_paye_withheld,
+      overtimeTax: tax.monthly_overtime_tax,
+      ssnit: {
+        employee: tax.monthly_pension_employee,
+        employer: tax.monthly_pension_employer,
+        tier1Employee: tax.monthly_ssnit_employee,
+        tier2Employee: tax.monthly_tier2_employee,
+      },
       tier3: {
         ...formData.tier3,
-        employee: tier3Employee,
-        employer: tier3Employer,
+        employee: tax.monthly_tier3_employee,
+        employer: tax.monthly_tier3_employer,
         employeeRate: tier3EmployeeRate,
         employerRate: tier3EmployerRate,
       },
-      netPay,
+      netPay: tax.monthly_net_pay,
       status: "Calculated",
     }
 

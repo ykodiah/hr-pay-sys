@@ -186,7 +186,12 @@ export class PayrollService extends BaseService {
         tier3_employer: taxResult.monthly_tier3_employer,
         paye_taxable_income: taxResult.annual_taxable_income / 12,
         tax_relief_total: taxResult.annual_tax_reliefs / 12,
-        tax_deduction: taxResult.monthly_paye_tax + taxResult.monthly_overtime_tax + taxResult.monthly_bonus_tax,
+        tax_deduction: taxResult.monthly_total_paye_withheld,
+        loan_deduction: taxResult.monthly_loan_deduction,
+        advance_deduction: taxResult.monthly_advance_deduction,
+        other_deductions: taxResult.monthly_other_deduction,
+        overtime_pay: taxResult.monthly_overtime,
+        bonus_pay: taxResult.monthly_bonus,
         total_deductions: taxResult.monthly_total_employee_deductions,
         net_pay: taxResult.monthly_net_pay,
         tax_year: taxYear,
@@ -241,27 +246,59 @@ export class PayrollService extends BaseService {
     companyId: string
   ): Promise<ServiceResponse<{ processed: number; errors: string[] }>> {
     return this.handleRequest(async (client) => {
-      // Fetch all active employees with financial data for this company
-      const { data: employees, error: empError } = await client
-        .from("employees")
-        .select(
-          `id, first_name, last_name, tier2_applicable:employee_financial(tier2_employee_contribution),
-           financial:employee_financial(
-             monthly_salary,
-             transport_allowance, housing_allowance, medical_allowance,
-             meal_allowance, communication_allowance, uniform_allowance, other_allowances,
-             tier2_employee_contribution, tier2_employer_contribution, tier3_contribution
-           )`
-        )
-        .eq("company_id", companyId)
-        .eq("status", "Active")
+      // Resolve pay period for this run so we can merge Pay Inputs
+      const { data: run } = await client
+        .from("payroll_runs")
+        .select("pay_period_start, pay_period_end")
+        .eq("id", payrollRunId)
+        .maybeSingle()
 
-      if (empError) throw empError
+      const payPeriod = run?.pay_period_start
+        ? String(run.pay_period_start).slice(0, 7)
+        : new Date().toISOString().slice(0, 7)
+
+      // Parallel fetch: employees + period pay inputs + active loan installments
+      const [empRes, inputsRes, loansRes] = await Promise.all([
+        client
+          .from("employees")
+          .select(
+            `id, first_name, last_name,
+             financial:employee_financial(
+               monthly_salary,
+               transport_allowance, housing_allowance, medical_allowance,
+               meal_allowance, communication_allowance, uniform_allowance, other_allowances,
+               tier2_employee_contribution, tier2_employer_contribution, tier3_contribution
+             )`,
+          )
+          .eq("company_id", companyId)
+          .eq("status", "Active"),
+        client
+          .from("payroll_pay_inputs")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("pay_period", payPeriod),
+        client
+          .from("employee_loans")
+          .select("employee_id, monthly_payment, status")
+          .eq("company_id", companyId)
+          .in("status", ["active", "approved"]),
+      ])
+
+      if (empRes.error) throw empRes.error
+
+      const inputsByEmployee = new Map(
+        (inputsRes.data ?? []).map((row: any) => [row.employee_id, row]),
+      )
+      const loansByEmployee = new Map<string, number>()
+      for (const loan of loansRes.data ?? []) {
+        const prev = loansByEmployee.get(loan.employee_id) ?? 0
+        loansByEmployee.set(loan.employee_id, prev + Number(loan.monthly_payment ?? 0))
+      }
 
       const errors: string[] = []
       let processed = 0
 
-      for (const emp of employees ?? []) {
+      for (const emp of empRes.data ?? []) {
         try {
           const fin = Array.isArray(emp.financial) ? emp.financial[0] : emp.financial
           if (!fin) {
@@ -269,19 +306,33 @@ export class PayrollService extends BaseService {
             continue
           }
 
+          const period = inputsByEmployee.get(emp.id)
+          const pick = (override: unknown, master: unknown) =>
+            override != null && override !== "" ? Number(override) : Number(master ?? 0)
+
           const input: EmployeePayInput = {
-            monthly_basic: Number(fin.monthly_salary ?? 0),
+            monthly_basic: pick(period?.basic_salary, fin.monthly_salary),
             monthly_allowances: {
-              transport: Number(fin.transport_allowance ?? 0),
-              housing: Number(fin.housing_allowance ?? 0),
-              medical: Number(fin.medical_allowance ?? 0),
-              meal: Number(fin.meal_allowance ?? 0),
-              communication: Number(fin.communication_allowance ?? 0),
-              uniform: Number(fin.uniform_allowance ?? 0),
-              other: Number(fin.other_allowances ?? 0),
+              transport: pick(period?.transport_allowance, fin.transport_allowance),
+              housing: pick(period?.housing_allowance, fin.housing_allowance),
+              medical: pick(period?.medical_allowance, fin.medical_allowance),
+              meal: pick(period?.meal_allowance, fin.meal_allowance),
+              communication: pick(period?.communication_allowance, fin.communication_allowance),
+              uniform: pick(period?.uniform_allowance, fin.uniform_allowance),
+              other: pick(period?.other_allowances, fin.other_allowances),
             },
-            tier2_applicable: Number(fin.tier2_employee_contribution ?? 0) > 0,
-            tier3_applicable: Number(fin.tier3_contribution ?? 0) > 0,
+            monthly_overtime: Number(period?.overtime_amount ?? 0),
+            monthly_bonus: Number(period?.bonus_amount ?? 0),
+            tier2_applicable: period?.tier2_applicable ?? true,
+            tier3_applicable:
+              period?.tier3_applicable ?? Number(fin.tier3_contribution ?? 0) > 0,
+            other_deductions: {
+              loan:
+                Number(period?.loan_deduction ?? 0) ||
+                Number(loansByEmployee.get(emp.id) ?? 0),
+              advance: Number(period?.advance_deduction ?? 0),
+              other: Number(period?.other_deductions ?? 0),
+            },
           }
 
           await this.calculateAndSaveEmployeeTax(payrollRunId, emp.id, companyId, input)
@@ -386,7 +437,12 @@ export class PayrollService extends BaseService {
       tier3_employer: tax.monthly_tier3_employer,
       paye_taxable_income: tax.annual_taxable_income / 12,
       tax_relief_total: tax.annual_tax_reliefs / 12,
-      paye_tax: tax.monthly_paye_tax + tax.monthly_overtime_tax + tax.monthly_bonus_tax,
+      paye_tax: tax.monthly_total_paye_withheld,
+      overtime_tax: tax.monthly_overtime_tax,
+      bonus_tax: tax.monthly_bonus_tax,
+      loan_deduction: tax.monthly_loan_deduction,
+      advance_deduction: tax.monthly_advance_deduction,
+      other_deductions: tax.monthly_other_deduction,
       total_deductions: tax.monthly_total_employee_deductions,
       net_pay: tax.monthly_net_pay,
       total_employer_cost: tax.monthly_total_employer_cost,

@@ -205,9 +205,21 @@ function SSNITRatesEditor({
   }
 
   const rateLabels: Record<string, { label: string; subtitle: string; color: string }> = {
-    ssnit: { label: "SSNIT Tier 1", subtitle: "Social Security & National Insurance Trust", color: "bg-blue-500/10 text-blue-700 dark:text-blue-400" },
-    tier2: { label: "SSNIT Tier 2 (NHIA)", subtitle: "National Health Insurance Authority", color: "bg-green-500/10 text-green-700 dark:text-green-400" },
-    tier3: { label: "Tier 3 Provident Fund", subtitle: "Voluntary — configure per company policy", color: "bg-amber-500/10 text-amber-700 dark:text-amber-400" },
+    ssnit: {
+      label: "Tier 1 (SSNIT)",
+      subtitle: "Act 766 — employee 0.5% + employer 13% of basic (= 13.5% Tier 1)",
+      color: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+    },
+    tier2: {
+      label: "Tier 2 (Occupational)",
+      subtitle: "Act 766 — employee 5% of basic (mandatory; employer share usually 0)",
+      color: "bg-green-500/10 text-green-700 dark:text-green-400",
+    },
+    tier3: {
+      label: "Tier 3 Provident Fund",
+      subtitle: "Voluntary — configure per company policy",
+      color: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+    },
   }
 
   return (
@@ -487,8 +499,8 @@ export default function GhanaTaxSettings({ companyId, taxYear }: Props) {
         )
       } else {
         setTaxRates([
-          { rate_type: "ssnit", employee_rate: 5.5, employer_rate: 13 },
-          { rate_type: "tier2", employee_rate: 5, employer_rate: 5 },
+          { rate_type: "ssnit", employee_rate: 0.5, employer_rate: 13 },
+          { rate_type: "tier2", employee_rate: 5, employer_rate: 0 },
           { rate_type: "tier3", employee_rate: 0, employer_rate: 0 },
         ])
       }

@@ -13,6 +13,7 @@ import {
   GRA_2025_TIER2,
   GRA_2025_TIER3,
   normalizePayeBands,
+  normalizePensionRates,
   type PAYEBand,
   type SSNITRates,
   type Tier2Rates,
@@ -94,10 +95,13 @@ export async function getTaxRates(
     }
   }
 
+  // Collapse legacy double-count configs (5.5% SSNIT + 5% Tier2) to Act 766 split
+  const pension = normalizePensionRates(ssnit, tier2)
+
   return {
     paye_bands: payeBands,
-    ssnit,
-    tier2,
+    ssnit: pension.ssnit,
+    tier2: pension.tier2,
     tier3,
     paye_bands_are_monthly: isMonthly,
   }

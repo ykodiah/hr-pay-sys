@@ -241,6 +241,7 @@ export default function ClientAppLayout({
           const subPage = pathSegments[2]
           const subPageMap = {
             history: "History",
+            input: "Pay Inputs",
             reports: "Reports",
             profile: "Profile",
             settings: "Settings",
@@ -301,7 +302,8 @@ export default function ClientAppLayout({
       {
         title: "Payroll",
         items: [
-          { name: "Payroll", href: "/app/payroll", icon: Calculator, description: "Process payroll" },
+          { name: "Pay Inputs", href: "/app/payroll/input", icon: ClipboardList, description: "Period emoluments & adjustments" },
+          { name: "Process Payroll", href: "/app/payroll", icon: Calculator, description: "Run statutory payroll" },
           { name: "Payroll History", href: "/app/payroll/history", icon: History, description: "Past payroll records" },
           { name: "Approvals", href: "/app/approvals", icon: CheckSquare, description: "Approve payroll, leave & overtime" },
           { name: "Loans", href: "/app/loans", icon: CreditCard, description: "Employee loans" },
