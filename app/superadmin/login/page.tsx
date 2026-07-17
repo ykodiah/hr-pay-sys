@@ -1,11 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export default function SuperadminLoginPage() {
-  const router = useRouter()
   const [email, setEmail] = useState('admin@akwaabahrpay.com')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -31,10 +29,9 @@ export default function SuperadminLoginPage() {
         return
       }
 
-      // Redirect to dashboard on success — refresh first so the layout
-      // re-reads the newly-set cookie before navigating
-      router.refresh()
-      router.push('/superadmin/dashboard')
+      // Use full page navigation so the browser sends the freshly-set
+      // httpOnly cookie on the very next request to /superadmin/dashboard
+      window.location.href = '/superadmin/dashboard'
     } catch (err: any) {
       setError(err.message || 'An error occurred')
       setLoading(false)
