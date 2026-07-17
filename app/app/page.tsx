@@ -186,7 +186,7 @@ export default function DashboardPage() {
         complianceSsnitUpToDate: true,
       })
     } catch (err) {
-      console.log("[v0] Dashboard load error:", err)
+      console.error("Dashboard load error:", err)
     } finally {
       setLoading(false)
     }
