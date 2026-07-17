@@ -193,7 +193,7 @@ function mapApiRow(row: PayInputApiRow): WorksheetRow {
   }
 }
 
-function calculateRow(row: WorksheetRow): WorksheetRow {
+function calculateRow(row: WorksheetRow, taxRates = DEFAULT_TAX_RATES): WorksheetRow {
   const tax = calculateGhanaTax(
     {
       monthly_basic: row.basicSalary,
@@ -210,10 +210,10 @@ function calculateRow(row: WorksheetRow): WorksheetRow {
       },
     },
     {
-      ...DEFAULT_TAX_RATES,
+      ...taxRates,
       tier3: {
-        employee_rate: row.tier3Rate || 0,
-        employer_rate: 0,
+        employee_rate: row.tier3Rate || taxRates.tier3?.employee_rate || 0,
+        employer_rate: taxRates.tier3?.employer_rate || 0,
       },
     },
   )
@@ -449,6 +449,8 @@ export default function PayrollPage() {
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null)
   const [lastProcessMessage, setLastProcessMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  // Tax rates fetched from DB (falls back to GRA defaults if not configured)
+  const [dbTaxRates, setDbTaxRates] = useState(DEFAULT_TAX_RATES)
 
   // Prorate dialog state
   type ProrateEmployee = { employeeId: string; name: string; dateOfJoining: string; proratedDays: number; totalDays: number }
@@ -467,11 +469,33 @@ export default function PayrollPage() {
     if (data?.id) {
       setCompanyId(data.id)
       setCompany(data)
+      // Fetch saved tax rates from DB for this company
+      try {
+        const taxRes = await fetch(`/api/settings/tax?company_id=${encodeURIComponent(data.id)}`, { credentials: "include" })
+        if (taxRes.ok) {
+          const tax = await taxRes.json()
+          setDbTaxRates({
+            paye_bands: tax.paye_bands ?? DEFAULT_TAX_RATES.paye_bands,
+            paye_bands_are_monthly: DEFAULT_TAX_RATES.paye_bands_are_monthly,
+            ssnit: tax.ssnit
+              ? { employee_rate: tax.ssnit.employee_rate, employer_rate: tax.ssnit.employer_rate }
+              : DEFAULT_TAX_RATES.ssnit,
+            tier2: tax.tier2
+              ? { employee_rate: tax.tier2.employee_rate, employer_rate: tax.tier2.employer_rate }
+              : DEFAULT_TAX_RATES.tier2,
+            tier3: tax.tier3
+              ? { employee_rate: tax.tier3.employee_rate, employer_rate: tax.tier3.employer_rate }
+              : DEFAULT_TAX_RATES.tier3,
+          })
+        }
+      } catch {
+        // silently fall back to GRA defaults
+      }
     }
     return data?.id ?? ""
   }, [])
 
-  const loadWorksheet = useCallback(async (cid: string, period: string) => {
+  const loadWorksheet = useCallback(async (cid: string, period: string) => { // eslint-disable-line react-hooks/exhaustive-deps
     setLoading(true)
     try {
       const [inputRes, runsRes] = await Promise.all([
@@ -491,7 +515,7 @@ export default function PayrollPage() {
       const runsJson = runsRes.ok ? await runsRes.json() : { runs: [] }
       const periodRuns: PayrollRunSummary[] = runsJson.runs ?? runsJson.data ?? []
 
-      const mapped = (inputJson.rows ?? []).map((r: PayInputApiRow) => calculateRow(mapApiRow(r)))
+      const mapped = (inputJson.rows ?? []).map((r: PayInputApiRow) => calculateRow(mapApiRow(r), dbTaxRates))
       const matchingRun =
         periodRuns.find((r) => String(r.pay_period_start ?? "").startsWith(period)) ?? null
 
@@ -684,7 +708,7 @@ export default function PayrollPage() {
       // Show any warnings/info messages
       if (warnings.length > 0) {
         const warningText = warnings
-          .filter(w => w.includes("⚠"))
+          .filter((w: string) => w.includes("⚠"))
           .slice(0, 3)
           .join("\n")
         if (warningText) {

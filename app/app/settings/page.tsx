@@ -479,6 +479,17 @@ export default function SettingsPage() {
     total: 10,
   })
 
+  // Payroll configuration — controlled state (replaces defaultValue)
+  const [payFrequency, setPayFrequency] = useState("monthly")
+  const [currency, setCurrencyPref] = useState("ghs")
+  const [minimumWage, setMinimumWage] = useState(18.15)
+  const [overtimeWeekdayRate, setOvertimeWeekdayRate] = useState(1.5)
+  const [overtimeWeekendRate, setOvertimeWeekendRate] = useState(2.0)
+  const [payrollCutoffDay, setPayrollCutoffDay] = useState(25)
+  const [autoCalcPaye, setAutoCalcPaye] = useState(true)
+  const [autoCalcSsnit, setAutoCalcSsnit] = useState(true)
+  const [autoCalcProvident, setAutoCalcProvident] = useState(true)
+
   const [isSavingPayroll, setIsSavingPayroll] = useState(false)
   const [isSavingTax, setIsSavingTax] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
@@ -1992,6 +2003,44 @@ export default function SettingsPage() {
     }
   }
 
+  const loadPayrollSettings = async (cid: string) => {
+    if (isDemoMode() || !cid || cid.startsWith("demo-")) return
+    try {
+      const [configRes, taxRes] = await Promise.all([
+        fetch(`/api/settings/payroll?company_id=${encodeURIComponent(cid)}`, { credentials: "include" }),
+        fetch(`/api/settings/tax?company_id=${encodeURIComponent(cid)}`, { credentials: "include" }),
+      ])
+      if (configRes.ok) {
+        const { config } = await configRes.json()
+        if (config) {
+          if (config.pay_frequency) setPayFrequency(config.pay_frequency)
+          if (config.currency) setCurrencyPref(config.currency)
+          if (typeof config.minimum_wage === "number") setMinimumWage(config.minimum_wage)
+          if (typeof config.overtime_weekday_multiplier === "number") setOvertimeWeekdayRate(config.overtime_weekday_multiplier)
+          if (typeof config.overtime_weekend_multiplier === "number") setOvertimeWeekendRate(config.overtime_weekend_multiplier)
+          if (typeof config.payroll_cutoff_day === "number") setPayrollCutoffDay(config.payroll_cutoff_day)
+          if (typeof config.auto_calculate_paye === "boolean") setAutoCalcPaye(config.auto_calculate_paye)
+          if (typeof config.auto_calculate_ssnit === "boolean") setAutoCalcSsnit(config.auto_calculate_ssnit)
+          if (typeof config.auto_calculate_provident_fund === "boolean") setAutoCalcProvident(config.auto_calculate_provident_fund)
+        }
+      }
+      if (taxRes.ok) {
+        const tax = await taxRes.json()
+        if (tax.ssnit) {
+          setSsnitRates({ employee: tax.ssnit.employee_rate, employer: tax.ssnit.employer_rate, total: tax.ssnit.employee_rate + tax.ssnit.employer_rate })
+        }
+        if (tax.tier2) {
+          setTier2Rates({ employee: tax.tier2.employee_rate, employer: tax.tier2.employer_rate, total: tax.tier2.employee_rate + tax.tier2.employer_rate })
+        }
+        if (tax.tier3) {
+          setTier3Rates({ employee: tax.tier3.employee_rate, employer: tax.tier3.employer_rate, total: tax.tier3.employee_rate + tax.tier3.employer_rate })
+        }
+      }
+    } catch (err) {
+      console.warn("[v0] loadPayrollSettings error:", err)
+    }
+  }
+
   const loadPayrollData = async (companyId?: string) => {
     if (isDemoMode()) {
       return
@@ -2003,6 +2052,9 @@ export default function SettingsPage() {
       console.warn("[v0] Unable to load payroll data without a company id")
       return
     }
+
+    // Load payroll config + tax rates from DB
+    void loadPayrollSettings(targetCompanyId)
 
     try {
       const [
@@ -4198,7 +4250,6 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
   const handleSavePayrollConfig = async () => {
     setIsSavingPayroll(true)
-    console.log("[v0] Saving payroll configuration...")
 
     try {
       const supabase = createClient()
@@ -4209,6 +4260,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
         return
       }
 
+      // 1. Save allowances & deductions to their dedicated tables
       const allowanceRows = allowances.map((a) => ({
         company_id: companyId,
         code: a.code,
@@ -4247,9 +4299,35 @@ Format the response in a professional, actionable manner for HR decision-makers.
         if (error) throw error
       }
 
+      // 2. Save payroll configuration fields to system_settings via API route
+      const configRes = await fetch("/api/settings/payroll", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          company_id: companyId,
+          config: {
+            pay_frequency: payFrequency,
+            currency,
+            minimum_wage: minimumWage,
+            overtime_weekday_multiplier: overtimeWeekdayRate,
+            overtime_weekend_multiplier: overtimeWeekendRate,
+            payroll_cutoff_day: payrollCutoffDay,
+            auto_calculate_paye: autoCalcPaye,
+            auto_calculate_ssnit: autoCalcSsnit,
+            auto_calculate_provident_fund: autoCalcProvident,
+          },
+        }),
+      })
+
+      if (!configRes.ok) {
+        const body = await configRes.json().catch(() => ({}))
+        throw new Error(body.error ?? "Failed to save payroll config")
+      }
+
       toast({
-        title: "Success",
-        description: "Payroll allowances and deductions saved to database.",
+        title: "Payroll configuration saved",
+        description: "Allowances, deductions, and payroll settings updated in database.",
       })
     } catch (error) {
       console.error("Error saving payroll config:", error)
@@ -4265,21 +4343,53 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
   const handleSaveTaxConfig = async () => {
     setIsSavingTax(true)
-    console.log("[v0] Saving tax configuration...")
 
     try {
-      // Simulate save operation
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const companyId = companyData?.id
+      if (!companyId || String(companyId).startsWith("demo-")) {
+        await new Promise((resolve) => setTimeout(resolve, 400))
+        toast({ title: "Success", description: "Tax configuration saved (demo)." })
+        return
+      }
+
+      const taxYear = new Date().getFullYear()
+
+      // Build PAYE bands from the current currency config (editable in UI)
+      const currentConfig = getCurrencyConfig(selectedCurrency)
+      const payeBands = currentConfig.taxBands.map((b: any, i: number) => ({
+        band_order: i + 1,
+        rate: b.rate,
+        threshold_amount: b.to === Number.POSITIVE_INFINITY ? 999999999 : b.to,
+        is_remaining_amount: b.to === Number.POSITIVE_INFINITY,
+        description: `${b.rate}% — ${b.from.toLocaleString()} to ${b.to === Number.POSITIVE_INFINITY ? "∞" : b.to.toLocaleString()}`,
+      }))
+
+      const res = await fetch("/api/settings/tax", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          company_id: companyId,
+          tax_year: taxYear,
+          ssnit: { employee: ssnitRates.employee, employer: ssnitRates.employer },
+          tier2: { employee: tier2Rates.employee, employer: tier2Rates.employer },
+          tier3: { employee: tier3Rates.employee, employer: tier3Rates.employer },
+          paye_bands: payeBands,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? "Failed to save tax configuration")
 
       toast({
-        title: "Success",
-        description: "Tax configuration saved successfully",
+        title: "Tax configuration saved",
+        description: `SSNIT/Tier rates and ${data.saved_bands ?? 0} PAYE bands saved to database.`,
       })
     } catch (error) {
       console.error("Error saving tax config:", error)
       toast({
         title: "Error",
-        description: "Failed to save tax configuration",
+        description: error instanceof Error ? error.message : "Failed to save tax configuration",
         variant: "destructive",
       })
     } finally {
@@ -6616,7 +6726,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   <div>
                     <Label htmlFor="payFrequency">Pay Frequency</Label>
-                    <Select defaultValue="monthly">
+                    <Select value={payFrequency} onValueChange={setPayFrequency}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -6630,7 +6740,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
                   <div>
                     <Label htmlFor="currency">Currency</Label>
-                    <Select value={selectedCurrency} onValueChange={handleCurrencyChange}>
+                    <Select value={selectedCurrency} onValueChange={(v) => { handleCurrencyChange(v); setCurrencyPref(v) }}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -6645,36 +6755,60 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
                   <div>
                     <Label htmlFor="minimumWage">Minimum Wage ({getCurrencyConfig(selectedCurrency).symbol})</Label>
-                    <Input type="number" defaultValue="18.15" />
+                    <Input
+                      id="minimumWage"
+                      type="number"
+                      value={minimumWage}
+                      onChange={(e) => setMinimumWage(parseFloat(e.target.value) || 0)}
+                    />
                   </div>
 
                   <div>
                     <Label htmlFor="weekdayOvertimeRate">Weekday Overtime Rate Multiplier</Label>
-                    <Input type="number" step="0.1" defaultValue="1.5" />
+                    <Input
+                      id="weekdayOvertimeRate"
+                      type="number"
+                      step="0.1"
+                      value={overtimeWeekdayRate}
+                      onChange={(e) => setOvertimeWeekdayRate(parseFloat(e.target.value) || 1)}
+                    />
                   </div>
 
                   <div>
                     <Label htmlFor="weekendOvertimeRate">Weekend Overtime Rate Multiplier</Label>
-                    <Input type="number" step="0.1" defaultValue="2" />
+                    <Input
+                      id="weekendOvertimeRate"
+                      type="number"
+                      step="0.1"
+                      value={overtimeWeekendRate}
+                      onChange={(e) => setOvertimeWeekendRate(parseFloat(e.target.value) || 1)}
+                    />
                   </div>
 
                   <div>
                     <Label htmlFor="payrollCutoffDay">Payroll Cutoff Day</Label>
-                    <Input type="number" min="1" max="31" defaultValue="25" />
+                    <Input
+                      id="payrollCutoffDay"
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={payrollCutoffDay}
+                      onChange={(e) => setPayrollCutoffDay(parseInt(e.target.value, 10) || 25)}
+                    />
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-2">
-                    <Switch id="autoCalculatePAYE" defaultChecked />
+                    <Switch id="autoCalculatePAYE" checked={autoCalcPaye} onCheckedChange={setAutoCalcPaye} />
                     <Label htmlFor="autoCalculatePAYE">Auto-calculate PAYE</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Switch id="autoCalculateSSNIT" defaultChecked />
+                    <Switch id="autoCalculateSSNIT" checked={autoCalcSsnit} onCheckedChange={setAutoCalcSsnit} />
                     <Label htmlFor="autoCalculateSSNIT">Auto-calculate SSNIT</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Switch id="autoCalculateProvidentFund" defaultChecked />
+                    <Switch id="autoCalculateProvidentFund" checked={autoCalcProvident} onCheckedChange={setAutoCalcProvident} />
                     <Label htmlFor="autoCalculateProvidentFund">Auto-calculate Provident Fund (Tier 3)</Label>
                   </div>
                 </div>
