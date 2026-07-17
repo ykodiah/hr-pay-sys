@@ -82,6 +82,9 @@ function mapPayslipToReportRow(p: any): PayrollReportRow {
     account_number: fin?.bank_account_number ?? p.snapshot_account_number ?? null,
     company_name: company?.name ?? null,
     ghana_card_number: emp?.ghana_card_number ?? null,
+    snapshot_subsidiary: p.snapshot_subsidiary ?? emp?.subsidiary ?? null,
+    snapshot_division: p.snapshot_division ?? emp?.division ?? null,
+    snapshot_location: p.snapshot_location ?? emp?.location ?? null,
     date_of_joining: emp?.hire_date ?? emp?.date_of_joining ?? null,
     contract_type: emp?.employment_type ?? emp?.contract_type ?? null,
     basic_salary: Number(p.basic_salary ?? 0),
@@ -345,39 +348,52 @@ function buildPAYEReport(
   }
 }
 
-/** Report 2 — SSNIT Tier 1 Contributions */
+/** Report 2 — SSNIT Tier 1 Contributions
+ *  Employee: 5.5% on basic earnings
+ *  Employer: 13% on basic earnings
+ *  Total Tier 1 Payable to SSNIT: 13.5% on basic earnings (employer 13% + employee 0.5% — the other 5% goes to Tier 2)
+ *  Note: ssnit_employee in the payslip may store the legacy 0.5% value from older runs.
+ *  We always recompute from basic_salary for display correctness per the new rates.
+ */
 function buildSSNITTier1Report(
   rows: PayrollReportRow[],
   meta: ReportMeta
 ): GeneratedReport {
   const columns: ReportColumn[] = [
-    { key: "employee_id_no",    label: "Employee ID",              type: "text" },
-    { key: "employee_name",     label: "Employee Name",            type: "text" },
-    { key: "ssnit_number",      label: "SSNIT Number",             type: "text" },
-    { key: "department",        label: "Department",               type: "text" },
-    { key: "insurable_earnings",label: "Insurable Earnings (GHS)", type: "currency" },
-    { key: "employee_contrib",  label: "Employee Tier 1 0.5% (GHS)", type: "currency" },
-    { key: "employer_contrib",  label: "Employer Tier 1 13% (GHS)",  type: "currency" },
-    { key: "total_contrib",     label: "Total Tier 1 (GHS)",         type: "currency" },
+    { key: "employee_id_no",    label: "Employee ID",                        type: "text" },
+    { key: "employee_name",     label: "Employee Name",                      type: "text" },
+    { key: "ssnit_number",      label: "SSNIT Number",                       type: "text" },
+    { key: "department",        label: "Department",                         type: "text" },
+    { key: "basic_earnings",    label: "Basic Earnings (GHS)",               type: "currency" },
+    { key: "employee_contrib",  label: "Employee Tier 1 (5.5%) (GHS)",       type: "currency" },
+    { key: "employer_contrib",  label: "Employer Tier 1 (13%) (GHS)",        type: "currency" },
+    { key: "total_contrib",     label: "Total Tier 1 Payable to SSNIT (13.5%) (GHS)", type: "currency" },
   ]
 
-  const typedRows = rows.map((r) => ({
-    employee_id_no:     r.employee_id_no ?? "",
-    employee_name:      r.employee_name ?? "",
-    ssnit_number:       r.ssnit_number ?? "",
-    department:         r.department ?? "",
-    insurable_earnings: ghs(r.basic_salary), // SSNIT is on basic
-    employee_contrib:   ghs(r.ssnit_employee),
-    employer_contrib:   ghs(r.ssnit_employer),
-    total_contrib:      ghs(r.ssnit_employee) + ghs(r.ssnit_employer),
-  }))
+  const typedRows = rows.map((r) => {
+    const basic         = ghs(r.basic_salary)
+    const empContrib    = ghs(basic * 0.055)   // employee 5.5%
+    const emplrContrib  = ghs(basic * 0.13)    // employer 13%
+    // Total payable to SSNIT = 13.5% (employer 13% + employee 0.5% portion; the other 5% of employee goes to Tier 2)
+    const totalPayable  = ghs(basic * 0.135)
+    return {
+      employee_id_no:   r.employee_id_no ?? "",
+      employee_name:    r.employee_name ?? "",
+      ssnit_number:     r.ssnit_number ?? "",
+      department:       r.department ?? "",
+      basic_earnings:   basic,
+      employee_contrib: empContrib,
+      employer_contrib: emplrContrib,
+      total_contrib:    totalPayable,
+    }
+  })
 
   const summary = {
-    total_employees:    rows.length,
-    total_insurable:    rows.reduce((s, r) => s + ghs(r.basic_salary), 0),
-    total_employee:     rows.reduce((s, r) => s + ghs(r.ssnit_employee), 0),
-    total_employer:     rows.reduce((s, r) => s + ghs(r.ssnit_employer), 0),
-    total_contributions:rows.reduce((s, r) => s + ghs(r.ssnit_employee) + ghs(r.ssnit_employer), 0),
+    total_employees:     rows.length,
+    total_basic_earnings:rows.reduce((s, r) => s + ghs(r.basic_salary), 0),
+    total_employee_5_5:  typedRows.reduce((s, r) => s + r.employee_contrib, 0),
+    total_employer_13:   typedRows.reduce((s, r) => s + r.employer_contrib, 0),
+    total_payable_ssnit: typedRows.reduce((s, r) => s + r.total_contrib, 0),
   }
 
   return {
@@ -392,39 +408,43 @@ function buildSSNITTier1Report(
   }
 }
 
-/** Report 3 — SSNIT Tier 2 (NHIA) Contributions */
+/** Report 3 — SSNIT Tier 2 (Occupational Pension) Contributions
+ *  Employee: 5% on basic earnings (Act 766)
+ *  Ghana Card column populated from employee record
+ *  Employer Tier 2 column removed per new requirement
+ */
 function buildSSNITTier2Report(
   rows: PayrollReportRow[],
   meta: ReportMeta
 ): GeneratedReport {
   const columns: ReportColumn[] = [
-    { key: "employee_id_no",    label: "Employee ID",              type: "text" },
-    { key: "employee_name",     label: "Employee Name",            type: "text" },
-    { key: "ssnit_number",      label: "SSNIT Number",             type: "text" },
-    { key: "department",        label: "Department",               type: "text" },
-    { key: "insurable_earnings",label: "Insurable Earnings (GHS)", type: "currency" },
-    { key: "employee_contrib",  label: "Employee Tier 2 5% (GHS)", type: "currency" },
-    { key: "employer_contrib",  label: "Employer Tier 2 (GHS)",    type: "currency" },
-    { key: "total_contrib",     label: "Total Tier 2 (GHS)",       type: "currency" },
+    { key: "employee_id_no",   label: "Employee ID",               type: "text" },
+    { key: "employee_name",    label: "Employee Name",             type: "text" },
+    { key: "ssnit_number",     label: "SSNIT Number",              type: "text" },
+    { key: "ghana_card_number",label: "Ghana Card No.",            type: "text" },
+    { key: "department",       label: "Department",                type: "text" },
+    { key: "basic_earnings",   label: "Basic Earnings (GHS)",      type: "currency" },
+    { key: "employee_contrib", label: "Employee Tier 2 (5%) (GHS)", type: "currency" },
   ]
 
-  const typedRows = rows.map((r) => ({
-    employee_id_no:     r.employee_id_no ?? "",
-    employee_name:      r.employee_name ?? "",
-    ssnit_number:       r.ssnit_number ?? "",
-    department:         r.department ?? "",
-    insurable_earnings: ghs(r.basic_salary),
-    employee_contrib:   ghs(r.tier2_employee),
-    employer_contrib:   ghs(r.tier2_employer),
-    total_contrib:      ghs(r.tier2_employee) + ghs(r.tier2_employer),
-  }))
+  const typedRows = rows.map((r) => {
+    const basic        = ghs(r.basic_salary)
+    const empContrib   = ghs(basic * 0.05)   // employee 5%
+    return {
+      employee_id_no:    r.employee_id_no ?? "",
+      employee_name:     r.employee_name ?? "",
+      ssnit_number:      r.ssnit_number ?? "",
+      ghana_card_number: r.ghana_card_number ?? "",
+      department:        r.department ?? "",
+      basic_earnings:    basic,
+      employee_contrib:  empContrib,
+    }
+  })
 
   const summary = {
     total_employees:    rows.length,
-    total_insurable:    rows.reduce((s, r) => s + ghs(r.basic_salary), 0),
-    total_employee:     rows.reduce((s, r) => s + ghs(r.tier2_employee), 0),
-    total_employer:     rows.reduce((s, r) => s + ghs(r.tier2_employer), 0),
-    total_contributions:rows.reduce((s, r) => s + ghs(r.tier2_employee) + ghs(r.tier2_employer), 0),
+    total_basic_earnings: rows.reduce((s, r) => s + ghs(r.basic_salary), 0),
+    total_employee_5:   typedRows.reduce((s, r) => s + r.employee_contrib, 0),
   }
 
   return {
@@ -439,35 +459,83 @@ function buildSSNITTier2Report(
   }
 }
 
-/** Report 4 — Bank Payment Advice */
+/** Report 4 — Bank Payment Advice
+ *  Rows grouped by bank (alphabetically).
+ *  A bank sub-header row is injected before each bank's employees.
+ *  A summary section appended showing totals per bank and grand total.
+ */
 function buildBankAdviceReport(
   rows: PayrollReportRow[],
   meta: ReportMeta
 ): GeneratedReport {
   const columns: ReportColumn[] = [
-    { key: "employee_id_no", label: "Employee ID",       type: "text" },
-    { key: "employee_name",  label: "Employee Name",     type: "text" },
-    { key: "bank_name",      label: "Bank",              type: "text" },
-    { key: "account_number", label: "Account Number",    type: "text" },
-    { key: "net_pay",        label: "Net Pay (GHS)",     type: "currency" },
-    { key: "pay_date",       label: "Payment Date",      type: "date" },
-    { key: "reference",      label: "Reference",         type: "text" },
+    { key: "employee_id_no", label: "Employee ID",    type: "text" },
+    { key: "employee_name",  label: "Employee Name",  type: "text" },
+    { key: "bank_name",      label: "Bank",           type: "text" },
+    { key: "account_number", label: "Account Number", type: "text" },
+    { key: "net_pay",        label: "Net Pay (GHS)",  type: "currency" },
+    { key: "pay_date",       label: "Payment Date",   type: "date" },
+    { key: "reference",      label: "Reference",      type: "text" },
   ]
 
-  const typedRows = rows.map((r) => ({
-    employee_id_no: r.employee_id_no ?? "",
-    employee_name:  r.employee_name ?? "",
-    bank_name:      r.bank_name ?? "",
-    account_number: r.account_number ?? "",
-    net_pay:        ghs(r.net_pay),
-    pay_date:       r.pay_date ?? "",
-    reference:      `SAL/${r.pay_period}/${r.employee_id_no ?? r.employee_id.slice(0, 8).toUpperCase()}`,
-  }))
-
-  const summary = {
-    total_employees: rows.length,
-    total_net_pay:   rows.reduce((s, r) => s + ghs(r.net_pay), 0),
+  // Group rows by bank name
+  const bankMap = new Map<string, PayrollReportRow[]>()
+  for (const r of rows) {
+    const bank = r.bank_name?.trim() || "Unknown Bank"
+    if (!bankMap.has(bank)) bankMap.set(bank, [])
+    bankMap.get(bank)!.push(r)
   }
+
+  // Sort banks alphabetically
+  const sortedBanks = Array.from(bankMap.keys()).sort()
+
+  // Build typed rows: inject a sub-header row per bank then each employee
+  const typedRows: Record<string, unknown>[] = []
+  for (const bank of sortedBanks) {
+    const bankRows = bankMap.get(bank)!
+    // Bank header marker row (used in CSV to visually separate banks)
+    typedRows.push({
+      employee_id_no: `--- ${bank} ---`,
+      employee_name:  "",
+      bank_name:      "",
+      account_number: "",
+      net_pay:        "",
+      pay_date:       "",
+      reference:      "",
+    })
+    for (const r of bankRows) {
+      typedRows.push({
+        employee_id_no: r.employee_id_no ?? "",
+        employee_name:  r.employee_name ?? "",
+        bank_name:      r.bank_name ?? "",
+        account_number: r.account_number ?? "",
+        net_pay:        ghs(r.net_pay),
+        pay_date:       r.pay_date ?? "",
+        reference:      `SAL/${r.pay_period}/${r.employee_id_no ?? r.employee_id.slice(0, 8).toUpperCase()}`,
+      })
+    }
+    // Bank sub-total row
+    const bankTotal = bankRows.reduce((s, r) => s + ghs(r.net_pay), 0)
+    typedRows.push({
+      employee_id_no: `  ${bank} Subtotal`,
+      employee_name:  `${bankRows.length} employee(s)`,
+      bank_name:      "",
+      account_number: "",
+      net_pay:        bankTotal,
+      pay_date:       "",
+      reference:      "",
+    })
+  }
+
+  // Summary object — per bank totals + grand total
+  const summaryEntries: Record<string, number> = { total_employees: rows.length }
+  for (const bank of sortedBanks) {
+    const bankRows  = bankMap.get(bank)!
+    const safeKey   = bank.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase()
+    summaryEntries[`bank_${safeKey}_employees`] = bankRows.length
+    summaryEntries[`bank_${safeKey}_total`]     = bankRows.reduce((s, r) => s + ghs(r.net_pay), 0)
+  }
+  summaryEntries.grand_total_net_pay = rows.reduce((s, r) => s + ghs(r.net_pay), 0)
 
   return {
     ...meta,
@@ -476,49 +544,55 @@ function buildBankAdviceReport(
     row_count: rows.length,
     columns,
     rows: typedRows,
-    summary,
+    summary: summaryEntries,
     csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.bank_advice),
   }
 }
 
-/** Report 5 — Cost to Company (CTC) */
+/** Report 5 — Cost to Company (CTC)
+ *  SSNIT employer: recomputed as 13% on basic earnings
+ *  Tier 2 employer column removed per requirement
+ */
 function buildCTCReport(
   rows: PayrollReportRow[],
   meta: ReportMeta
 ): GeneratedReport {
   const columns: ReportColumn[] = [
-    { key: "employee_id_no",     label: "Employee ID",            type: "text" },
-    { key: "employee_name",      label: "Employee Name",          type: "text" },
-    { key: "department",         label: "Department",             type: "text" },
-    { key: "basic_salary",       label: "Basic Salary (GHS)",     type: "currency" },
-    { key: "total_allowances",   label: "Allowances (GHS)",       type: "currency" },
-    { key: "gross_pay",          label: "Gross Pay (GHS)",        type: "currency" },
-    { key: "ssnit_employer",     label: "SSNIT Employer (GHS)",   type: "currency" },
-    { key: "tier2_employer",     label: "Tier 2 Employer (GHS)",  type: "currency" },
-    { key: "tier3_employer",     label: "Tier 3 Employer (GHS)",  type: "currency" },
-    { key: "cost_to_company",    label: "Total CTC (GHS)",        type: "currency" },
+    { key: "employee_id_no",     label: "Employee ID",               type: "text" },
+    { key: "employee_name",      label: "Employee Name",             type: "text" },
+    { key: "department",         label: "Department",                type: "text" },
+    { key: "basic_salary",       label: "Basic Salary (GHS)",        type: "currency" },
+    { key: "total_allowances",   label: "Allowances (GHS)",          type: "currency" },
+    { key: "gross_pay",          label: "Gross Pay (GHS)",           type: "currency" },
+    { key: "ssnit_employer",     label: "SSNIT Employer 13% (GHS)",  type: "currency" },
+    { key: "tier3_employer",     label: "Tier 3 Employer (GHS)",     type: "currency" },
+    { key: "cost_to_company",    label: "Total CTC (GHS)",           type: "currency" },
   ]
 
-  const typedRows = rows.map((r) => ({
-    employee_id_no:   r.employee_id_no ?? "",
-    employee_name:    r.employee_name ?? "",
-    department:       r.department ?? "",
-    basic_salary:     ghs(r.basic_salary),
-    total_allowances: ghs(r.total_allowances),
-    gross_pay:        ghs(r.gross_pay),
-    ssnit_employer:   ghs(r.ssnit_employer),
-    tier2_employer:   ghs(r.tier2_employer),
-    tier3_employer:   ghs(r.tier3_employer),
-    cost_to_company:  ghs(r.cost_to_company),
-  }))
+  const typedRows = rows.map((r) => {
+    const basic         = ghs(r.basic_salary)
+    const ssnitEmployer = ghs(basic * 0.13)      // 13% on basic
+    const tier3Empl     = ghs(r.tier3_employer)
+    const ctc           = ghs(r.gross_pay) + ssnitEmployer + tier3Empl
+    return {
+      employee_id_no:   r.employee_id_no ?? "",
+      employee_name:    r.employee_name ?? "",
+      department:       r.department ?? "",
+      basic_salary:     basic,
+      total_allowances: ghs(r.total_allowances),
+      gross_pay:        ghs(r.gross_pay),
+      ssnit_employer:   ssnitEmployer,
+      tier3_employer:   tier3Empl,
+      cost_to_company:  ctc,
+    }
+  })
 
   const summary = {
-    total_employees:  rows.length,
-    total_gross:      rows.reduce((s, r) => s + ghs(r.gross_pay), 0),
-    total_employer_contributions: rows.reduce(
-      (s, r) => s + ghs(r.ssnit_employer) + ghs(r.tier2_employer) + ghs(r.tier3_employer), 0
-    ),
-    total_ctc: rows.reduce((s, r) => s + ghs(r.cost_to_company), 0),
+    total_employees:       rows.length,
+    total_gross:           rows.reduce((s, r) => s + ghs(r.gross_pay), 0),
+    total_ssnit_employer:  typedRows.reduce((s, r) => s + r.ssnit_employer, 0),
+    total_tier3_employer:  typedRows.reduce((s, r) => s + r.tier3_employer, 0),
+    total_ctc:             typedRows.reduce((s, r) => s + r.cost_to_company, 0),
   }
 
   return {
@@ -533,102 +607,191 @@ function buildCTCReport(
   }
 }
 
-/** Report 6 — Loans & Advances */
+/** Report 6 — Loans & Advances
+ *  Rows sourced from payslips (loan_deduction, advance_deduction) for the period.
+ *  Grouped into separate sections per loan type, then a summary page.
+ */
 function buildLoansReport(
   rows: PayrollReportRow[],
   meta: ReportMeta
 ): GeneratedReport {
   const columns: ReportColumn[] = [
-    { key: "employee_id_no",    label: "Employee ID",          type: "text" },
-    { key: "employee_name",     label: "Employee Name",        type: "text" },
-    { key: "department",        label: "Department",           type: "text" },
-    { key: "loan_amount",       label: "Loan Principal (GHS)", type: "currency" },
-    { key: "loan_deduction",    label: "Monthly Repayment (GHS)", type: "currency" },
-    { key: "advance_deduction", label: "Advance Deduction (GHS)", type: "currency" },
-    { key: "current_loan_balance", label: "Outstanding Balance (GHS)", type: "currency" },
+    { key: "employee_id_no",       label: "Employee ID",              type: "text" },
+    { key: "employee_name",        label: "Employee Name",            type: "text" },
+    { key: "department",           label: "Department",               type: "text" },
+    { key: "loan_type",            label: "Loan / Advance Type",      type: "text" },
+    { key: "monthly_deduction",    label: "Monthly Deduction (GHS)",  type: "currency" },
+    { key: "outstanding_balance",  label: "Outstanding Balance (GHS)", type: "currency" },
   ]
 
-  const withLoans = rows.filter(
-    (r) => ghs(r.loan_deduction) > 0 || ghs(r.advance_deduction) > 0
+  type LoanRow = { employee_id_no: string; employee_name: string; department: string; loan_type: string; monthly_deduction: number; outstanding_balance: number }
+  const loanRows: LoanRow[] = []
+  const advanceRows: LoanRow[] = []
+
+  for (const r of rows) {
+    const base = { employee_id_no: r.employee_id_no ?? "", employee_name: r.employee_name ?? "", department: r.department ?? "" }
+    if (ghs(r.loan_deduction) > 0) {
+      loanRows.push({ ...base, loan_type: "Loan", monthly_deduction: ghs(r.loan_deduction), outstanding_balance: ghs(r.current_loan_balance ?? 0) })
+    }
+    if (ghs(r.advance_deduction) > 0) {
+      advanceRows.push({ ...base, loan_type: "Advance", monthly_deduction: ghs(r.advance_deduction), outstanding_balance: 0 })
+    }
+  }
+
+  const sectionHeader = (title: string) => ({
+    employee_id_no: `=== ${title} ===`, employee_name: "", department: "", loan_type: "", monthly_deduction: "" as unknown as number, outstanding_balance: "" as unknown as number,
+  })
+  const subtotalRow = (label: string, count: number, total: number, balance: number) => ({
+    employee_id_no: `  ${label}`, employee_name: `${count} employee(s)`, department: "", loan_type: "SUBTOTAL", monthly_deduction: total, outstanding_balance: balance,
+  })
+  const blankRow = { employee_id_no: "", employee_name: "", department: "", loan_type: "", monthly_deduction: "" as unknown as number, outstanding_balance: "" as unknown as number }
+
+  const loanDeductTotal    = loanRows.reduce((s, r) => s + r.monthly_deduction, 0)
+  const loanBalanceTotal   = loanRows.reduce((s, r) => s + r.outstanding_balance, 0)
+  const advanceDeductTotal = advanceRows.reduce((s, r) => s + r.monthly_deduction, 0)
+  const grandTotal         = loanDeductTotal + advanceDeductTotal
+
+  const combinedRows: Record<string, unknown>[] = []
+
+  if (loanRows.length > 0) {
+    combinedRows.push(sectionHeader("LOANS"), ...loanRows, subtotalRow("Loans Subtotal", loanRows.length, loanDeductTotal, loanBalanceTotal), blankRow)
+  }
+  if (advanceRows.length > 0) {
+    combinedRows.push(sectionHeader("ADVANCES"), ...advanceRows, subtotalRow("Advances Subtotal", advanceRows.length, advanceDeductTotal, 0), blankRow)
+  }
+
+  // Summary section
+  combinedRows.push(
+    sectionHeader("SUMMARY"),
+    { employee_id_no: "Type", employee_name: "No. of Employees", department: "", loan_type: "Total Deduction (GHS)", monthly_deduction: "" as unknown as number, outstanding_balance: "" as unknown as number },
+    { employee_id_no: "Loans",    employee_name: String(loanRows.length),    department: "", loan_type: "",    monthly_deduction: loanDeductTotal,    outstanding_balance: loanBalanceTotal },
+    { employee_id_no: "Advances", employee_name: String(advanceRows.length), department: "", loan_type: "",    monthly_deduction: advanceDeductTotal,  outstanding_balance: 0 },
+    { employee_id_no: "GRAND TOTAL", employee_name: String(loanRows.length + advanceRows.length), department: "", loan_type: "", monthly_deduction: grandTotal, outstanding_balance: loanBalanceTotal },
   )
 
-  const typedRows = withLoans.map((r) => ({
-    employee_id_no:       r.employee_id_no ?? "",
-    employee_name:        r.employee_name ?? "",
-    department:           r.department ?? "",
-    loan_amount:          ghs(r.loan_amount ?? 0),
-    loan_deduction:       ghs(r.loan_deduction),
-    advance_deduction:    ghs(r.advance_deduction),
-    current_loan_balance: ghs(r.current_loan_balance ?? 0),
-  }))
-
+  const allRows = [...loanRows, ...advanceRows]
   const summary = {
-    total_with_loans:        withLoans.length,
-    total_loan_deductions:   withLoans.reduce((s, r) => s + ghs(r.loan_deduction), 0),
-    total_advance_deductions:withLoans.reduce((s, r) => s + ghs(r.advance_deduction), 0),
-    total_outstanding:       withLoans.reduce((s, r) => s + ghs(r.current_loan_balance ?? 0), 0),
+    total_employees_with_loans:    new Set(loanRows.map((r) => r.employee_id_no)).size,
+    total_employees_with_advances: new Set(advanceRows.map((r) => r.employee_id_no)).size,
+    total_loan_deductions:         loanDeductTotal,
+    total_advance_deductions:      advanceDeductTotal,
+    total_outstanding_balance:     loanBalanceTotal,
+    grand_total_deductions:        grandTotal,
   }
 
   return {
     ...meta,
     report_type: "loans",
     report_name: REPORT_LABELS.loans,
-    row_count: withLoans.length,
+    row_count: allRows.length,
     columns,
-    rows: typedRows,
+    rows: combinedRows,
     summary,
-    csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.loans),
+    csv: withCsvMeta(columns, combinedRows, meta, REPORT_LABELS.loans),
   }
 }
 
-/** Report 7 — Allowances Breakdown */
+/** Report 7 — Allowances Breakdown
+ *  Split into three sections in the CSV:
+ *    Section 1: Taxable Allowances (housing is taxable in Ghana)
+ *    Section 2: Non-Taxable Allowances (transport, medical, meal, communication, other)
+ *    Section 3: Summary — totals + employee counts per section
+ *
+ *  Taxable determination (per Ghana tax law defaults):
+ *    Taxable: housing_allowance
+ *    Non-taxable: transport, medical, meal, communication, other
+ *
+ *  The employee_allowances table stores individual taxability flags, but
+ *  since payslips aggregate amounts into type buckets we apply the statutory defaults here.
+ */
 function buildAllowancesReport(
   rows: PayrollReportRow[],
   meta: ReportMeta
 ): GeneratedReport {
-  const columns: ReportColumn[] = [
-    { key: "employee_id_no",       label: "Employee ID",               type: "text" },
-    { key: "employee_name",        label: "Employee Name",             type: "text" },
-    { key: "department",           label: "Department",                type: "text" },
-    { key: "transport_allowance",  label: "Transport (GHS)",           type: "currency" },
-    { key: "housing_allowance",    label: "Housing (GHS)",             type: "currency" },
-    { key: "medical_allowance",    label: "Medical (GHS)",             type: "currency" },
-    { key: "meal_allowance",       label: "Meal (GHS)",                type: "currency" },
-    { key: "communication_allowance", label: "Communication (GHS)",    type: "currency" },
-    { key: "other_allowances",     label: "Other (GHS)",               type: "currency" },
-    { key: "total_allowances",     label: "Total Allowances (GHS)",    type: "currency" },
+  const baseColumns: ReportColumn[] = [
+    { key: "employee_id_no",       label: "Employee ID",            type: "text" },
+    { key: "employee_name",        label: "Employee Name",          type: "text" },
+    { key: "department",           label: "Department",             type: "text" },
+    { key: "allowance_type",       label: "Allowance Type",         type: "text" },
+    { key: "taxable",              label: "Taxable / Non-Taxable",  type: "text" },
+    { key: "amount",               label: "Amount (GHS)",           type: "currency" },
   ]
 
-  const typedRows = rows.map((r) => ({
-    employee_id_no:          r.employee_id_no ?? "",
-    employee_name:           r.employee_name ?? "",
-    department:              r.department ?? "",
-    transport_allowance:     ghs(r.transport_allowance),
-    housing_allowance:       ghs(r.housing_allowance),
-    medical_allowance:       ghs(r.medical_allowance),
-    meal_allowance:          ghs(r.meal_allowance),
-    communication_allowance: ghs(r.communication_allowance),
-    other_allowances:        ghs(r.other_allowances),
-    total_allowances:        ghs(r.total_allowances),
-  }))
+  // Produce one row per allowance type per employee
+  type AllowRow = { employee_id_no: string; employee_name: string; department: string; allowance_type: string; taxable: string; amount: number }
+  const allAllowRows: AllowRow[] = []
+
+  for (const r of rows) {
+    const base = { employee_id_no: r.employee_id_no ?? "", employee_name: r.employee_name ?? "", department: r.department ?? "" }
+    const items: { type: string; taxable: string; amount: number }[] = [
+      { type: "Transport Allowance",      taxable: "Non-Taxable", amount: ghs(r.transport_allowance) },
+      { type: "Housing Allowance",        taxable: "Taxable",     amount: ghs(r.housing_allowance) },
+      { type: "Medical Allowance",        taxable: "Non-Taxable", amount: ghs(r.medical_allowance) },
+      { type: "Meal Allowance",           taxable: "Non-Taxable", amount: ghs(r.meal_allowance) },
+      { type: "Communication Allowance",  taxable: "Non-Taxable", amount: ghs(r.communication_allowance) },
+      { type: "Other Allowances",         taxable: "Non-Taxable", amount: ghs(r.other_allowances) },
+    ]
+    for (const it of items) {
+      if (it.amount > 0) {
+        allAllowRows.push({ ...base, allowance_type: it.type, taxable: it.taxable, amount: it.amount })
+      }
+    }
+  }
+
+  // Split into taxable and non-taxable
+  const taxableRows    = allAllowRows.filter((r) => r.taxable === "Taxable")
+  const nonTaxableRows = allAllowRows.filter((r) => r.taxable === "Non-Taxable")
+
+  // Build combined CSV with section headers + summary
+  const sectionHeader = (title: string) => ({
+    employee_id_no: `=== ${title} ===`,
+    employee_name: "", department: "", allowance_type: "", taxable: "", amount: "",
+  })
+  const subtotalRow = (label: string, count: number, total: number) => ({
+    employee_id_no: `  ${label}`, employee_name: `${count} row(s)`,
+    department: "", allowance_type: "", taxable: "SUBTOTAL", amount: total,
+  })
+  const blankRow = { employee_id_no: "", employee_name: "", department: "", allowance_type: "", taxable: "", amount: "" }
+
+  const taxableTotal    = taxableRows.reduce((s, r) => s + r.amount, 0)
+  const nonTaxableTotal = nonTaxableRows.reduce((s, r) => s + r.amount, 0)
+  const taxableEmpCount = new Set(taxableRows.map((r) => r.employee_id_no)).size
+  const nonTaxEmpCount  = new Set(nonTaxableRows.map((r) => r.employee_id_no)).size
+
+  const combinedRows: Record<string, unknown>[] = [
+    sectionHeader("TAXABLE ALLOWANCES"),
+    ...taxableRows,
+    subtotalRow("Taxable Subtotal", taxableRows.length, taxableTotal),
+    blankRow,
+    sectionHeader("NON-TAXABLE ALLOWANCES"),
+    ...nonTaxableRows,
+    subtotalRow("Non-Taxable Subtotal", nonTaxableRows.length, nonTaxableTotal),
+    blankRow,
+    sectionHeader("SUMMARY"),
+    { employee_id_no: "Section", employee_name: "No. of Employees", department: "", allowance_type: "No. of Rows", taxable: "", amount: "" as unknown as number },
+    { employee_id_no: "Taxable Allowances",     employee_name: String(taxableEmpCount),  department: "", allowance_type: String(taxableRows.length),    taxable: "GHS", amount: taxableTotal },
+    { employee_id_no: "Non-Taxable Allowances", employee_name: String(nonTaxEmpCount),   department: "", allowance_type: String(nonTaxableRows.length),  taxable: "GHS", amount: nonTaxableTotal },
+    { employee_id_no: "GRAND TOTAL",            employee_name: String(rows.length),      department: "", allowance_type: String(allAllowRows.length),    taxable: "GHS", amount: taxableTotal + nonTaxableTotal },
+  ]
 
   const summary = {
-    total_employees:   rows.length,
-    total_transport:   rows.reduce((s, r) => s + ghs(r.transport_allowance), 0),
-    total_housing:     rows.reduce((s, r) => s + ghs(r.housing_allowance), 0),
-    total_medical:     rows.reduce((s, r) => s + ghs(r.medical_allowance), 0),
-    total_allowances:  rows.reduce((s, r) => s + ghs(r.total_allowances), 0),
+    total_employees:         rows.length,
+    taxable_employees:       taxableEmpCount,
+    total_taxable:           taxableTotal,
+    non_taxable_employees:   nonTaxEmpCount,
+    total_non_taxable:       nonTaxableTotal,
+    total_all_allowances:    taxableTotal + nonTaxableTotal,
   }
 
   return {
     ...meta,
     report_type: "allowances",
     report_name: REPORT_LABELS.allowances,
-    row_count: rows.length,
-    columns,
-    rows: typedRows,
+    row_count: allAllowRows.length,
+    columns: baseColumns,
+    rows: combinedRows,
     summary,
-    csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.allowances),
+    csv: withCsvMeta(baseColumns, combinedRows, meta, REPORT_LABELS.allowances),
   }
 }
 
@@ -738,49 +901,83 @@ function buildPayrollSummaryReport(
   }
 }
 
-/** Report 10 — Other Deductions */
+/** Report 10 — Other Deductions
+ *  Rows sourced from payslips for the period.
+ *  Each deduction type (Loan, Advance, Other) gets its own section, then a summary page.
+ */
 function buildDeductionsReport(
   rows: PayrollReportRow[],
   meta: ReportMeta
 ): GeneratedReport {
   const columns: ReportColumn[] = [
-    { key: "employee_id_no",    label: "Employee ID",              type: "text" },
-    { key: "employee_name",     label: "Employee Name",            type: "text" },
-    { key: "department",        label: "Department",               type: "text" },
-    { key: "loan_deduction",    label: "Loan Deduction (GHS)",     type: "currency" },
-    { key: "advance_deduction", label: "Advance Deduction (GHS)",  type: "currency" },
-    { key: "other_deductions",  label: "Other Deductions (GHS)",   type: "currency" },
-    { key: "total_other",       label: "Total Non-Tax Ded. (GHS)", type: "currency" },
-    { key: "net_pay",           label: "Net Pay (GHS)",            type: "currency" },
+    { key: "employee_id_no",   label: "Employee ID",          type: "text" },
+    { key: "employee_name",    label: "Employee Name",        type: "text" },
+    { key: "department",       label: "Department",           type: "text" },
+    { key: "deduction_type",   label: "Deduction Type",       type: "text" },
+    { key: "amount",           label: "Amount (GHS)",         type: "currency" },
   ]
 
-  const typedRows = rows.map((r) => ({
-    employee_id_no:    r.employee_id_no ?? "",
-    employee_name:     r.employee_name ?? "",
-    department:        r.department ?? "",
-    loan_deduction:    ghs(r.loan_deduction),
-    advance_deduction: ghs(r.advance_deduction),
-    other_deductions:  ghs(r.other_deductions),
-    total_other:       ghs(r.loan_deduction) + ghs(r.advance_deduction) + ghs(r.other_deductions),
-    net_pay:           ghs(r.net_pay),
-  }))
+  type DedRow = { employee_id_no: string; employee_name: string; department: string; deduction_type: string; amount: number }
+  const loanDedRows:    DedRow[] = []
+  const advanceDedRows: DedRow[] = []
+  const otherDedRows:   DedRow[] = []
+
+  for (const r of rows) {
+    const base = { employee_id_no: r.employee_id_no ?? "", employee_name: r.employee_name ?? "", department: r.department ?? "" }
+    if (ghs(r.loan_deduction) > 0)    loanDedRows.push({ ...base, deduction_type: "Loan Deduction", amount: ghs(r.loan_deduction) })
+    if (ghs(r.advance_deduction) > 0) advanceDedRows.push({ ...base, deduction_type: "Advance Deduction", amount: ghs(r.advance_deduction) })
+    if (ghs(r.other_deductions) > 0)  otherDedRows.push({ ...base, deduction_type: "Other Deduction", amount: ghs(r.other_deductions) })
+  }
+
+  const sectionHeader = (title: string) => ({
+    employee_id_no: `=== ${title} ===`, employee_name: "", department: "", deduction_type: "", amount: "" as unknown as number,
+  })
+  const subtotalRow = (label: string, count: number, total: number) => ({
+    employee_id_no: `  ${label}`, employee_name: `${count} employee(s)`, department: "", deduction_type: "SUBTOTAL", amount: total,
+  })
+  const blankRow = { employee_id_no: "", employee_name: "", department: "", deduction_type: "", amount: "" as unknown as number }
+
+  const loanTotal    = loanDedRows.reduce((s, r) => s + r.amount, 0)
+  const advanceTotal = advanceDedRows.reduce((s, r) => s + r.amount, 0)
+  const otherTotal   = otherDedRows.reduce((s, r) => s + r.amount, 0)
+  const grandTotal   = loanTotal + advanceTotal + otherTotal
+
+  const combinedRows: Record<string, unknown>[] = []
+  if (loanDedRows.length > 0)    combinedRows.push(sectionHeader("LOAN DEDUCTIONS"), ...loanDedRows, subtotalRow("Loans Subtotal", loanDedRows.length, loanTotal), blankRow)
+  if (advanceDedRows.length > 0) combinedRows.push(sectionHeader("ADVANCE DEDUCTIONS"), ...advanceDedRows, subtotalRow("Advances Subtotal", advanceDedRows.length, advanceTotal), blankRow)
+  if (otherDedRows.length > 0)   combinedRows.push(sectionHeader("OTHER DEDUCTIONS"), ...otherDedRows, subtotalRow("Other Subtotal", otherDedRows.length, otherTotal), blankRow)
+
+  // Summary section
+  const allDedRows = [...loanDedRows, ...advanceDedRows, ...otherDedRows]
+  combinedRows.push(
+    sectionHeader("SUMMARY"),
+    { employee_id_no: "Deduction Type", employee_name: "No. of Employees", department: "", deduction_type: "Total Amount (GHS)", amount: "" as unknown as number },
+    { employee_id_no: "Loan Deductions",    employee_name: String(new Set(loanDedRows.map((r) => r.employee_id_no)).size),    department: "", deduction_type: "",    amount: loanTotal },
+    { employee_id_no: "Advance Deductions", employee_name: String(new Set(advanceDedRows.map((r) => r.employee_id_no)).size), department: "", deduction_type: "",    amount: advanceTotal },
+    { employee_id_no: "Other Deductions",   employee_name: String(new Set(otherDedRows.map((r) => r.employee_id_no)).size),   department: "", deduction_type: "",    amount: otherTotal },
+    { employee_id_no: "GRAND TOTAL",        employee_name: String(new Set(allDedRows.map((r) => r.employee_id_no)).size),     department: "", deduction_type: "ALL", amount: grandTotal },
+  )
 
   const summary = {
-    total_employees: rows.length,
-    total_loans:     rows.reduce((s, r) => s + ghs(r.loan_deduction), 0),
-    total_advances:  rows.reduce((s, r) => s + ghs(r.advance_deduction), 0),
-    total_other:     rows.reduce((s, r) => s + ghs(r.other_deductions), 0),
+    total_employees:         rows.length,
+    employees_with_loans:    new Set(loanDedRows.map((r) => r.employee_id_no)).size,
+    employees_with_advances: new Set(advanceDedRows.map((r) => r.employee_id_no)).size,
+    employees_with_others:   new Set(otherDedRows.map((r) => r.employee_id_no)).size,
+    total_loans:             loanTotal,
+    total_advances:          advanceTotal,
+    total_others:            otherTotal,
+    grand_total:             grandTotal,
   }
 
   return {
     ...meta,
     report_type: "deductions",
     report_name: REPORT_LABELS.deductions,
-    row_count: rows.length,
+    row_count: allDedRows.length,
     columns,
-    rows: typedRows,
+    rows: combinedRows,
     summary,
-    csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.deductions),
+    csv: withCsvMeta(columns, combinedRows, meta, REPORT_LABELS.deductions),
   }
 }
 

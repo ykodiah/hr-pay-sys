@@ -67,6 +67,9 @@ export interface PayrollReportRow {
   account_number:        string | null
   company_name:          string | null
   ghana_card_number:     string | null
+  snapshot_subsidiary:   string | null
+  snapshot_division:     string | null
+  snapshot_location:     string | null
   date_of_joining:       string | null
   contract_type:         string | null
   basic_salary:          number

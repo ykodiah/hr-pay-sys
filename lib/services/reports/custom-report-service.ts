@@ -88,8 +88,11 @@ async function fetchPayrollRows(companyId: string, payPeriod: string): Promise<P
       ssnit_number: fin?.ssnit_number ?? "",
       bank_name: fin?.bank_name ?? "",
       account_number: fin?.bank_account_number ?? "",
-      company_name: "",
+      company_name: p.snapshot_company_name ?? "",
       ghana_card_number: emp?.ghana_card_number ?? "",
+      snapshot_subsidiary: p.snapshot_subsidiary ?? emp?.subsidiary_name ?? null,
+      snapshot_division: p.snapshot_division ?? emp?.division ?? null,
+      snapshot_location: p.snapshot_location ?? emp?.location ?? null,
       date_of_joining: null,
       contract_type: null,
       basic_salary: Number(p.basic_salary ?? 0),
@@ -183,6 +186,7 @@ export async function runCustomReport(options: {
   definitionId?: string
   definition?: CustomReportDefinition
   payPeriod: string
+  filters?: Record<string, string | null>
 }) {
   const client = await createClient()
   let def = options.definition
@@ -201,7 +205,29 @@ export async function runCustomReport(options: {
     throw new Error("Custom report must include at least one column")
   }
 
-  const sourceRows = await fetchPayrollRows(options.companyId, options.payPeriod)
+  let sourceRows = await fetchPayrollRows(options.companyId, options.payPeriod)
+
+  // Apply any filters passed in (from custom designer or saved definition)
+  const filters = (options.filters ?? (def as any)?.filters ?? {}) as Record<string, string | null>
+  if (filters.subsidiary) {
+    sourceRows = sourceRows.filter((r) => {
+      const sub = (r as any).snapshot_subsidiary ?? ""
+      return sub === filters.subsidiary
+    })
+  }
+  if (filters.division) {
+    sourceRows = sourceRows.filter((r) => {
+      const div = (r as any).snapshot_division ?? (r as any).division ?? ""
+      return div === filters.division
+    })
+  }
+  if (filters.location) {
+    sourceRows = sourceRows.filter((r) => {
+      const loc = (r as any).snapshot_location ?? (r as any).location ?? ""
+      return loc === filters.location
+    })
+  }
+
   const columns = def.columns as ReportColumn[]
   const typedRows = sourceRows.map((row) => {
     const out: Record<string, unknown> = {}

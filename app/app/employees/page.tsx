@@ -1386,13 +1386,13 @@ export default function EmployeesPage() {
               </div>
             ) : (
               <div className="max-h-[600px] overflow-y-auto pr-1 scrollbar-thin">
-              <div className="grid gap-4">
+              <div className="grid gap-2">
                 {filteredEmployees.map((employee) => (
-                  <Card key={employee.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <Avatar className="w-12 h-12">
+                  <Card key={employee.id} className="hover:shadow-sm transition-shadow">
+                    <CardContent className="px-4 py-2.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Avatar className="w-8 h-8 shrink-0">
                             <AvatarImage
                               src={
                                 employee.profile_picture ||
@@ -1400,59 +1400,51 @@ export default function EmployeesPage() {
                                 `https://api.dicebear.com/7.x/initials/svg?seed=${listDisplayName(employee)}`
                               }
                             />
-                            <AvatarFallback className="bg-emerald-100 text-emerald-700">
+                            <AvatarFallback className="bg-emerald-100 text-emerald-700 text-xs">
                               {listDisplayName(employee)
                                 ?.split(" ")
                                 .map((n: string) => n[0])
                                 .join("")}
                             </AvatarFallback>
                           </Avatar>
-                          <div>
-                            <h3 className="font-semibold text-lg">{listDisplayName(employee)}</h3>
-                            <p className="text-gray-600">{employee.position}</p>
-                            <div className="flex items-center space-x-4 mt-1">
-                              <span className="text-sm text-gray-500">{employee.department}</span>
-                              <span className="text-sm text-gray-500">•</span>
-                              <span className="text-sm text-gray-500">ID: {listEmployeeCode(employee)}</span>
-                            </div>
+                          <div className="min-w-0">
+                            <h3 className="font-medium text-sm leading-tight truncate">{listDisplayName(employee)}</h3>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {employee.position}
+                              {employee.department ? ` · ${employee.department}` : ""}
+                              {listEmployeeCode(employee) ? ` · ${listEmployeeCode(employee)}` : ""}
+                            </p>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-6">
-                          <div className="text-right">
-                            <p className="text-sm text-gray-500">Monthly Salary</p>
-                            <p className="text-sm font-medium">{formatAmount(listMonthlySalary(employee))}</p>
+                        <div className="flex items-center gap-4 shrink-0">
+                          <div className="text-right hidden sm:block">
+                            <p className="text-xs text-muted-foreground leading-none">Salary</p>
+                            <p className="text-xs font-medium mt-0.5">{formatAmount(listMonthlySalary(employee))}</p>
                           </div>
-                          <div className="text-right">
-                            <p className="text-sm text-gray-500">Status</p>
-                            <Badge
-                              variant={employee.status === "Active" ? "default" : "secondary"}
-                              className={
-                                employee.status === "Active"
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : "bg-gray-100 text-gray-800"
-                              }
-                            >
-                              {employee.status}
-                            </Badge>
-                          </div>
+                          <Badge
+                            variant={employee.status === "Active" ? "default" : "secondary"}
+                            className={`text-[10px] px-1.5 py-0 h-5 ${
+                              employee.status === "Active"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-gray-100 text-gray-800"
+                            }`}
+                          >
+                            {employee.status}
+                          </Badge>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="w-4 h-4" />
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                <MoreHorizontal className="w-3.5 h-3.5" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem
                                 onClick={async () => {
                                   try {
-                                    const res = await fetch(`/api/employees/${employee.id}?include_financial=true`, {
-                                      cache: "no-store",
-                                    })
+                                    const res = await fetch(`/api/employees/${employee.id}?include_financial=true`, { cache: "no-store" })
                                     const json = await res.json()
                                     setSelectedEmployee(json.employee || employee)
-                                  } catch {
-                                    setSelectedEmployee(employee)
-                                  }
+                                  } catch { setSelectedEmployee(employee) }
                                   setIsEditDialogOpen(true)
                                 }}
                               >
@@ -1462,14 +1454,10 @@ export default function EmployeesPage() {
                               <DropdownMenuItem
                                 onClick={async () => {
                                   try {
-                                    const res = await fetch(`/api/employees/${employee.id}?include_financial=true`, {
-                                      cache: "no-store",
-                                    })
+                                    const res = await fetch(`/api/employees/${employee.id}?include_financial=true`, { cache: "no-store" })
                                     const json = await res.json()
                                     setSelectedEmployee(json.employee || employee)
-                                  } catch {
-                                    setSelectedEmployee(employee)
-                                  }
+                                  } catch { setSelectedEmployee(employee) }
                                   setIsEditDialogOpen(true)
                                 }}
                               >

@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "run") {
-      const { company_id, pay_period, definition_id, definition, download } = body
+      const { company_id, pay_period, definition_id, definition, download, format, filters } = body
       if (!company_id || !pay_period) {
         return NextResponse.json(
           { error: "company_id and pay_period are required" },
@@ -75,10 +75,56 @@ export async function POST(req: NextRequest) {
         payPeriod: pay_period,
         definitionId: definition_id,
         definition,
+        filters: filters ?? {},
       })
 
       if (download) {
         const safeName = report.report_name.replace(/[^a-zA-Z0-9_-]+/g, "-").toLowerCase()
+        const fmt = String(format || "csv").toLowerCase()
+
+        if (fmt === "pdf" || fmt === "html") {
+          const { loadCompanyBrand, renderBrandedHtmlDocument } = await import("@/lib/exports/company-branding")
+          const { createClient } = await import("@/lib/supabase/server")
+          const client = await createClient()
+          const company = await loadCompanyBrand(client, company_id)
+          const cols = report.columns || []
+
+          const money = (n: number) =>
+            Number(n || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+          const headerHtml = cols.map((c: any) => `<th>${c.label}</th>`).join("")
+          const bodyHtml = (report.rows || [])
+            .map((r: any) => {
+              const cells = cols.map((c: any) => {
+                const val = r[c.key]
+                if (c.type === "currency" || c.type === "number") {
+                  return `<td class="right">${typeof val === "number" ? money(val) : String(val ?? "")}</td>`
+                }
+                return `<td>${String(val ?? "")}</td>`
+              }).join("")
+              return `<tr>${cells}</tr>`
+            })
+            .join("")
+
+          const html = renderBrandedHtmlDocument({
+            title: report.report_name,
+            company,
+            period: pay_period,
+            subtitle: `${report.row_count} employee row(s)`,
+            bodyHtml: `<table><thead><tr>${headerHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>`,
+            autoPrint: true,
+          })
+
+          return new NextResponse(html, {
+            status: 200,
+            headers: {
+              "Content-Type": "text/html; charset=utf-8",
+              "Content-Disposition": `inline; filename="custom-${safeName}-${pay_period}.html"`,
+              "Cache-Control": "no-store",
+            },
+          })
+        }
+
         return new NextResponse(report.csv, {
           status: 200,
           headers: {

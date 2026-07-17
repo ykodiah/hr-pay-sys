@@ -330,17 +330,19 @@ export default function ComplianceReportsPage() {
   const companies: { id: string; name: string }[] = companiesData?.data ?? []
 
   // Custom report designer state
-  const [customName, setCustomName] = useState("")
+  const [customName,        setCustomName]        = useState("")
   const [customDescription, setCustomDescription] = useState("")
-  const [customCategory, setCustomCategory] = useState<"compliance" | "financial" | "banking" | "payroll" | "custom">("custom")
-  const [selectedFields, setSelectedFields] = useState<string[]>([
-    "employee_id_no",
-    "employee_name",
-    "gross_pay",
-    "paye_tax",
-    "net_pay",
+  const [customCategory,    setCustomCategory]    = useState<"compliance" | "financial" | "banking" | "payroll" | "custom">("custom")
+  // selectedFields is an ORDERED array — position in array = column order
+  const [selectedFields,    setSelectedFields]    = useState<string[]>([
+    "employee_id_no", "employee_name", "gross_pay", "paye_tax", "net_pay",
   ])
-  const [customSaving, setCustomSaving] = useState(false)
+  // Custom report filters (passed to the engine as metadata for filtering rows)
+  const [customFilterSubsidiary, setCustomFilterSubsidiary] = useState("all")
+  const [customFilterDivision,   setCustomFilterDivision]   = useState("all")
+  const [customFilterLocation,   setCustomFilterLocation]   = useState("all")
+  const [customFilterCompany,    setCustomFilterCompany]    = useState("all")
+  const [customSaving,  setCustomSaving]  = useState(false)
   const [customRunning, setCustomRunning] = useState(false)
   const customKey = companyId ? `/api/reports/custom?company_id=${companyId}` : null
   const { data: customData, mutate: mutateCustom } = useSWR(customKey, fetcher)
@@ -634,11 +636,12 @@ export default function ComplianceReportsPage() {
             <CardHeader>
               <CardTitle className="text-base">Design a custom report</CardTitle>
               <CardDescription>
-                Choose fields for compliance, financial, banking, or payroll extracts.
-                Downloads always include a title block and column headings.
+                Select columns in order — the position number shown on each checkbox defines the column order in the generated report.
+                Filter by subsidiary, company, division or location to scope the output.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Row 1: Name + Category */}
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Report name</Label>
@@ -651,9 +654,7 @@ export default function ComplianceReportsPage() {
                 <div className="space-y-2">
                   <Label>Category</Label>
                   <Select value={customCategory} onValueChange={(v: any) => setCustomCategory(v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="compliance">Compliance</SelectItem>
                       <SelectItem value="financial">Financial</SelectItem>
@@ -664,6 +665,8 @@ export default function ComplianceReportsPage() {
                   </Select>
                 </div>
               </div>
+
+              {/* Row 2: Description */}
               <div className="space-y-2">
                 <Label>Description</Label>
                 <Input
@@ -673,15 +676,89 @@ export default function ComplianceReportsPage() {
                 />
               </div>
 
+              {/* Row 3: Filters — Subsidiary / Company / Division / Location */}
               <div>
-                <Label className="mb-2 block">Columns (select headings)</Label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-72 overflow-y-auto border rounded-lg p-3">
+                <Label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Scope / Filters (optional)
+                </Label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Company</Label>
+                    <Select value={customFilterCompany} onValueChange={setCustomFilterCompany}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All companies</SelectItem>
+                        {companies.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Subsidiary</Label>
+                    <Select value={customFilterSubsidiary} onValueChange={setCustomFilterSubsidiary}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All subsidiaries</SelectItem>
+                        {(companiesData?.subsidiaries ?? []).map((s: any) => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Division</Label>
+                    <Select value={customFilterDivision} onValueChange={setCustomFilterDivision}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All divisions</SelectItem>
+                        {["Head Office", "Marketing", "Operations", "Finance", "Technology", "Sales"].map((d) => (
+                          <SelectItem key={d} value={d}>{d}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Location</Label>
+                    <Select value={customFilterLocation} onValueChange={setCustomFilterLocation}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="All" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All locations</SelectItem>
+                        {["Accra", "Kumasi", "Kumasi Branch", "Takoradi", "Tamale", "Sunyani"].map((l) => (
+                          <SelectItem key={l} value={l}>{l}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 4: Column selection with order numbers */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="block">
+                    Columns
+                    <span className="ml-1.5 text-xs text-muted-foreground font-normal">
+                      — check to add; the number shows the column&apos;s position in the report
+                    </span>
+                  </Label>
+                  {selectedFields.length > 0 && (
+                    <button
+                      className="text-xs text-muted-foreground hover:text-foreground underline"
+                      onClick={() => setSelectedFields([])}
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-80 overflow-y-auto border rounded-lg p-3">
                   {CUSTOM_FIELD_CATALOG.map((field) => {
-                    const checked = selectedFields.includes(field.key)
+                    const idx = selectedFields.indexOf(field.key)
+                    const checked = idx !== -1
                     return (
                       <label
                         key={field.key}
-                        className="flex items-start gap-2 text-sm rounded-md px-2 py-1.5 hover:bg-muted/60 cursor-pointer"
+                        className={`flex items-start gap-2 text-sm rounded-md px-2 py-1.5 cursor-pointer transition-colors ${checked ? "bg-primary/5 border border-primary/20" : "hover:bg-muted/60"}`}
                       >
                         <Checkbox
                           checked={checked}
@@ -691,16 +768,28 @@ export default function ComplianceReportsPage() {
                             )
                           }}
                         />
-                        <span>
+                        <span className="flex-1 min-w-0">
                           <span className="font-medium">{field.label}</span>
                           <span className="block text-xs text-muted-foreground capitalize">{field.source}</span>
                         </span>
+                        {checked && (
+                          <span className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
+                            {idx + 1}
+                          </span>
+                        )}
                       </label>
                     )
                   })}
                 </div>
+                {selectedFields.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    {selectedFields.length} column{selectedFields.length !== 1 ? "s" : ""} selected in order:
+                    {" "}{selectedFields.map((k) => CUSTOM_FIELD_CATALOG.find((f) => f.key === k)?.label ?? k).join(" → ")}
+                  </p>
+                )}
               </div>
 
+              {/* Action buttons */}
               <div className="flex flex-wrap gap-2">
                 <Button
                   disabled={!companyId || !customName || selectedFields.length === 0 || customSaving}
@@ -723,6 +812,12 @@ export default function ComplianceReportsPage() {
                             category: customCategory,
                             data_source: "payroll",
                             columns,
+                            filters: {
+                              company: customFilterCompany !== "all" ? customFilterCompany : null,
+                              subsidiary: customFilterSubsidiary !== "all" ? customFilterSubsidiary : null,
+                              division: customFilterDivision !== "all" ? customFilterDivision : null,
+                              location: customFilterLocation !== "all" ? customFilterLocation : null,
+                            },
                           },
                         }),
                       })
@@ -731,11 +826,7 @@ export default function ComplianceReportsPage() {
                       mutateCustom()
                       toast({ title: "Custom report saved", description: customName })
                     } catch (err) {
-                      toast({
-                        title: "Save failed",
-                        description: err instanceof Error ? err.message : "Unknown error",
-                        variant: "destructive",
-                      })
+                      toast({ title: "Save failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" })
                     } finally {
                       setCustomSaving(false)
                     }
@@ -744,6 +835,8 @@ export default function ComplianceReportsPage() {
                   {customSaving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : null}
                   Save report type
                 </Button>
+
+                {/* CSV Download */}
                 <Button
                   variant="outline"
                   disabled={!companyId || selectedFields.length === 0 || customRunning}
@@ -760,8 +853,15 @@ export default function ComplianceReportsPage() {
                         body: JSON.stringify({
                           action: "run",
                           download: true,
+                          format: "csv",
                           company_id: companyId,
                           pay_period: period,
+                          filters: {
+                            company: customFilterCompany !== "all" ? customFilterCompany : null,
+                            subsidiary: customFilterSubsidiary !== "all" ? customFilterSubsidiary : null,
+                            division: customFilterDivision !== "all" ? customFilterDivision : null,
+                            location: customFilterLocation !== "all" ? customFilterLocation : null,
+                          },
                           definition: {
                             company_id: companyId,
                             name: customName || "Custom Report",
@@ -772,25 +872,18 @@ export default function ComplianceReportsPage() {
                           },
                         }),
                       })
-                      if (!res.ok) {
-                        const json = await res.json()
-                        throw new Error(json.error || "Download failed")
-                      }
+                      if (!res.ok) { const json = await res.json(); throw new Error(json.error || "Download failed") }
                       const blob = await res.blob()
-                      const url = URL.createObjectURL(blob)
-                      const a = document.createElement("a")
-                      a.href = url
+                      const url  = URL.createObjectURL(blob)
+                      const a    = document.createElement("a")
+                      a.href     = url
                       a.download = `custom-report-${period}.csv`
                       a.click()
                       URL.revokeObjectURL(url)
                       mutate(historyKey)
-                      toast({ title: "Download ready", description: "CSV includes title and column headings." })
+                      toast({ title: "CSV ready", description: "Download includes title block and ordered columns." })
                     } catch (err) {
-                      toast({
-                        title: "Download failed",
-                        description: err instanceof Error ? err.message : "Unknown error",
-                        variant: "destructive",
-                      })
+                      toast({ title: "Download failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" })
                     } finally {
                       setCustomRunning(false)
                     }
@@ -798,6 +891,59 @@ export default function ComplianceReportsPage() {
                 >
                   {customRunning ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
                   Download CSV
+                </Button>
+
+                {/* PDF Download */}
+                <Button
+                  variant="outline"
+                  disabled={!companyId || selectedFields.length === 0 || customRunning}
+                  onClick={async () => {
+                    setCustomRunning(true)
+                    try {
+                      const columns: ReportColumn[] = selectedFields.map((key) => {
+                        const f = CUSTOM_FIELD_CATALOG.find((c) => c.key === key)!
+                        return { key: f.key, label: f.label, type: f.type }
+                      })
+                      const res = await fetch("/api/reports/custom", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          action: "run",
+                          download: true,
+                          format: "pdf",
+                          company_id: companyId,
+                          pay_period: period,
+                          filters: {
+                            company: customFilterCompany !== "all" ? customFilterCompany : null,
+                            subsidiary: customFilterSubsidiary !== "all" ? customFilterSubsidiary : null,
+                            division: customFilterDivision !== "all" ? customFilterDivision : null,
+                            location: customFilterLocation !== "all" ? customFilterLocation : null,
+                          },
+                          definition: {
+                            company_id: companyId,
+                            name: customName || "Custom Report",
+                            description: customDescription,
+                            category: customCategory,
+                            data_source: "payroll",
+                            columns,
+                          },
+                        }),
+                      })
+                      if (!res.ok) { const json = await res.json(); throw new Error(json.error || "PDF generation failed") }
+                      const html   = await res.text()
+                      const url    = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }))
+                      const opened = window.open(url, "_blank", "noopener,noreferrer")
+                      if (!opened) { const a = document.createElement("a"); a.href = url; a.download = `custom-report-${period}.html`; a.click() }
+                      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+                      toast({ title: "PDF ready", description: "Print → Save as PDF from the opened window." })
+                    } catch (err) {
+                      toast({ title: "PDF failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" })
+                    } finally {
+                      setCustomRunning(false)
+                    }
+                  }}
+                >
+                  PDF
                 </Button>
               </div>
             </CardContent>
