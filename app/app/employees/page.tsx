@@ -1360,7 +1360,7 @@ export default function EmployeesPage() {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Employee Directory ({filteredEmployees.length} employees)</span>
-            {searchTerm && <div className="text-sm text-muted-foreground">Showing results for "{searchTerm}"</div>}
+            {searchTerm && <div className="text-sm text-muted-foreground">Showing results for &quot;{searchTerm}&quot;</div>}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -1385,6 +1385,7 @@ export default function EmployeesPage() {
                 )}
               </div>
             ) : (
+              <div className="max-h-[600px] overflow-y-auto pr-1 scrollbar-thin">
               <div className="grid gap-4">
                 {filteredEmployees.map((employee) => (
                   <Card key={employee.id} className="hover:shadow-md transition-shadow">
@@ -1490,6 +1491,7 @@ export default function EmployeesPage() {
                     </CardContent>
                   </Card>
                 ))}
+              </div>
               </div>
             )}
           </div>

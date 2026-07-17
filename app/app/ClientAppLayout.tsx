@@ -721,10 +721,10 @@ export default function ClientAppLayout({
 
         <div className="flex">
           {/* Desktop Sidebar */}
-          <aside className={`bg-white border-r border-gray-200 min-h-screen transition-all duration-300 ${
+          <aside className={`bg-white border-r border-gray-200 sticky top-0 h-screen transition-all duration-300 ${
             sidebarCollapsed ? 'w-16' : 'w-64'
-          } hidden md:block`}>
-            <nav className="p-4 space-y-2">
+          } hidden md:flex md:flex-col flex-shrink-0`}>
+            <nav className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin">
               <Suspense fallback={<div>Loading...</div>}>
                 {/* Dashboard Link */}
                 <a

@@ -28,7 +28,7 @@ export async function GET(request: Request) {
       supabase
         .from("employees")
         .select(
-          `id, first_name, last_name, employee_id, department, position, status, subsidiary_id,
+          `id, first_name, last_name, employee_id, department, position, status, subsidiary_id, date_of_joining,
            financial:employee_financial(
              monthly_salary, transport_allowance, housing_allowance, medical_allowance,
              meal_allowance, communication_allowance, uniform_allowance, other_allowances,
@@ -66,7 +66,7 @@ export async function GET(request: Request) {
       // Fallback without relational embed if join shape differs
       const fallback = await supabase
         .from("employees")
-        .select("id, first_name, last_name, employee_id, department, position, status, subsidiary_id")
+        .select("id, first_name, last_name, employee_id, department, position, status, subsidiary_id, date_of_joining")
         .eq("company_id", companyId)
         .in("status", ACTIVE_STATUSES)
         .order("first_name")
@@ -135,6 +135,7 @@ export async function GET(request: Request) {
         department: emp.department ?? null,
         position: emp.position ?? null,
         status: emp.status ?? null,
+        date_of_joining: emp.date_of_joining ?? null,
         subsidiary_id: emp.subsidiary_id ?? null,
         bank_name: fin?.bank_name ?? null,
         account_number: fin?.bank_account_number ?? null,

@@ -13,9 +13,16 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   Calculator,
   RefreshCw,
-  Play,
   Database,
   Users,
   DollarSign,
@@ -34,6 +41,7 @@ type PayInputApiRow = {
   full_name: string
   department: string | null
   position?: string | null
+  date_of_joining?: string | null
   master: {
     basic_salary: number
     transport_allowance: number
@@ -75,6 +83,7 @@ type WorksheetRow = {
   name: string
   department: string
   position: string
+  dateOfJoining: string | null
   basicSalary: number
   allowances: number
   overtime: number
@@ -161,6 +170,7 @@ function mapApiRow(row: PayInputApiRow): WorksheetRow {
     name: row.full_name,
     department: row.department ?? "",
     position: row.position ?? "",
+    dateOfJoining: row.date_of_joining ?? null,
     basicSalary: basic,
     allowances,
     overtime: Number(row.input.overtime_amount ?? 0),
@@ -440,6 +450,13 @@ export default function PayrollPage() {
   const [lastProcessMessage, setLastProcessMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
+  // Prorate dialog state
+  type ProrateEmployee = { employeeId: string; name: string; dateOfJoining: string; proratedDays: number; totalDays: number }
+  const [prorateQueue, setProrateQueue] = useState<ProrateEmployee[]>([])
+  const [prorateDecisions, setProrateDecisions] = useState<Record<string, "prorate" | "full">>({})
+  const [showProrateDialog, setShowProrateDialog] = useState(false)
+  const [pendingRunFn, setPendingRunFn] = useState<(() => void) | null>(null)
+
   const resolveCompany = useCallback(async () => {
     const supabase = createClient()
     const { data } = await supabase
@@ -703,11 +720,67 @@ export default function PayrollPage() {
   }
 
   /**
+   * Check if any selected employees joined mid-month in the selected pay period.
+   * Returns an array of employees that need a prorate decision.
+   */
+  function getMidMonthJoiners(employeeRows: WorksheetRow[], period: string) {
+    const [year, month] = period.split("-").map(Number)
+    const periodStart = new Date(year, month - 1, 1)
+    const periodEnd = new Date(year, month, 0) // last day of month
+    const totalDays = periodEnd.getDate()
+
+    return employeeRows
+      .filter((r) => {
+        if (!r.dateOfJoining) return false
+        const joined = new Date(r.dateOfJoining)
+        // Joined within the selected pay period month but not on day 1
+        return (
+          joined.getFullYear() === year &&
+          joined.getMonth() === month - 1 &&
+          joined.getDate() > 1
+        )
+      })
+      .map((r) => {
+        const joined = new Date(r.dateOfJoining!)
+        const proratedDays = totalDays - joined.getDate() + 1
+        return {
+          employeeId: r.employeeId,
+          name: r.name,
+          dateOfJoining: r.dateOfJoining!,
+          proratedDays,
+          totalDays,
+        }
+      })
+  }
+
+  /**
+   * Entry point for Run Payroll — checks for mid-month joiners and shows
+   * the prorate dialog if needed, otherwise runs payroll directly.
+   */
+  const handleRunPayrollWithCheck = () => {
+    const employeesToRun = selected.length ? selected : rows
+    const midMonthJoiners = getMidMonthJoiners(employeesToRun, payPeriod)
+
+    if (midMonthJoiners.length > 0) {
+      // Pre-fill decisions: default to "full" for each joiner
+      const defaults: Record<string, "prorate" | "full"> = {}
+      midMonthJoiners.forEach((e) => { defaults[e.employeeId] = "full" })
+      setProrateQueue(midMonthJoiners)
+      setProrateDecisions(defaults)
+      setShowProrateDialog(true)
+      // Store the actual run function to call after dialog confirmation
+      setPendingRunFn(() => () => handleRunPayroll(defaults))
+    } else {
+      void handleRunPayroll({})
+    }
+  }
+
+  /**
    * Run Payroll — direct completion path.
    * Processes all calculated rows and marks the run as completed immediately
    * without routing through the approval workflow.
    */
-  const handleRunPayroll = async () => {
+  const handleRunPayroll = async (prorateMeta: Record<string, "prorate" | "full"> = {}) => {
     ensureDemoSessionCookie()
     if (!companyId) {
       toast({ title: "Company required", description: "Load a company before running payroll.", variant: "destructive" })
@@ -721,7 +794,28 @@ export default function PayrollPage() {
     setProcessing(true)
     setLastProcessMessage(null)
     try {
-      const employeesToRun = selected.length ? selected : rows
+      const baseEmployees = selected.length ? selected : rows
+      // Apply prorate decisions: scale basicSalary, allowances, grossPay, netPay proportionally
+      const employeesToRun = baseEmployees.map((r) => {
+        const decision = prorateMeta[r.employeeId]
+        if (decision !== "prorate") return r
+        // Find the joiner entry to get day ratio
+        const joinerInfo = prorateQueue.find((j) => j.employeeId === r.employeeId)
+        if (!joinerInfo) return r
+        const ratio = joinerInfo.proratedDays / joinerInfo.totalDays
+        return {
+          ...r,
+          basicSalary: round2(r.basicSalary * ratio),
+          allowances: round2(r.allowances * ratio),
+          overtime: round2(r.overtime * ratio),
+          grossPay: round2(r.grossPay * ratio),
+          netPay: round2(r.netPay * ratio),
+          totalDeductions: round2(r.totalDeductions * ratio),
+          paye: round2(r.paye * ratio),
+          ssnitEmployee: round2(r.ssnitEmployee * ratio),
+          providentFund: round2(r.providentFund * ratio),
+        }
+      })
       const res = await fetchWithTimeout(
         "/api/payroll/process",
         {
@@ -928,21 +1022,13 @@ export default function PayrollPage() {
           <Calculator className="h-4 w-4 mr-2" />
           Recalculate
         </Button>
-        <Button onClick={handleRunPayroll} disabled={processing || !rows.length || !companyId}>
+        <Button onClick={handleRunPayrollWithCheck} disabled={processing || !rows.length || !companyId}>
           {processing ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
           ) : (
             <Zap className="h-4 w-4 mr-2" />
           )}
           Run Payroll
-        </Button>
-        <Button variant="outline" onClick={handleProcess} disabled={processing || !rows.length || !companyId}>
-          {processing ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Play className="h-4 w-4 mr-2" />
-          )}
-          Process & Submit
         </Button>
         <Button
           variant="outline"
@@ -1147,13 +1233,13 @@ export default function PayrollPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>What happens after Process & Submit?</CardTitle>
+          <CardTitle>What happens after Run Payroll?</CardTitle>
           <CardDescription>End-to-end payroll flow</CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-2">
           <ol className="list-decimal pl-5 space-y-1">
             <li>
-              <strong className="text-foreground">Process & Submit</strong> writes{" "}
+              <strong className="text-foreground">Run Payroll</strong> writes{" "}
               <code>payroll_items</code> + draft <code>payslips</code> and sets the run to{" "}
               <em>pending</em>.
             </li>
@@ -1198,6 +1284,77 @@ export default function PayrollPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Mid-month joiner prorate dialog */}
+      <Dialog open={showProrateDialog} onOpenChange={setShowProrateDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Mid-month joiners detected</DialogTitle>
+            <DialogDescription>
+              The following employee(s) joined during {fmtPeriod(payPeriod)}. Choose whether to
+              pay a prorated amount (based on days worked) or the full month salary.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {prorateQueue.map((emp) => {
+              const decision = prorateDecisions[emp.employeeId] ?? "full"
+              return (
+                <div key={emp.employeeId} className="rounded-md border p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">{emp.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Joined {new Date(emp.dateOfJoining).toLocaleDateString("en-GH", {
+                          day: "numeric", month: "long", year: "numeric",
+                        })} · {emp.proratedDays} of {emp.totalDays} days
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {emp.proratedDays}/{emp.totalDays} days
+                    </Badge>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant={decision === "prorate" ? "default" : "outline"}
+                      className="flex-1"
+                      onClick={() =>
+                        setProrateDecisions((prev) => ({ ...prev, [emp.employeeId]: "prorate" }))
+                      }
+                    >
+                      Prorate ({emp.proratedDays}/{emp.totalDays} days)
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={decision === "full" ? "default" : "outline"}
+                      className="flex-1"
+                      onClick={() =>
+                        setProrateDecisions((prev) => ({ ...prev, [emp.employeeId]: "full" }))
+                      }
+                    >
+                      Full month
+                    </Button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowProrateDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setShowProrateDialog(false)
+                if (pendingRunFn) pendingRunFn()
+              }}
+            >
+              <Zap className="h-4 w-4 mr-2" />
+              Confirm &amp; Run Payroll
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
