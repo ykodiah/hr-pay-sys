@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
-import { createClient } from "@/lib/supabase/client"
 import {
   Calculator,
   Save,
@@ -207,12 +206,12 @@ function SSNITRatesEditor({
   const rateLabels: Record<string, { label: string; subtitle: string; color: string }> = {
     ssnit: {
       label: "Tier 1 (SSNIT)",
-      subtitle: "Act 766 — employee 0.5% + employer 13% of basic (= 13.5% Tier 1)",
+      subtitle: "Act 766 — employee 5.5% + employer 13% of basic salary (total 18.5% to SSNIT)",
       color: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
     },
     tier2: {
-      label: "Tier 2 (Occupational)",
-      subtitle: "Act 766 — employee 5% of basic (mandatory; employer share usually 0)",
+      label: "Tier 2 (Trustee / Occupational)",
+      subtitle: "Act 766 — employee 5% of basic to trustee (employer share is 0)",
       color: "bg-green-500/10 text-green-700 dark:text-green-400",
     },
     tier3: {
@@ -437,7 +436,6 @@ function LiveCalculator({ bands, rates }: { bands: TaxBandRow[]; rates: TaxRateR
 export default function GhanaTaxSettings({ companyId, taxYear }: Props) {
   const year = taxYear ?? new Date().getFullYear()
   const { toast } = useToast()
-  const supabase = createClient()
 
   const [loading, setLoading] = useState(true)
   const [savingBands, setSavingBands] = useState(false)
@@ -445,96 +443,97 @@ export default function GhanaTaxSettings({ companyId, taxYear }: Props) {
   const [bands, setBands] = useState<TaxBandRow[]>([])
   const [taxRates, setTaxRates] = useState<TaxRateRow[]>([])
 
-  // Load data
+  // Load data via API route (service-role key — bypasses RLS for both read and write)
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const [bandsRes, ratesRes] = await Promise.all([
-        supabase
-          .from("paye_tax_bands")
-          .select("id, band_order, rate, threshold_amount, is_remaining_amount, description")
-          .eq("company_id", companyId)
-          .eq("tax_year", year)
-          .eq("is_active", true)
-          .order("band_order", { ascending: true }),
-        supabase
-          .from("tax_rates")
-          .select("id, rate_type, employee_rate, employer_rate")
-          .eq("company_id", companyId)
-          .eq("is_active", true),
-      ])
-
-      if (bandsRes.data && bandsRes.data.length > 0) {
-        setBands(
-          bandsRes.data.map((b) => ({
-            id: b.id,
-            band_order: b.band_order,
-            rate: Number(b.rate),
-            threshold_amount: Number(b.threshold_amount),
-            is_remaining_amount: b.is_remaining_amount ?? false,
-            description: b.description ?? "",
-          }))
+      try {
+        const res = await fetch(
+          `/api/settings/tax?company_id=${encodeURIComponent(companyId)}&tax_year=${year}`,
+          { credentials: "include" }
         )
-      } else {
-        // Fallback to current GRA monthly band widths
-        setBands(
-          GRA_MONTHLY_PAYE_BANDS.map((b) => ({
+        if (res.ok) {
+          const data = await res.json()
+
+          // PAYE bands
+          if (data.paye_bands && data.paye_bands.length > 0) {
+            setBands(
+              data.paye_bands.map((b: any, i: number) => ({
+                band_order: b.band_order ?? i + 1,
+                rate: Number(b.rate),
+                threshold_amount: Number(b.threshold_amount),
+                is_remaining_amount: b.is_remaining_amount ?? false,
+                description: b.description ?? "",
+              }))
+            )
+          } else {
+            setBands(
+              GRA_MONTHLY_PAYE_BANDS.map((b) => ({
+                band_order: b.band_order,
+                rate: b.rate,
+                threshold_amount: b.threshold_amount,
+                is_remaining_amount: b.is_remaining_amount,
+                description: b.description,
+              }))
+            )
+          }
+
+          // SSNIT / Tier rates
+          const rates: TaxRateRow[] = [
+            {
+              rate_type: "ssnit",
+              employee_rate: data.ssnit?.employee_rate ?? 5.5,
+              employer_rate: data.ssnit?.employer_rate ?? 13,
+            },
+            {
+              rate_type: "tier2",
+              employee_rate: data.tier2?.employee_rate ?? 5,
+              employer_rate: data.tier2?.employer_rate ?? 0,
+            },
+            {
+              rate_type: "tier3",
+              employee_rate: data.tier3?.employee_rate ?? 0,
+              employer_rate: data.tier3?.employer_rate ?? 0,
+            },
+          ]
+          setTaxRates(rates)
+        }
+      } catch {
+        // silently fall back to GRA defaults already set by useState
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [companyId, year])
+
+  // Save PAYE bands — goes through the API route (service-role key, bypasses RLS)
+  const saveBands = async () => {
+    setSavingBands(true)
+    try {
+      const res = await fetch("/api/settings/tax", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          company_id: companyId,
+          tax_year: year,
+          paye_bands: bands.map((b) => ({
             band_order: b.band_order,
             rate: b.rate,
             threshold_amount: b.threshold_amount,
             is_remaining_amount: b.is_remaining_amount,
             description: b.description,
-          }))
-        )
-      }
-
-      if (ratesRes.data && ratesRes.data.length > 0) {
-        setTaxRates(
-          ratesRes.data.map((r) => ({
-            id: r.id,
-            rate_type: r.rate_type as "ssnit" | "tier2" | "tier3",
-            employee_rate: Number(r.employee_rate),
-            employer_rate: Number(r.employer_rate),
-          }))
-        )
-      } else {
-        setTaxRates([
-          { rate_type: "ssnit", employee_rate: 0.5, employer_rate: 13 },
-          { rate_type: "tier2", employee_rate: 5, employer_rate: 0 },
-          { rate_type: "tier3", employee_rate: 0, employer_rate: 0 },
-        ])
-      }
-
-      setLoading(false)
-    }
-    load()
-  }, [companyId, year])
-
-  // Save PAYE bands
-  const saveBands = async () => {
-    setSavingBands(true)
-    const rows = bands.map((b) => ({
-      company_id: companyId,
-      band_order: b.band_order,
-      rate: b.rate,
-      threshold_amount: b.threshold_amount,
-      is_remaining_amount: b.is_remaining_amount,
-      description: b.description,
-      tax_year: year,
-      effective_date: `${year}-01-01`,
-      currency_code: "GHS",
-      is_active: true,
-    }))
-
-    const { error } = await supabase
-      .from("paye_tax_bands")
-      .upsert(rows, { onConflict: "company_id,tax_year,band_order" })
-
-    setSavingBands(false)
-    if (error) {
-      toast({ title: "Error saving bands", description: error.message, variant: "destructive" })
-    } else {
+          })),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.errors?.join(", ") ?? data.error ?? "Save failed")
       toast({ title: "PAYE bands saved", description: `${year} tax bands updated successfully.` })
+    } catch (err) {
+      toast({ title: "Error saving bands", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" })
+    } finally {
+      setSavingBands(false)
     }
   }
 
@@ -552,29 +551,36 @@ export default function GhanaTaxSettings({ companyId, taxYear }: Props) {
     toast({ title: "Reset to GRA monthly defaults", description: "Save to persist the reset." })
   }
 
-  // Save SSNIT / Tier rates
+  // Save SSNIT / Tier rates — goes through the API route (service-role key, bypasses RLS)
   const saveRates = async () => {
     setSavingRates(true)
-    const rows = taxRates.map((r) => ({
-      company_id: companyId,
-      rate_type: r.rate_type,
-      employee_rate: r.employee_rate,
-      employer_rate: r.employer_rate,
-      tax_year: year,
-      effective_date: `${year}-01-01`,
-      is_active: true,
-      ...(r.id ? { id: r.id } : {}),
-    }))
-
-    const { error } = await supabase
-      .from("tax_rates")
-      .upsert(rows, { onConflict: "company_id,rate_type" })
-
-    setSavingRates(false)
-    if (error) {
-      toast({ title: "Error saving rates", description: error.message, variant: "destructive" })
-    } else {
+    try {
+      const byType = Object.fromEntries(taxRates.map((r) => [r.rate_type, r]))
+      const res = await fetch("/api/settings/tax", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          company_id: companyId,
+          tax_year: year,
+          ssnit: byType.ssnit
+            ? { employee: byType.ssnit.employee_rate, employer: byType.ssnit.employer_rate }
+            : undefined,
+          tier2: byType.tier2
+            ? { employee: byType.tier2.employee_rate, employer: byType.tier2.employer_rate }
+            : undefined,
+          tier3: byType.tier3
+            ? { employee: byType.tier3.employee_rate, employer: byType.tier3.employer_rate }
+            : undefined,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.errors?.join(", ") ?? data.error ?? "Save failed")
       toast({ title: "SSNIT/Tier rates saved", description: "Contribution rates updated successfully." })
+    } catch (err) {
+      toast({ title: "Error saving rates", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" })
+    } finally {
+      setSavingRates(false)
     }
   }
 

@@ -3,10 +3,9 @@
  *
  * Implements:
  *   - GRA PAYE rates effective 1 January 2024 (monthly progressive bands)
- *   - National Pensions Act 766 contribution split:
- *       Employee 5.5% total → Tier 1 (SSNIT) 0.5% + Tier 2 5%
- *       Employer 13% total  → Tier 1 (SSNIT) 13%  + Tier 2 0%
- *       Combined 18.5% → Tier 1 13.5% + Tier 2 5%
+ *   - National Pensions Act 766 employee deductions (applied on basic salary):
+ *       Tier 1 (SSNIT)  — employee 5.5%, employer 13%  → total 18.5% to SSNIT
+ *       Tier 2 (Trustee) — employee 5%,  employer 0%   → total 5% to trustee
  *   - Voluntary Tier 3 provident fund
  *   - Overtime taxed at marginal PAYE rate (remitted with PAYE)
  *   - Bonus final withholding at 5% (when within GRA bonus rules)
@@ -28,16 +27,16 @@ export interface PAYEBand {
 }
 
 export interface SSNITRates {
-  /** Tier 1 employee share (Act 766 default: 0.5) */
+  /** Tier 1 (SSNIT) employee share — Act 766 default: 5.5% of basic */
   employee_rate: number
-  /** Tier 1 employer share (Act 766 default: 13) */
+  /** Tier 1 (SSNIT) employer share — Act 766 default: 13% of basic */
   employer_rate: number
 }
 
 export interface Tier2Rates {
-  /** Tier 2 employee share (Act 766 default: 5) */
+  /** Tier 2 (Trustee) employee share — Act 766 default: 5% of basic */
   employee_rate: number
-  /** Tier 2 employer share (Act 766 default: 0 — funded from employee 5%) */
+  /** Tier 2 employer share — Act 766 default: 0 */
   employer_rate: number
 }
 
@@ -178,10 +177,13 @@ export const GRA_2025_PAYE_BANDS: PAYEBand[] = [
 const OBSOLETE_FIRST_BAND_THRESHOLDS = new Set([365, 402, 4380, 4824])
 
 /**
- * Act 766 defaults — Tier 1 + Tier 2 split of the 18.5% contribution.
- * Employee paycheck deduction = 0.5% + 5% = 5.5% (never 10.5%).
+ * GRA Act 766 defaults.
+ * Tier 1 (SSNIT): employee 5.5%, employer 13% of basic salary.
+ * Tier 2 (Trustee): employee 5%, employer 0% of basic salary.
+ * Total employee pension deduction = 10.5% of basic.
+ * Total employer pension cost = 13% of basic.
  */
-export const GRA_2025_SSNIT: SSNITRates = { employee_rate: 0.5, employer_rate: 13 }
+export const GRA_2025_SSNIT: SSNITRates = { employee_rate: 5.5, employer_rate: 13 }
 export const GRA_2025_TIER2: Tier2Rates = { employee_rate: 5, employer_rate: 0 }
 export const GRA_2025_TIER3: Tier3Rates = { employee_rate: 0, employer_rate: 0 }
 
@@ -253,32 +255,20 @@ export function normalizePayeBands(bands: PAYEBand[] | null | undefined): {
 }
 
 /**
- * Fix legacy configs that stored SSNIT as 5.5%/13% AND Tier 2 as 5%/5%
- * (double-counting employee to 10.5% / employer to 18%).
+ * Validate/normalise pension rates before calculation.
+ * Falls back to GRA Act 766 defaults only when values are clearly invalid
+ * (zero or missing). User-configured rates from DB are respected as-is.
  */
 export function normalizePensionRates(ssnit: SSNITRates, tier2: Tier2Rates): {
   ssnit: SSNITRates
   tier2: Tier2Rates
 } {
-  const empTotal = Number(ssnit.employee_rate) + Number(tier2.employee_rate)
-  const erTotal = Number(ssnit.employer_rate) + Number(tier2.employer_rate)
+  const ssnitEmp = Number(ssnit?.employee_rate)
+  const ssnitEr  = Number(ssnit?.employer_rate)
+  const t2Emp    = Number(tier2?.employee_rate)
 
-  // Classic wrong seed: 5.5 + 5 employee, 13 + 5 employer
-  if (empTotal >= 10 || erTotal >= 17) {
-    return { ssnit: { ...GRA_2025_SSNIT }, tier2: { ...GRA_2025_TIER2 } }
-  }
-
-  // Legacy "all 5.5% under SSNIT, Tier2 also 5/5"
-  if (Number(ssnit.employee_rate) >= 5 && Number(tier2.employee_rate) >= 5) {
-    return { ssnit: { ...GRA_2025_SSNIT }, tier2: { ...GRA_2025_TIER2 } }
-  }
-
-  // Legacy single-bucket: SSNIT 5.5/13 with Tier2 0 — expand to Act 766 split
-  if (
-    Number(ssnit.employee_rate) === 5.5 &&
-    Number(ssnit.employer_rate) === 13 &&
-    Number(tier2.employee_rate) === 0
-  ) {
+  // If rates are missing/NaN/zero, fall back to Act 766 defaults
+  if (!isFinite(ssnitEmp) || !isFinite(ssnitEr) || !isFinite(t2Emp)) {
     return { ssnit: { ...GRA_2025_SSNIT }, tier2: { ...GRA_2025_TIER2 } }
   }
 
