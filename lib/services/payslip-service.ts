@@ -30,6 +30,9 @@ export interface PayslipRow {
   snapshot_employee_id_no: string | null
   snapshot_position: string | null
   snapshot_department: string | null
+  snapshot_location: string | null
+  snapshot_division: string | null
+  snapshot_subsidiary: string | null
   snapshot_ssnit_number: string | null
   snapshot_bank_name: string | null
   snapshot_account_number: string | null
@@ -62,6 +65,15 @@ export interface PayslipRow {
   net_pay: number
   total_employer_cost: number
   loan_balance: number
+  // Year-to-date accumulators
+  ytd_gross: number
+  ytd_net: number
+  ytd_paye: number
+  ytd_ssnit: number
+  leave_balance: number
+  // Template & notes
+  template_id: string | null
+  custom_notes: string | null
   // Calculated breakdown stored as JSONB
   calculation_breakdown: TaxCalculationResult | null
   // Status
