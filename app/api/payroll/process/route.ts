@@ -32,8 +32,11 @@ type ProcessRow = {
   grossPay?: number
   providentFund?: number
   ssnitEmployee?: number
+  tier2Employee?: number
   taxableIncome?: number
   paye?: number
+  overtimeTax?: number
+  bonusTax?: number
   totalDeductions?: number
   netPay?: number
 }
@@ -132,13 +135,21 @@ async function persistRowsFromWorksheet(
       const bonus = n(row.bonus)
       const gross = n(row.grossPay) || n(basic + allowances + overtime + bonus)
       const ssnit = n(row.ssnitEmployee)
+      // Tier 2: use the computed value from the worksheet; fall back to 5% of basic
+      const tier2 = row.tier2Employee != null ? n(row.tier2Employee) : n(basic * 0.05)
+      // SSNIT employer: 13% of basic (not a ratio of employee share)
+      const ssnitEmployer = n(basic * 0.13)
       const pf = n(row.providentFund)
       const paye = n(row.paye)
+      // OT and bonus tax are sub-components of paye already included in paye total
+      const overtimeTax = row.overtimeTax != null ? n(row.overtimeTax) : 0
+      const bonusTax = row.bonusTax != null ? n(row.bonusTax) : 0
+      const basePaye = n(paye - overtimeTax - bonusTax)
       const loan = n(row.loan)
       const advance = n(row.advance)
       const other = n(row.other)
       const totalDeductions =
-        n(row.totalDeductions) || n(ssnit + pf + paye + loan + advance + other)
+        n(row.totalDeductions) || n(ssnit + tier2 + pf + paye + loan + advance + other)
       const net = n(row.netPay) || n(gross - totalDeductions)
       const taxable = n(row.taxableIncome)
 
@@ -164,7 +175,6 @@ async function persistRowsFromWorksheet(
       const splitComm       = masterAllowTotal > 0 ? n(masterComm      * scale) : 0
       const splitOther      = masterAllowTotal > 0 ? n(allowances - splitTransport - splitHousing - splitMedical - splitMeal - splitComm) : allowances
 
-      const ssnitEmployer = n(ssnit * (13 / 5.5))
       // Build only the columns that actually exist in payroll_items table
       // Do NOT pass id — let Postgres gen_random_uuid() generate a valid UUID
       const itemPayload: Record<string, any> = {
@@ -178,12 +188,14 @@ async function persistRowsFromWorksheet(
         gross_pay: gross,
         ssnit_employee: ssnit,
         ssnit_employer: ssnitEmployer,
-        tier2_employee: 0,
+        tier2_employee: tier2,
         tier2_employer: 0,
         tier3_employee: pf,
         tier3_employer: 0,
-        tax_deduction: paye, // original column
-        paye_tax: paye, // new column
+        tax_deduction: paye,       // original column (total PAYE withheld)
+        paye_tax: paye,            // new column (same total)
+        overtime_tax: overtimeTax,
+        bonus_tax: bonusTax,
         loan_deduction: loan,
         advance_deduction: advance,
         other_deductions: other,
@@ -195,8 +207,12 @@ async function persistRowsFromWorksheet(
         calculation_breakdown: {
           allowances,
           ssnit_employee: ssnit,
+          tier2_employee: tier2,
           tier3_employee: pf,
-          paye,
+          paye_base: basePaye,
+          overtime_tax: overtimeTax,
+          bonus_tax: bonusTax,
+          paye_total: paye,
           loan,
           advance,
           other,
@@ -249,9 +265,12 @@ async function persistRowsFromWorksheet(
         gross_pay: gross,
         ssnit_employee: ssnit,
         ssnit_employer: ssnitEmployer,
+        tier2_employee: tier2,
         tier3_employee: pf,
         paye_taxable_income: taxable,
         paye_tax: paye,
+        overtime_tax: overtimeTax,
+        bonus_tax: bonusTax,
         loan_deduction: loan,
         advance_deduction: advance,
         other_deductions: other,

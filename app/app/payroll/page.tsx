@@ -97,8 +97,11 @@ type WorksheetRow = {
   grossPay: number
   providentFund: number
   ssnitEmployee: number
+  tier2Employee: number
   taxableIncome: number
   paye: number
+  overtimeTax: number
+  bonusTax: number
   totalDeductions: number
   netPay: number
   selected: boolean
@@ -184,11 +187,14 @@ function mapApiRow(row: PayInputApiRow): WorksheetRow {
     grossPay: 0,
     providentFund: 0,
     ssnitEmployee: 0,
+    tier2Employee: 0,
     taxableIncome: 0,
     paye: 0,
+    overtimeTax: 0,
+    bonusTax: 0,
     totalDeductions: 0,
     netPay: 0,
-    selected: true,
+    selected: false,
     status: "Loaded",
   }
 }
@@ -223,8 +229,11 @@ function calculateRow(row: WorksheetRow, taxRates = DEFAULT_TAX_RATES): Workshee
     grossPay: round2(tax.monthly_gross + tax.monthly_overtime + tax.monthly_bonus),
     providentFund: round2(tax.monthly_tier3_employee),
     ssnitEmployee: round2(tax.monthly_ssnit_employee),
+    tier2Employee: round2(tax.monthly_tier2_employee),
     taxableIncome: round2(tax.monthly_taxable_income),
     paye: round2(tax.monthly_total_paye_withheld),
+    overtimeTax: round2(tax.monthly_overtime_tax),
+    bonusTax: round2(tax.monthly_bonus_tax),
     totalDeductions: round2(tax.monthly_total_employee_deductions),
     netPay: round2(tax.monthly_net_pay),
     status: "Calculated",
@@ -249,6 +258,9 @@ function exportPayload(rows: WorksheetRow[]) {
     allowances: r.allowances,
     overtime: r.overtime,
     grossPay: r.grossPay,
+    tier2Employee: r.tier2Employee,
+    overtimeTax: r.overtimeTax,
+    bonusTax: r.bonusTax,
     providentFund: r.providentFund,
     ssnitEmployee: r.ssnitEmployee,
     taxableIncome: r.taxableIncome,
