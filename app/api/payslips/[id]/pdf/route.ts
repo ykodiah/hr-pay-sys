@@ -7,13 +7,18 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { requireApiUser } from "@/lib/auth/api-user"
 import { getPayslipById } from "@/lib/services/payslip-service"
-import { loadCompanyBrand, renderBrandedHtmlDocument } from "@/lib/exports/company-branding"
+import { loadCompanyBrand, AKWAABA_BRAND_FOOTER } from "@/lib/exports/company-branding"
 
-function money(n: number) {
-  return `GHS ${Number(n || 0).toLocaleString("en-GH", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
+function money(n: number | null | undefined) {
+  return `GHS ${Number(n || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+function esc(s: unknown) {
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+}
+function fmtPeriod(p: string) {
+  if (!p) return ""
+  const [y, m] = p.split("-")
+  return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("en-GH", { month: "long", year: "numeric" })
 }
 
 export async function GET(
@@ -31,59 +36,183 @@ export async function GET(
     }
 
     const client = await createClient()
-    const company = await loadCompanyBrand(client, data.company_id)
-    if (!company?.name && data.snapshot_company_name) {
-      ;(company as any).name = data.snapshot_company_name
-    }
 
-    const bodyHtml = `
-      <div class="grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:12px">
-        <div><strong>Employee:</strong> ${data.snapshot_employee_name || ""}</div>
-        <div><strong>Employee ID:</strong> ${data.snapshot_employee_id_no || ""}</div>
-        <div><strong>Department:</strong> ${data.snapshot_department || ""}</div>
-        <div><strong>Position:</strong> ${data.snapshot_position || ""}</div>
-        <div><strong>SSNIT:</strong> ${data.snapshot_ssnit_number || ""}</div>
-        <div><strong>Bank:</strong> ${data.snapshot_bank_name || ""} ${data.snapshot_account_number || ""}</div>
-      </div>
-      <table>
-        <thead><tr><th>Earnings</th><th class="right">Amount</th></tr></thead>
-        <tbody>
-          <tr><td>Basic Salary</td><td class="right">${money(data.basic_salary)}</td></tr>
-          <tr><td>Transport Allowance</td><td class="right">${money(data.transport_allowance)}</td></tr>
-          <tr><td>Housing Allowance</td><td class="right">${money(data.housing_allowance)}</td></tr>
-          <tr><td>Medical Allowance</td><td class="right">${money(data.medical_allowance)}</td></tr>
-          <tr><td>Meal Allowance</td><td class="right">${money(data.meal_allowance)}</td></tr>
-          <tr><td>Communication Allowance</td><td class="right">${money(data.communication_allowance)}</td></tr>
-          <tr><td>Other Allowances</td><td class="right">${money(data.other_allowances)}</td></tr>
-          <tr><td>Overtime</td><td class="right">${money(data.overtime_pay)}</td></tr>
-          <tr><td>Bonus</td><td class="right">${money(data.bonus_pay)}</td></tr>
-          <tr class="total"><td>Gross Pay</td><td class="right">${money(data.gross_pay)}</td></tr>
-        </tbody>
-      </table>
-      <table>
-        <thead><tr><th>Deductions</th><th class="right">Amount</th></tr></thead>
-        <tbody>
-          <tr><td>SSNIT (Employee)</td><td class="right">${money(data.ssnit_employee)}</td></tr>
-          <tr><td>Tier 2 (Employee)</td><td class="right">${money(data.tier2_employee)}</td></tr>
-          <tr><td>Provident Fund / Tier 3</td><td class="right">${money(data.tier3_employee)}</td></tr>
-          <tr><td>PAYE Tax</td><td class="right">${money(data.paye_tax)}</td></tr>
-          <tr><td>Loans</td><td class="right">${money(data.loan_deduction)}</td></tr>
-          <tr><td>Advance</td><td class="right">${money(data.advance_deduction)}</td></tr>
-          <tr><td>Other Deductions</td><td class="right">${money(data.other_deductions)}</td></tr>
-          <tr class="total"><td>Total Deductions</td><td class="right">${money(data.total_deductions)}</td></tr>
-          <tr class="total"><td>Net Pay</td><td class="right">${money(data.net_pay)}</td></tr>
-        </tbody>
-      </table>
-    `
+    // Load company branding and active loan in parallel
+    const [company, loanRes] = await Promise.all([
+      loadCompanyBrand(client, data.company_id),
+      client.from("employee_loans").select("*").eq("employee_id", data.employee_id).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    ])
 
-    const html = renderBrandedHtmlDocument({
-      title: "Employee Payslip",
-      company: company || { name: data.snapshot_company_name || "Company" },
-      period: data.pay_period,
-      subtitle: `Pay date ${data.pay_date || ""} · Status ${data.status}`,
-      bodyHtml,
-      autoPrint: true,
-    })
+    const companyName = company?.name || data.snapshot_company_name || "Company"
+    const logoUrl = company?.logo_url || ""
+    const loan = loanRes.data
+
+    const earnings: [string, number][] = [
+      ["Basic Salary",            Number(data.basic_salary)],
+      ["Transport Allowance",     Number(data.transport_allowance)],
+      ["Housing Allowance",       Number(data.housing_allowance)],
+      ["Medical Allowance",       Number(data.medical_allowance)],
+      ["Meal Allowance",          Number(data.meal_allowance)],
+      ["Communication Allowance", Number(data.communication_allowance)],
+      ["Other Allowances",        Number(data.other_allowances)],
+      ["Overtime",                Number(data.overtime_pay)],
+      ["Bonus",                   Number(data.bonus_pay)],
+    ].filter(([, v]) => v > 0)
+
+    const deductions: [string, number][] = [
+      ["SSNIT (Employee 5.5%)",   Number(data.ssnit_employee)],
+      ["Tier 2 (Employee 5%)",    Number(data.tier2_employee)],
+      ["Tier 3 / Provident Fund", Number(data.tier3_employee)],
+      ["PAYE Tax",                Number(data.paye_tax)],
+      ["Loan Repayment",          Number(data.loan_deduction)],
+      ["Advance Deduction",       Number(data.advance_deduction)],
+      ["Other Deductions",        Number(data.other_deductions)],
+    ].filter(([, v]) => v > 0)
+
+    const hasLoan = loan || Number(data.loan_deduction) > 0
+    const loanBalance = loan?.remaining_balance ?? data.loan_balance ?? 0
+    const loanPct = loan
+      ? Math.min(100, Math.round(((Number(loan.principal) - Number(loan.remaining_balance)) / Number(loan.principal)) * 100))
+      : 0
+    const ytd = Number((data as any).ytd_gross ?? 0)
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Payslip — ${esc(data.snapshot_employee_name)} — ${esc(fmtPeriod(data.pay_period))}</title>
+  <style>
+    :root { --brand:#0f6b4c; --ink:#111; --muted:#5b6b62; --line:#d7ddd8; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:"Iowan Old Style",Georgia,serif; color:var(--ink); font-size:12px; background:#fff; padding:28px; max-width:780px; margin:0 auto; }
+    .toolbar { margin-bottom:18px; }
+    .toolbar button { background:var(--brand); color:#fff; border:0; padding:8px 14px; border-radius:6px; cursor:pointer; font:600 13px/1 inherit; }
+    /* Header */
+    .header { display:flex; gap:14px; align-items:flex-start; border-bottom:2.5px solid var(--brand); padding-bottom:12px; margin-bottom:12px; }
+    .logo { width:56px; height:56px; object-fit:contain; border:1px solid var(--line); border-radius:6px; }
+    .logo-init { width:56px; height:56px; border-radius:6px; background:linear-gradient(145deg,#0f6b4c,#1f8f67); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:18px; flex-shrink:0; }
+    .co-name { font-size:18px; font-weight:700; letter-spacing:-.02em; }
+    .slip-title { font-size:10px; font-weight:700; color:var(--brand); letter-spacing:.08em; text-transform:uppercase; margin-top:3px; }
+    .period-line { font-size:11px; color:var(--muted); margin-top:2px; }
+    /* Employee info */
+    .info-grid { display:grid; grid-template-columns:repeat(3,1fr); border:1px solid var(--line); border-radius:6px; overflow:hidden; margin-bottom:12px; }
+    .ic { padding:7px 10px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); }
+    .ic:nth-child(3n) { border-right:none; }
+    .ic:nth-last-child(-n+3) { border-bottom:none; }
+    .il { display:block; font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+    .iv { display:block; font-size:11px; font-weight:600; margin-top:1px; }
+    /* Tables */
+    .t-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+    .th { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; padding:5px 8px; border-radius:4px 4px 0 0; }
+    .th-e { background:#ecfdf5; color:#065f46; }
+    .th-d { background:#fef2f2; color:#991b1b; }
+    table { width:100%; border-collapse:collapse; }
+    td { padding:4.5px 8px; font-size:11px; border-bottom:1px solid #f3f4f6; }
+    .r { text-align:right; white-space:nowrap; }
+    .red { color:#b91c1c; }
+    .tr td { font-weight:700; background:#f9fafb; border-top:1.5px solid var(--line); }
+    /* Net pay */
+    .net { background:linear-gradient(135deg,#111827,#1f2937); color:#fff; border-radius:8px; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .nl { font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:rgba(255,255,255,.6); }
+    .na { font-size:22px; font-weight:700; letter-spacing:-.02em; }
+    .nd { text-align:right; font-size:11px; color:rgba(255,255,255,.8); }
+    /* Loan */
+    .loan-box { background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:10px 12px; margin-bottom:10px; }
+    .ln-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#92400e; margin-bottom:8px; }
+    .ln-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+    .ln-cell { background:#fff; border:1px solid #fde68a; border-radius:5px; padding:5px 8px; }
+    .ln-lbl { display:block; font-size:9px; color:#78716c; text-transform:uppercase; }
+    .ln-val { display:block; font-size:11px; font-weight:600; color:#1c1917; margin-top:1px; }
+    .amber { color:#b45309; }
+    .green { color:#065f46; }
+    .pr-row { display:flex; justify-content:space-between; font-size:9px; color:#92400e; margin-top:8px; margin-bottom:3px; }
+    .pr-bar { background:#fde68a; border-radius:9999px; height:5px; }
+    .pr-fill { background:#d97706; height:5px; border-radius:9999px; }
+    /* YTD */
+    .ytd-row { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:10px; }
+    .ytd-c { background:#f9fafb; border:1px solid #e5e7eb; border-radius:5px; padding:5px 8px; }
+    .yl { display:block; font-size:9px; color:var(--muted); text-transform:uppercase; margin-bottom:2px; }
+    .blue { color:#1d4ed8; }
+    /* Footer */
+    .footer { border-top:1px solid var(--line); padding-top:8px; display:flex; justify-content:space-between; font-size:9px; color:var(--muted); margin-top:12px; }
+    @media print { .toolbar { display:none; } body { padding:14px; } }
+  </style>
+</head>
+<body>
+  <div class="toolbar"><button onclick="window.print()">Print / Save as PDF</button></div>
+
+  <div class="header">
+    ${logoUrl ? `<img class="logo" src="${esc(logoUrl)}" alt="${esc(companyName)}"/>` : `<div class="logo-init">${esc(companyName.slice(0,2).toUpperCase())}</div>`}
+    <div>
+      <div class="co-name">${esc(companyName)}</div>
+      <div class="slip-title">Employee Payslip</div>
+      <div class="period-line">${esc(fmtPeriod(data.pay_period))} · Pay Date: ${esc(data.pay_date || "")} · Status: ${esc(data.status)}</div>
+    </div>
+  </div>
+
+  <div class="info-grid">
+    <div class="ic"><span class="il">Employee</span><span class="iv">${esc(data.snapshot_employee_name)}</span></div>
+    <div class="ic"><span class="il">Employee ID</span><span class="iv">${esc(data.snapshot_employee_id_no)}</span></div>
+    <div class="ic"><span class="il">Department</span><span class="iv">${esc(data.snapshot_department)}</span></div>
+    <div class="ic"><span class="il">Position</span><span class="iv">${esc(data.snapshot_position)}</span></div>
+    <div class="ic"><span class="il">SSNIT Number</span><span class="iv">${esc(data.snapshot_ssnit_number)}</span></div>
+    <div class="ic"><span class="il">Bank / Account</span><span class="iv">${esc(`${data.snapshot_bank_name || ""} ${data.snapshot_account_number || ""}`.trim())}</span></div>
+  </div>
+
+  <div class="t-row">
+    <div>
+      <div class="th th-e">Earnings</div>
+      <table><tbody>
+        ${earnings.map(([l, v]) => `<tr><td>${esc(l)}</td><td class="r">${money(v)}</td></tr>`).join("")}
+        <tr class="tr"><td>Gross Pay</td><td class="r">${money(data.gross_pay)}</td></tr>
+      </tbody></table>
+    </div>
+    <div>
+      <div class="th th-d">Deductions</div>
+      <table><tbody>
+        ${deductions.map(([l, v]) => `<tr><td>${esc(l)}</td><td class="r red">${money(v)}</td></tr>`).join("")}
+        <tr class="tr"><td>Total Deductions</td><td class="r red">${money(data.total_deductions)}</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div class="net">
+    <div><div class="nl">Net Pay</div><div class="na">${money(data.net_pay)}</div></div>
+    <div class="nd"><div class="nl">Taxable Income</div><div>${money(data.paye_taxable_income)}</div></div>
+  </div>
+
+  ${hasLoan ? `
+  <div class="loan-box">
+    <div class="ln-title">Loan Summary</div>
+    <div class="ln-grid">
+      ${loan ? `
+      <div class="ln-cell"><span class="ln-lbl">Loan Type</span><span class="ln-val">${esc(loan.loan_type)}</span></div>
+      <div class="ln-cell"><span class="ln-lbl">Principal</span><span class="ln-val">${money(loan.principal)}</span></div>
+      <div class="ln-cell"><span class="ln-lbl">Monthly Payment</span><span class="ln-val">${money(loan.monthly_payment)}</span></div>
+      <div class="ln-cell"><span class="ln-lbl">Amount Paid</span><span class="ln-val green">${money(loan.amount_paid)}</span></div>
+      ` : ""}
+      <div class="ln-cell"><span class="ln-lbl">This Month Deducted</span><span class="ln-val amber">${money(data.loan_deduction)}</span></div>
+      <div class="ln-cell"><span class="ln-lbl">Remaining Balance</span><span class="ln-val amber">${money(loanBalance)}</span></div>
+    </div>
+    ${loan ? `<div class="pr-row"><span>Repayment Progress</span><span>${loanPct}%</span></div><div class="pr-bar"><div class="pr-fill" style="width:${loanPct}%"></div></div>` : ""}
+  </div>` : ""}
+
+  ${ytd > 0 ? `
+  <div class="ytd-row">
+    <div class="ytd-c"><span class="yl">YTD Gross</span>${money((data as any).ytd_gross)}</div>
+    <div class="ytd-c"><span class="yl">YTD Net</span><span class="green">${money((data as any).ytd_net)}</span></div>
+    <div class="ytd-c"><span class="yl">YTD PAYE</span><span class="red">${money((data as any).ytd_paye)}</span></div>
+    <div class="ytd-c"><span class="yl">YTD SSNIT</span><span class="blue">${money((data as any).ytd_ssnit)}</span></div>
+  </div>` : ""}
+
+  <div class="footer">
+    <span>${esc(AKWAABA_BRAND_FOOTER)}</span>
+    <span>Confidential · Generated ${new Date().toLocaleString("en-GH")}</span>
+  </div>
+
+  <script>window.addEventListener('load',function(){setTimeout(function(){window.print()},300)})</script>
+</body>
+</html>`
 
     return new NextResponse(html, {
       status: 200,

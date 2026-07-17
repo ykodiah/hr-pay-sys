@@ -65,6 +65,7 @@ import {
   Brain,
   ClipboardList,
   AlertCircle,
+  Receipt,
 } from "lucide-react"
 import { Suspense, useState, useEffect } from "react"
 import { AIChatbox } from "@/components/ai-chatbox"
@@ -304,6 +305,7 @@ export default function ClientAppLayout({
         items: [
           { name: "Pay Inputs", href: "/app/payroll/input", icon: ClipboardList, description: "Period emoluments & adjustments" },
           { name: "Process Payroll", href: "/app/payroll", icon: Calculator, description: "Run statutory payroll" },
+          { name: "Payslips", href: "/app/payroll/payslips", icon: Receipt, description: "Generate & download payslips" },
           { name: "Payroll History", href: "/app/payroll/history", icon: History, description: "Past payroll records" },
           { name: "Approvals", href: "/app/approvals", icon: CheckSquare, description: "Approve payroll, leave & overtime" },
           { name: "Loans", href: "/app/loans", icon: CreditCard, description: "Employee loans" },
