@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { ScrollText, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 
 interface AuditLog {
   id: string
@@ -16,33 +18,36 @@ interface AuditLog {
   created_at: string
 }
 
+const ACTION_COLOR: Record<string, string> = {
+  tenant_created:  'bg-emerald-100 text-emerald-700',
+  tenant_updated:  'bg-blue-100 text-blue-700',
+  tenant_deleted:  'bg-red-100 text-red-700',
+  user_created:    'bg-violet-100 text-violet-700',
+  user_updated:    'bg-amber-100 text-amber-700',
+  backup_created:  'bg-slate-100 text-slate-600',
+  admin_user_created: 'bg-violet-100 text-violet-700',
+  feature_flag_created: 'bg-amber-100 text-amber-700',
+}
+
 export default function AuditPage() {
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
-  const [filters, setFilters] = useState({
-    action: '',
-    resourceType: '',
-    days: 30,
-  })
+  const [filters, setFilters] = useState({ action: '', resourceType: '' })
 
-  useEffect(() => {
-    fetchAuditLogs()
-  }, [filters])
+  useEffect(() => { fetchLogs() }, [filters]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fetchAuditLogs = async () => {
+  const fetchLogs = async () => {
     try {
       setLoading(true)
-      const params = new URLSearchParams()
+      const params = new URLSearchParams({ limit: '200' })
       if (filters.action) params.append('action', filters.action)
       if (filters.resourceType) params.append('resourceType', filters.resourceType)
-      params.append('limit', '200')
-
       const res = await fetch(`/api/superadmin/audit?${params}`)
-      if (!res.ok) throw new Error('Failed to fetch audit logs')
+      if (!res.ok) throw new Error()
       const data = await res.json()
       setLogs(data.logs || [])
-    } catch (err) {
-      console.error(err)
+    } catch {
+      // silent
     } finally {
       setLoading(false)
     }
@@ -50,147 +55,100 @@ export default function AuditPage() {
 
   const handleExport = () => {
     const csv = [
-      ['Timestamp', 'Action', 'Resource Type', 'User ID', 'IP Address', 'Changes'].join(','),
-      ...logs.map((log) =>
-        [
-          log.created_at,
-          log.action,
-          log.resource_type,
-          log.superadmin_user_id,
-          log.ip_address,
-          JSON.stringify(log.changes || ''),
-        ]
-          .map((v) => `"${v}"`)
-          .join(',')
+      ['Timestamp', 'Action', 'Resource Type', 'Resource ID', 'IP Address'].join(','),
+      ...logs.map((l) =>
+        [l.created_at, l.action, l.resource_type, l.resource_id || '', l.ip_address].map((v) => `"${v}"`).join(',')
       ),
     ].join('\n')
-
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `audit-logs-${new Date().toISOString().split('T')[0]}.csv`
-    document.body.appendChild(a)
-    a.click()
-    window.URL.revokeObjectURL(url)
-    document.body.removeChild(a)
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
+      download: `audit-${new Date().toISOString().split('T')[0]}.csv`,
+    })
+    document.body.appendChild(a); a.click(); a.remove()
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Audit Trail</h1>
-          <p className="text-gray-600 mt-1">View all superadmin actions and changes</p>
+          <h1 className="text-2xl font-bold text-slate-900">Audit Trail</h1>
+          <p className="text-slate-500 mt-1 text-sm">Every superadmin action logged for accountability.</p>
         </div>
-        <Button onClick={handleExport} className="bg-green-600 text-white hover:bg-green-700">
-          Export CSV
+        <Button variant="outline" size="sm" onClick={handleExport}>
+          <Download className="w-4 h-4 mr-1.5" /> Export CSV
         </Button>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
-        <h3 className="font-bold">Filters</h3>
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Action</label>
-            <select
-              value={filters.action}
-              onChange={(e) => setFilters({ ...filters, action: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            >
-              <option value="">All Actions</option>
-              <option value="tenant_created">Tenant Created</option>
-              <option value="tenant_updated">Tenant Updated</option>
-              <option value="tenant_deleted">Tenant Deleted</option>
-              <option value="user_created">User Created</option>
-              <option value="user_updated">User Updated</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Resource Type</label>
-            <select
-              value={filters.resourceType}
-              onChange={(e) => setFilters({ ...filters, resourceType: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            >
-              <option value="">All Types</option>
-              <option value="tenant">Tenant</option>
-              <option value="user">User</option>
-              <option value="module">Module</option>
-              <option value="billing">Billing</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Days</label>
-            <select
-              value={filters.days}
-              onChange={(e) => setFilters({ ...filters, days: parseInt(e.target.value) })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            >
-              <option value={7}>Last 7 days</option>
-              <option value={30}>Last 30 days</option>
-              <option value={90}>Last 90 days</option>
-              <option value={365}>Last year</option>
-            </select>
-          </div>
-        </div>
+      <div className="flex flex-wrap gap-3">
+        <select
+          value={filters.action}
+          onChange={(e) => setFilters({ ...filters, action: e.target.value })}
+          className="px-3 py-2 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          <option value="">All Actions</option>
+          <option value="tenant">Tenant</option>
+          <option value="user">User</option>
+          <option value="backup">Backup</option>
+          <option value="feature_flag">Feature Flag</option>
+        </select>
+        <select
+          value={filters.resourceType}
+          onChange={(e) => setFilters({ ...filters, resourceType: e.target.value })}
+          className="px-3 py-2 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          <option value="">All Resources</option>
+          <option value="tenant">Tenant</option>
+          <option value="admin_user">Admin User</option>
+          <option value="backup">Backup</option>
+          <option value="feature_flag">Feature Flag</option>
+        </select>
+        <span className="ml-auto text-sm text-muted-foreground self-center">
+          {logs.length} record{logs.length !== 1 ? 's' : ''}
+        </span>
       </div>
 
-      {/* Logs Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading audit logs...</div>
-        ) : logs.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No audit logs found</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                    Timestamp
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                    Action
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                    Resource
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                    IP Address
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                    Changes
-                  </th>
+      {/* Table */}
+      <Card>
+        <div className="overflow-x-auto">
+          {loading ? (
+            <div className="p-10 text-center text-sm text-muted-foreground">Loading audit logs...</div>
+          ) : logs.length === 0 ? (
+            <div className="p-10 text-center">
+              <ScrollText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">No audit logs found.</p>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-slate-50/60">
+                  {['Timestamp', 'Action', 'Resource', 'Resource ID', 'IP Address'].map((h) => (
+                    <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
-                      {new Date(log.created_at).toLocaleString()}
+                  <tr key={log.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-5 py-3 text-slate-500 whitespace-nowrap text-xs">
+                      {new Date(log.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {log.action}
+                    <td className="px-5 py-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ACTION_COLOR[log.action] || 'bg-slate-100 text-slate-600'}`}>
+                        {log.action.replace(/_/g, ' ')}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {log.resource_type} ({log.resource_id?.slice(0, 8)})
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 font-mono">{log.ip_address}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
-                      {log.changes ? JSON.stringify(log.changes).slice(0, 50) : 'N/A'}
-                    </td>
+                    <td className="px-5 py-3 text-slate-600 capitalize">{log.resource_type?.replace(/_/g, ' ')}</td>
+                    <td className="px-5 py-3 text-slate-500 font-mono text-xs">{log.resource_id ? log.resource_id.slice(0, 8) + '...' : '—'}</td>
+                    <td className="px-5 py-3 text-slate-500 font-mono text-xs">{log.ip_address}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </Card>
     </div>
   )
 }

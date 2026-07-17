@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { Building2, Plus, Search, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface Tenant {
   id: string
@@ -17,21 +17,30 @@ interface Tenant {
   updated_at: string
 }
 
+const PLAN_STYLE: Record<string, string> = {
+  enterprise: 'bg-purple-100 text-purple-700',
+  pro: 'bg-blue-100 text-blue-700',
+  professional: 'bg-blue-100 text-blue-700',
+  basic: 'bg-slate-100 text-slate-600',
+}
+
+const STATUS_STYLE: Record<string, string> = {
+  active: 'bg-emerald-100 text-emerald-700',
+  suspended: 'bg-red-100 text-red-700',
+  inactive: 'bg-slate-100 text-slate-500',
+}
+
 export default function TenantsPage() {
-  const router = useRouter()
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
-  const [createForm, setCreateForm] = useState({ name: '', slug: '', description: '', plan: 'basic' })
-  const [searchTerm, setSearchTerm] = useState('')
+  const [form, setForm] = useState({ name: '', slug: '', description: '', plan: 'basic' })
+  const [search, setSearch] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  // Fetch tenants
-  useEffect(() => {
-    fetchTenants()
-  }, [])
+  useEffect(() => { fetchTenants() }, [])
 
   const fetchTenants = async () => {
     try {
@@ -41,33 +50,24 @@ export default function TenantsPage() {
       const data = await res.json()
       setTenants(data.tenants || [])
     } catch (err) {
-      console.error(err)
       setError('Failed to load tenants')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleCreateTenant = async (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      setSubmitting(true)
-      setError('')
-      setSuccess('')
-
+      setSubmitting(true); setError(''); setSuccess('')
       const res = await fetch('/api/superadmin/tenants', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(createForm),
+        body: JSON.stringify(form),
       })
-
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Failed to create tenant')
-      }
-
-      setSuccess('Tenant created successfully!')
-      setCreateForm({ name: '', slug: '', description: '', plan: 'basic' })
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed') }
+      setSuccess('Tenant created successfully.')
+      setForm({ name: '', slug: '', description: '', plan: 'basic' })
       setShowCreate(false)
       fetchTenants()
     } catch (err) {
@@ -77,220 +77,169 @@ export default function TenantsPage() {
     }
   }
 
-  const filteredTenants = tenants.filter(
-    (t) =>
-      t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.slug.toLowerCase().includes(searchTerm.toLowerCase())
+  const filtered = tenants.filter((t) =>
+    t.name.toLowerCase().includes(search.toLowerCase()) ||
+    t.slug.toLowerCase().includes(search.toLowerCase())
   )
+
+  const active = tenants.filter((t) => t.status === 'active').length
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Tenants</h1>
-          <p className="text-gray-600 mt-1">Manage all tenant accounts and subscriptions</p>
+          <h1 className="text-2xl font-bold text-slate-900">Tenants</h1>
+          <p className="text-slate-500 mt-1 text-sm">Manage all tenant organisations and subscriptions.</p>
         </div>
-        <Button
-          onClick={() => setShowCreate(!showCreate)}
-          className="bg-blue-600 text-white hover:bg-blue-700"
-        >
-          + Create Tenant
+        <Button onClick={() => setShowCreate(true)} size="sm">
+          <Plus className="w-4 h-4 mr-1.5" /> New Tenant
         </Button>
       </div>
 
-      {/* Messages */}
+      {/* Stat pills */}
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: 'Total', value: tenants.length, color: 'text-slate-900' },
+          { label: 'Active', value: active, color: 'text-emerald-600' },
+          { label: 'Inactive', value: tenants.length - active, color: 'text-slate-500' },
+        ].map(({ label, value, color }) => (
+          <Card key={label}>
+            <CardContent className="pt-4 pb-4">
+              <p className="text-xs text-muted-foreground">{label}</p>
+              <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Alerts */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+        <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
           {error}
+          <button onClick={() => setError('')}><X className="w-4 h-4" /></button>
         </div>
       )}
       {success && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-700">
+        <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-sm text-emerald-700">
           {success}
+          <button onClick={() => setSuccess('')}><X className="w-4 h-4" /></button>
         </div>
       )}
 
-      {/* Create Form */}
+      {/* Create form */}
       {showCreate && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
-          <h2 className="font-bold text-lg">Create New Tenant</h2>
-          <form onSubmit={handleCreateTenant} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tenant Name
-                </label>
-                <Input
-                  type="text"
-                  placeholder="e.g., Acme Corporation"
-                  value={createForm.name}
-                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                  required
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Create New Tenant</CardTitle>
+              <button onClick={() => setShowCreate(false)} className="text-slate-400 hover:text-slate-700">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-slate-700">Tenant Name</label>
+                  <Input placeholder="Acme Corporation" value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-slate-700">Slug</label>
+                  <Input placeholder="acme-corp" value={form.slug}
+                    onChange={(e) => setForm({ ...form, slug: e.target.value })} required />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-slate-700">Description</label>
+                <textarea
+                  placeholder="Optional description"
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                  rows={2}
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Slug
-                </label>
-                <Input
-                  type="text"
-                  placeholder="e.g., acme-corp"
-                  value={createForm.slug}
-                  onChange={(e) => setCreateForm({ ...createForm, slug: e.target.value })}
-                  required
-                />
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-slate-700">Plan</label>
+                <select value={form.plan} onChange={(e) => setForm({ ...form, plan: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background">
+                  <option value="basic">Basic</option>
+                  <option value="pro">Pro</option>
+                  <option value="enterprise">Enterprise</option>
+                </select>
               </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
-              <textarea
-                placeholder="Optional description"
-                value={createForm.description}
-                onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={3}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Plan
-              </label>
-              <select
-                value={createForm.plan}
-                onChange={(e) => setCreateForm({ ...createForm, plan: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="basic">Basic</option>
-                <option value="professional">Professional</option>
-                <option value="enterprise">Enterprise</option>
-              </select>
-            </div>
-            <div className="flex gap-3 justify-end">
-              <Button
-                type="button"
-                onClick={() => setShowCreate(false)}
-                variant="outline"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={submitting}
-                className="bg-blue-600 text-white hover:bg-blue-700"
-              >
-                {submitting ? 'Creating...' : 'Create Tenant'}
-              </Button>
-            </div>
-          </form>
-        </div>
+              <div className="flex justify-end gap-3 pt-1">
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
+                <Button type="submit" size="sm" disabled={submitting}>
+                  {submitting ? 'Creating...' : 'Create Tenant'}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       )}
 
       {/* Search */}
       <div className="relative">
+        <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
         <Input
-          type="text"
-          placeholder="Search tenants by name or slug..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
+          className="pl-9"
+          placeholder="Search by name or slug..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
         />
-        <span className="absolute left-3 top-2.5 text-gray-400">🔍</span>
       </div>
 
-      {/* Tenants Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading tenants...</div>
-        ) : filteredTenants.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No tenants found</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                    Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                    Slug
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                    Plan
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                    Created
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                    Actions
-                  </th>
+      {/* Table */}
+      <Card>
+        <div className="overflow-x-auto">
+          {loading ? (
+            <div className="p-10 text-center text-sm text-muted-foreground">Loading tenants...</div>
+          ) : filtered.length === 0 ? (
+            <div className="p-10 text-center">
+              <Building2 className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">No tenants found.</p>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-slate-50/60">
+                  {['Organisation', 'Slug', 'Plan', 'Status', 'Created'].map((h) => (
+                    <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredTenants.map((tenant) => (
-                  <tr key={tenant.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                      {tenant.name}
+              <tbody className="divide-y divide-border">
+                {filtered.map((t) => (
+                  <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-md bg-slate-100 flex items-center justify-center text-xs font-semibold text-slate-600">
+                          {t.name.slice(0, 2).toUpperCase()}
+                        </div>
+                        <span className="font-medium text-slate-900">{t.name}</span>
+                      </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{tenant.slug}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {tenant.plan}
-                      </span>
+                    <td className="px-5 py-3.5 text-slate-500 font-mono text-xs">{t.slug}</td>
+                    <td className="px-5 py-3.5">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${PLAN_STYLE[t.plan] || 'bg-slate-100 text-slate-600'}`}>{t.plan}</span>
                     </td>
-                    <td className="px-6 py-4 text-sm">
-                      <span
-                        className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                          tenant.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {tenant.status}
-                      </span>
+                    <td className="px-5 py-3.5">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLE[t.status] || 'bg-slate-100 text-slate-500'}`}>{t.status}</span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {new Date(tenant.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <Link href={`/superadmin/tenants/${tenant.id}`}>
-                        <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700">
-                          View Details
-                        </Button>
-                      </Link>
+                    <td className="px-5 py-3.5 text-slate-500">
+                      {new Date(t.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="text-gray-600 text-sm font-medium">Total Tenants</div>
-          <div className="text-3xl font-bold text-gray-900 mt-2">{tenants.length}</div>
+          )}
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="text-gray-600 text-sm font-medium">Active</div>
-          <div className="text-3xl font-bold text-green-600 mt-2">
-            {tenants.filter((t) => t.status === 'active').length}
-          </div>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="text-gray-600 text-sm font-medium">Inactive</div>
-          <div className="text-3xl font-bold text-gray-600 mt-2">
-            {tenants.filter((t) => t.status !== 'active').length}
-          </div>
-        </div>
-      </div>
+      </Card>
     </div>
   )
 }

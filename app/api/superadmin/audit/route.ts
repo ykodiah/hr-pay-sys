@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifySuperAdminToken } from "@/lib/superadmin/auth"
-import { createClient } from "@/lib/supabase/server"
 import { getAuditLogs } from "@/lib/superadmin/audit"
 
 export async function GET(req: NextRequest) {

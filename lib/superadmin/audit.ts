@@ -1,4 +1,13 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@supabase/supabase-js"
+
+// Service-role client bypasses RLS for superadmin tables
+function getServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 export interface AuditLogEntry {
   userId: string
@@ -13,7 +22,7 @@ export interface AuditLogEntry {
 
 export async function logAudit(entry: AuditLogEntry) {
   try {
-    const client = await createClient()
+    const client = getServiceClient()
     await client.from("superadmin_audit_logs").insert({
       superadmin_user_id: entry.userId,
       action: entry.action,
@@ -26,7 +35,7 @@ export async function logAudit(entry: AuditLogEntry) {
       created_at: new Date().toISOString(),
     })
   } catch (err) {
-    console.error("[v0] Audit log error:", err)
+    console.error("[superadmin] Audit log error:", err)
   }
 }
 
@@ -38,7 +47,7 @@ export async function getAuditLogs(filters?: {
   offset?: number
 }) {
   try {
-    const client = await createClient()
+    const client = getServiceClient()
     let query = client
       .from("superadmin_audit_logs")
       .select("*")
@@ -46,17 +55,16 @@ export async function getAuditLogs(filters?: {
 
     if (filters?.userId) query = query.eq("superadmin_user_id", filters.userId)
     if (filters?.resourceType) query = query.eq("resource_type", filters.resourceType)
-    if (filters?.action) query = query.eq("action", filters.action)
+    if (filters?.action) query = query.ilike("action", `%${filters.action}%`)
 
     const limit = filters?.limit || 100
     const offset = filters?.offset || 0
-
     const { data, error } = await query.range(offset, offset + limit - 1)
 
     if (error) throw error
-    return data
+    return data ?? []
   } catch (err) {
-    console.error("[v0] Get audit logs error:", err)
+    console.error("[superadmin] Get audit logs error:", err)
     return []
   }
 }

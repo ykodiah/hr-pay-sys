@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { CreditCard, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 
 interface Invoice {
   id: string
@@ -14,204 +16,120 @@ interface Invoice {
   created_at: string
 }
 
+const PAY_STYLE: Record<string, string> = {
+  paid:    'bg-emerald-100 text-emerald-700',
+  pending: 'bg-amber-100 text-amber-700',
+  overdue: 'bg-red-100 text-red-700',
+  void:    'bg-slate-100 text-slate-500',
+}
+
 export default function BillingPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
-  const [metrics, setMetrics] = useState({
-    totalRevenue: 0,
-    pendingPayments: 0,
-    paidInvoices: 0,
-  })
-  const [dateRange, setDateRange] = useState('month')
 
   useEffect(() => {
-    fetchBillingData()
-  }, [dateRange])
+    // Billing invoices are currently seeded statically
+    // until a full billing API is implemented.
+    const mock: Invoice[] = [
+      { id: '1', tenant_id: 'Acme Corp', invoice_number: 'INV-2026-001', total_amount: 1500, payment_status: 'paid', billing_period_start: '2026-07-01', billing_period_end: '2026-07-31', created_at: '2026-07-01' },
+      { id: '2', tenant_id: 'Zenith Ltd', invoice_number: 'INV-2026-002', total_amount: 850, payment_status: 'pending', billing_period_start: '2026-07-01', billing_period_end: '2026-07-31', created_at: '2026-07-01' },
+      { id: '3', tenant_id: 'Momentum HR', invoice_number: 'INV-2026-003', total_amount: 2400, payment_status: 'overdue', billing_period_start: '2026-06-01', billing_period_end: '2026-06-30', created_at: '2026-06-01' },
+    ]
+    setInvoices(mock)
+    setLoading(false)
+  }, [])
 
-  const fetchBillingData = async () => {
-    try {
-      setLoading(true)
-      // Mock billing data
-      const mockInvoices: Invoice[] = [
-        {
-          id: '1',
-          tenant_id: 'tenant-1',
-          invoice_number: 'INV-2026-001',
-          total_amount: 500,
-          payment_status: 'paid',
-          billing_period_start: '2026-07-01',
-          billing_period_end: '2026-07-31',
-          created_at: '2026-07-01',
-        },
-        {
-          id: '2',
-          tenant_id: 'tenant-2',
-          invoice_number: 'INV-2026-002',
-          total_amount: 1200,
-          payment_status: 'pending',
-          billing_period_start: '2026-07-01',
-          billing_period_end: '2026-07-31',
-          created_at: '2026-07-01',
-        },
-      ]
-      setInvoices(mockInvoices)
-      setMetrics({
-        totalRevenue: mockInvoices.reduce((sum, i) => sum + i.total_amount, 0),
-        pendingPayments: mockInvoices.filter((i) => i.payment_status === 'pending').length,
-        paidInvoices: mockInvoices.filter((i) => i.payment_status === 'paid').length,
-      })
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const totalRevenue = invoices.filter((i) => i.payment_status === 'paid').reduce((s, i) => s + i.total_amount, 0)
+  const pending = invoices.filter((i) => i.payment_status === 'pending')
+  const overdue = invoices.filter((i) => i.payment_status === 'overdue')
 
-  const handleExportInvoices = () => {
+  const handleExport = () => {
     const csv = [
-      ['Invoice Number', 'Tenant ID', 'Amount', 'Status', 'Period', 'Created'].join(','),
-      ...invoices.map((inv) =>
-        [
-          inv.invoice_number,
-          inv.tenant_id,
-          inv.total_amount,
-          inv.payment_status,
-          `${inv.billing_period_start} to ${inv.billing_period_end}`,
-          inv.created_at,
-        ]
-          .map((v) => `"${v}"`)
-          .join(',')
+      ['Invoice', 'Tenant', 'Amount', 'Status', 'Period'].join(','),
+      ...invoices.map((i) =>
+        [i.invoice_number, i.tenant_id, i.total_amount, i.payment_status, `${i.billing_period_start} – ${i.billing_period_end}`]
+          .map((v) => `"${v}"`).join(',')
       ),
     ].join('\n')
-
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `invoices-${new Date().toISOString().split('T')[0]}.csv`
-    document.body.appendChild(a)
-    a.click()
-    window.URL.revokeObjectURL(url)
-    document.body.removeChild(a)
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
+      download: `invoices-${new Date().toISOString().split('T')[0]}.csv`,
+    })
+    document.body.appendChild(a); a.click(); a.remove()
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Billing</h1>
-          <p className="text-gray-600 mt-1">Revenue tracking and invoicing</p>
+          <h1 className="text-2xl font-bold text-slate-900">Billing</h1>
+          <p className="text-slate-500 mt-1 text-sm">Revenue tracking and invoice management.</p>
         </div>
-        <div className="flex gap-2">
-          <select
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg"
-          >
-            <option value="week">This Week</option>
-            <option value="month">This Month</option>
-            <option value="quarter">This Quarter</option>
-            <option value="year">This Year</option>
-          </select>
-          <Button onClick={handleExportInvoices} className="bg-green-600 text-white hover:bg-green-700">
-            Export
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={handleExport}>
+          <Download className="w-4 h-4 mr-1.5" /> Export CSV
+        </Button>
       </div>
 
       {/* Metrics */}
-      {loading ? (
-        <div className="text-center py-8">Loading billing data...</div>
-      ) : (
-        <>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <div className="text-gray-600 text-sm font-medium">Total Revenue</div>
-              <div className="text-3xl font-bold text-green-600 mt-2">
-                GHS {metrics.totalRevenue.toFixed(2)}
-              </div>
-              <p className="text-gray-500 text-xs mt-2">All time</p>
-            </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <div className="text-gray-600 text-sm font-medium">Paid Invoices</div>
-              <div className="text-3xl font-bold text-green-600 mt-2">{metrics.paidInvoices}</div>
-              <p className="text-gray-500 text-xs mt-2">Completed payments</p>
-            </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <div className="text-gray-600 text-sm font-medium">Pending Payments</div>
-              <div className="text-3xl font-bold text-orange-600 mt-2">{metrics.pendingPayments}</div>
-              <p className="text-gray-500 text-xs mt-2">Awaiting payment</p>
-            </div>
-          </div>
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: 'Collected Revenue', value: `GHS ${totalRevenue.toLocaleString()}`, sub: 'paid invoices', color: 'text-emerald-600' },
+          { label: 'Pending', value: pending.length, sub: `GHS ${pending.reduce((s, i) => s + i.total_amount, 0).toLocaleString()} outstanding`, color: 'text-amber-600' },
+          { label: 'Overdue', value: overdue.length, sub: `GHS ${overdue.reduce((s, i) => s + i.total_amount, 0).toLocaleString()} overdue`, color: 'text-red-600' },
+        ].map(({ label, value, sub, color }) => (
+          <Card key={label}>
+            <CardContent className="pt-4 pb-4">
+              <p className="text-xs text-muted-foreground">{label}</p>
+              <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-          {/* Invoices Table */}
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="font-bold text-lg">Recent Invoices</h3>
+      {/* Invoices table */}
+      <Card>
+        <div className="overflow-x-auto">
+          {loading ? (
+            <div className="p-10 text-center text-sm text-muted-foreground">Loading invoices...</div>
+          ) : invoices.length === 0 ? (
+            <div className="p-10 text-center">
+              <CreditCard className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">No invoices yet.</p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                      Invoice
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                      Tenant
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                      Amount
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                      Period
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {invoices.map((inv) => (
-                    <tr key={inv.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm font-medium text-blue-600">
-                        {inv.invoice_number}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{inv.tenant_id}</td>
-                      <td className="px-6 py-4 text-sm font-bold text-gray-900">
-                        GHS {inv.total_amount.toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {new Date(inv.billing_period_start).toLocaleDateString()} -{' '}
-                        {new Date(inv.billing_period_end).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        <span
-                          className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                            inv.payment_status === 'paid'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-orange-100 text-orange-800'
-                          }`}
-                        >
-                          {inv.payment_status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        <Button variant="ghost" size="sm" className="text-blue-600">
-                          View
-                        </Button>
-                      </td>
-                    </tr>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-slate-50/60">
+                  {['Invoice #', 'Tenant', 'Amount', 'Billing Period', 'Status'].map((h) => (
+                    <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
-      )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {invoices.map((inv) => (
+                  <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-5 py-3.5 font-mono text-slate-700 text-xs">{inv.invoice_number}</td>
+                    <td className="px-5 py-3.5 font-medium text-slate-900">{inv.tenant_id}</td>
+                    <td className="px-5 py-3.5 font-semibold text-slate-900">GHS {inv.total_amount.toLocaleString()}</td>
+                    <td className="px-5 py-3.5 text-slate-500 text-xs">
+                      {new Date(inv.billing_period_start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                      {' – '}
+                      {new Date(inv.billing_period_end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${PAY_STYLE[inv.payment_status] || 'bg-slate-100 text-slate-500'}`}>
+                        {inv.payment_status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </Card>
     </div>
   )
 }

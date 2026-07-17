@@ -168,21 +168,51 @@ export async function getCurrentSuperadminUser(
 }
 
 /**
- * Set JWT token in cookie
+ * Verify superadmin token from request cookies or Authorization header.
+ * Returns a merged session+user object usable with both call patterns:
+ *   const user = await verifySuperAdminToken(req)  → returns object with .id, .email, .role
+ *   const auth = await verifySuperAdminToken(req)  → object also has .valid and .userId
+ * Returns null if token is missing or invalid.
  */
-export async function setAuthCookie(token: string, expiresIn: number = 86400000): Promise<void> {
-  const cookieStore = await cookies()
-  cookieStore.set('superadmin_token', token, {
+export async function verifySuperAdminToken(
+  request: Pick<Request, 'headers'> & { cookies: { get: (name: string) => { value: string } | undefined } }
+): Promise<(SuperadminSession & { id: string; valid: true; userId: string }) | null> {
+  const cookieToken = request.cookies.get('superadmin_token')?.value
+  const authHeader = (request.headers as Headers).get?.('authorization')
+  const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+  const token = cookieToken || bearerToken
+
+  if (!token) return null
+
+  const session = verifyToken(token)
+  if (!session) return null
+
+  return {
+    ...session,
+    id: session.userId,
+    valid: true,
+    userId: session.userId,
+  }
+}
+
+/**
+ * Set JWT token in HTTP-only cookie on a NextResponse object
+ */
+export function setAuthCookie(
+  response: { cookies: { set: (name: string, value: string, options: object) => void } },
+  token: string
+): void {
+  response.cookies.set('superadmin_token', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: expiresIn / 1000, // Convert ms to seconds
-    path: '/superadmin',
+    maxAge: 86400,
+    path: '/',
   })
 }
 
 /**
- * Get auth token from cookie
+ * Get auth token from Next.js cookie store (Server Components / Route Handlers)
  */
 export async function getAuthCookie(): Promise<string | null> {
   const cookieStore = await cookies()
@@ -190,7 +220,7 @@ export async function getAuthCookie(): Promise<string | null> {
 }
 
 /**
- * Clear auth cookie (logout)
+ * Clear auth cookie
  */
 export async function clearAuthCookie(): Promise<void> {
   const cookieStore = await cookies()

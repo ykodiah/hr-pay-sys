@@ -1,7 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { Users, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface SuperAdminUser {
   id: string
@@ -14,24 +17,29 @@ interface SuperAdminUser {
   created_at: string
 }
 
+const ROLE_STYLE: Record<string, string> = {
+  admin:     'bg-purple-100 text-purple-700',
+  support:   'bg-blue-100 text-blue-700',
+  viewer:    'bg-slate-100 text-slate-600',
+  moderator: 'bg-amber-100 text-amber-700',
+}
+
+const STATUS_STYLE: Record<string, string> = {
+  active:    'bg-emerald-100 text-emerald-700',
+  inactive:  'bg-slate-100 text-slate-500',
+  suspended: 'bg-red-100 text-red-700',
+}
+
 export default function UsersPage() {
   const [users, setUsers] = useState<SuperAdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
-  const [createForm, setCreateForm] = useState({
-    email: '',
-    password: '',
-    first_name: '',
-    last_name: '',
-    role: 'admin',
-  })
+  const [form, setForm] = useState({ email: '', password: '', first_name: '', last_name: '', role: 'admin' })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  useEffect(() => {
-    fetchUsers()
-  }, [])
+  useEffect(() => { fetchUsers() }, [])
 
   const fetchUsers = async () => {
     try {
@@ -40,34 +48,25 @@ export default function UsersPage() {
       if (!res.ok) throw new Error('Failed to fetch users')
       const data = await res.json()
       setUsers(data.users || [])
-    } catch (err) {
-      console.error(err)
+    } catch {
       setError('Failed to load users')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleCreateUser = async (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      setSubmitting(true)
-      setError('')
-      setSuccess('')
-
+      setSubmitting(true); setError(''); setSuccess('')
       const res = await fetch('/api/superadmin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(createForm),
+        body: JSON.stringify(form),
       })
-
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Failed to create user')
-      }
-
-      setSuccess('Superadmin user created successfully!')
-      setCreateForm({ email: '', password: '', first_name: '', last_name: '', role: 'admin' })
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed') }
+      setSuccess('Admin user created successfully.')
+      setForm({ email: '', password: '', first_name: '', last_name: '', role: 'admin' })
       setShowCreate(false)
       fetchUsers()
     } catch (err) {
@@ -80,188 +79,133 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Superadmin Users</h1>
-          <p className="text-gray-600 mt-1">Manage superadmin access and permissions</p>
+          <h1 className="text-2xl font-bold text-slate-900">Admin Users</h1>
+          <p className="text-slate-500 mt-1 text-sm">Manage who has access to the superadmin portal.</p>
         </div>
-        <Button
-          onClick={() => setShowCreate(!showCreate)}
-          className="bg-blue-600 text-white hover:bg-blue-700"
-        >
-          + Create User
+        <Button onClick={() => setShowCreate(true)} size="sm">
+          <Plus className="w-4 h-4 mr-1.5" /> New User
         </Button>
       </div>
 
-      {/* Messages */}
+      {/* Alerts */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-          {error}
+        <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+          {error}<button onClick={() => setError('')}><X className="w-4 h-4" /></button>
         </div>
       )}
       {success && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-700">
-          {success}
+        <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-sm text-emerald-700">
+          {success}<button onClick={() => setSuccess('')}><X className="w-4 h-4" /></button>
         </div>
       )}
 
-      {/* Create Form */}
+      {/* Create form */}
       {showCreate && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
-          <h2 className="font-bold text-lg">Create New Superadmin User</h2>
-          <form onSubmit={handleCreateUser} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  First Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="John"
-                  value={createForm.first_name}
-                  onChange={(e) => setCreateForm({ ...createForm, first_name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Create Admin User</CardTitle>
+              <button onClick={() => setShowCreate(false)} className="text-slate-400 hover:text-slate-700">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-slate-700">First Name</label>
+                  <Input placeholder="Kofi" value={form.first_name}
+                    onChange={(e) => setForm({ ...form, first_name: e.target.value })} required />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-slate-700">Last Name</label>
+                  <Input placeholder="Mensah" value={form.last_name}
+                    onChange={(e) => setForm({ ...form, last_name: e.target.value })} required />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Last Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="Doe"
-                  value={createForm.last_name}
-                  onChange={(e) => setCreateForm({ ...createForm, last_name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-slate-700">Email</label>
+                <Input type="email" placeholder="kofi@example.com" value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })} required />
               </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                placeholder="john@example.com"
-                value={createForm.email}
-                onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={createForm.password}
-                onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Role
-              </label>
-              <select
-                value={createForm.role}
-                onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="admin">Admin</option>
-                <option value="moderator">Moderator</option>
-              </select>
-            </div>
-            <div className="flex gap-3 justify-end">
-              <Button
-                type="button"
-                onClick={() => setShowCreate(false)}
-                variant="outline"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={submitting}
-                className="bg-blue-600 text-white hover:bg-blue-700"
-              >
-                {submitting ? 'Creating...' : 'Create User'}
-              </Button>
-            </div>
-          </form>
-        </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-slate-700">Password</label>
+                <Input type="password" placeholder="••••••••" value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-slate-700">Role</label>
+                <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring bg-background">
+                  <option value="admin">Admin</option>
+                  <option value="support">Support</option>
+                  <option value="viewer">Viewer</option>
+                </select>
+              </div>
+              <div className="flex justify-end gap-3 pt-1">
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
+                <Button type="submit" size="sm" disabled={submitting}>
+                  {submitting ? 'Creating...' : 'Create User'}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Users Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading users...</div>
-        ) : users.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No users found</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                    Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                    Email
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                    Role
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                    Last Login
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                    Created
-                  </th>
+      {/* Table */}
+      <Card>
+        <div className="overflow-x-auto">
+          {loading ? (
+            <div className="p-10 text-center text-sm text-muted-foreground">Loading users...</div>
+          ) : users.length === 0 ? (
+            <div className="p-10 text-center">
+              <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">No admin users yet.</p>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-slate-50/60">
+                  {['Name', 'Email', 'Role', 'Status', 'Last Login', 'Joined'].map((h) => (
+                    <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
-                {users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                      {user.first_name} {user.last_name}
+              <tbody className="divide-y divide-border">
+                {users.map((u) => (
+                  <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-xs font-semibold text-slate-600">
+                          {u.first_name?.[0]}{u.last_name?.[0]}
+                        </div>
+                        <span className="font-medium text-slate-900">{u.first_name} {u.last_name}</span>
+                      </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
-                    <td className="px-6 py-4 text-sm capitalize text-gray-900">{user.role}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <span
-                        className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                          user.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {user.status}
-                      </span>
+                    <td className="px-5 py-3.5 text-slate-600">{u.email}</td>
+                    <td className="px-5 py-3.5">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${ROLE_STYLE[u.role] || 'bg-slate-100 text-slate-600'}`}>{u.role}</span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {user.last_login_at
-                        ? new Date(user.last_login_at).toLocaleDateString()
-                        : 'Never'}
+                    <td className="px-5 py-3.5">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLE[u.status] || 'bg-slate-100 text-slate-500'}`}>{u.status}</span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {new Date(user.created_at).toLocaleDateString()}
+                    <td className="px-5 py-3.5 text-slate-500 text-xs">
+                      {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Never'}
+                    </td>
+                    <td className="px-5 py-3.5 text-slate-500 text-xs">
+                      {new Date(u.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </Card>
     </div>
   )
 }

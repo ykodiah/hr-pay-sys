@@ -10,18 +10,13 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
   const checking = useRef(false)
 
   useEffect(() => {
-    // Skip auth check for login page
     if (pathname === '/superadmin/login') return
-    // Prevent concurrent checks
     if (checking.current) return
     checking.current = true
-
     const checkAuth = async () => {
       try {
         const res = await fetch('/api/superadmin/auth/verify', { cache: 'no-store' })
-        if (!res.ok) {
-          router.replace('/superadmin/login')
-        }
+        if (!res.ok) router.replace('/superadmin/login')
       } finally {
         checking.current = false
       }
@@ -29,17 +24,18 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
     checkAuth()
   }, [pathname]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Don't show navbar on login page
   const isLoginPage = pathname === '/superadmin/login'
+  if (isLoginPage) return <>{children}</>
 
   return (
-    <div>
-      {!isLoginPage && <SuperAdminNavbar />}
-      <div className={isLoginPage ? '' : 'min-h-screen bg-gray-50'}>
-        <div className={isLoginPage ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'}>
+    <div className="flex min-h-screen bg-slate-50">
+      <SuperAdminNavbar />
+      {/* md:pl-56 offsets content past the 224px (w-56) fixed sidebar */}
+      <main className="flex-1 min-w-0 pt-14 md:pt-0 md:pl-56">
+        <div className="p-6 max-w-screen-xl mx-auto">
           {children}
         </div>
-      </div>
+      </main>
     </div>
   )
 }
