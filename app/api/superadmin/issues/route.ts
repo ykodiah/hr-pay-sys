@@ -70,10 +70,13 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
-    await logAudit(user.id, 'issue_created', 'issue', issue?.[0]?.id, {
-      title,
-      priority,
-      issue_type,
+    await logAudit({
+      userId: user.id,
+      action: 'issue_created',
+      resourceType: 'issue',
+      resourceId: issue?.[0]?.id,
+      changes: { title, priority, issue_type },
+      ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
     })
 
     return NextResponse.json({ issue: issue?.[0] })

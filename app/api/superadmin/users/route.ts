@@ -15,7 +15,7 @@ function getDb() {
 export async function GET(req: NextRequest) {
   try {
     const auth = await verifySuperAdminToken(req)
-    if (!auth.valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!auth?.valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const client = getDb()
     const { data: users, error } = await client
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const auth = await verifySuperAdminToken(req)
-    if (!auth.valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!auth?.valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const body = await req.json()
     const { email, password, first_name, last_name, role = "admin" } = body

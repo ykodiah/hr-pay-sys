@@ -1,255 +1,171 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Download, Trash2, Plus, RotateCw } from 'lucide-react'
+import { HardDrive, Plus, Download, Trash2, RefreshCw, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 
 interface Backup {
-  id: string
-  tenant_id: string | null
-  backup_type: 'full' | 'incremental' | 'tenant_export'
-  backup_size_mb: number
-  status: 'in_progress' | 'completed' | 'failed'
-  s3_path: string | null
-  created_at: string
-  retention_until: string
+  id: string; tenant_id: string | null; backup_type: 'full' | 'incremental' | 'tenant_export'
+  backup_size_mb: number; status: 'in_progress' | 'completed' | 'failed'
+  s3_path: string | null; created_at: string; retention_until: string
 }
+
+const STATUS_STYLES: Record<string, string> = {
+  completed: 'bg-emerald-100 text-emerald-700',
+  in_progress: 'bg-blue-100 text-blue-700',
+  failed: 'bg-red-100 text-red-700',
+}
+const STATUS_ICON: Record<string, JSX.Element> = {
+  completed: <CheckCircle2 className="w-3.5 h-3.5" />,
+  in_progress: <Loader2 className="w-3.5 h-3.5 animate-spin" />,
+  failed: <AlertCircle className="w-3.5 h-3.5" />,
+}
+const TYPE_LABELS: Record<string, string> = { full: 'Full Backup', incremental: 'Incremental', tenant_export: 'Tenant Export' }
 
 export default function BackupsPage() {
   const [backups, setBackups] = useState<Backup[]>([])
   const [loading, setLoading] = useState(true)
-  const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [backupType, setBackupType] = useState<'full' | 'incremental' | 'tenant_export'>('full')
+  const [showCreate, setShowCreate] = useState(false)
+  const [backupType, setBackupType] = useState<Backup['backup_type']>('full')
+  const [creating, setCreating] = useState(false)
 
-  useEffect(() => {
-    fetchBackups()
-  }, [])
-
-  const fetchBackups = async () => {
+  const load = async () => {
+    setLoading(true)
     try {
-      const response = await fetch('/api/superadmin/backups')
-      if (!response.ok) throw new Error('Failed to fetch backups')
-      const data = await response.json()
-      setBackups(data.backups || [])
-    } catch (error) {
-      console.error('Error fetching backups:', error)
-    } finally {
-      setLoading(false)
-    }
+      const r = await fetch('/api/superadmin/backups')
+      const d = r.ok ? await r.json() : {}
+      setBackups(d.backups || [])
+    } finally { setLoading(false) }
   }
+  useEffect(() => { load() }, [])
 
-  const handleCreateBackup = async () => {
+  const handleCreate = async () => {
+    setCreating(true)
     try {
-      const response = await fetch('/api/superadmin/backups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      await fetch('/api/superadmin/backups', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ backup_type: backupType }),
       })
-
-      if (!response.ok) throw new Error('Failed to create backup')
-      
-      setShowCreateDialog(false)
-      fetchBackups()
-    } catch (error) {
-      console.error('Error creating backup:', error)
-      alert('Failed to create backup')
-    }
+      setShowCreate(false); load()
+    } finally { setCreating(false) }
   }
 
-  const handleDownloadBackup = (backup: Backup) => {
-    if (backup.s3_path) {
-      window.open(`/api/superadmin/backups/${backup.id}/download`, '_blank')
-    }
-  }
-
-  const handleDeleteBackup = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this backup?')) return
-
-    try {
-      const response = await fetch(`/api/superadmin/backups/${id}`, {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) throw new Error('Failed to delete backup')
-      setBackups(backups.filter(b => b.id !== id))
-    } catch (error) {
-      console.error('Error deleting backup:', error)
-      alert('Failed to delete backup')
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-800'
-      case 'in_progress':
-        return 'bg-blue-100 text-blue-800'
-      case 'failed':
-        return 'bg-red-100 text-red-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case 'full':
-        return 'Full Backup'
-      case 'incremental':
-        return 'Incremental'
-      case 'tenant_export':
-        return 'Tenant Export'
-      default:
-        return type
-    }
-  }
+  const totalMB = backups.reduce((s, b) => s + (b.backup_size_mb || 0), 0)
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Data Backups</h1>
-          <p className="text-gray-600 mt-1">Manage system backups and recovery</p>
+          <h1 className="text-2xl font-bold text-slate-900">Data Backups</h1>
+          <p className="text-sm text-slate-500 mt-1">Manage system backups and recovery operations.</p>
         </div>
-        <button
-          onClick={() => setShowCreateDialog(true)}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
-        >
-          <Plus className="w-5 h-5" />
-          Create Backup
-        </button>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <p className="text-gray-600 text-sm">Total Backups</p>
-          <p className="text-2xl font-bold text-gray-900">{backups.length}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <p className="text-gray-600 text-sm">Completed</p>
-          <p className="text-2xl font-bold text-green-600">{backups.filter(b => b.status === 'completed').length}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <p className="text-gray-600 text-sm">In Progress</p>
-          <p className="text-2xl font-bold text-blue-600">{backups.filter(b => b.status === 'in_progress').length}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <p className="text-gray-600 text-sm">Total Size</p>
-          <p className="text-2xl font-bold text-gray-900">
-            {(backups.reduce((sum, b) => sum + (b.backup_size_mb || 0), 0) / 1024).toFixed(1)} GB
-          </p>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={load} className="gap-2">
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          </Button>
+          <Button size="sm" onClick={() => setShowCreate(true)} className="gap-2">
+            <Plus className="w-4 h-4" /> New Backup
+          </Button>
         </div>
       </div>
 
-      {/* Create Backup Dialog */}
-      {showCreateDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h2 className="text-xl font-bold mb-4">Create New Backup</h2>
-            <div className="space-y-4">
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Backups', value: backups.length },
+          { label: 'Completed', value: backups.filter(b => b.status === 'completed').length, cls: 'text-emerald-600' },
+          { label: 'In Progress', value: backups.filter(b => b.status === 'in_progress').length, cls: 'text-blue-600' },
+          { label: 'Total Size', value: `${(totalMB / 1024).toFixed(2)} GB` },
+        ].map(({ label, value, cls }) => (
+          <Card key={label}><CardContent className="pt-4">
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className={`text-2xl font-bold mt-1 ${cls ?? 'text-slate-900'}`}>{loading ? '—' : value}</p>
+          </CardContent></Card>
+        ))}
+      </div>
+
+      {/* Create backup modal */}
+      {showCreate && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-sm">
+            <CardHeader><CardTitle className="text-lg flex items-center gap-2"><HardDrive className="w-5 h-5" /> New Backup</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Backup Type</label>
-                <select
-                  value={backupType}
-                  onChange={(e) => setBackupType(e.target.value as any)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
+                <label className="text-sm font-medium text-slate-700 mb-2 block">Backup Type</label>
+                <select value={backupType} onChange={e => setBackupType(e.target.value as Backup['backup_type'])}
+                  className="w-full h-9 px-3 border border-input rounded-md text-sm bg-background">
                   <option value="full">Full Backup</option>
                   <option value="incremental">Incremental Backup</option>
                   <option value="tenant_export">Tenant Export</option>
                 </select>
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  {backupType === 'full' && 'Complete snapshot of all platform data and configuration.'}
+                  {backupType === 'incremental' && 'Only changes since the last full backup.'}
+                  {backupType === 'tenant_export' && 'Isolated export of a single tenant\'s data.'}
+                </p>
               </div>
-              <p className="text-sm text-gray-600">
-                {backupType === 'full' && 'Complete system backup including all data and configurations'}
-                {backupType === 'incremental' && 'Only backup changes since last full backup'}
-                {backupType === 'tenant_export' && 'Export specific tenant data for archival or migration'}
-              </p>
-            </div>
-            <div className="flex gap-2 mt-6">
-              <button
-                onClick={() => setShowCreateDialog(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateBackup}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Create
-              </button>
-            </div>
-          </div>
+              <div className="flex gap-2 pt-1">
+                <Button variant="outline" className="flex-1" onClick={() => setShowCreate(false)}>Cancel</Button>
+                <Button className="flex-1" disabled={creating} onClick={handleCreate}>
+                  {creating ? <><Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />Creating...</> : 'Create'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
-      {/* Backups Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Type</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Size</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Created</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Retention</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {loading ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                  Loading backups...
-                </td>
-              </tr>
-            ) : backups.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                  No backups found
-                </td>
-              </tr>
-            ) : (
-              backups.map((backup) => (
-                <tr key={backup.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">{getTypeLabel(backup.backup_type)}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{backup.backup_size_mb?.toFixed(2)} MB</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(backup.status)}`}>
-                      {backup.status.charAt(0).toUpperCase() + backup.status.slice(1)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {new Date(backup.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {new Date(backup.retention_until).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 flex gap-2">
-                    {backup.status === 'completed' && (
-                      <button
-                        onClick={() => handleDownloadBackup(backup)}
-                        className="p-2 text-gray-600 hover:bg-gray-100 rounded transition"
-                        title="Download"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleDeleteBackup(backup.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded transition"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
+      {/* Table */}
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-slate-50">
+                  <th className="px-5 py-3 text-left font-medium text-muted-foreground">Type</th>
+                  <th className="px-5 py-3 text-left font-medium text-muted-foreground">Size</th>
+                  <th className="px-5 py-3 text-left font-medium text-muted-foreground">Status</th>
+                  <th className="px-5 py-3 text-left font-medium text-muted-foreground">Created</th>
+                  <th className="px-5 py-3 text-left font-medium text-muted-foreground">Retain Until</th>
+                  <th className="px-5 py-3 text-left font-medium text-muted-foreground">Actions</th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {loading ? (
+                  <tr><td colSpan={6} className="px-5 py-8 text-center text-muted-foreground">Loading backups...</td></tr>
+                ) : backups.length === 0 ? (
+                  <tr><td colSpan={6} className="px-5 py-8 text-center text-muted-foreground">No backups found. Create one to get started.</td></tr>
+                ) : backups.map(b => (
+                  <tr key={b.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-5 py-3.5 font-medium">{TYPE_LABELS[b.backup_type] ?? b.backup_type}</td>
+                    <td className="px-5 py-3.5 text-muted-foreground">{b.backup_size_mb ? `${b.backup_size_mb.toFixed(1)} MB` : '—'}</td>
+                    <td className="px-5 py-3.5">
+                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[b.status]}`}>
+                        {STATUS_ICON[b.status]} {b.status.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-muted-foreground">{new Date(b.created_at).toLocaleDateString('en-GB')}</td>
+                    <td className="px-5 py-3.5 text-muted-foreground">{b.retention_until ? new Date(b.retention_until).toLocaleDateString('en-GB') : '—'}</td>
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-1">
+                        {b.status === 'completed' && (
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Download">
+                            <Download className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50" title="Delete">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

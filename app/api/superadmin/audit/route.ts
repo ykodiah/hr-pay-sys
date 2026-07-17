@@ -5,7 +5,7 @@ import { getAuditLogs } from "@/lib/superadmin/audit"
 export async function GET(req: NextRequest) {
   try {
     const auth = await verifySuperAdminToken(req)
-    if (!auth.valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!auth?.valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const searchParams = req.nextUrl.searchParams
     const action = searchParams.get("action") || undefined

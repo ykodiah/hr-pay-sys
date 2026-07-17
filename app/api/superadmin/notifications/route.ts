@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifySuperAdminToken } from "@/lib/superadmin/auth"
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@supabase/supabase-js"
+
+function getDb() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 export async function GET(req: NextRequest) {
   try {
     const auth = await verifySuperAdminToken(req)
-    if (!auth.valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!auth?.valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const client = await createClient()
+    const client = getDb()
     const { data: notifications, error } = await client
       .from("superadmin_notifications")
       .select("*")
@@ -18,7 +26,6 @@ export async function GET(req: NextRequest) {
     if (error) throw error
 
     const unread = notifications?.filter((n) => !n.read_at).length || 0
-
     return NextResponse.json({ notifications, unread })
   } catch (err: any) {
     console.error("[v0] Notifications GET error:", err)
@@ -29,12 +36,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const auth = await verifySuperAdminToken(req)
-    if (!auth.valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!auth?.valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const body = await req.json()
     const { recipient_user_id, title, message, type = "info", metadata } = body
 
-    const client = await createClient()
+    const client = getDb()
     const { data: notification, error } = await client
       .from("superadmin_notifications")
       .insert({

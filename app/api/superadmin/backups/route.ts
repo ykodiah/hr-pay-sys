@@ -65,9 +65,13 @@ export async function POST(request: NextRequest) {
     if (error) throw error
 
     // Log audit
-    await logAudit(user.id, 'backup_created', 'backup', backup?.[0]?.id, {
-      backup_type,
-      tenant_id,
+    await logAudit({
+      userId: user.id,
+      action: 'backup_created',
+      resourceType: 'backup',
+      resourceId: backup?.[0]?.id,
+      changes: { backup_type, tenant_id },
+      ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
     })
 
     return NextResponse.json({ backup: backup?.[0] })

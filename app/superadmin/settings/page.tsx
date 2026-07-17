@@ -1,153 +1,128 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { Settings, Shield, Bell, Database, Globe } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
-interface Setting {
-  id: string
-  key: string
-  value: string
-  description: string
-  is_sensitive: boolean
+const SETTINGS_SECTIONS = [
+  {
+    id: 'platform', icon: Globe, label: 'Platform', items: [
+      { key: 'platform_name', label: 'Platform Name', value: 'AkwaabaHRPay', desc: 'Displayed in branding and emails' },
+      { key: 'support_email', label: 'Support Email', value: 'support@akwaabahrpay.com', desc: 'Default support contact' },
+      { key: 'max_tenants', label: 'Max Tenants', value: '1000', desc: 'Platform-wide tenant cap' },
+    ],
+  },
+  {
+    id: 'billing', icon: Database, label: 'Billing', items: [
+      { key: 'default_payment_term_days', label: 'Payment Term (days)', value: '30', desc: 'Default invoice payment window' },
+      { key: 'trial_period_days', label: 'Trial Period (days)', value: '14', desc: 'Free trial duration for new tenants' },
+    ],
+  },
+  {
+    id: 'backups', icon: Shield, label: 'Backups & Retention', items: [
+      { key: 'backup_retention_days', label: 'Retention (days)', value: '90', desc: 'How long to keep backup files' },
+      { key: 'auto_backup_enabled', label: 'Auto Backup', value: 'true', desc: 'Enable scheduled daily backups' },
+    ],
+  },
+  {
+    id: 'notifications', icon: Bell, label: 'Notifications', items: [
+      { key: 'maintenance_mode', label: 'Maintenance Mode', value: 'false', desc: 'Block access while in maintenance' },
+      { key: 'alert_email', label: 'Alert Email', value: 'alerts@akwaabahrpay.com', desc: 'Receive system alerts here' },
+    ],
+  },
+]
+
+type SettingsMap = Record<string, string>
+
+function buildDefaults(): SettingsMap {
+  const m: SettingsMap = {}
+  SETTINGS_SECTIONS.forEach(s => s.items.forEach(i => { m[i.key] = i.value }))
+  return m
 }
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<Setting[]>([])
-  const [loading, setLoading] = useState(true)
-  const [editingKey, setEditingKey] = useState<string | null>(null)
-  const [editValue, setEditValue] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [values, setValues] = useState<SettingsMap>(buildDefaults)
+  const [editing, setEditing] = useState<string | null>(null)
+  const [draft, setDraft] = useState('')
+  const [saved, setSaved] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchSettings()
-  }, [])
+  const startEdit = (key: string) => { setEditing(key); setDraft(values[key] ?? '') }
 
-  const fetchSettings = async () => {
-    try {
-      setLoading(true)
-      // Mock settings
-      setSettings([
-        {
-          id: '1',
-          key: 'max_tenants',
-          value: '1000',
-          description: 'Maximum number of tenants allowed',
-          is_sensitive: false,
-        },
-        {
-          id: '2',
-          key: 'default_payment_term_days',
-          value: '30',
-          description: 'Default payment term in days',
-          is_sensitive: false,
-        },
-        {
-          id: '3',
-          key: 'backup_retention_days',
-          value: '90',
-          description: 'Number of days to retain backups',
-          is_sensitive: false,
-        },
-        {
-          id: '4',
-          key: 'maintenance_mode',
-          value: 'false',
-          description: 'System maintenance mode',
-          is_sensitive: false,
-        },
-      ])
-    } catch (err) {
-      setError('Failed to load settings')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSave = async (key: string) => {
-    try {
-      setSaving(true)
-      setError('')
-      // Mock save
-      setSettings(settings.map((s) => (s.key === key ? { ...s, value: editValue } : s)))
-      setSuccess(`${key} updated successfully`)
-      setEditingKey(null)
-      setEditValue('')
-    } catch (err) {
-      setError('Failed to save setting')
-    } finally {
-      setSaving(false)
-    }
+  const commitEdit = (key: string) => {
+    setValues(v => ({ ...v, [key]: draft }))
+    setEditing(null)
+    setSaved(key)
+    setTimeout(() => setSaved(null), 2000)
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-600 mt-1">Manage system configuration and preferences</p>
+        <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
+        <p className="text-sm text-slate-500 mt-1">Manage platform configuration and preferences.</p>
       </div>
 
-      {error && <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{error}</div>}
-      {success && <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-700">{success}</div>}
-
-      {loading ? (
-        <div className="text-center py-8">Loading settings...</div>
-      ) : (
-        <div className="space-y-4">
-          {settings.map((setting) => (
-            <div key={setting.id} className="bg-white rounded-lg border border-gray-200 p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="font-bold text-lg text-gray-900">{setting.key}</h3>
-                  <p className="text-gray-600 text-sm mt-1">{setting.description}</p>
+      {SETTINGS_SECTIONS.map(({ id, icon: Icon, label, items }) => (
+        <Card key={id}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Icon className="w-4 h-4 text-muted-foreground" /> {label}
+            </CardTitle>
+            <CardDescription className="text-xs">Configure {label.toLowerCase()} settings</CardDescription>
+          </CardHeader>
+          <CardContent className="divide-y divide-border">
+            {items.map(item => (
+              <div key={item.key} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                <div className="flex-1 min-w-0 mr-4">
+                  <p className="text-sm font-medium text-slate-800">{item.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
                 </div>
-                {setting.is_sensitive && (
-                  <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded">
-                    Sensitive
-                  </span>
+                {editing === item.key ? (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Input value={draft} onChange={e => setDraft(e.target.value)} className="h-8 w-40 text-sm"
+                      onKeyDown={e => { if (e.key === 'Enter') commitEdit(item.key); if (e.key === 'Escape') setEditing(null) }} autoFocus />
+                    <Button size="sm" className="h-8 px-3" onClick={() => commitEdit(item.key)}>Save</Button>
+                    <Button size="sm" variant="outline" className="h-8 px-3" onClick={() => setEditing(null)}>Cancel</Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 shrink-0">
+                    {saved === item.key && <span className="text-xs text-emerald-600 font-medium">Saved</span>}
+                    <code className="text-sm font-mono text-slate-700 bg-slate-50 border border-border px-2 py-0.5 rounded">
+                      {values[item.key]}
+                    </code>
+                    <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs" onClick={() => startEdit(item.key)}>
+                      Edit
+                    </Button>
+                  </div>
                 )}
               </div>
+            ))}
+          </CardContent>
+        </Card>
+      ))}
 
-              {editingKey === setting.key ? (
-                <div className="flex gap-3">
-                  <input
-                    type={setting.is_sensitive ? 'password' : 'text'}
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
-                  />
-                  <Button
-                    onClick={() => handleSave(setting.key)}
-                    disabled={saving}
-                    className="bg-blue-600 text-white hover:bg-blue-700"
-                  >
-                    Save
-                  </Button>
-                  <Button onClick={() => setEditingKey(null)} variant="outline">
-                    Cancel
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex justify-between items-center">
-                  <div className="font-mono text-gray-900">
-                    {setting.is_sensitive ? '••••••••' : setting.value}
-                  </div>
-                  <Button
-                    onClick={() => {
-                      setEditingKey(setting.key)
-                      setEditValue(setting.value)
-                    }}
-                    variant="outline"
-                  >
-                    Edit
-                  </Button>
-                </div>
-              )}
+      {/* Danger zone */}
+      <Card className="border-red-200">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base text-red-600 flex items-center gap-2">
+            <Shield className="w-4 h-4" /> Danger Zone
+          </CardTitle>
+          <CardDescription className="text-xs">Irreversible platform-level actions.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between p-3 rounded-lg border border-red-200 bg-red-50">
+            <div>
+              <p className="text-sm font-medium text-red-800">Enable Maintenance Mode</p>
+              <p className="text-xs text-red-600 mt-0.5">Blocks all tenant logins and shows a maintenance page.</p>
             </div>
-          ))}
-        </div>
-      )}
+            <Button variant="destructive" size="sm" onClick={() => setValues(v => ({ ...v, maintenance_mode: v.maintenance_mode === 'true' ? 'false' : 'true' }))}>
+              {values.maintenance_mode === 'true' ? 'Disable' : 'Enable'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

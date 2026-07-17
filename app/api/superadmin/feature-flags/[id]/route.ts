@@ -11,47 +11,19 @@ function getDb() {
   )
 }
 
-export async function GET(req: NextRequest) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const auth = await verifySuperAdminToken(req)
     if (!auth?.valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const client = getDb()
-    const { data: flags, error } = await client
-      .from("superadmin_feature_flags")
-      .select("*")
-      .order("created_at", { ascending: true })
-
-    if (error) throw error
-    return NextResponse.json({ flags })
-  } catch (err: any) {
-    console.error("[v0] Feature flags GET error:", err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
-  }
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    const auth = await verifySuperAdminToken(req)
-    if (!auth?.valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
+    const { id } = await params
     const body = await req.json()
-    const { flag_key, flag_name, description, enabled, rollout_percentage = 0 } = body
-
-    if (!flag_key || flag_name === undefined) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
-    }
 
     const client = getDb()
     const { data: flag, error } = await client
       .from("superadmin_feature_flags")
-      .insert({
-        flag_key,
-        flag_name,
-        description,
-        enabled,
-        rollout_percentage,
-      })
+      .update({ ...body, updated_at: new Date().toISOString() })
+      .eq("id", id)
       .select("*")
       .single()
 
@@ -59,16 +31,41 @@ export async function POST(req: NextRequest) {
 
     await logAudit({
       userId: auth.userId,
-      action: "feature_flag_created",
+      action: "feature_flag_updated",
       resourceType: "feature_flag",
-      resourceId: flag.id,
-      changes: { flag_key, flag_name, enabled, rollout_percentage },
+      resourceId: id,
+      changes: body,
       ipAddress: req.headers.get("x-forwarded-for") || "unknown",
     })
 
-    return NextResponse.json({ flag }, { status: 201 })
+    return NextResponse.json({ flag })
   } catch (err: any) {
-    console.error("[v0] Feature flags POST error:", err)
+    console.error("[v0] Feature flag PATCH error:", err)
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const auth = await verifySuperAdminToken(req)
+    if (!auth?.valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const { id } = await params
+    const client = getDb()
+    const { error } = await client.from("superadmin_feature_flags").delete().eq("id", id)
+    if (error) throw error
+
+    await logAudit({
+      userId: auth.userId,
+      action: "feature_flag_deleted",
+      resourceType: "feature_flag",
+      resourceId: id,
+      ipAddress: req.headers.get("x-forwarded-for") || "unknown",
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (err: any) {
+    console.error("[v0] Feature flag DELETE error:", err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }

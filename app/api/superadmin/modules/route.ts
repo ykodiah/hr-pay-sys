@@ -17,15 +17,14 @@ export async function GET(req: NextRequest) {
     if (!auth?.valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const client = getDb()
-    const { data: flags, error } = await client
-      .from("superadmin_feature_flags")
+    const { data: modules, error } = await client
+      .from("superadmin_modules")
       .select("*")
       .order("created_at", { ascending: true })
 
     if (error) throw error
-    return NextResponse.json({ flags })
+    return NextResponse.json({ modules })
   } catch (err: any) {
-    console.error("[v0] Feature flags GET error:", err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
@@ -36,22 +35,14 @@ export async function POST(req: NextRequest) {
     if (!auth?.valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const body = await req.json()
-    const { flag_key, flag_name, description, enabled, rollout_percentage = 0 } = body
+    const { name, slug, description, monthly_cost = 0, is_active = true } = body
 
-    if (!flag_key || flag_name === undefined) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
-    }
+    if (!name || !slug) return NextResponse.json({ error: "Name and slug required" }, { status: 400 })
 
     const client = getDb()
-    const { data: flag, error } = await client
-      .from("superadmin_feature_flags")
-      .insert({
-        flag_key,
-        flag_name,
-        description,
-        enabled,
-        rollout_percentage,
-      })
+    const { data: module, error } = await client
+      .from("superadmin_modules")
+      .insert({ name, slug, description, monthly_cost, is_active })
       .select("*")
       .single()
 
@@ -59,16 +50,15 @@ export async function POST(req: NextRequest) {
 
     await logAudit({
       userId: auth.userId,
-      action: "feature_flag_created",
-      resourceType: "feature_flag",
-      resourceId: flag.id,
-      changes: { flag_key, flag_name, enabled, rollout_percentage },
+      action: "module_created",
+      resourceType: "module",
+      resourceId: module.id,
+      changes: { name, slug, monthly_cost, is_active },
       ipAddress: req.headers.get("x-forwarded-for") || "unknown",
     })
 
-    return NextResponse.json({ flag }, { status: 201 })
+    return NextResponse.json({ module }, { status: 201 })
   } catch (err: any) {
-    console.error("[v0] Feature flags POST error:", err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
