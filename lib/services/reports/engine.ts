@@ -329,12 +329,29 @@ function buildPAYEReport(
     paye_tax:            ghs(r.paye_tax),
   }))
 
-  const summary = {
+  const totals = {
     total_employees:    rows.length,
-    total_gross_pay:    rows.reduce((s, r) => s + ghs(r.gross_pay), 0),
-    total_taxable:      rows.reduce((s, r) => s + ghs(r.paye_taxable_income), 0),
-    total_paye_tax:     rows.reduce((s, r) => s + ghs(r.paye_tax), 0),
+    total_gross_pay:    typedRows.reduce((s, r) => s + r.gross_pay, 0),
+    total_taxable:      typedRows.reduce((s, r) => s + r.paye_taxable_income, 0),
+    total_paye_tax:     typedRows.reduce((s, r) => s + r.paye_tax, 0),
   }
+
+  // Append a grand total row so it appears in both the preview table and CSV
+  const allRows: Record<string, unknown>[] = [
+    ...typedRows,
+    {
+      employee_id_no:      "GRAND TOTAL",
+      employee_name:       `${rows.length} employee(s)`,
+      ghana_card_number:   "",
+      department:          "",
+      position:            "",
+      gross_pay:           totals.total_gross_pay,
+      paye_taxable_income: totals.total_taxable,
+      tax_relief_total:    typedRows.reduce((s, r) => s + r.tax_relief_total, 0),
+      paye_tax:            totals.total_paye_tax,
+      _is_total_row:       true,
+    },
+  ]
 
   return {
     ...meta,
@@ -342,9 +359,9 @@ function buildPAYEReport(
     report_name: REPORT_LABELS.paye,
     row_count: rows.length,
     columns,
-    rows: typedRows,
-    summary,
-    csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.paye),
+    rows: allRows,
+    summary: totals,
+    csv: withCsvMeta(columns, allRows, meta, REPORT_LABELS.paye),
   }
 }
 
@@ -390,11 +407,26 @@ function buildSSNITTier1Report(
 
   const summary = {
     total_employees:     rows.length,
-    total_basic_earnings:rows.reduce((s, r) => s + ghs(r.basic_salary), 0),
+    total_basic_earnings:typedRows.reduce((s, r) => s + r.basic_earnings, 0),
     total_employee_5_5:  typedRows.reduce((s, r) => s + r.employee_contrib, 0),
     total_employer_13:   typedRows.reduce((s, r) => s + r.employer_contrib, 0),
     total_payable_ssnit: typedRows.reduce((s, r) => s + r.total_contrib, 0),
   }
+
+  const allRows: Record<string, unknown>[] = [
+    ...typedRows,
+    {
+      employee_id_no:   "GRAND TOTAL",
+      employee_name:    `${rows.length} employee(s)`,
+      ssnit_number:     "",
+      department:       "",
+      basic_earnings:   summary.total_basic_earnings,
+      employee_contrib: summary.total_employee_5_5,
+      employer_contrib: summary.total_employer_13,
+      total_contrib:    summary.total_payable_ssnit,
+      _is_total_row:    true,
+    },
+  ]
 
   return {
     ...meta,
@@ -402,9 +434,9 @@ function buildSSNITTier1Report(
     report_name: REPORT_LABELS.ssnit_tier1,
     row_count: rows.length,
     columns,
-    rows: typedRows,
+    rows: allRows,
     summary,
-    csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.ssnit_tier1),
+    csv: withCsvMeta(columns, allRows, meta, REPORT_LABELS.ssnit_tier1),
   }
 }
 
@@ -442,10 +474,24 @@ function buildSSNITTier2Report(
   })
 
   const summary = {
-    total_employees:    rows.length,
-    total_basic_earnings: rows.reduce((s, r) => s + ghs(r.basic_salary), 0),
-    total_employee_5:   typedRows.reduce((s, r) => s + r.employee_contrib, 0),
+    total_employees:      rows.length,
+    total_basic_earnings: typedRows.reduce((s, r) => s + r.basic_earnings, 0),
+    total_employee_5:     typedRows.reduce((s, r) => s + r.employee_contrib, 0),
   }
+
+  const allRows: Record<string, unknown>[] = [
+    ...typedRows,
+    {
+      employee_id_no:    "GRAND TOTAL",
+      employee_name:     `${rows.length} employee(s)`,
+      ssnit_number:      "",
+      ghana_card_number: "",
+      department:        "",
+      basic_earnings:    summary.total_basic_earnings,
+      employee_contrib:  summary.total_employee_5,
+      _is_total_row:     true,
+    },
+  ]
 
   return {
     ...meta,
@@ -453,9 +499,9 @@ function buildSSNITTier2Report(
     report_name: REPORT_LABELS.ssnit_tier2,
     row_count: rows.length,
     columns,
-    rows: typedRows,
+    rows: allRows,
     summary,
-    csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.ssnit_tier2),
+    csv: withCsvMeta(columns, allRows, meta, REPORT_LABELS.ssnit_tier2),
   }
 }
 
@@ -535,7 +581,20 @@ function buildBankAdviceReport(
     summaryEntries[`bank_${safeKey}_employees`] = bankRows.length
     summaryEntries[`bank_${safeKey}_total`]     = bankRows.reduce((s, r) => s + ghs(r.net_pay), 0)
   }
-  summaryEntries.grand_total_net_pay = rows.reduce((s, r) => s + ghs(r.net_pay), 0)
+  const grandNetPay = rows.reduce((s, r) => s + ghs(r.net_pay), 0)
+  summaryEntries.grand_total_net_pay = grandNetPay
+
+  // Append a clearly-marked grand total row at the very end
+  typedRows.push({
+    employee_id_no: "GRAND TOTAL",
+    employee_name:  `${rows.length} employee(s)`,
+    bank_name:      `${sortedBanks.length} bank(s)`,
+    account_number: "",
+    net_pay:        grandNetPay,
+    pay_date:       "",
+    reference:      "",
+    _is_total_row:  true,
+  })
 
   return {
     ...meta,
@@ -588,12 +647,30 @@ function buildCTCReport(
   })
 
   const summary = {
-    total_employees:       rows.length,
-    total_gross:           rows.reduce((s, r) => s + ghs(r.gross_pay), 0),
-    total_ssnit_employer:  typedRows.reduce((s, r) => s + r.ssnit_employer, 0),
-    total_tier3_employer:  typedRows.reduce((s, r) => s + r.tier3_employer, 0),
-    total_ctc:             typedRows.reduce((s, r) => s + r.cost_to_company, 0),
+    total_employees:      rows.length,
+    total_basic:          typedRows.reduce((s, r) => s + r.basic_salary, 0),
+    total_allowances:     typedRows.reduce((s, r) => s + r.total_allowances, 0),
+    total_gross:          typedRows.reduce((s, r) => s + r.gross_pay, 0),
+    total_ssnit_employer: typedRows.reduce((s, r) => s + r.ssnit_employer, 0),
+    total_tier3_employer: typedRows.reduce((s, r) => s + r.tier3_employer, 0),
+    total_ctc:            typedRows.reduce((s, r) => s + r.cost_to_company, 0),
   }
+
+  const allRows: Record<string, unknown>[] = [
+    ...typedRows,
+    {
+      employee_id_no:   "GRAND TOTAL",
+      employee_name:    `${rows.length} employee(s)`,
+      department:       "",
+      basic_salary:     summary.total_basic,
+      total_allowances: summary.total_allowances,
+      gross_pay:        summary.total_gross,
+      ssnit_employer:   summary.total_ssnit_employer,
+      tier3_employer:   summary.total_tier3_employer,
+      cost_to_company:  summary.total_ctc,
+      _is_total_row:    true,
+    },
+  ]
 
   return {
     ...meta,
@@ -601,9 +678,9 @@ function buildCTCReport(
     report_name: REPORT_LABELS.cost_to_company,
     row_count: rows.length,
     columns,
-    rows: typedRows,
+    rows: allRows,
     summary,
-    csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.cost_to_company),
+    csv: withCsvMeta(columns, allRows, meta, REPORT_LABELS.cost_to_company),
   }
 }
 
@@ -666,7 +743,7 @@ function buildLoansReport(
     { employee_id_no: "Type", employee_name: "No. of Employees", department: "", loan_type: "Total Deduction (GHS)", monthly_deduction: "" as unknown as number, outstanding_balance: "" as unknown as number },
     { employee_id_no: "Loans",    employee_name: String(loanRows.length),    department: "", loan_type: "",    monthly_deduction: loanDeductTotal,    outstanding_balance: loanBalanceTotal },
     { employee_id_no: "Advances", employee_name: String(advanceRows.length), department: "", loan_type: "",    monthly_deduction: advanceDeductTotal,  outstanding_balance: 0 },
-    { employee_id_no: "GRAND TOTAL", employee_name: String(loanRows.length + advanceRows.length), department: "", loan_type: "", monthly_deduction: grandTotal, outstanding_balance: loanBalanceTotal },
+    { employee_id_no: "GRAND TOTAL", employee_name: String(loanRows.length + advanceRows.length), department: "", loan_type: "", monthly_deduction: grandTotal, outstanding_balance: loanBalanceTotal, _is_total_row: true },
   )
 
   const allRows = [...loanRows, ...advanceRows]
@@ -771,7 +848,7 @@ function buildAllowancesReport(
     { employee_id_no: "Section", employee_name: "No. of Employees", department: "", allowance_type: "No. of Rows", taxable: "", amount: "" as unknown as number },
     { employee_id_no: "Taxable Allowances",     employee_name: String(taxableEmpCount),  department: "", allowance_type: String(taxableRows.length),    taxable: "GHS", amount: taxableTotal },
     { employee_id_no: "Non-Taxable Allowances", employee_name: String(nonTaxEmpCount),   department: "", allowance_type: String(nonTaxableRows.length),  taxable: "GHS", amount: nonTaxableTotal },
-    { employee_id_no: "GRAND TOTAL",            employee_name: String(rows.length),      department: "", allowance_type: String(allAllowRows.length),    taxable: "GHS", amount: taxableTotal + nonTaxableTotal },
+    { employee_id_no: "GRAND TOTAL", employee_name: String(rows.length), department: "", allowance_type: String(allAllowRows.length), taxable: "GHS", amount: taxableTotal + nonTaxableTotal, _is_total_row: true },
   ]
 
   const summary = {
@@ -828,10 +905,25 @@ function buildProvidentFundReport(
 
   const summary = {
     total_members:       withTier3.length,
-    total_employee:      withTier3.reduce((s, r) => s + ghs(r.tier3_employee), 0),
-    total_employer:      withTier3.reduce((s, r) => s + ghs(r.tier3_employer), 0),
-    total_contributions: withTier3.reduce((s, r) => s + ghs(r.tier3_employee) + ghs(r.tier3_employer), 0),
+    total_employee:      typedRows.reduce((s, r) => s + r.tier3_employee, 0),
+    total_employer:      typedRows.reduce((s, r) => s + r.tier3_employer, 0),
+    total_contributions: typedRows.reduce((s, r) => s + r.total_tier3, 0),
   }
+
+  const allRows: Record<string, unknown>[] = [
+    ...typedRows,
+    {
+      employee_id_no: "GRAND TOTAL",
+      employee_name:  `${withTier3.length} member(s)`,
+      ssnit_number:   "",
+      department:     "",
+      basic_salary:   typedRows.reduce((s, r) => s + r.basic_salary, 0),
+      tier3_employee: summary.total_employee,
+      tier3_employer: summary.total_employer,
+      total_tier3:    summary.total_contributions,
+      _is_total_row:  true,
+    },
+  ]
 
   return {
     ...meta,
@@ -839,9 +931,9 @@ function buildProvidentFundReport(
     report_name: REPORT_LABELS.provident_fund,
     row_count: withTier3.length,
     columns,
-    rows: typedRows,
+    rows: allRows,
     summary,
-    csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.provident_fund),
+    csv: withCsvMeta(columns, allRows, meta, REPORT_LABELS.provident_fund),
   }
 }
 
@@ -882,12 +974,30 @@ function buildPayrollSummaryReport(
 
   const summary = {
     total_employees:  rows.length,
-    total_gross:      rows.reduce((s, r) => s + ghs(r.gross_pay), 0),
-    total_paye:       rows.reduce((s, r) => s + ghs(r.paye_tax), 0),
-    total_ssnit:      rows.reduce((s, r) => s + ghs(r.ssnit_employee) + ghs(r.ssnit_employer), 0),
-    total_deductions: rows.reduce((s, r) => s + ghs(r.total_deductions), 0),
-    total_net_pay:    rows.reduce((s, r) => s + ghs(r.net_pay), 0),
+    total_gross:      typedRows.reduce((s, r) => s + r.gross_pay, 0),
+    total_paye:       typedRows.reduce((s, r) => s + r.paye_tax, 0),
+    total_deductions: typedRows.reduce((s, r) => s + r.total_deductions, 0),
+    total_net_pay:    typedRows.reduce((s, r) => s + r.net_pay, 0),
   }
+
+  const allRows: Record<string, unknown>[] = [
+    ...typedRows,
+    {
+      employee_id_no:   "GRAND TOTAL",
+      employee_name:    `${rows.length} employee(s)`,
+      department:       "",
+      basic_salary:     typedRows.reduce((s, r) => s + r.basic_salary, 0),
+      total_allowances: typedRows.reduce((s, r) => s + r.total_allowances, 0),
+      gross_pay:        summary.total_gross,
+      ssnit_employee:   typedRows.reduce((s, r) => s + r.ssnit_employee, 0),
+      tier2_employee:   typedRows.reduce((s, r) => s + r.tier2_employee, 0),
+      paye_tax:         summary.total_paye,
+      loan_deduction:   typedRows.reduce((s, r) => s + r.loan_deduction, 0),
+      total_deductions: summary.total_deductions,
+      net_pay:          summary.total_net_pay,
+      _is_total_row:    true,
+    },
+  ]
 
   return {
     ...meta,
@@ -895,7 +1005,7 @@ function buildPayrollSummaryReport(
     report_name: REPORT_LABELS.payroll_summary,
     row_count: rows.length,
     columns,
-    rows: typedRows,
+    rows: allRows,
     summary,
     csv: withCsvMeta(columns, typedRows, meta, REPORT_LABELS.payroll_summary),
   }
@@ -955,7 +1065,7 @@ function buildDeductionsReport(
     { employee_id_no: "Loan Deductions",    employee_name: String(new Set(loanDedRows.map((r) => r.employee_id_no)).size),    department: "", deduction_type: "",    amount: loanTotal },
     { employee_id_no: "Advance Deductions", employee_name: String(new Set(advanceDedRows.map((r) => r.employee_id_no)).size), department: "", deduction_type: "",    amount: advanceTotal },
     { employee_id_no: "Other Deductions",   employee_name: String(new Set(otherDedRows.map((r) => r.employee_id_no)).size),   department: "", deduction_type: "",    amount: otherTotal },
-    { employee_id_no: "GRAND TOTAL",        employee_name: String(new Set(allDedRows.map((r) => r.employee_id_no)).size),     department: "", deduction_type: "ALL", amount: grandTotal },
+    { employee_id_no: "GRAND TOTAL", employee_name: String(new Set(allDedRows.map((r) => r.employee_id_no)).size), department: "", deduction_type: "ALL", amount: grandTotal, _is_total_row: true },
   )
 
   const summary = {

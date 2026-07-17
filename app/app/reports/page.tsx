@@ -1115,7 +1115,7 @@ export default function ComplianceReportsPage() {
                 ))}
               </div>
 
-              {/* First 10 rows preview */}
+              {/* First 10 rows preview — total row always shown last */}
               <div className="overflow-x-auto rounded-md border">
                 <table className="w-full text-xs">
                   <thead>
@@ -1128,24 +1128,46 @@ export default function ComplianceReportsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {previewReport.rows.slice(0, 10).map((row: any, i: number) => (
-                      <tr key={i} className="border-b last:border-0 hover:bg-muted/20">
-                        {previewReport.columns.map((col: any) => (
-                          <td key={col.key} className="px-3 py-2 whitespace-nowrap">
-                            {col.type === "currency"
-                              ? `GHS ${fmtGHS(Number(row[col.key] ?? 0))}`
-                              : String(row[col.key] ?? "—")}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                    {previewReport.rows.length > 10 && (
-                      <tr>
-                        <td colSpan={previewReport.columns.length} className="px-3 py-2 text-center text-muted-foreground italic">
-                          ... and {previewReport.rows.length - 10} more rows — download CSV for full data
-                        </td>
-                      </tr>
-                    )}
+                    {(() => {
+                      const allPreviewRows: any[] = previewReport.rows
+                      const totalRow = allPreviewRows.find((r: any) => r._is_total_row === true)
+                      const dataRows = allPreviewRows.filter((r: any) => !r._is_total_row)
+                      const visibleData = dataRows.slice(0, 10)
+                      const hiddenCount = dataRows.length - visibleData.length
+                      return (
+                        <>
+                          {visibleData.map((row: any, i: number) => (
+                            <tr key={i} className="border-b hover:bg-muted/20">
+                              {previewReport.columns.map((col: any) => (
+                                <td key={col.key} className="px-3 py-2 whitespace-nowrap">
+                                  {col.type === "currency" && typeof row[col.key] === "number"
+                                    ? `GHS ${fmtGHS(row[col.key])}`
+                                    : String(row[col.key] ?? "—")}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                          {hiddenCount > 0 && (
+                            <tr>
+                              <td colSpan={previewReport.columns.length} className="px-3 py-2 text-center text-muted-foreground italic">
+                                ... and {hiddenCount} more rows — download CSV for full data
+                              </td>
+                            </tr>
+                          )}
+                          {totalRow && (
+                            <tr className="border-t-2 border-border bg-muted/50 font-semibold sticky bottom-0">
+                              {previewReport.columns.map((col: any) => (
+                                <td key={col.key} className="px-3 py-2 whitespace-nowrap">
+                                  {col.type === "currency" && typeof totalRow[col.key] === "number"
+                                    ? `GHS ${fmtGHS(totalRow[col.key])}`
+                                    : String(totalRow[col.key] ?? "")}
+                                </td>
+                              ))}
+                            </tr>
+                          )}
+                        </>
+                      )
+                    })()}
                   </tbody>
                 </table>
               </div>
