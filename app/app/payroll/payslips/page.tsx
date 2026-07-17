@@ -24,14 +24,10 @@ import {
   Layers,
   Globe,
   Sliders,
-  Eye,
   RefreshCw,
   CheckSquare2,
   XSquare,
-  ChevronDown,
-  ChevronRight,
   DollarSign,
-  TrendingDown,
   CreditCard,
   AlertCircle,
   CheckCircle2,
@@ -40,11 +36,9 @@ import {
   Filter,
   Loader2,
   BarChart3,
-  Banknote,
-  Receipt,
-  BookOpen,
   ArrowUpRight,
   ArrowDownRight,
+  Building,
 } from "lucide-react"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -141,30 +135,21 @@ function fmtPeriod(p: string) {
   return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("en-GH", { month: "long", year: "numeric" })
 }
 
+function periodFromDate(d: string) {
+  // "2026-07-01" → "2026-07"
+  return d.slice(0, 7)
+}
+
 function statusBadge(status: string) {
   const cfg: Record<string, { label: string; cls: string }> = {
-    draft:  { label: "Draft",  cls: "bg-gray-100 text-gray-700" },
-    issued: { label: "Issued", cls: "bg-emerald-100 text-emerald-800" },
-    viewed: { label: "Viewed", cls: "bg-blue-100 text-blue-800" },
-    archived:{ label: "Archived", cls: "bg-orange-100 text-orange-700" },
+    draft:    { label: "Draft",    cls: "bg-gray-100 text-gray-700" },
+    issued:   { label: "Issued",   cls: "bg-emerald-100 text-emerald-800" },
+    viewed:   { label: "Viewed",   cls: "bg-blue-100 text-blue-800" },
+    archived: { label: "Archived", cls: "bg-orange-100 text-orange-700" },
   }
   const c = cfg[status] ?? { label: status, cls: "bg-gray-100 text-gray-600" }
   return <Badge className={`text-xs ${c.cls}`}>{c.label}</Badge>
 }
-
-const CURRENT_YEAR = new Date().getFullYear()
-const MONTHS = Array.from({ length: 12 }, (_, i) => {
-  const d = new Date(CURRENT_YEAR, i, 1)
-  return { value: `${CURRENT_YEAR}-${String(i + 1).padStart(2, "0")}`, label: d.toLocaleDateString("en-GH", { month: "long", year: "numeric" }) }
-})
-// Include prev year months too
-const ALL_PERIODS = [
-  ...Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(CURRENT_YEAR - 1, i, 1)
-    return { value: `${CURRENT_YEAR - 1}-${String(i + 1).padStart(2, "0")}`, label: d.toLocaleDateString("en-GH", { month: "long", year: "numeric" }) }
-  }),
-  ...MONTHS,
-].reverse()
 
 // ─── Payslip Preview Component ────────────────────────────────────────────────
 
@@ -182,16 +167,20 @@ function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | n
   ].filter(e => e.val > 0)
 
   const deductions = [
-    { label: "SSNIT (Employee 5.5%)",  val: slip.ssnit_employee },
-    { label: "Tier 2 (Employee 5%)",   val: slip.tier2_employee },
-    { label: "Tier 3 / Provident Fund",val: slip.tier3_employee },
-    { label: "PAYE Tax",               val: slip.paye_tax },
-    { label: "Loan Repayment",         val: slip.loan_deduction },
-    { label: "Advance Deduction",      val: slip.advance_deduction },
-    { label: "Other Deductions",       val: slip.other_deductions },
+    { label: "SSNIT (Employee 5.5%)",   val: slip.ssnit_employee },
+    { label: "Tier 2 (Employee 5%)",    val: slip.tier2_employee },
+    { label: "Tier 3 / Provident Fund", val: slip.tier3_employee },
+    { label: "PAYE Tax",                val: slip.paye_tax },
+    { label: "Loan Repayment",          val: slip.loan_deduction },
+    { label: "Advance Deduction",       val: slip.advance_deduction },
+    { label: "Other Deductions",        val: slip.other_deductions },
   ].filter(d => d.val > 0)
 
   const hasLoan = loan || slip.loan_deduction > 0
+
+  // Determine entity line: subsidiary name or parent company
+  const entityName = slip.snapshot_subsidiary || slip.snapshot_company_name || "Company"
+  const isSubsidiary = Boolean(slip.snapshot_subsidiary)
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
@@ -204,6 +193,19 @@ function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | n
             <p className="text-sm text-emerald-100 mt-0.5">
               {slip.snapshot_employee_id_no} · {slip.snapshot_department || "—"} · {slip.snapshot_position || "—"}
             </p>
+            {/* Subsidiary / company entity */}
+            <div className="flex items-center gap-1.5 mt-1.5">
+              {isSubsidiary ? (
+                <Building className="w-3 h-3 text-emerald-300" />
+              ) : (
+                <Building2 className="w-3 h-3 text-emerald-300" />
+              )}
+              <span className="text-xs text-emerald-200">
+                {isSubsidiary
+                  ? `${entityName} (Subsidiary of ${slip.snapshot_company_name})`
+                  : entityName}
+              </span>
+            </div>
           </div>
           <div className="text-right">
             <p className="text-xs text-emerald-200">Pay Period</p>
@@ -216,10 +218,12 @@ function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | n
       {/* Employee Info Grid */}
       <div className="grid grid-cols-2 gap-px bg-gray-100 border-b border-gray-200">
         {[
-          ["SSNIT Number", slip.snapshot_ssnit_number],
-          ["Bank", slip.snapshot_bank_name],
+          ["SSNIT Number",   slip.snapshot_ssnit_number],
+          ["Bank",           slip.snapshot_bank_name],
           ["Account Number", slip.snapshot_account_number],
-          ["Status", slip.status],
+          ["Division",       slip.snapshot_division],
+          ["Location",       slip.snapshot_location],
+          ["Status",         slip.status],
         ].map(([label, val]) => (
           <div key={label} className="bg-white px-4 py-2.5">
             <p className="text-xs text-gray-400 uppercase tracking-wider">{label}</p>
@@ -284,7 +288,7 @@ function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | n
           </div>
         </div>
 
-        {/* Loan Summary — only if loan exists */}
+        {/* Loan Summary */}
         {hasLoan && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-3">
@@ -348,8 +352,8 @@ function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | n
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
                 { label: "YTD Gross", val: slip.ytd_gross, cls: "text-gray-900" },
-                { label: "YTD Net", val: slip.ytd_net, cls: "text-emerald-700" },
-                { label: "YTD PAYE", val: slip.ytd_paye, cls: "text-red-700" },
+                { label: "YTD Net",   val: slip.ytd_net,   cls: "text-emerald-700" },
+                { label: "YTD PAYE",  val: slip.ytd_paye,  cls: "text-red-700" },
                 { label: "YTD SSNIT", val: slip.ytd_ssnit, cls: "text-blue-700" },
               ].map(({ label, val, cls }) => (
                 <div key={label} className="bg-gray-50 rounded-lg px-3 py-2">
@@ -373,21 +377,25 @@ export default function PayslipsPage() {
 
   // Global state
   const [activeTab, setActiveTab] = useState("individual")
-  const [isLoading, setIsLoading] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  // Payroll runs — only periods that have been processed
+  const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([])
+  const [loadingRuns, setLoadingRuns] = useState(true)
 
   // Individual tab state
   const [empSearch, setEmpSearch] = useState("")
   const [employees, setEmployees] = useState<Employee[]>([])
   const [filteredEmps, setFilteredEmps] = useState<Employee[]>([])
   const [selectedEmpId, setSelectedEmpId] = useState<string | null>(null)
-  const [selectedPeriod, setSelectedPeriod] = useState(MONTHS[MONTHS.length - 1]?.value || "")
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("")
   const [indivSlip, setIndivSlip] = useState<PayslipRow | null>(null)
   const [activeLoan, setActiveLoan] = useState<ActiveLoan | null>(null)
   const [loadingSlip, setLoadingSlip] = useState(false)
   const [recentSlips, setRecentSlips] = useState<PayslipRow[]>([])
 
   // Bulk tab state
-  const [bulkPeriod, setBulkPeriod] = useState(MONTHS[MONTHS.length - 1]?.value || "")
+  const [bulkPeriod, setBulkPeriod] = useState<string>("")
   const [bulkFilterType, setBulkFilterType] = useState<"department"|"division"|"location"|"subsidiary"|"company">("department")
   const [bulkFilterValue, setBulkFilterValue] = useState<string>("all")
   const [bulkSlips, setBulkSlips] = useState<PayslipRow[]>([])
@@ -402,6 +410,7 @@ export default function PayslipsPage() {
   const [customNotes, setCustomNotes] = useState("")
   const [customSlips, setCustomSlips] = useState<PayslipRow[]>([])
   const [loadingCustom, setLoadingCustom] = useState(false)
+  const [customLoaded, setCustomLoaded] = useState(false)
 
   // Filter lists
   const [departments, setDepartments] = useState<string[]>([])
@@ -412,17 +421,34 @@ export default function PayslipsPage() {
   // Stats
   const [stats, setStats] = useState({ totalIssued: 0, totalDraft: 0, latestPeriod: "" })
 
-  // ── Fetch reference data on mount ──
-  useEffect(() => {
-    void loadReferenceData()
-    void loadStats()
-  }, [])
+  // ── Period options — derived from real payroll runs ──
+  const periodOptions = useMemo(() => {
+    const seen = new Set<string>()
+    return payrollRuns
+      .map(r => {
+        const p = periodFromDate(r.pay_period_start)
+        if (seen.has(p)) return null
+        seen.add(p)
+        return { value: p, label: fmtPeriod(p), status: r.status }
+      })
+      .filter(Boolean) as { value: string; label: string; status: string }[]
+  }, [payrollRuns])
 
-  const loadReferenceData = async () => {
-    const [empsRes, subsRes] = await Promise.all([
-      supabase.from("employees").select("id, first_name, last_name, employee_id, department, division, location, subsidiary_id").eq("status", "active").order("first_name"),
+  // ── Fetch payroll runs + reference data on mount / refresh ──
+  useEffect(() => {
+    void loadAll()
+  }, [refreshKey])
+
+  const loadAll = async () => {
+    setLoadingRuns(true)
+    const [runsRes, empsRes, subsRes] = await Promise.all([
+      supabase.from("payroll_runs").select("id, pay_period_start, pay_period_end, status").order("pay_period_start", { ascending: false }).limit(48),
+      supabase.from("employees").select("id, first_name, last_name, employee_id, department, division, location, subsidiary_id").in("status", ["active", "Active"]).order("first_name"),
       supabase.from("subsidiaries").select("id, name").eq("status", "active"),
     ])
+
+    const runs = (runsRes.data ?? []) as PayrollRun[]
+    setPayrollRuns(runs)
 
     const emps = (empsRes.data ?? []) as Employee[]
     setEmployees(emps)
@@ -435,6 +461,17 @@ export default function PayslipsPage() {
     setDivisions(divs)
     setLocations(locs)
     setSubsidiaries((subsRes.data ?? []) as { id: string; name: string }[])
+    setLoadingRuns(false)
+
+    // Set default periods once runs load
+    if (runs.length > 0) {
+      const firstPeriod = periodFromDate(runs[0].pay_period_start)
+      setSelectedPeriod(prev => prev || firstPeriod)
+      setBulkPeriod(prev => prev || firstPeriod)
+      setCustomPeriodFrom(prev => prev || firstPeriod)
+    }
+
+    void loadStats()
   }
 
   const loadStats = async () => {
@@ -466,6 +503,7 @@ export default function PayslipsPage() {
 
   // ── Load individual payslip ──
   const loadIndividualSlip = useCallback(async (empId: string, period: string) => {
+    if (!empId || !period) return
     setLoadingSlip(true)
     setIndivSlip(null)
     setActiveLoan(null)
@@ -477,7 +515,7 @@ export default function PayslipsPage() {
       ])
 
       if (slipRes.data) setIndivSlip(slipRes.data as PayslipRow)
-      if (loanRes.data)  setActiveLoan(loanRes.data as ActiveLoan)
+      if (loanRes.data) setActiveLoan(loanRes.data as ActiveLoan)
       setRecentSlips((recentRes.data ?? []) as PayslipRow[])
     } catch (err) {
       toast({ title: "Error", description: "Could not load payslip.", variant: "destructive" })
@@ -490,6 +528,19 @@ export default function PayslipsPage() {
     if (selectedEmpId && selectedPeriod) void loadIndividualSlip(selectedEmpId, selectedPeriod)
   }, [selectedEmpId, selectedPeriod])
 
+  // ── Refresh handler (re-loads data then re-fetches current slip) ──
+  const handleRefresh = useCallback(async () => {
+    setRefreshKey(k => k + 1)
+    await loadStats()
+    if (selectedEmpId && selectedPeriod) {
+      await loadIndividualSlip(selectedEmpId, selectedPeriod)
+    }
+    if (activeTab === "bulk") {
+      void loadBulkSlips()
+    }
+    toast({ title: "Refreshed", description: "Payslip data updated from database." })
+  }, [selectedEmpId, selectedPeriod, activeTab])
+
   // ── Print individual payslip ──
   const printIndividualSlip = () => {
     if (!indivSlip?.id) return
@@ -498,6 +549,7 @@ export default function PayslipsPage() {
 
   // ── Load bulk payslips ──
   const loadBulkSlips = useCallback(async () => {
+    if (!bulkPeriod) return
     setLoadingBulk(true)
     setBulkSlips([])
     setBulkSelected(new Set())
@@ -515,19 +567,23 @@ export default function PayslipsPage() {
       } else if (bulkFilterType === "location" && bulkFilterValue !== "all") {
         query = query.eq("snapshot_location", bulkFilterValue)
       }
-      // For subsidiary + company we filter client-side after joining with employees
 
       const { data, error } = await query.limit(500)
       if (error) throw error
 
       let slips = (data ?? []) as PayslipRow[]
 
-      // Subsidiary filter: join via employee_id
+      // Subsidiary / company filter — client-side
       if (bulkFilterType === "subsidiary" && bulkFilterValue !== "all") {
         const { data: empIds } = await supabase
           .from("employees")
           .select("id")
           .eq("subsidiary_id", bulkFilterValue)
+        const ids = new Set((empIds ?? []).map((e: any) => e.id))
+        slips = slips.filter(s => ids.has(s.employee_id))
+      } else if (bulkFilterType === "company") {
+        // parent company employees only — those without a subsidiary
+        const { data: empIds } = await supabase.from("employees").select("id").is("subsidiary_id", null)
         const ids = new Set((empIds ?? []).map((e: any) => e.id))
         slips = slips.filter(s => ids.has(s.employee_id))
       }
@@ -542,7 +598,7 @@ export default function PayslipsPage() {
   }, [bulkPeriod, bulkFilterType, bulkFilterValue, supabase, toast])
 
   useEffect(() => {
-    if (activeTab === "bulk") void loadBulkSlips()
+    if (activeTab === "bulk" && bulkPeriod) void loadBulkSlips()
   }, [activeTab, bulkPeriod, bulkFilterType, bulkFilterValue])
 
   // ── Bulk PDF download ──
@@ -559,8 +615,12 @@ export default function PayslipsPage() {
 
   // ── Load custom payslips ──
   const loadCustomSlips = async () => {
-    if (!customPeriodFrom) { toast({ title: "Select a start period", variant: "destructive" }); return }
+    if (!customPeriodFrom) {
+      toast({ title: "Select a start period", variant: "destructive" })
+      return
+    }
     setLoadingCustom(true)
+    setCustomLoaded(false)
     try {
       let query = supabase
         .from("payslips")
@@ -568,12 +628,18 @@ export default function PayslipsPage() {
         .gte("pay_period", customPeriodFrom)
         .order("snapshot_employee_name", { ascending: true })
 
-      if (customPeriodTo) query = query.lte("pay_period", customPeriodTo)
+      if (customPeriodTo && customPeriodTo !== customPeriodFrom) {
+        query = query.lte("pay_period", customPeriodTo)
+      } else {
+        query = query.lte("pay_period", customPeriodFrom)
+      }
+
       if (customEmpIds.size > 0) query = query.in("employee_id", [...customEmpIds])
 
       const { data, error } = await query.limit(500)
       if (error) throw error
       setCustomSlips((data ?? []) as PayslipRow[])
+      setCustomLoaded(true)
     } catch (err) {
       toast({ title: "Error", description: "Failed to load custom payslips.", variant: "destructive" })
     } finally {
@@ -597,7 +663,7 @@ export default function PayslipsPage() {
     if (bulkFilterType === "department") return departments
     if (bulkFilterType === "division")   return divisions
     if (bulkFilterType === "location")   return locations
-    return [] // handled separately for subsidiary
+    return []
   }, [bulkFilterType, departments, divisions, locations])
 
   const selectedEmployee = employees.find(e => e.id === selectedEmpId)
@@ -608,11 +674,11 @@ export default function PayslipsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Payslips</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Generate, preview and download employee payslips in PDF format</p>
+          <p className="text-sm text-gray-500 mt-0.5">Generate, preview and download employee payslips by processed pay run</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => { void loadStats(); void loadReferenceData() }}>
-            <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loadingRuns}>
+            {loadingRuns ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
             Refresh
           </Button>
         </div>
@@ -621,15 +687,15 @@ export default function PayslipsPage() {
       {/* ── Stats Bar ───────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Issued Payslips", value: stats.totalIssued, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50" },
-          { label: "Draft Payslips",  value: stats.totalDraft,  icon: Clock,        color: "text-amber-600",  bg: "bg-amber-50" },
-          { label: "Active Employees",value: employees.length,  icon: Users,        color: "text-blue-600",   bg: "bg-blue-50" },
-          { label: "Latest Period",   value: fmtPeriod(stats.latestPeriod) || "—", icon: Calendar, color: "text-purple-600", bg: "bg-purple-50" },
+          { label: "Issued Payslips",  value: stats.totalIssued,              icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50" },
+          { label: "Draft Payslips",   value: stats.totalDraft,               icon: Clock,        color: "text-amber-600",  bg: "bg-amber-50" },
+          { label: "Active Employees", value: employees.length,               icon: Users,        color: "text-blue-600",   bg: "bg-blue-50" },
+          { label: "Pay Runs",         value: payrollRuns.length,             icon: Calendar,     color: "text-purple-600", bg: "bg-purple-50" },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <Card key={label} className="border-0 shadow-sm">
             <CardContent className="p-4 flex items-center gap-3">
               <div className={`w-9 h-9 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}>
-                <Icon className={`w-4.5 h-4.5 ${color}`} />
+                <Icon className={`w-4 h-4 ${color}`} />
               </div>
               <div>
                 <p className="text-xs text-gray-400">{label}</p>
@@ -669,19 +735,36 @@ export default function PayslipsPage() {
                   <CardTitle className="text-sm font-semibold text-gray-700">Select Employee</CardTitle>
                 </CardHeader>
                 <CardContent className="px-4 pb-4 space-y-3">
-                  {/* Period selector */}
+                  {/* Period selector — only shows periods with processed runs */}
                   <div>
-                    <Label className="text-xs text-gray-500 mb-1 block">Pay Period</Label>
-                    <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                      <SelectTrigger className="h-8 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ALL_PERIODS.map(p => (
-                          <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label className="text-xs text-gray-500 mb-1 block">Pay Run Period</Label>
+                    {loadingRuns ? (
+                      <div className="flex items-center gap-2 h-8 text-xs text-gray-400">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading pay runs…
+                      </div>
+                    ) : periodOptions.length === 0 ? (
+                      <div className="flex items-center gap-2 h-8 text-xs text-amber-600">
+                        <AlertCircle className="w-3.5 h-3.5" /> No processed pay runs found
+                      </div>
+                    ) : (
+                      <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                        <SelectTrigger className="h-8 text-sm">
+                          <SelectValue placeholder="Select pay run…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {periodOptions.map(p => (
+                            <SelectItem key={p.value} value={p.value}>
+                              <span className="flex items-center gap-2">
+                                {p.label}
+                                <Badge className={`text-[10px] px-1.5 py-0 ${p.status === "completed" || p.status === "approved" || p.status === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-600"}`}>
+                                  {p.status}
+                                </Badge>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
 
                   {/* Search */}
@@ -760,6 +843,12 @@ export default function PayslipsPage() {
                   <h3 className="text-sm font-medium text-gray-500">No employee selected</h3>
                   <p className="text-xs text-gray-400 mt-1">Search and select an employee on the left to preview their payslip.</p>
                 </div>
+              ) : !selectedPeriod ? (
+                <div className="flex flex-col items-center justify-center h-full min-h-64 text-center border-2 border-dashed border-amber-200 rounded-xl bg-amber-50 py-12 px-6">
+                  <AlertCircle className="w-10 h-10 text-amber-400 mb-3" />
+                  <h3 className="text-sm font-medium text-amber-700">No pay run available</h3>
+                  <p className="text-xs text-amber-600 mt-1">Run payroll for a period first to view payslips.</p>
+                </div>
               ) : loadingSlip ? (
                 <div className="flex flex-col items-center justify-center h-64">
                   <Loader2 className="w-8 h-8 animate-spin text-emerald-600 mb-3" />
@@ -770,7 +859,8 @@ export default function PayslipsPage() {
                   <AlertCircle className="w-10 h-10 text-amber-400 mb-3" />
                   <h3 className="text-sm font-medium text-amber-700">No payslip found</h3>
                   <p className="text-xs text-amber-600 mt-1">
-                    No payslip for <strong>{selectedEmployee?.first_name} {selectedEmployee?.last_name}</strong> in <strong>{fmtPeriod(selectedPeriod)}</strong>. Run payroll for this period first.
+                    No payslip for <strong>{selectedEmployee?.first_name} {selectedEmployee?.last_name}</strong> in <strong>{fmtPeriod(selectedPeriod)}</strong>.
+                    {periodOptions.length > 0 ? " This pay run did not include this employee." : " Run payroll for this period first."}
                   </p>
                 </div>
               ) : (
@@ -820,22 +910,20 @@ export default function PayslipsPage() {
                         {t === "division"    && <Layers    className="w-3 h-3" />}
                         {t === "location"    && <MapPin    className="w-3 h-3" />}
                         {t === "subsidiary"  && <Globe     className="w-3 h-3" />}
-                        {t === "company"     && <Globe     className="w-3 h-3" />}
+                        {t === "company"     && <Building2 className="w-3 h-3" />}
                         {t.charAt(0).toUpperCase() + t.slice(1)}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Filter value */}
+                {/* Filter value — shown for dept/div/loc/subsidiary (not "company" which is all-parent) */}
                 {bulkFilterType !== "company" && (
-                  <div className="min-w-44">
-                    <Label className="text-xs text-gray-500 mb-1 block">
-                      {bulkFilterType === "subsidiary" ? "Subsidiary" : bulkFilterType.charAt(0).toUpperCase() + bulkFilterType.slice(1)}
-                    </Label>
+                  <div className="min-w-48">
+                    <Label className="text-xs text-gray-500 mb-1 block capitalize">{bulkFilterType}</Label>
                     <Select value={bulkFilterValue} onValueChange={setBulkFilterValue}>
                       <SelectTrigger className="h-8 text-sm">
-                        <SelectValue />
+                        <SelectValue placeholder={`All ${bulkFilterType}s`} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All {bulkFilterType}s</SelectItem>
@@ -848,20 +936,30 @@ export default function PayslipsPage() {
                   </div>
                 )}
 
-                {/* Period */}
-                <div className="min-w-44">
-                  <Label className="text-xs text-gray-500 mb-1 block">Pay Period</Label>
-                  <Select value={bulkPeriod} onValueChange={setBulkPeriod}>
-                    <SelectTrigger className="h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ALL_PERIODS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                {/* Period — only from processed pay runs */}
+                <div className="min-w-52">
+                  <Label className="text-xs text-gray-500 mb-1 block">Pay Run Period</Label>
+                  {periodOptions.length === 0 ? (
+                    <div className="flex items-center gap-2 h-8 text-xs text-amber-600">
+                      <AlertCircle className="w-3.5 h-3.5" /> No pay runs
+                    </div>
+                  ) : (
+                    <Select value={bulkPeriod} onValueChange={setBulkPeriod}>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="Select pay run…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {periodOptions.map(p => (
+                          <SelectItem key={p.value} value={p.value}>
+                            {p.label} — {p.status}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
 
-                <Button size="sm" variant="outline" onClick={loadBulkSlips} disabled={loadingBulk} className="h-8">
+                <Button size="sm" variant="outline" onClick={loadBulkSlips} disabled={loadingBulk || !bulkPeriod} className="h-8">
                   {loadingBulk ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                 </Button>
               </div>
@@ -873,7 +971,7 @@ export default function PayslipsPage() {
             <CardHeader className="pb-3 px-4 pt-4 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-semibold text-gray-700">
-                  {bulkSlips.length} payslip{bulkSlips.length !== 1 ? "s" : ""} — {fmtPeriod(bulkPeriod)}
+                  {bulkSlips.length} payslip{bulkSlips.length !== 1 ? "s" : ""} — {bulkPeriod ? fmtPeriod(bulkPeriod) : "—"}
                 </CardTitle>
                 <CardDescription className="text-xs">
                   {bulkSelected.size} selected · Net pay total: {money(bulkSlips.filter(s => bulkSelected.has(s.id)).reduce((sum, s) => sum + s.net_pay, 0))}
@@ -900,10 +998,16 @@ export default function PayslipsPage() {
                 <div className="flex items-center justify-center h-32">
                   <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
                 </div>
+              ) : !bulkPeriod ? (
+                <div className="flex flex-col items-center justify-center h-32 text-gray-400">
+                  <AlertCircle className="w-8 h-8 mb-2 opacity-40" />
+                  <p className="text-sm">Select a pay run period above</p>
+                </div>
               ) : filteredBulkSlips.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-32 text-gray-400">
                   <FileText className="w-8 h-8 mb-2 opacity-40" />
                   <p className="text-sm">No payslips found for this selection</p>
+                  <p className="text-xs mt-1">Run payroll for this period first, or adjust the filter.</p>
                 </div>
               ) : (
                 <div className="max-h-[480px] overflow-y-auto scrollbar-thin">
@@ -965,11 +1069,11 @@ export default function PayslipsPage() {
               {filteredBulkSlips.length > 0 && (
                 <div className="border-t border-gray-200 px-4 py-3 bg-gray-50 flex flex-wrap gap-6">
                   {[
-                    { label: "Total Gross", val: filteredBulkSlips.reduce((s, r) => s + r.gross_pay, 0), cls: "text-gray-800" },
-                    { label: "Total PAYE",  val: filteredBulkSlips.reduce((s, r) => s + r.paye_tax, 0),  cls: "text-red-700" },
-                    { label: "Total SSNIT", val: filteredBulkSlips.reduce((s, r) => s + r.ssnit_employee, 0), cls: "text-blue-700" },
-                    { label: "Total Loans", val: filteredBulkSlips.reduce((s, r) => s + r.loan_deduction, 0), cls: "text-amber-700" },
-                    { label: "Total Net",   val: filteredBulkSlips.reduce((s, r) => s + r.net_pay, 0),   cls: "text-emerald-700 font-bold" },
+                    { label: "Total Gross", val: filteredBulkSlips.reduce((s, r) => s + r.gross_pay, 0),       cls: "text-gray-800" },
+                    { label: "Total PAYE",  val: filteredBulkSlips.reduce((s, r) => s + r.paye_tax, 0),        cls: "text-red-700" },
+                    { label: "Total SSNIT", val: filteredBulkSlips.reduce((s, r) => s + r.ssnit_employee, 0),  cls: "text-blue-700" },
+                    { label: "Total Loans", val: filteredBulkSlips.reduce((s, r) => s + r.loan_deduction, 0),  cls: "text-amber-700" },
+                    { label: "Total Net",   val: filteredBulkSlips.reduce((s, r) => s + r.net_pay, 0),         cls: "text-emerald-700 font-bold" },
                   ].map(({ label, val, cls }) => (
                     <div key={label}>
                       <p className="text-xs text-gray-400">{label}</p>
@@ -992,16 +1096,24 @@ export default function PayslipsPage() {
                 <Sliders className="w-4 h-4" />
                 Custom Payslip Generation
               </CardTitle>
-              <CardDescription className="text-xs">Filter by date range and specific employees for a tailored payslip batch.</CardDescription>
+              <CardDescription className="text-xs">Filter by pay run period range and specific employees for a tailored payslip batch.</CardDescription>
             </CardHeader>
             <CardContent className="px-4 pb-4 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <Label className="text-xs text-gray-500 mb-1 block">From Period</Label>
-                  <Select value={customPeriodFrom} onValueChange={setCustomPeriodFrom}>
-                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select..." /></SelectTrigger>
-                    <SelectContent>{ALL_PERIODS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
-                  </Select>
+                  {periodOptions.length === 0 ? (
+                    <div className="flex items-center gap-2 h-8 text-xs text-amber-600">
+                      <AlertCircle className="w-3.5 h-3.5" /> No pay runs
+                    </div>
+                  ) : (
+                    <Select value={customPeriodFrom} onValueChange={setCustomPeriodFrom}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
+                      <SelectContent>
+                        {periodOptions.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
                 <div>
                   <Label className="text-xs text-gray-500 mb-1 block">To Period (optional)</Label>
@@ -1009,7 +1121,7 @@ export default function PayslipsPage() {
                     <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Same as from" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">Same as from</SelectItem>
-                      {ALL_PERIODS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                      {periodOptions.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1052,13 +1164,21 @@ export default function PayslipsPage() {
               </div>
 
               <div className="flex items-center gap-2 pt-1">
-                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8" onClick={loadCustomSlips} disabled={loadingCustom || !customPeriodFrom}>
+                <Button
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 h-8"
+                  onClick={loadCustomSlips}
+                  disabled={loadingCustom || !customPeriodFrom}
+                >
                   {loadingCustom ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Filter className="w-3.5 h-3.5 mr-1.5" />}
                   Generate List
                 </Button>
-                {customSlips.length > 0 && (
+                {customLoaded && customSlips.length > 0 && (
                   <Button size="sm" variant="outline" className="h-8 text-xs"
-                    onClick={() => { const ids = customSlips.map(s => `id=${s.id}`).join("&"); window.open(`/api/payslips/bulk/pdf?${ids}`, "_blank") }}>
+                    onClick={() => {
+                      const ids = customSlips.map(s => `id=${s.id}`).join("&")
+                      window.open(`/api/payslips/bulk/pdf?${ids}`, "_blank")
+                    }}>
                     <Download className="w-3.5 h-3.5 mr-1.5" />
                     Download All PDF ({customSlips.length})
                   </Button>
@@ -1068,46 +1188,55 @@ export default function PayslipsPage() {
           </Card>
 
           {/* Custom results */}
-          {customSlips.length > 0 && (
+          {customLoaded && (
             <Card className="shadow-sm">
               <CardHeader className="pb-3 px-4 pt-4">
-                <CardTitle className="text-sm font-semibold text-gray-700">{customSlips.length} payslip{customSlips.length !== 1 ? "s" : ""} matched</CardTitle>
+                <CardTitle className="text-sm font-semibold text-gray-700">
+                  {customSlips.length} payslip{customSlips.length !== 1 ? "s" : ""} matched
+                </CardTitle>
+                {customSlips.length === 0 && (
+                  <CardDescription className="text-xs text-amber-600">
+                    No payslips found for the selected criteria. Ensure payroll has been run for this period.
+                  </CardDescription>
+                )}
               </CardHeader>
-              <CardContent className="px-0 pb-0">
-                <div className="max-h-96 overflow-y-auto scrollbar-thin">
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-gray-50 border-b">
-                      <tr>
-                        <th className="text-left py-2 px-4 text-xs font-semibold text-gray-500">Employee</th>
-                        <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Period</th>
-                        <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Department</th>
-                        <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500">Net Pay</th>
-                        <th className="text-center py-2 px-3 text-xs font-semibold text-gray-500">Status</th>
-                        <th className="text-center py-2 px-4 text-xs font-semibold text-gray-500">PDF</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {customSlips.map(s => (
-                        <tr key={s.id} className="hover:bg-gray-50">
-                          <td className="py-2.5 px-4">
-                            <div className="font-medium text-gray-900">{s.snapshot_employee_name}</div>
-                            <div className="text-xs text-gray-400">{s.snapshot_employee_id_no}</div>
-                          </td>
-                          <td className="py-2.5 px-3 text-gray-600 text-xs">{fmtPeriod(s.pay_period)}</td>
-                          <td className="py-2.5 px-3 text-gray-600 text-xs">{s.snapshot_department || "—"}</td>
-                          <td className="py-2.5 px-3 text-right font-semibold text-emerald-700">{money(s.net_pay)}</td>
-                          <td className="py-2.5 px-3 text-center">{statusBadge(s.status)}</td>
-                          <td className="py-2.5 px-4 text-center">
-                            <button onClick={() => window.open(`/api/payslips/${s.id}/pdf`, "_blank")} className="text-gray-400 hover:text-emerald-600">
-                              <Printer className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
+              {customSlips.length > 0 && (
+                <CardContent className="px-0 pb-0">
+                  <div className="max-h-96 overflow-y-auto scrollbar-thin">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-gray-50 border-b">
+                        <tr>
+                          <th className="text-left py-2 px-4 text-xs font-semibold text-gray-500">Employee</th>
+                          <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Period</th>
+                          <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Department</th>
+                          <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500">Net Pay</th>
+                          <th className="text-center py-2 px-3 text-xs font-semibold text-gray-500">Status</th>
+                          <th className="text-center py-2 px-4 text-xs font-semibold text-gray-500">PDF</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {customSlips.map(s => (
+                          <tr key={s.id} className="hover:bg-gray-50">
+                            <td className="py-2.5 px-4">
+                              <div className="font-medium text-gray-900">{s.snapshot_employee_name}</div>
+                              <div className="text-xs text-gray-400">{s.snapshot_employee_id_no}</div>
+                            </td>
+                            <td className="py-2.5 px-3 text-gray-600 text-xs">{fmtPeriod(s.pay_period)}</td>
+                            <td className="py-2.5 px-3 text-gray-600 text-xs">{s.snapshot_department || "—"}</td>
+                            <td className="py-2.5 px-3 text-right font-semibold text-emerald-700">{money(s.net_pay)}</td>
+                            <td className="py-2.5 px-3 text-center">{statusBadge(s.status)}</td>
+                            <td className="py-2.5 px-4 text-center">
+                              <button onClick={() => window.open(`/api/payslips/${s.id}/pdf`, "_blank")} className="text-gray-400 hover:text-emerald-600">
+                                <Printer className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              )}
             </Card>
           )}
         </TabsContent>

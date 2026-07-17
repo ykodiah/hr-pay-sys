@@ -89,6 +89,26 @@ async function persistRowsFromWorksheet(
   await client.from("payroll_items").delete().eq("payroll_run_id", runId)
   await client.from("payslips").delete().eq("payroll_run_id", runId)
 
+  // Pre-fetch employee financial data + employee info for snapshot enrichment
+  const empIds = rows.map((r) => r.employeeId).filter(Boolean)
+  const [finRes, empRes, subRes, coRes] = await Promise.all([
+    empIds.length
+      ? client.from("employee_financial").select("employee_id, transport_allowance, housing_allowance, medical_allowance, meal_allowance, communication_allowance, uniform_allowance, other_allowances, bank_name, bank_account_number, ssnit_number").in("employee_id", empIds)
+      : { data: [] as any[] },
+    empIds.length
+      ? client.from("employees").select("id, subsidiary_id, location, division").in("id", empIds)
+      : { data: [] as any[] },
+    client.from("subsidiaries").select("id, name"),
+    client.from("companies").select("id, name").eq("id", companyId).limit(1).maybeSingle(),
+  ])
+  const finByEmp = new Map<string, any>()
+  for (const f of finRes.data ?? []) finByEmp.set(f.employee_id, f)
+  const empInfoById = new Map<string, any>()
+  for (const e of empRes.data ?? []) empInfoById.set(e.id, e)
+  const subById = new Map<string, string>()
+  for (const s of subRes.data ?? []) subById.set(s.id, s.name)
+  const companyName: string = coRes.data?.name ?? "Company"
+
   for (const row of rows) {
     try {
       // Validate required fields before processing
@@ -121,6 +141,28 @@ async function persistRowsFromWorksheet(
         n(row.totalDeductions) || n(ssnit + pf + paye + loan + advance + other)
       const net = n(row.netPay) || n(gross - totalDeductions)
       const taxable = n(row.taxableIncome)
+
+      // Get individual allowance breakdown from employee_financial
+      const fin = finByEmp.get(row.employeeId)
+      const empInfo = empInfoById.get(row.employeeId)
+      const subName = empInfo?.subsidiary_id ? (subById.get(empInfo.subsidiary_id) ?? null) : null
+      // Distribute the total allowances proportionally from master, falling back to lump-sum
+      const masterTransport = n(fin?.transport_allowance)
+      const masterHousing   = n(fin?.housing_allowance)
+      const masterMedical   = n(fin?.medical_allowance)
+      const masterMeal      = n(fin?.meal_allowance)
+      const masterComm      = n(fin?.communication_allowance)
+      const masterUniform   = n(fin?.uniform_allowance)
+      const masterOther     = n(fin?.other_allowances)
+      const masterAllowTotal = masterTransport + masterHousing + masterMedical + masterMeal + masterComm + masterUniform + masterOther
+      // If financial record exists, use those proportions scaled to actual allowances total
+      const scale = masterAllowTotal > 0 ? allowances / masterAllowTotal : 0
+      const splitTransport  = masterAllowTotal > 0 ? n(masterTransport * scale) : 0
+      const splitHousing    = masterAllowTotal > 0 ? n(masterHousing   * scale) : 0
+      const splitMedical    = masterAllowTotal > 0 ? n(masterMedical   * scale) : 0
+      const splitMeal       = masterAllowTotal > 0 ? n(masterMeal      * scale) : 0
+      const splitComm       = masterAllowTotal > 0 ? n(masterComm      * scale) : 0
+      const splitOther      = masterAllowTotal > 0 ? n(allowances - splitTransport - splitHousing - splitMedical - splitMeal - splitComm) : allowances
 
       const ssnitEmployer = n(ssnit * (13 / 5.5))
       // Build only the columns that actually exist in payroll_items table
@@ -188,8 +230,20 @@ async function persistRowsFromWorksheet(
         snapshot_employee_id_no: row.employeeCode || null,
         snapshot_position: row.position || null,
         snapshot_department: row.department || null,
+        snapshot_location: empInfo?.location ?? null,
+        snapshot_division: empInfo?.division ?? null,
+        snapshot_subsidiary: subName,
+        snapshot_company_name: subName ? companyName : companyName,
+        snapshot_ssnit_number: fin?.ssnit_number ?? null,
+        snapshot_bank_name: fin?.bank_name ?? null,
+        snapshot_account_number: fin?.bank_account_number ?? null,
         basic_salary: basic,
-        other_allowances: allowances,
+        transport_allowance: splitTransport,
+        housing_allowance: splitHousing,
+        medical_allowance: splitMedical,
+        meal_allowance: splitMeal,
+        communication_allowance: splitComm,
+        other_allowances: splitOther,
         overtime_pay: overtime,
         bonus_pay: bonus,
         gross_pay: gross,
