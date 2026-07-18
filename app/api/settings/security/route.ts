@@ -2,6 +2,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import { jsonError, resolveTenantContext } from "@/lib/settings/resolve-tenant"
 
+function isColumnError(error: any) {
+  const message = String(error?.message || error || "").toLowerCase()
+  return (
+    error?.code === "PGRST204" ||
+    message.includes("column") ||
+    message.includes("schema cache") ||
+    message.includes("could not find")
+  )
+}
+
 function formatBytes(bytes?: number | null) {
   if (!bytes || bytes <= 0) return "0 MB"
   const megabytes = bytes / (1024 * 1024)
@@ -57,11 +67,14 @@ export async function GET(req: NextRequest) {
 
     const securitySettings = securityData
       ? {
-          dataEncryptionEnabled: !!securityData.data_encryption_enabled,
-          auditLoggingEnabled: !!securityData.audit_logging_enabled,
-          autoBackupEnabled: !!securityData.auto_backup_enabled,
+          dataEncryptionEnabled: securityData.data_encryption_enabled !== false,
+          auditLoggingEnabled: securityData.audit_logging_enabled !== false,
+          autoBackupEnabled: securityData.auto_backup_enabled !== false,
           backupFrequency: securityData.backup_frequency || "daily",
+          backupRetentionDays: securityData.backup_retention_days ?? 30,
           dataRetentionDays: securityData.data_retention_days ?? 90,
+          gdprComplianceEnabled: !!securityData.gdpr_compliance_enabled,
+          dataAnonymizationEnabled: !!securityData.data_anonymization_enabled,
         }
       : null
 
@@ -114,18 +127,38 @@ export async function POST(req: NextRequest) {
 
     if (action === "save") {
       const s = body.settings || body
-      const { error } = await service.from("security_settings").upsert(
-        {
-          company_id: companyId,
-          data_encryption_enabled: !!s.dataEncryptionEnabled,
-          audit_logging_enabled: !!s.auditLoggingEnabled,
-          auto_backup_enabled: !!s.autoBackupEnabled,
-          backup_frequency: s.backupFrequency || "daily",
-          data_retention_days: Number(s.dataRetentionDays || 90),
-          updated_at: now,
-        },
-        { onConflict: "company_id" },
-      )
+      const fullRow = {
+        company_id: companyId,
+        data_encryption_enabled: s.dataEncryptionEnabled !== false,
+        audit_logging_enabled: s.auditLoggingEnabled !== false,
+        auto_backup_enabled: s.autoBackupEnabled !== false,
+        backup_frequency: s.backupFrequency || "daily",
+        backup_retention_days: Number(s.backupRetentionDays || 30),
+        data_retention_days: Number(s.dataRetentionDays || 90),
+        gdpr_compliance_enabled: !!s.gdprComplianceEnabled,
+        data_anonymization_enabled: !!s.dataAnonymizationEnabled,
+        updated_at: now,
+      }
+
+      const coreRow = {
+        company_id: companyId,
+        data_encryption_enabled: fullRow.data_encryption_enabled,
+        audit_logging_enabled: fullRow.audit_logging_enabled,
+        auto_backup_enabled: fullRow.auto_backup_enabled,
+        backup_frequency: fullRow.backup_frequency,
+        data_retention_days: fullRow.data_retention_days,
+        updated_at: now,
+      }
+
+      let { error } = await service
+        .from("security_settings")
+        .upsert(fullRow, { onConflict: "company_id" })
+      if (error && isColumnError(error)) {
+        const retry = await service
+          .from("security_settings")
+          .upsert(coreRow, { onConflict: "company_id" })
+        error = retry.error
+      }
       if (error) throw error
       return NextResponse.json({ success: true })
     }

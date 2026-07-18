@@ -260,7 +260,19 @@ interface SecuritySettings {
   auditLoggingEnabled: boolean
   autoBackupEnabled: boolean
   backupFrequency: string
+  backupRetentionDays: number
   dataRetentionDays: number
+  gdprComplianceEnabled: boolean
+  dataAnonymizationEnabled: boolean
+}
+
+interface BackupHistoryItem {
+  id: string
+  backup_status: string
+  backup_size: number | null
+  backup_type: string
+  started_at: string
+  completed_at: string | null
 }
 
 interface HrConfig {
@@ -819,13 +831,19 @@ export default function SettingsPage() {
     auditLoggingEnabled: true,
     autoBackupEnabled: true,
     backupFrequency: "daily",
+    backupRetentionDays: 30,
     dataRetentionDays: 90,
+    gdprComplianceEnabled: false,
+    dataAnonymizationEnabled: false,
   })
   const [isSavingSecuritySettings, setIsSavingSecuritySettings] = useState(false)
   const [backupSize, setBackupSize] = useState<string | null>(null)
   const [backupStatus, setBackupStatus] = useState<string | null>(null)
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
+  const [backupHistory, setBackupHistory] = useState<BackupHistoryItem[]>([])
   const [isExportingReport, setIsExportingReport] = useState(false)
+  const [showAllLogsModal, setShowAllLogsModal] = useState(false)
+  const [isLoadingAllLogs, setIsLoadingAllLogs] = useState(false)
 
   const [showPassword, setShowPassword] = useState(false)
   const [testConnectionStatus, setTestConnectionStatus] = useState<"idle" | "testing" | "success" | "error">("idle")
@@ -1691,11 +1709,13 @@ export default function SettingsPage() {
 
       if (accessPayload.accessSettings) setAccessSettings((prev) => ({ ...prev, ...accessPayload.accessSettings }))
       setActiveSessions(Array.isArray(accessPayload.activeSessions) ? accessPayload.activeSessions : [])
-      if (securityPayload.securitySettings) setSecuritySettings(securityPayload.securitySettings)
+      if (securityPayload.securitySettings)
+        setSecuritySettings((prev) => ({ ...prev, ...securityPayload.securitySettings }))
       setLastBackupTime(securityPayload.lastBackupTime || null)
       setBackupStatus(securityPayload.backupStatus || null)
       setBackupSize(securityPayload.backupSize || "0 MB")
-      if (securityPayload.auditLogs) setAuditLogs(securityPayload.auditLogs)
+      setAuditLogs(Array.isArray(securityPayload.auditLogs) ? securityPayload.auditLogs : [])
+      setBackupHistory(Array.isArray(securityPayload.backupHistory) ? securityPayload.backupHistory : [])
 
       console.log("[v0] Access and security data loaded from database.")
     } catch (error) {
@@ -3824,23 +3844,7 @@ This document contains important information about ${document.name.toLowerCase()
     setIsBackingUp(true)
     console.log("[v0] Initiating manual backup...")
     try {
-      if (isDemoMode()) {
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-        setLastBackupTime(new Date().toISOString())
-        setBackupSize("55 MB")
-        setBackupStatus("Completed")
-        toast({
-          title: "Backup Successful",
-          description: "Manual backup completed successfully.",
-        })
-        return
-      }
-
-      const companyId = companyData.id || (await loadCompanyData())
-
-      if (!companyId) {
-        throw new Error("No company identifier available")
-      }
+      const companyId = await resolveHrCompanyId()
 
       const result = await settingsFetch("/api/settings/security", {
         method: "POST",
@@ -3850,6 +3854,7 @@ This document contains important information about ${document.name.toLowerCase()
       setLastBackupTime(result.backup?.lastBackupTime || new Date().toISOString())
       setBackupSize(result.backup?.backupSize || "0 MB")
       setBackupStatus(result.backup?.backupStatus || "Completed")
+      await loadAccessAndSecurityData(companyId)
 
       toast({
         title: "Backup Successful",
@@ -3859,7 +3864,7 @@ This document contains important information about ${document.name.toLowerCase()
       console.error("[v0] Backup failed", error)
       toast({
         title: "Backup Failed",
-        description: "Failed to complete system backup.",
+        description: error instanceof Error ? error.message : "Failed to complete system backup.",
         variant: "destructive",
       })
     } finally {
@@ -4870,17 +4875,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     setIsSavingSecuritySettings(true)
     console.log("[v0] Saving security settings...")
     try {
-      if (isDemoMode()) {
-        await new Promise((resolve) => setTimeout(resolve, 800))
-        toast({ title: "Security Settings Saved", description: "Security configurations have been updated." })
-        return
-      }
-
-      const companyId = companyData.id || (await loadCompanyData())
-
-      if (!companyId) {
-        throw new Error("No company identifier available")
-      }
+      const companyId = await resolveHrCompanyId()
 
       await settingsFetch("/api/settings/security", {
         method: "POST",
@@ -4890,13 +4885,14 @@ Format the response in a professional, actionable manner for HR decision-makers.
           settings: securitySettings,
         }),
       })
+      await loadAccessAndSecurityData(companyId)
 
       toast({ title: "Security Settings Saved", description: "Security configurations have been updated." })
     } catch (error) {
       console.error("[v0] Failed to save security settings", error)
       toast({
         title: "Error",
-        description: "Unable to save security configurations.",
+        description: error instanceof Error ? error.message : "Unable to save security configurations.",
         variant: "destructive",
       })
     } finally {
@@ -4905,27 +4901,29 @@ Format the response in a professional, actionable manner for HR decision-makers.
   }
 
   const handleViewAllLogs = async () => {
+    setShowAllLogsModal(true)
+    setIsLoadingAllLogs(true)
     try {
-      if (!isDemoMode() && companyData.id) {
-        const payload = await settingsFetch(
-          `/api/settings/security?company_id=${encodeURIComponent(companyData.id)}&limit=100`,
-        )
-        if (payload.auditLogs) setAuditLogs(payload.auditLogs)
-      }
-      toast({ title: "Audit Logs Loaded", description: "Showing the latest security audit events." })
+      const companyId = await resolveHrCompanyId()
+      const payload = await settingsFetch(
+        `/api/settings/security?company_id=${encodeURIComponent(companyId)}&limit=200`,
+      )
+      if (Array.isArray(payload.auditLogs)) setAuditLogs(payload.auditLogs)
     } catch (error) {
       toast({
         title: "Error",
-        description: "Unable to load full audit log history.",
+        description: error instanceof Error ? error.message : "Unable to load full audit log history.",
         variant: "destructive",
       })
+    } finally {
+      setIsLoadingAllLogs(false)
     }
   }
 
   const handleExportSecurityReport = async () => {
     setIsExportingReport(true)
     try {
-      const companyId = companyData.id || (await loadCompanyData())
+      const companyId = await resolveHrCompanyId()
       const res = await fetch("/api/settings/security", {
         method: "POST",
         credentials: "include",
@@ -5401,6 +5399,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
           if (value === "notifications") void loadNotificationSettings()
           if (value === "roles") void loadRoles()
           if (value === "access") void loadAccessAndSecurityData()
+          if (value === "security") void loadAccessAndSecurityData()
         }}
         className="space-y-6"
       >
@@ -9139,9 +9138,12 @@ Format the response in a professional, actionable manner for HR decision-makers.
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Security Policies</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="dataEncryption">Data Encryption at Rest</Label>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <Label htmlFor="dataEncryption">Data Encryption at Rest</Label>
+                        <p className="text-xs text-muted-foreground">Encrypt stored tenant data</p>
+                      </div>
                       <Switch
                         id="dataEncryption"
                         checked={securitySettings.dataEncryptionEnabled}
@@ -9150,8 +9152,11 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         }
                       />
                     </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="auditLogging">Audit Logging</Label>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <Label htmlFor="auditLogging">Audit Logging</Label>
+                        <p className="text-xs text-muted-foreground">Record security-relevant events</p>
+                      </div>
                       <Switch
                         id="auditLogging"
                         checked={securitySettings.auditLoggingEnabled}
@@ -9160,13 +9165,42 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         }
                       />
                     </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="autoBackup">Automatic Backups</Label>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <Label htmlFor="autoBackup">Automatic Backups</Label>
+                        <p className="text-xs text-muted-foreground">Schedule recurring backups</p>
+                      </div>
                       <Switch
                         id="autoBackup"
                         checked={securitySettings.autoBackupEnabled}
                         onCheckedChange={(checked) =>
                           setSecuritySettings({ ...securitySettings, autoBackupEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <Label htmlFor="gdprCompliance">GDPR Compliance Mode</Label>
+                        <p className="text-xs text-muted-foreground">Enforce data-subject protections</p>
+                      </div>
+                      <Switch
+                        id="gdprCompliance"
+                        checked={securitySettings.gdprComplianceEnabled}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, gdprComplianceEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <Label htmlFor="dataAnonymization">Data Anonymization</Label>
+                        <p className="text-xs text-muted-foreground">Mask PII in exports and logs</p>
+                      </div>
+                      <Switch
+                        id="dataAnonymization"
+                        checked={securitySettings.dataAnonymizationEnabled}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, dataAnonymizationEnabled: checked })
                         }
                       />
                     </div>
@@ -9182,6 +9216,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="hourly">Hourly</SelectItem>
                           <SelectItem value="daily">Daily</SelectItem>
                           <SelectItem value="weekly">Weekly</SelectItem>
                           <SelectItem value="monthly">Monthly</SelectItem>
@@ -9189,15 +9224,31 @@ Format the response in a professional, actionable manner for HR decision-makers.
                       </Select>
                     </div>
                     <div>
+                      <Label htmlFor="backupRetention">Backup Retention (days)</Label>
+                      <Input
+                        id="backupRetention"
+                        type="number"
+                        min="1"
+                        value={securitySettings.backupRetentionDays}
+                        onChange={(e) =>
+                          setSecuritySettings({
+                            ...securitySettings,
+                            backupRetentionDays: Number.parseInt(e.target.value) || 0,
+                          })
+                        }
+                      />
+                    </div>
+                    <div>
                       <Label htmlFor="retentionPeriod">Data Retention Period (days)</Label>
                       <Input
                         id="retentionPeriod"
                         type="number"
+                        min="1"
                         value={securitySettings.dataRetentionDays}
                         onChange={(e) =>
                           setSecuritySettings({
                             ...securitySettings,
-                            dataRetentionDays: Number.parseInt(e.target.value),
+                            dataRetentionDays: Number.parseInt(e.target.value) || 0,
                           })
                         }
                       />
@@ -9246,6 +9297,46 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     </CardContent>
                   </Card>
                 </div>
+
+                {backupHistory.length > 0 && (
+                  <div className="border rounded-lg overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-muted/50 border-b">
+                          <th className="text-left font-medium px-3 py-2">Type</th>
+                          <th className="text-left font-medium px-3 py-2">Status</th>
+                          <th className="text-left font-medium px-3 py-2">Size</th>
+                          <th className="text-left font-medium px-3 py-2">Completed</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {backupHistory.slice(0, 8).map((b) => (
+                          <tr key={b.id} className="border-b last:border-0">
+                            <td className="px-3 py-2 capitalize">{b.backup_type || "manual"}</td>
+                            <td className="px-3 py-2">
+                              <Badge
+                                variant={
+                                  String(b.backup_status).toLowerCase() === "completed" ? "default" : "secondary"
+                                }
+                                className="capitalize"
+                              >
+                                {b.backup_status || "unknown"}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-2">
+                              {b.backup_size ? `${(b.backup_size / (1024 * 1024)).toFixed(1)} MB` : "—"}
+                            </td>
+                            <td className="px-3 py-2">
+                              {b.completed_at || b.started_at
+                                ? new Date(b.completed_at || b.started_at).toLocaleString()
+                                : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
 
               {/* Audit Logs */}
@@ -9310,6 +9401,54 @@ Format the response in a professional, actionable manner for HR decision-makers.
               </div>
             </CardContent>
           </Card>
+
+          {showAllLogsModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <Card className="w-full max-w-3xl max-h-[85vh] overflow-y-auto">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Audit Logs</CardTitle>
+                      <CardDescription>Latest security and access events for this tenant</CardDescription>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => setShowAllLogsModal(false)}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingAllLogs ? (
+                    <div className="flex items-center justify-center py-10">
+                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : auditLogs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-6 text-center">No audit events recorded yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {auditLogs.map((log) => (
+                        <div key={log.id} className="flex items-center justify-between border rounded-md p-3">
+                          <div>
+                            <p className="font-medium text-sm">{log.action}</p>
+                            <p className="text-xs text-gray-600">
+                              {log.user_email} • {log.ip_address} • {new Date(log.timestamp).toLocaleString()}
+                            </p>
+                          </div>
+                          <Badge variant={log.severity === "high" ? "destructive" : "secondary"}>
+                            {log.severity}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex justify-end mt-4">
+                    <Button variant="outline" onClick={() => setShowAllLogsModal(false)}>
+                      Close
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
