@@ -48,6 +48,17 @@ export async function resolveTenantContext(
     companyId = (searchParams.get("company_id") || "").trim()
   }
 
+  // Client demo ids historically used "demo-company-001"; memory DB seeds a UUID.
+  if (companyId === "demo-company-001" || companyId.startsWith("demo-")) {
+    const { data: demoCompany } = await service
+      .from("companies")
+      .select("id")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    if (demoCompany?.id) companyId = demoCompany.id
+  }
+
   if (!companyId && userId && !demo) {
     try {
       const { data: rpcId } = await service.rpc("get_current_user_company_id")
@@ -64,7 +75,7 @@ export async function resolveTenantContext(
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle()
-    companyId = company?.id || (demo ? "demo-company-001" : "")
+    companyId = company?.id || ""
   }
 
   if (!companyId) {

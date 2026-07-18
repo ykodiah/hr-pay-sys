@@ -229,6 +229,22 @@ const isDemoMode = () => {
   return false
 }
 
+const clearClientDemoSession = () => {
+  if (typeof window === "undefined") return
+  document.cookie = "demo-session=; path=/; max-age=0"
+  try {
+    localStorage.removeItem("demo_profile")
+  } catch {
+    // ignore
+  }
+}
+
+const isPlaceholderLogo = (url?: string | null) => {
+  if (!url) return true
+  const value = url.trim()
+  return !value || value.includes("/placeholder") || value === "null" || value === "undefined"
+}
+
 const formatBytes = (bytes?: number | null) => {
   if (!bytes || bytes <= 0) return "0 MB"
   const megabytes = bytes / (1024 * 1024)
@@ -1275,52 +1291,130 @@ export default function SettingsPage() {
   }
 
   // Logo upload function
+  const applyCompanyPayload = (data: any) => {
+    if (!data?.id) return null
+    const nextDivisions = ensureStringArray(data.divisions)
+    const nextDepartments = ensureStringArray(data.departments)
+    const nextLocations = ensureStringArray(data.locations)
+    const resolvedLogoUrl = isPlaceholderLogo(data.logo_url) ? "" : String(data.logo_url)
+
+    setCompanyData({
+      id: data.id,
+      name: data.name || "",
+      email_address: data.email_address || "",
+      tax_id: data.tax_id || "",
+      ssnit_number: data.ssnit_number || "",
+      industry: data.industry || "",
+      status: "active",
+      address: data.address || "",
+      phone_number: data.phone_number || "",
+      divisions: nextDivisions,
+      departments: nextDepartments,
+      locations: nextLocations,
+      logo_url: resolvedLogoUrl || null,
+    })
+    setDivisions(nextDivisions)
+    setDepartments(nextDepartments)
+    setLocations(nextLocations)
+    setCompanyLogoPreview(resolvedLogoUrl)
+    setLogoPreview(resolvedLogoUrl)
+    return data.id as string
+  }
+
+  const persistCompanySettings = async (overrides: Record<string, unknown> = {}) => {
+    const companyId = (overrides.company_id as string) || companyData.id
+    if (!companyId) throw new Error("No company identifier available")
+
+    const logoCandidate =
+      (overrides.logo_url as string | null | undefined) ??
+      (isPlaceholderLogo(companyLogoPreview) ? null : companyLogoPreview) ??
+      (isPlaceholderLogo(companyData.logo_url) ? null : companyData.logo_url)
+
+    const payload = {
+      company_id: companyId,
+      name: companyData.name,
+      industry: companyData.industry,
+      tax_id: companyData.tax_id,
+      ssnit_number: companyData.ssnit_number,
+      email_address: companyData.email_address,
+      phone_number: companyData.phone_number,
+      address: companyData.address,
+      divisions,
+      departments,
+      locations,
+      logo_url: logoCandidate,
+      ...overrides,
+    }
+
+    const result = await settingsFetch("/api/settings/company", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    })
+
+    if (result.company) {
+      applyCompanyPayload(result.company)
+      clearClientDemoSession()
+    }
+    return result
+  }
+
   const handleLogoUpload = async (file: File, type: "company" | "subsidiary") => {
     if (!file) return
 
     setIsUploadingLogo(true)
     try {
-      // Create form data for blob upload
       const formData = new FormData()
       formData.append("file", file)
 
-      // Upload to Vercel Blob
       const response = await fetch("/api/upload", {
         method: "POST",
         body: formData,
+        credentials: "include",
       })
 
-      if (!response.ok) {
-        throw new Error("Upload failed")
+      const uploaded = await response.json().catch(() => ({}))
+      if (!response.ok || !uploaded.url) {
+        throw new Error(uploaded.error || "Upload failed")
       }
 
-      const { url } = await response.json()
+      const url = uploaded.url as string
 
-      // Set preview based on type
       if (type === "company") {
         setCompanyLogoPreview(url)
-        setCompanyData({ ...companyData, logo_url: url })
+        setCompanyData((prev) => ({ ...prev, logo_url: url }))
+
+        // Persist immediately so navigating away cannot lose the new logo.
+        if (companyData.id && !String(companyData.id).startsWith("demo-")) {
+          await persistCompanySettings({ logo_url: url })
+          toast({
+            title: "Logo saved",
+            description: "Company logo uploaded and saved to the database.",
+          })
+        } else {
+          toast({
+            title: "Logo uploaded",
+            description: "Logo ready. Click Save Company Settings to persist it.",
+          })
+        }
       } else {
         setSubsidiaryLogoPreview(url)
         if (selectedSubsidiary) {
           const updatedSubsidiary = { ...selectedSubsidiary, logo_url: url }
           setSelectedSubsidiary(updatedSubsidiary)
-          // Also update the subsidiary in the main list
           setSubsidiaries((prev) =>
             prev.map((sub) => (sub.id === selectedSubsidiary.id ? { ...sub, logo_url: url } : sub)),
           )
         }
+        toast({
+          title: "Logo uploaded successfully",
+          description: "Your logo has been uploaded and is ready to use.",
+        })
       }
-
-      toast({
-        title: "Logo uploaded successfully",
-        description: "Your logo has been uploaded and is ready to use.",
-      })
     } catch (error) {
       console.error("Logo upload error:", error)
       toast({
         title: "Upload failed",
-        description: "Failed to upload logo. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to upload logo. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -1330,33 +1424,57 @@ export default function SettingsPage() {
 
   // Load functions
   const fetchCurrentCompanyId = async (): Promise<string | null> => {
-    if (isDemoMode()) return "demo-company-001"
-
     if (companyData.id) {
       const trimmed = companyData.id.trim()
-      if (trimmed.length > 0) return trimmed
+      if (trimmed.length > 0 && !trimmed.startsWith("demo-")) return trimmed
     }
 
     try {
       const { data, error } = await supabase.rpc("get_current_user_company_id")
+      if (!error && typeof data === "string" && data.trim().length > 0) {
+        return data
+      }
       if (error) {
         console.warn("[v0] get_current_user_company_id RPC failed", error)
-        return null
-      }
-      if (typeof data === "string" && data.trim().length > 0) {
-        return data
       }
     } catch (error) {
       console.warn("[v0] RPC get_current_user_company_id threw", error)
     }
+
+    // Only fall back to the synthetic demo id when no real tenant id exists.
+    if (isDemoMode()) return "demo-company-001"
     return null
   }
 
   const loadCompanyData = async (): Promise<string | null> => {
     console.log("[v0] Loading company data...")
 
+    // Always try the service-role API first. A stale demo-session cookie must not
+    // block reading real tenant company rows (that was causing logo/settings reverts).
+    try {
+      const currentCompanyId = await fetchCurrentCompanyId()
+      const qs =
+        currentCompanyId && !String(currentCompanyId).startsWith("demo-")
+          ? `?company_id=${encodeURIComponent(currentCompanyId)}`
+          : ""
+      const payload = await settingsFetch(`/api/settings/company${qs}`)
+      if (payload.company?.id) {
+        clearClientDemoSession()
+        return applyCompanyPayload(payload.company)
+      }
+    } catch (error) {
+      console.error("[v0] Error loading company data:", error)
+      if (!isDemoMode()) {
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to load company data",
+          variant: "destructive",
+        })
+      }
+    }
+
     if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock company data")
+      console.log("[v0] Demo mode fallback for company data")
       setCompanyData({
         id: "demo-company-001",
         name: "Akwaaba Technologies Ltd",
@@ -1370,84 +1488,16 @@ export default function SettingsPage() {
         divisions: ["Head Office", "Regional Office"],
         departments: ["Technology", "Human Resources", "Finance"],
         locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
+        logo_url: null,
       })
       setDivisions(["Head Office", "Regional Office"])
       setDepartments(["Technology", "Human Resources", "Finance"])
       setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-      setCompanyLogoPreview("/placeholder.svg")
-      setLogoPreview("/placeholder.svg")
+      setCompanyLogoPreview("")
+      setLogoPreview("")
       return "demo-company-001"
     }
 
-    try {
-      const currentCompanyId = await fetchCurrentCompanyId()
-      const qs = currentCompanyId ? `?company_id=${encodeURIComponent(currentCompanyId)}` : ""
-      const payload = await settingsFetch(`/api/settings/company${qs}`)
-      const data = payload.company
-      if (data) {
-        const divisions = ensureStringArray(data.divisions)
-        const departments = ensureStringArray(data.departments)
-        const locations = ensureStringArray(data.locations)
-        const resolvedLogoUrl = data.logo_url || ""
-
-        setCompanyData({
-          id: data.id,
-          name: data.name || "",
-          email_address: data.email_address || "",
-          tax_id: data.tax_id || "",
-          ssnit_number: data.ssnit_number || "",
-          industry: data.industry || "",
-          status: "active",
-          address: data.address || "",
-          phone_number: data.phone_number || "",
-          divisions,
-          departments,
-          locations,
-          logo_url: resolvedLogoUrl || null,
-        })
-
-        setDivisions(divisions)
-        setDepartments(departments)
-        setLocations(locations)
-        setCompanyLogoPreview(resolvedLogoUrl || "/placeholder.svg")
-        setLogoPreview(resolvedLogoUrl || "/placeholder.svg")
-        return data.id
-      }
-    } catch (error) {
-      console.error("[v0] Error loading company data:", error)
-      if (error.message && error.message.includes("infinite recursion detected in policy")) {
-        console.log("[v0] Database policy error detected, falling back to demo mode")
-        // Set demo session cookie to prevent future database calls
-        document.cookie = "demo-session=active; path=/; max-age=86400"
-        // Load demo data
-        setCompanyData({
-          id: "demo-company-001",
-          name: "Akwaaba Technologies Ltd",
-          email_address: "ykodiah@gmail.com",
-          tax_id: "C0012345678",
-          ssnit_number: "1234567890",
-          industry: "Technology",
-          status: "active",
-          address: "123 Liberation Road, Labone, Accra, Ghana",
-          phone_number: "0249397960",
-          divisions: ["Head Office", "Regional Office"],
-          departments: ["Technology", "Human Resources", "Finance"],
-          locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
-          logo_url: "/placeholder.svg",
-        })
-        setDivisions(["Head Office", "Regional Office"])
-        setDepartments(["Technology", "Human Resources", "Finance"])
-        setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-        setCompanyLogoPreview("/placeholder.svg")
-        setLogoPreview("/placeholder.svg")
-        return "demo-company-001"
-      }
-      toast({
-        title: "Error",
-        description: "Failed to load company data",
-        variant: "destructive",
-      })
-    }
     return companyData.id || null
   }
 
@@ -2611,83 +2661,63 @@ export default function SettingsPage() {
   }
 
   const handleSaveSettings = async () => {
-    console.log("[v0] Saving all settings changes")
+    console.log("[v0] Saving company settings changes")
     setIsSavingSettings(true)
 
-    if (isDemoMode()) {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      toast({
-        title: "Settings Saved",
-        description: "All settings changes have been saved successfully (Demo Mode)",
-      })
-      setIsSavingSettings(false)
-      return
-    }
-
     try {
-      const companyId = companyData.id || (await loadCompanyData())
-
+      let companyId = companyData.id
+      if (!companyId || String(companyId).startsWith("demo-")) {
+        companyId = (await loadCompanyData()) || companyId
+      }
       if (!companyId) {
         throw new Error("No company identifier available")
       }
 
-      const normalizedCompanyLogo = (() => {
-        const preview = companyLogoPreview?.trim() || ""
-        const current = companyData.logo_url ? companyData.logo_url.toString().trim() : ""
-        const preferred = preview && !preview.includes("/placeholder") ? preview : ""
-        const fallback = current && !current.includes("/placeholder") ? current : ""
-        const value = preferred || fallback
-        return value || null
-      })()
+      const normalizedCompanyLogo = isPlaceholderLogo(companyLogoPreview)
+        ? isPlaceholderLogo(companyData.logo_url)
+          ? null
+          : companyData.logo_url
+        : companyLogoPreview.trim()
 
-      await settingsFetch("/api/settings/company", {
-        method: "POST",
-        body: JSON.stringify({
-          company_id: companyId,
-          name: companyData.name,
-          industry: companyData.industry,
-          tax_id: companyData.tax_id,
-          ssnit_number: companyData.ssnit_number,
-          email_address: companyData.email_address,
-          phone_number: companyData.phone_number,
-          address: companyData.address,
-          divisions,
-          departments,
-          locations,
-          logo_url: normalizedCompanyLogo,
-        }),
+      const saved = await persistCompanySettings({
+        company_id: companyId,
+        logo_url: normalizedCompanyLogo,
+        divisions,
+        departments,
+        locations,
       })
 
+      // Keep related settings in sync, but never let these wipe a successful company save.
       await settingsFetch("/api/settings/hr", {
         method: "POST",
         body: JSON.stringify({
           action: "save_config",
-          company_id: companyId,
+          company_id: saved.company?.id || companyId,
           config: hrConfig,
         }),
-      })
+      }).catch((err) => console.warn("[v0] HR config save skipped:", err))
 
       await settingsFetch("/api/settings/subsidiaries", {
         method: "POST",
         body: JSON.stringify({
           action: "save_sync_preferences",
-          company_id: companyId,
+          company_id: saved.company?.id || companyId,
           ...syncPrefs,
         }),
       }).catch(() => null)
 
-      await loadAllData()
+      // Re-read company from API to prove persistence (same path used on module return).
+      await loadCompanyData()
 
       toast({
-        title: "Settings Saved",
-        description: "All settings changes have been saved and updated successfully",
+        title: "Company Settings Saved",
+        description: "Company details and logo were saved to the database.",
       })
     } catch (error) {
       console.error("Save settings error:", error)
       toast({
         title: "Error",
-        description: "Failed to save settings changes",
+        description: error instanceof Error ? error.message : "Failed to save settings changes",
         variant: "destructive",
       })
     } finally {
@@ -5641,7 +5671,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
               <div className="space-y-4">
                 <Label>Company Logo</Label>
                 <div className="flex items-center space-x-4">
-                  {companyLogoPreview || companyData.logo_url ? (
+                  {!isPlaceholderLogo(companyLogoPreview || companyData.logo_url) ? (
                     <div className="relative">
                       <img
                         src={companyLogoPreview || companyData.logo_url}
@@ -5652,9 +5682,25 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         variant="ghost"
                         size="sm"
                         className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
-                        onClick={() => {
+                        onClick={async () => {
                           setCompanyLogoPreview("")
-                          setCompanyData({ ...companyData, logo_url: "" })
+                          setCompanyData((prev) => ({ ...prev, logo_url: null }))
+                          if (companyData.id && !String(companyData.id).startsWith("demo-")) {
+                            try {
+                              await persistCompanySettings({ logo_url: null })
+                              toast({
+                                title: "Logo removed",
+                                description: "Company logo cleared in the database.",
+                              })
+                            } catch (error) {
+                              toast({
+                                title: "Error",
+                                description:
+                                  error instanceof Error ? error.message : "Failed to clear logo",
+                                variant: "destructive",
+                              })
+                            }
+                          }
                         }}
                       >
                         <X className="h-3 w-3" />
