@@ -8,50 +8,94 @@ function formatBytes(bytes?: number | null) {
   return `${megabytes.toFixed(megabytes >= 10 ? 0 : 1)} MB`
 }
 
+function isUuid(value: unknown) {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  )
+}
+
+function isMissingRelation(error: any) {
+  const message = String(error?.message || error || "").toLowerCase()
+  return (
+    error?.code === "42P01" ||
+    error?.code === "PGRST205" ||
+    message.includes("does not exist") ||
+    message.includes("could not find the table")
+  )
+}
+
+async function safeSelect(query: PromiseLike<{ data: any; error: any }>, label: string) {
+  const { data, error } = await query
+  if (error) {
+    if (isMissingRelation(error)) {
+      console.warn(`[settings/hr] ${label} table missing:`, error.message)
+      return []
+    }
+    throw error
+  }
+  return data || []
+}
+
+async function safeMaybeSingle(query: PromiseLike<{ data: any; error: any }>, label: string) {
+  const { data, error } = await query
+  if (error) {
+    if (isMissingRelation(error)) {
+      console.warn(`[settings/hr] ${label} table missing:`, error.message)
+      return null
+    }
+    throw error
+  }
+  return data || null
+}
+
 export async function GET(req: NextRequest) {
   try {
     const ctx = await resolveTenantContext(req)
     if (ctx instanceof NextResponse) return ctx
     const { companyId, service } = ctx
 
-    const [
-      { data: configuration, error: configError },
-      { data: documents, error: documentsError },
-      { data: policies, error: policiesError },
-      { data: structuredGrades, error: structuredError },
-      { data: unstructured, error: unstructuredError },
-    ] = await Promise.all([
-      service.from("hr_configuration").select("*").eq("company_id", companyId).maybeSingle(),
-      service
-        .from("hr_documents")
-        .select("id, document_name, document_type, file_path, file_size, visible_to_all, created_at, content")
-        .eq("company_id", companyId)
-        .order("created_at", { ascending: false }),
-      service
-        .from("leave_policies")
-        .select("*")
-        .eq("company_id", companyId)
-        .eq("is_active", true)
-        .order("created_at", { ascending: true }),
-      service
-        .from("salary_grades")
-        .select("id, grade_name, grade_level, step_1, step_2, step_3, step_4, step_5, min_salary, max_salary, notches")
-        .eq("company_id", companyId)
-        .order("grade_level", { ascending: true }),
-      service
-        .from("unstructured_salary_grades")
-        .select(
-          "id, grade_name, description, general_increment_type, general_increment_value, performance_increment_type, performance_increment_value",
-        )
-        .eq("company_id", companyId)
-        .order("created_at", { ascending: true }),
+    const [configuration, documents, policies, structuredGrades, unstructured] = await Promise.all([
+      safeMaybeSingle(
+        service.from("hr_configuration").select("*").eq("company_id", companyId).maybeSingle(),
+        "hr_configuration",
+      ),
+      safeSelect(
+        service
+          .from("hr_documents")
+          .select("id, document_name, document_type, file_path, file_size, visible_to_all, created_at, content")
+          .eq("company_id", companyId)
+          .order("created_at", { ascending: false }),
+        "hr_documents",
+      ),
+      safeSelect(
+        service
+          .from("leave_policies")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("is_active", true)
+          .order("created_at", { ascending: true }),
+        "leave_policies",
+      ),
+      safeSelect(
+        service
+          .from("salary_grades")
+          .select("id, grade_name, grade_level, step_1, step_2, step_3, step_4, step_5, min_salary, max_salary, notches")
+          .eq("company_id", companyId)
+          .order("grade_level", { ascending: true }),
+        "salary_grades",
+      ),
+      safeSelect(
+        service
+          .from("unstructured_salary_grades")
+          .select(
+            "id, grade_name, description, general_increment_type, general_increment_value, performance_increment_type, performance_increment_value",
+          )
+          .eq("company_id", companyId)
+          .order("created_at", { ascending: true }),
+        "unstructured_salary_grades",
+      ),
     ])
-
-    if (configError) throw configError
-    if (documentsError) throw documentsError
-    if (policiesError) throw policiesError
-    if (structuredError) throw structuredError
-    if (unstructuredError) throw unstructuredError
 
     const hrConfig = configuration
       ? {
@@ -177,7 +221,7 @@ export async function POST(req: NextRequest) {
         is_active: true,
         updated_at: now,
       }
-      if (policy.id && !String(policy.id).startsWith("temp-")) {
+      if (isUuid(policy.id)) {
         const { data, error } = await service
           .from("leave_policies")
           .update(row)
@@ -190,10 +234,22 @@ export async function POST(req: NextRequest) {
       }
       const { data, error } = await service
         .from("leave_policies")
-        .upsert(row, { onConflict: "company_id,name" })
+        .insert({ ...row, created_at: now })
         .select()
         .single()
-      if (error) throw error
+      if (error) {
+        // Name collision: reactivate / update existing row
+        if (String(error.message || "").toLowerCase().includes("duplicate") || error.code === "23505") {
+          const { data: existing, error: upsertError } = await service
+            .from("leave_policies")
+            .upsert(row, { onConflict: "company_id,name" })
+            .select()
+            .single()
+          if (upsertError) throw upsertError
+          return NextResponse.json({ success: true, policy: existing })
+        }
+        throw error
+      }
       return NextResponse.json({ success: true, policy: data })
     }
 
@@ -201,7 +257,7 @@ export async function POST(req: NextRequest) {
       const id = body.id
       const name = body.name
       let query = service.from("leave_policies").update({ is_active: false, updated_at: now }).eq("company_id", companyId)
-      if (id) query = query.eq("id", id)
+      if (isUuid(id)) query = query.eq("id", id)
       else if (name) query = query.eq("name", name)
       else return NextResponse.json({ error: "id or name required" }, { status: 400 })
       const { error } = await query
@@ -223,7 +279,7 @@ export async function POST(req: NextRequest) {
         uploaded_by: userId,
         updated_at: now,
       }
-      if (doc.id && !String(doc.id).match(/^\d+$/) && !String(doc.id).startsWith("temp-")) {
+      if (isUuid(doc.id)) {
         const { data, error } = await service
           .from("hr_documents")
           .update(row)
@@ -240,6 +296,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "toggle_document_visibility") {
+      if (!isUuid(body.id)) {
+        return NextResponse.json({ error: "Valid document id required" }, { status: 400 })
+      }
       const { error } = await service
         .from("hr_documents")
         .update({ visible_to_all: !!body.visible_to_all, updated_at: now })
@@ -250,6 +309,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "delete_document") {
+      if (!isUuid(body.id)) {
+        return NextResponse.json({ error: "Valid document id required" }, { status: 400 })
+      }
       const { error } = await service.from("hr_documents").delete().eq("id", body.id).eq("company_id", companyId)
       if (error) throw error
       return NextResponse.json({ success: true })
@@ -278,7 +340,7 @@ export async function POST(req: NextRequest) {
         is_active: true,
         updated_at: now,
       }
-      if (grade.id && typeof grade.id === "string" && grade.id.includes("-")) {
+      if (isUuid(grade.id)) {
         const { data, error } = await service
           .from("salary_grades")
           .update(row)
@@ -295,6 +357,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "delete_salary_grade") {
+      if (!isUuid(body.id)) {
+        return NextResponse.json({ error: "Valid grade id required" }, { status: 400 })
+      }
       const { error } = await service.from("salary_grades").delete().eq("id", body.id).eq("company_id", companyId)
       if (error) throw error
       return NextResponse.json({ success: true })
@@ -313,7 +378,7 @@ export async function POST(req: NextRequest) {
         is_active: true,
         updated_at: now,
       }
-      if (grade.id && typeof grade.id === "string" && grade.id.includes("-")) {
+      if (isUuid(grade.id)) {
         const { data, error } = await service
           .from("unstructured_salary_grades")
           .update(row)
@@ -334,6 +399,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "delete_unstructured_grade") {
+      if (!isUuid(body.id)) {
+        return NextResponse.json({ error: "Valid grade id required" }, { status: 400 })
+      }
       const { error } = await service
         .from("unstructured_salary_grades")
         .delete()

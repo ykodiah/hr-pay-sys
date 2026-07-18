@@ -343,35 +343,7 @@ export default function SettingsPage() {
   const [documentPreviewContent, setDocumentPreviewContent] = useState("")
   const [isParsingFile, setIsParsingFile] = useState(false)
 
-  const [hrDocuments, setHrDocuments] = useState<HrDocumentItem[]>([
-    {
-      id: "1",
-      name: "Employee Handbook",
-      type: "PDF",
-      size: "1.2MB",
-      visibleToAll: true,
-      fileUrl: "/placeholder-document.pdf",
-      uploadedAt: new Date().toISOString()
-    },
-    {
-      id: "2",
-      name: "Code of Conduct",
-      type: "DOC",
-      size: "0.5MB",
-      visibleToAll: true,
-      fileUrl: "/placeholder-document.pdf",
-      uploadedAt: new Date().toISOString()
-    },
-    {
-      id: "3",
-      name: "Safety Manual",
-      type: "PDF",
-      size: "0.8MB",
-      visibleToAll: false,
-      fileUrl: "/placeholder-document.pdf",
-      uploadedAt: new Date().toISOString()
-    },
-  ])
+  const [hrDocuments, setHrDocuments] = useState<HrDocumentItem[]>([])
 
   const [documentZoom, setDocumentZoom] = useState(100)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -386,11 +358,7 @@ export default function SettingsPage() {
   const [selectedDocument, setSelectedDocument] = useState(null)
   const [uploadedFile, setUploadedFile] = useState(null)
   const [documentName, setDocumentName] = useState("")
-  const [currentPolicies, setCurrentPolicies] = useState([
-    { name: "Annual Leave", days: 21, usage: "68%", trend: "up", description: "Annual vacation leave" },
-    { name: "Sick Leave", days: 10, usage: "23%", trend: "down", description: "Medical leave for illness" },
-    { name: "Maternity Leave", days: 84, usage: "12%", trend: "stable", description: "Maternity and paternity leave" },
-  ])
+  const [currentPolicies, setCurrentPolicies] = useState<any[]>([])
 
   const [divisions, setDivisions] = useState<string[]>([])
   const [departments, setDepartments] = useState<string[]>([])
@@ -440,7 +408,7 @@ export default function SettingsPage() {
   const [isSavingSubsidiaries, setIsSavingSubsidiaries] = useState(false)
 
   const [isManagingLeaveTypes, setIsManagingLeaveTypes] = useState(false)
-  const [selectedPolicy, setSelectedPolicy] = useState<string | null>(null)
+  const [selectedPolicy, setSelectedPolicy] = useState<any>(null)
 
   useEffect(() => {
     if (selectedSubsidiary) {
@@ -881,24 +849,7 @@ export default function SettingsPage() {
   ])
 
   // Structured Salary Grades
-  const [salaryGrades, setSalaryGrades] = useState<StructuredSalaryGrade[]>([
-    {
-      id: 1,
-      name: "Grade 1",
-      description: "Entry Level",
-      minSalary: 2500,
-      maxSalary: 4000,
-      notches: [
-        { step: 1, amount: 2500 },
-        { step: 2, amount: 2750 },
-        { step: 3, amount: 3000 },
-        { step: 4, amount: 3250 },
-        { step: 5, amount: 3500 },
-        { step: 6, amount: 3750 },
-        { step: 7, amount: 4000 },
-      ],
-    },
-  ])
+  const [salaryGrades, setSalaryGrades] = useState<StructuredSalaryGrade[]>([])
   const [showSalaryGradeModal, setShowSalaryGradeModal] = useState(false)
   const [editingGrade, setEditingGrade] = useState(null)
   const [newGrade, setNewGrade] = useState({
@@ -917,15 +868,7 @@ export default function SettingsPage() {
   const [isExporting, setIsExporting] = useState(false)
 
   const [salaryGradeTab, setSalaryGradeTab] = useState("structured")
-  const [unstructuredGrades, setUnstructuredGrades] = useState<UnstructuredSalaryGrade[]>([
-    {
-      id: 1,
-      name: "Management Level",
-      description: "Senior management positions",
-      generalIncrement: { type: "percentage", value: 5 },
-      performanceIncrement: { type: "percentage", value: 10 },
-    },
-  ])
+  const [unstructuredGrades, setUnstructuredGrades] = useState<UnstructuredSalaryGrade[]>([])
   const [showUnstructuredModal, setShowUnstructuredModal] = useState(false)
   const [editingUnstructured, setEditingUnstructured] = useState(null)
   const [newUnstructured, setNewUnstructured] = useState({
@@ -1797,30 +1740,43 @@ export default function SettingsPage() {
     }
   }
 
+  const resolveHrCompanyId = async (companyId?: string) => {
+    let targetCompanyId = companyId || companyData.id
+    if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+      targetCompanyId = (await loadCompanyData()) || targetCompanyId
+    }
+    if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+      throw new Error("No company identifier available")
+    }
+    return targetCompanyId
+  }
+
   const loadHrData = async (companyId?: string) => {
-    if (isDemoMode()) {
-      return
-    }
-
-    const targetCompanyId = companyId || companyData.id
-
-    if (!targetCompanyId) {
-      console.warn("[v0] Unable to load HR data without a company id")
-      return
-    }
-
+    // Always hit the service-role API first (same pattern as Company).
+    // A stale demo-session cookie must not keep mock HR policies/docs on screen.
     try {
-      const payload = await settingsFetch(`/api/settings/hr?company_id=${encodeURIComponent(targetCompanyId)}`)
+      let targetCompanyId = companyId || companyData.id
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        targetCompanyId = (await loadCompanyData()) || targetCompanyId
+      }
+
+      const qs =
+        targetCompanyId && !String(targetCompanyId).startsWith("demo-")
+          ? `?company_id=${encodeURIComponent(targetCompanyId)}`
+          : ""
+      const payload = await settingsFetch(`/api/settings/hr${qs}`)
+      clearClientDemoSession()
+
       if (payload.hrConfig) setHrConfig(payload.hrConfig)
-      if (payload.hrDocuments) setHrDocuments(payload.hrDocuments)
-      if (payload.leavePolicies?.length) setCurrentPolicies(payload.leavePolicies)
-      if (payload.salaryGrades) setSalaryGrades(payload.salaryGrades)
-      if (payload.unstructuredGrades) setUnstructuredGrades(payload.unstructuredGrades)
+      setHrDocuments(Array.isArray(payload.hrDocuments) ? payload.hrDocuments : [])
+      setCurrentPolicies(Array.isArray(payload.leavePolicies) ? payload.leavePolicies : [])
+      setSalaryGrades(Array.isArray(payload.salaryGrades) ? payload.salaryGrades : [])
+      setUnstructuredGrades(Array.isArray(payload.unstructuredGrades) ? payload.unstructuredGrades : [])
     } catch (error) {
       console.error("[v0] Failed to load HR configuration/documents", error)
       toast({
         title: "Error",
-        description: "Unable to load HR configuration.",
+        description: error instanceof Error ? error.message : "Unable to load HR configuration.",
         variant: "destructive",
       })
     }
@@ -1887,8 +1843,8 @@ export default function SettingsPage() {
       if (items.allowances?.length) setAllowances(items.allowances)
       if (items.deductions?.length) setDeductions(items.deductions)
       if (items.taxReliefs?.length) setTaxReliefs(items.taxReliefs)
-      if (hr.salaryGrades) setSalaryGrades(hr.salaryGrades)
-      if (hr.unstructuredGrades) setUnstructuredGrades(hr.unstructuredGrades)
+      if (Array.isArray(hr.salaryGrades)) setSalaryGrades(hr.salaryGrades)
+      if (Array.isArray(hr.unstructuredGrades)) setUnstructuredGrades(hr.unstructuredGrades)
     } catch (error) {
       console.error("[v0] Failed to load payroll configuration", error)
       toast({
@@ -2594,18 +2550,17 @@ export default function SettingsPage() {
 
     setIsSavingPolicy(true)
     try {
-      if (!isDemoMode() && companyData.id) {
-        await settingsFetch("/api/settings/hr", {
-          method: "POST",
-          body: JSON.stringify({
-            action: "delete_leave_policy",
-            company_id: companyData.id,
-            id: selectedPolicy.id,
-            name: selectedPolicy.name,
-          }),
-        })
-      }
-      setCurrentPolicies((prev) => prev.filter((policy) => policy.name !== selectedPolicy.name))
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "delete_leave_policy",
+          company_id: companyId,
+          id: selectedPolicy.id,
+          name: selectedPolicy.name,
+        }),
+      })
+      await loadHrData(companyId)
       setShowPolicyModal(false)
 
       toast({
@@ -2615,7 +2570,7 @@ export default function SettingsPage() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to delete policy. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to delete policy. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -2625,30 +2580,34 @@ export default function SettingsPage() {
 
   const handleToggleDocumentVisibility = async (docId: number | string) => {
     const doc = hrDocuments.find((d) => String(d.id) === String(docId))
-    const nextVisible = !doc?.visibleToAll
+    if (!doc) return
+    const nextVisible = !doc.visibleToAll
+    const previous = doc.visibleToAll
     setHrDocuments((prev) =>
       prev.map((d) => (String(d.id) === String(docId) ? { ...d, visibleToAll: nextVisible } : d)),
     )
     try {
-      if (!isDemoMode() && companyData.id && doc && String(doc.id).includes("-")) {
-        await settingsFetch("/api/settings/hr", {
-          method: "POST",
-          body: JSON.stringify({
-            action: "toggle_document_visibility",
-            company_id: companyData.id,
-            id: doc.id,
-            visible_to_all: nextVisible,
-          }),
-        })
-      }
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "toggle_document_visibility",
+          company_id: companyId,
+          id: doc.id,
+          visible_to_all: nextVisible,
+        }),
+      })
       toast({
         title: "Visibility Updated",
-        description: `${doc?.name} is now ${nextVisible ? "visible to" : "hidden from"} all employees.`,
+        description: `${doc.name} is now ${nextVisible ? "visible to" : "hidden from"} all employees.`,
       })
     } catch (error) {
+      setHrDocuments((prev) =>
+        prev.map((d) => (String(d.id) === String(docId) ? { ...d, visibleToAll: previous } : d)),
+      )
       toast({
         title: "Error",
-        description: "Failed to update document visibility",
+        description: error instanceof Error ? error.message : "Failed to update document visibility",
         variant: "destructive",
       })
     }
@@ -2666,56 +2625,57 @@ export default function SettingsPage() {
 
     setIsSavingDocument(true)
     try {
-      const fileUrl = uploadedFile ? URL.createObjectURL(uploadedFile) : selectedDocument?.fileUrl
-      const fileType = uploadedFile
-        ? uploadedFile.type.includes("pdf")
-          ? "PDF"
-          : uploadedFile.type.includes("word")
-            ? "DOC"
-            : "FILE"
-        : selectedDocument?.type
+      const companyId = await resolveHrCompanyId()
+      let fileUrl = selectedDocument?.fileUrl || null
+      let content = selectedDocument?.content || documentPreviewContent || ""
+      let fileType = selectedDocument?.type || "FILE"
+      let fileSize = undefined as number | undefined
 
-      if (!isDemoMode() && companyData.id) {
-        const saved = await settingsFetch("/api/settings/hr", {
+      if (uploadedFile) {
+        const formData = new FormData()
+        formData.append("file", uploadedFile)
+        const uploadRes = await fetch("/api/upload/document", {
           method: "POST",
-          body: JSON.stringify({
-            action: "save_document",
-            company_id: companyData.id,
-            document: {
-              id: selectedDocument?.id,
-              name: documentName,
-              type: fileType,
-              fileUrl,
-              visibleToAll: selectedDocument?.visibleToAll,
-              file_size: uploadedFile?.size,
-            },
-          }),
+          body: formData,
+          credentials: "include",
         })
-        await loadHrData(companyData.id)
-        void saved
-      } else {
-        setHrDocuments((prev) =>
-          prev.map((doc) =>
-            doc.id === selectedDocument.id
-              ? {
-                  ...doc,
-                  name: documentName,
-                  ...(uploadedFile
-                    ? {
-                        fileUrl,
-                        type: fileType,
-                        size: `${(uploadedFile.size / (1024 * 1024)).toFixed(1)}MB`,
-                      }
-                    : {}),
-                }
-              : doc,
-          ),
-        )
+        const uploaded = await uploadRes.json().catch(() => ({}))
+        if (!uploadRes.ok) {
+          throw new Error(uploaded.error || "Document upload failed")
+        }
+        fileUrl = uploaded.url
+        if (!content || content.includes("File uploaded successfully")) {
+          content = await parseFileContent(uploadedFile)
+        }
+        fileSize = uploadedFile.size
+        const fileName = uploadedFile.name.toLowerCase()
+        if (uploadedFile.type.includes("pdf") || fileName.endsWith(".pdf")) fileType = "PDF"
+        else if (uploadedFile.type.includes("word") || fileName.endsWith(".docx")) fileType = "DOCX"
+        else if (fileName.endsWith(".doc")) fileType = "DOC"
       }
+
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_document",
+          company_id: companyId,
+          document: {
+            id: selectedDocument?.id,
+            name: documentName,
+            type: fileType,
+            fileUrl,
+            visibleToAll: selectedDocument?.visibleToAll,
+            file_size: fileSize,
+            content,
+          },
+        }),
+      })
+      await loadHrData(companyId)
 
       setShowDocumentModal(false)
       setDocumentName("")
       setUploadedFile(null)
+      setDocumentPreviewContent("")
 
       toast({
         title: "Document Updated",
@@ -2724,7 +2684,7 @@ export default function SettingsPage() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update document. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update document. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -2793,6 +2753,7 @@ export default function SettingsPage() {
 
     setIsSavingPolicy(true)
     try {
+      const companyId = await resolveHrCompanyId()
       const newPolicy = {
         name: newLeaveType.name,
         days: newLeaveType.days,
@@ -2802,19 +2763,15 @@ export default function SettingsPage() {
         carryOver: !!newLeaveType.carryOver,
       }
 
-      if (!isDemoMode() && companyData.id) {
-        const saved = await settingsFetch("/api/settings/hr", {
-          method: "POST",
-          body: JSON.stringify({
-            action: "save_leave_policy",
-            company_id: companyData.id,
-            policy: newPolicy,
-          }),
-        })
-        newPolicy.id = saved.policy?.id
-      }
-
-      setCurrentPolicies((prev) => [...prev, newPolicy])
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_leave_policy",
+          company_id: companyId,
+          policy: newPolicy,
+        }),
+      })
+      await loadHrData(companyId)
       setNewLeaveType({ name: "", days: 0, description: "", carryOver: false })
       setShowAddLeaveTypeModal(false)
 
@@ -2825,7 +2782,7 @@ export default function SettingsPage() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to add leave type. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to add leave type. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -2835,6 +2792,7 @@ export default function SettingsPage() {
 
   const handlePolicyAction = (action, policyName) => {
     const policy = currentPolicies.find((p) => p.name === policyName)
+    if (!policy) return
 
     setSelectedPolicy(policy)
     setPolicyModalType(action)
@@ -2843,7 +2801,7 @@ export default function SettingsPage() {
       setEditingPolicy({
         name: policy.name,
         days: policy.days,
-        description: policy.description,
+        description: policy.description || "",
       })
     }
 
@@ -2853,6 +2811,7 @@ export default function SettingsPage() {
   const handleSavePolicyChanges = async () => {
     setIsSavingPolicy(true)
     try {
+      const companyId = await resolveHrCompanyId()
       const updated = {
         id: selectedPolicy.id,
         name: editingPolicy.name,
@@ -2860,26 +2819,18 @@ export default function SettingsPage() {
         description: editingPolicy.description,
         usage: selectedPolicy.usage,
         trend: selectedPolicy.trend,
+        carryOver: !!selectedPolicy.carryOver,
       }
 
-      if (!isDemoMode() && companyData.id) {
-        await settingsFetch("/api/settings/hr", {
-          method: "POST",
-          body: JSON.stringify({
-            action: "save_leave_policy",
-            company_id: companyData.id,
-            policy: updated,
-          }),
-        })
-      }
-
-      setCurrentPolicies((prev) =>
-        prev.map((policy) =>
-          policy.name === selectedPolicy.name
-            ? { ...policy, name: editingPolicy.name, days: editingPolicy.days, description: editingPolicy.description }
-            : policy,
-        ),
-      )
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_leave_policy",
+          company_id: companyId,
+          policy: updated,
+        }),
+      })
+      await loadHrData(companyId)
 
       setShowPolicyModal(false)
       toast({
@@ -2889,7 +2840,7 @@ export default function SettingsPage() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update policy. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update policy. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -3368,6 +3319,16 @@ This document contains important information about ${document.name.toLowerCase()
     if (docId) {
       const doc = hrDocuments.find((d) => d.id === docId)
       setSelectedDocument(doc)
+      if (action === "edit" && doc) {
+        setDocumentName(doc.name || "")
+        setUploadedFile(null)
+        setDocumentPreviewContent(doc.content || "")
+      }
+    } else if (action === "add") {
+      setSelectedDocument(null)
+      setDocumentName("")
+      setUploadedFile(null)
+      setDocumentPreviewContent("")
     }
     setDocumentModalType(action)
     setShowDocumentModal(true)
@@ -3561,24 +3522,26 @@ This document contains important information about ${document.name.toLowerCase()
 
     setIsSavingDocument(true)
     try {
+      const companyId = await resolveHrCompanyId()
+
       // Parse file content if not already parsed
       let content = documentPreviewContent
       if (!content || content.includes("File uploaded successfully")) {
         content = await parseFileContent(uploadedFile)
       }
 
-      let fileUrl = URL.createObjectURL(uploadedFile)
-      try {
-        const formData = new FormData()
-        formData.append("file", uploadedFile)
-        const uploadRes = await fetch("/api/upload", { method: "POST", body: formData, credentials: "include" })
-        if (uploadRes.ok) {
-          const uploaded = await uploadRes.json()
-          if (uploaded.url) fileUrl = uploaded.url
-        }
-      } catch {
-        // keep object URL fallback
+      const formData = new FormData()
+      formData.append("file", uploadedFile)
+      const uploadRes = await fetch("/api/upload/document", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      })
+      const uploaded = await uploadRes.json().catch(() => ({}))
+      if (!uploadRes.ok || !uploaded.url) {
+        throw new Error(uploaded.error || "Document upload failed")
       }
+      const fileUrl = uploaded.url
 
       let fileType = "FILE"
       const fileName = uploadedFile.name.toLowerCase()
@@ -3586,38 +3549,22 @@ This document contains important information about ${document.name.toLowerCase()
       else if (uploadedFile.type.includes("word") || fileName.endsWith(".docx")) fileType = "DOCX"
       else if (fileName.endsWith(".doc")) fileType = "DOC"
 
-      const newDoc = {
-        id: String(Date.now()),
-        name: documentName,
-        type: fileType,
-        size: `${(uploadedFile.size / (1024 * 1024)).toFixed(1)}MB`,
-        visibleToAll: false,
-        fileUrl,
-        uploadedAt: new Date().toISOString(),
-        content,
-      }
-
-      if (!isDemoMode() && companyData.id) {
-        const saved = await settingsFetch("/api/settings/hr", {
-          method: "POST",
-          body: JSON.stringify({
-            action: "save_document",
-            company_id: companyData.id,
-            document: {
-              name: documentName,
-              type: fileType,
-              fileUrl,
-              visibleToAll: false,
-              file_size: uploadedFile.size,
-              content,
-            },
-          }),
-        })
-        if (saved.document?.id) newDoc.id = String(saved.document.id)
-        await loadHrData(companyData.id)
-      } else {
-        setHrDocuments((prev) => [...prev, newDoc])
-      }
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_document",
+          company_id: companyId,
+          document: {
+            name: documentName,
+            type: fileType,
+            fileUrl,
+            visibleToAll: false,
+            file_size: uploadedFile.size,
+            content,
+          },
+        }),
+      })
+      await loadHrData(companyId)
 
       setShowDocumentModal(false)
       setDocumentName("")
@@ -3632,7 +3579,7 @@ This document contains important information about ${document.name.toLowerCase()
       console.error("Error saving document:", error)
       toast({
         title: "Error",
-        description: "Failed to upload document. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to upload document. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -3641,14 +3588,14 @@ This document contains important information about ${document.name.toLowerCase()
   }
 
   const handleDeleteDocument = async (docId) => {
+    setIsSavingDocument(true)
     try {
-      if (!isDemoMode() && companyData.id && String(docId).includes("-")) {
-        await settingsFetch("/api/settings/hr", {
-          method: "POST",
-          body: JSON.stringify({ action: "delete_document", company_id: companyData.id, id: docId }),
-        })
-      }
-      setHrDocuments((prev) => prev.filter((doc) => String(doc.id) !== String(docId)))
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({ action: "delete_document", company_id: companyId, id: docId }),
+      })
+      await loadHrData(companyId)
       setShowDocumentModal(false)
       toast({
         title: "Document Deleted",
@@ -3657,7 +3604,7 @@ This document contains important information about ${document.name.toLowerCase()
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to delete document. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to delete document. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -3707,23 +3654,16 @@ This document contains important information about ${document.name.toLowerCase()
   const handleSaveHRConfig = async () => {
     setIsSaving(true)
     try {
-      if (isDemoMode()) {
-        toast({
-          title: "HR Configuration Saved",
-          description: "HR settings updated successfully (Demo Mode)",
-        })
-      } else {
-        const companyId = companyData.id || (await loadCompanyData())
-        if (!companyId) throw new Error("No company identifier available")
-        await settingsFetch("/api/settings/hr", {
-          method: "POST",
-          body: JSON.stringify({ action: "save_config", company_id: companyId, config: hrConfig }),
-        })
-        toast({
-          title: "HR Configuration Saved",
-          description: "HR settings updated successfully",
-        })
-      }
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({ action: "save_config", company_id: companyId, config: hrConfig }),
+      })
+      await loadHrData(companyId)
+      toast({
+        title: "HR Configuration Saved",
+        description: "HR settings updated successfully",
+      })
     } catch (error) {
       toast({
         title: "Error",
@@ -5067,7 +5007,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     }
 
     const gradeToAdd = {
-      id: editingGrade ? editingGrade.id : Date.now(),
+      id: editingGrade ? editingGrade.id : undefined,
       name: newGrade.name,
       description: newGrade.description,
       minSalary: Number.parseFloat(newGrade.minSalary),
@@ -5076,22 +5016,16 @@ Format the response in a professional, actionable manner for HR decision-makers.
     }
 
     try {
-      if (!isDemoMode() && companyData.id) {
-        const saved = await settingsFetch("/api/settings/hr", {
-          method: "POST",
-          body: JSON.stringify({
-            action: "save_salary_grade",
-            company_id: companyData.id,
-            grade: gradeToAdd,
-          }),
-        })
-        if (saved.grade?.id) gradeToAdd.id = saved.grade.id
-        await loadHrData(companyData.id)
-      } else if (editingGrade) {
-        setSalaryGrades((prev) => prev.map((grade) => (grade.id === editingGrade.id ? gradeToAdd : grade)))
-      } else {
-        setSalaryGrades((prev) => [...prev, gradeToAdd])
-      }
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_salary_grade",
+          company_id: companyId,
+          grade: gradeToAdd,
+        }),
+      })
+      await loadHrData(companyId)
 
       toast({
         title: editingGrade ? "Grade Updated" : "Grade Added",
@@ -5120,13 +5054,12 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
   const handleDeleteSalaryGrade = async (gradeId) => {
     try {
-      if (!isDemoMode() && companyData.id && String(gradeId).includes("-")) {
-        await settingsFetch("/api/settings/hr", {
-          method: "POST",
-          body: JSON.stringify({ action: "delete_salary_grade", company_id: companyData.id, id: gradeId }),
-        })
-      }
-      setSalaryGrades((prev) => prev.filter((grade) => grade.id !== gradeId))
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({ action: "delete_salary_grade", company_id: companyId, id: gradeId }),
+      })
+      await loadHrData(companyId)
       toast({
         title: "Grade Deleted",
         description: "Salary grade has been deleted successfully.",
@@ -5245,7 +5178,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     }
 
     const gradeToAdd = {
-      id: editingUnstructured ? editingUnstructured.id : Date.now(),
+      id: editingUnstructured ? editingUnstructured.id : undefined,
       name: newUnstructured.name,
       description: newUnstructured.description,
       generalIncrement: newUnstructured.generalIncrement,
@@ -5253,22 +5186,16 @@ Format the response in a professional, actionable manner for HR decision-makers.
     }
 
     try {
-      if (!isDemoMode() && companyData.id) {
-        const saved = await settingsFetch("/api/settings/hr", {
-          method: "POST",
-          body: JSON.stringify({
-            action: "save_unstructured_grade",
-            company_id: companyData.id,
-            grade: gradeToAdd,
-          }),
-        })
-        if (saved.grade?.id) gradeToAdd.id = saved.grade.id
-        await loadHrData(companyData.id)
-      } else if (editingUnstructured) {
-        setUnstructuredGrades((prev) => prev.map((grade) => (grade.id === editingUnstructured.id ? gradeToAdd : grade)))
-      } else {
-        setUnstructuredGrades((prev) => [...prev, gradeToAdd])
-      }
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_unstructured_grade",
+          company_id: companyId,
+          grade: gradeToAdd,
+        }),
+      })
+      await loadHrData(companyId)
 
       toast({
         title: editingUnstructured ? "Grade Updated" : "Grade Added",
@@ -5295,17 +5222,16 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
   const handleDeleteUnstructuredGrade = async (gradeId) => {
     try {
-      if (!isDemoMode() && companyData.id && String(gradeId).includes("-")) {
-        await settingsFetch("/api/settings/hr", {
-          method: "POST",
-          body: JSON.stringify({
-            action: "delete_unstructured_grade",
-            company_id: companyData.id,
-            id: gradeId,
-          }),
-        })
-      }
-      setUnstructuredGrades((prev) => prev.filter((grade) => grade.id !== gradeId))
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "delete_unstructured_grade",
+          company_id: companyId,
+          id: gradeId,
+        }),
+      })
+      await loadHrData(companyId)
       toast({
         title: "Grade Deleted",
         description: "Unstructured salary grade has been deleted successfully.",
@@ -6342,9 +6268,12 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 <CardDescription>Manage leave policies and generate AI insights</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {currentPolicies.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No leave policies yet. Add a leave type to get started.</p>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {currentPolicies.map((policy) => (
-                    <Card key={policy.name} className="border-l-4 border-l-blue-500">
+                    <Card key={policy.id || policy.name} className="border-l-4 border-l-blue-500">
                       <CardHeader>
                         <CardTitle className="text-lg font-semibold">{policy.name}</CardTitle>
                         <CardDescription>{policy.description}</CardDescription>
@@ -6427,6 +6356,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 <CardDescription>Manage HR documents and visibility settings</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {hrDocuments.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No HR documents yet. Upload a PDF or Word file to get started.</p>
+                )}
                 <div className="space-y-3">
                   {hrDocuments.map((doc) => (
                     <Card key={doc.id} className="border-l-4 border-l-green-500">
@@ -6475,11 +6407,26 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <TrendingUp className="w-5 h-5" />
-                  <span>Salary Grades & Notches</span>
-                </CardTitle>
-                <CardDescription>Manage salary grades and compensation structure for employees</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center space-x-2">
+                      <TrendingUp className="w-5 h-5" />
+                      <span>Salary Grades & Notches</span>
+                    </CardTitle>
+                    <CardDescription>Manage salary grades and compensation structure for employees</CardDescription>
+                  </div>
+                  {salaryGradeTab === "structured" ? (
+                    <Button variant="outline" onClick={handleAddSalaryGrade}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Grade
+                    </Button>
+                  ) : (
+                    <Button variant="outline" onClick={handleAddUnstructuredGrade}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Grade
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Tab Navigation */}
@@ -6508,100 +6455,110 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
                 {/* Structured Salary Grades */}
                 {salaryGradeTab === "structured" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {salaryGrades.map((grade) => (
-                      <Card key={grade.id} className="border-l-4 border-l-purple-500">
-                        <CardHeader>
-                          <CardTitle className="text-lg font-semibold">{grade.name}</CardTitle>
-                          <CardDescription>{grade.description}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="space-y-2">
-                            <p className="text-sm">
-                              <span className="font-medium">Range:</span> ₵{grade.minSalary.toLocaleString()} - ₵
-                              {grade.maxSalary.toLocaleString()}
-                            </p>
-                            <p className="text-sm">
-                              <span className="font-medium">Notches:</span> {grade.notches.length} steps
-                            </p>
-                          </div>
-
-                          <div className="border-t pt-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-medium text-muted-foreground">Salary Steps</span>
+                  <>
+                    {salaryGrades.length === 0 && (
+                      <p className="text-sm text-muted-foreground">No structured grades yet. Click Add Grade to create one.</p>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {salaryGrades.map((grade) => (
+                        <Card key={grade.id} className="border-l-4 border-l-purple-500">
+                          <CardHeader>
+                            <CardTitle className="text-lg font-semibold">{grade.name}</CardTitle>
+                            <CardDescription>{grade.description}</CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                              <p className="text-sm">
+                                <span className="font-medium">Range:</span> ₵{Number(grade.minSalary || 0).toLocaleString()} - ₵
+                                {Number(grade.maxSalary || 0).toLocaleString()}
+                              </p>
+                              <p className="text-sm">
+                                <span className="font-medium">Notches:</span> {(grade.notches || []).length} steps
+                              </p>
                             </div>
-                            <div className="bg-gray-50 border border-gray-200 rounded-md p-3 max-h-32 overflow-y-auto">
-                              <div className="space-y-1">
-                                {grade.notches.map((notch) => (
-                                  <div key={notch.step} className="flex justify-between text-xs">
-                                    <span>Step {notch.step}</span>
-                                    <span className="font-medium">₵{notch.amount.toLocaleString()}</span>
-                                  </div>
-                                ))}
+
+                            <div className="border-t pt-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-muted-foreground">Salary Steps</span>
+                              </div>
+                              <div className="bg-gray-50 border border-gray-200 rounded-md p-3 max-h-32 overflow-y-auto">
+                                <div className="space-y-1">
+                                  {(grade.notches || []).map((notch) => (
+                                    <div key={notch.step} className="flex justify-between text-xs">
+                                      <span>Step {notch.step}</span>
+                                      <span className="font-medium">₵{Number(notch.amount || 0).toLocaleString()}</span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div className="flex justify-end space-x-2 pt-2">
-                            <Button variant="outline" size="sm" onClick={() => handleEditSalaryGrade(grade)}>
-                              Edit
-                            </Button>
-                            <Button variant="destructive" size="sm" onClick={() => handleDeleteSalaryGrade(grade.id)}>
-                              Delete
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+                            <div className="flex justify-end space-x-2 pt-2">
+                              <Button variant="outline" size="sm" onClick={() => handleEditSalaryGrade(grade)}>
+                                Edit
+                              </Button>
+                              <Button variant="destructive" size="sm" onClick={() => handleDeleteSalaryGrade(grade.id)}>
+                                Delete
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </>
                 )}
 
                 {/* Unstructured Salary Grades */}
                 {salaryGradeTab === "unstructured" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {unstructuredGrades.map((grade) => (
-                      <Card key={grade.id} className="border-l-4 border-l-blue-500">
-                        <CardHeader>
-                          <CardTitle className="text-lg font-semibold">{grade.name}</CardTitle>
-                          <CardDescription>{grade.description}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="space-y-3">
-                            <div className="bg-green-50 border border-green-200 rounded-md p-3">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium text-green-800">General Increment</span>
-                                <span className="text-sm font-semibold text-green-900">
-                                  {grade.generalIncrement.type === "percentage"
-                                    ? `${grade.generalIncrement.value}%`
-                                    : `₵${grade.generalIncrement.value.toLocaleString()}`}
-                                </span>
+                  <>
+                    {unstructuredGrades.length === 0 && (
+                      <p className="text-sm text-muted-foreground">No unstructured grades yet. Click Add Grade to create one.</p>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {unstructuredGrades.map((grade) => (
+                        <Card key={grade.id} className="border-l-4 border-l-blue-500">
+                          <CardHeader>
+                            <CardTitle className="text-lg font-semibold">{grade.name}</CardTitle>
+                            <CardDescription>{grade.description}</CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="space-y-3">
+                              <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium text-green-800">General Increment</span>
+                                  <span className="text-sm font-semibold text-green-900">
+                                    {grade.generalIncrement.type === "percentage"
+                                      ? `${grade.generalIncrement.value}%`
+                                      : `₵${Number(grade.generalIncrement.value || 0).toLocaleString()}`}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium text-blue-800">Performance Increment</span>
+                                  <span className="text-sm font-semibold text-blue-900">
+                                    {grade.performanceIncrement.type === "percentage"
+                                      ? `${grade.performanceIncrement.value}%`
+                                      : `₵${Number(grade.performanceIncrement.value || 0).toLocaleString()}`}
+                                  </span>
+                                </div>
                               </div>
                             </div>
 
-                            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium text-blue-800">Performance Increment</span>
-                                <span className="text-sm font-semibold text-blue-900">
-                                  {grade.performanceIncrement.type === "percentage"
-                                    ? `${grade.performanceIncrement.value}%`
-                                    : `₵${grade.performanceIncrement.value.toLocaleString()}`}
-                                </span>
-                              </div>
+                            <div className="flex justify-end space-x-2 pt-2">
+                              <Button variant="outline" size="sm" onClick={() => handleEditUnstructuredGrade(grade)}>
+                                Edit
+                              </Button>
+                              <Button variant="destructive" size="sm" onClick={() => handleDeleteUnstructuredGrade(grade.id)}>
+                                Delete
+                              </Button>
                             </div>
-                          </div>
-
-                          <div className="flex justify-end space-x-2 pt-2">
-                            <Button variant="outline" size="sm" onClick={() => handleEditUnstructuredGrade(grade)}>
-                              Edit
-                            </Button>
-                            <Button variant="destructive" size="sm" onClick={() => handleDeleteUnstructuredGrade(grade.id)}>
-                              Delete
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -9774,6 +9731,415 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 </div>
               </CardContent>
             </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Add Leave Type Modal */}
+      {showAddLeaveTypeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Add Leave Type</h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowAddLeaveTypeModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="leaveTypeName">Name</Label>
+                <Input
+                  id="leaveTypeName"
+                  value={newLeaveType.name}
+                  onChange={(e) => setNewLeaveType({ ...newLeaveType, name: e.target.value })}
+                  placeholder="e.g., Annual Leave"
+                />
+              </div>
+              <div>
+                <Label htmlFor="leaveTypeDays">Days</Label>
+                <Input
+                  id="leaveTypeDays"
+                  type="number"
+                  min="1"
+                  value={newLeaveType.days || ""}
+                  onChange={(e) => setNewLeaveType({ ...newLeaveType, days: Number.parseInt(e.target.value) || 0 })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="leaveTypeDescription">Description</Label>
+                <Textarea
+                  id="leaveTypeDescription"
+                  value={newLeaveType.description}
+                  onChange={(e) => setNewLeaveType({ ...newLeaveType, description: e.target.value })}
+                  placeholder="Brief policy description"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Allow carry over</Label>
+                  <p className="text-sm text-muted-foreground">Unused days can roll into the next leave year</p>
+                </div>
+                <Switch
+                  checked={!!newLeaveType.carryOver}
+                  onCheckedChange={(checked) => setNewLeaveType({ ...newLeaveType, carryOver: checked })}
+                />
+              </div>
+              <div className="flex justify-end space-x-3 pt-2">
+                <Button variant="outline" onClick={() => setShowAddLeaveTypeModal(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleAddLeaveType}
+                  disabled={isSavingPolicy}
+                  className="bg-black text-white hover:bg-gray-800"
+                >
+                  {isSavingPolicy ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Leave Type"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Leave Policy View / Edit / Delete Modal */}
+      {showPolicyModal && selectedPolicy && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">
+                {policyModalType === "view" && `View Policy: ${selectedPolicy.name}`}
+                {policyModalType === "edit" && "Edit Leave Policy"}
+                {policyModalType === "delete" && "Delete Leave Policy"}
+              </h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowPolicyModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {policyModalType === "view" && (
+              <div className="space-y-3">
+                <p className="text-sm">
+                  <span className="font-medium">Name:</span> {selectedPolicy.name}
+                </p>
+                <p className="text-sm">
+                  <span className="font-medium">Days:</span> {selectedPolicy.days}
+                </p>
+                <p className="text-sm">
+                  <span className="font-medium">Usage:</span> {selectedPolicy.usage || "0%"}
+                </p>
+                <p className="text-sm">
+                  <span className="font-medium">Carry over:</span> {selectedPolicy.carryOver ? "Yes" : "No"}
+                </p>
+                <p className="text-sm">
+                  <span className="font-medium">Description:</span> {selectedPolicy.description || "—"}
+                </p>
+                <div className="flex justify-end pt-2">
+                  <Button variant="outline" onClick={() => setShowPolicyModal(false)}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {policyModalType === "edit" && (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="editPolicyName">Name</Label>
+                  <Input
+                    id="editPolicyName"
+                    value={editingPolicy.name}
+                    onChange={(e) => setEditingPolicy({ ...editingPolicy, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editPolicyDays">Days</Label>
+                  <Input
+                    id="editPolicyDays"
+                    type="number"
+                    min="0"
+                    value={editingPolicy.days}
+                    onChange={(e) =>
+                      setEditingPolicy({ ...editingPolicy, days: Number.parseInt(e.target.value) || 0 })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editPolicyDescription">Description</Label>
+                  <Textarea
+                    id="editPolicyDescription"
+                    value={editingPolicy.description}
+                    onChange={(e) => setEditingPolicy({ ...editingPolicy, description: e.target.value })}
+                  />
+                </div>
+                <div className="flex justify-end space-x-3 pt-2">
+                  <Button variant="outline" onClick={() => setShowPolicyModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSavePolicyChanges}
+                    disabled={isSavingPolicy}
+                    className="bg-black text-white hover:bg-gray-800"
+                  >
+                    {isSavingPolicy ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save Changes"
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {policyModalType === "delete" && (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Are you sure you want to delete <span className="font-medium text-foreground">{selectedPolicy.name}</span>?
+                  This will deactivate the leave policy for the tenant.
+                </p>
+                <div className="flex justify-end space-x-3">
+                  <Button variant="outline" onClick={() => setShowPolicyModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button variant="destructive" onClick={handleDeletePolicy} disabled={isSavingPolicy}>
+                    {isSavingPolicy ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      "Delete Policy"
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Structured Salary Grade Modal */}
+      {showSalaryGradeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">{editingGrade ? "Edit Salary Grade" : "Add Salary Grade"}</h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowSalaryGradeModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="gradeName">Grade Name</Label>
+                <Input
+                  id="gradeName"
+                  value={newGrade.name}
+                  onChange={(e) => setNewGrade({ ...newGrade, name: e.target.value })}
+                  placeholder="e.g., Grade 1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="gradeDescription">Description</Label>
+                <Input
+                  id="gradeDescription"
+                  value={newGrade.description}
+                  onChange={(e) => setNewGrade({ ...newGrade, description: e.target.value })}
+                  placeholder="e.g., Entry Level"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="minSalary">Min Salary</Label>
+                  <Input
+                    id="minSalary"
+                    type="number"
+                    value={newGrade.minSalary}
+                    onChange={(e) => setNewGrade({ ...newGrade, minSalary: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="maxSalary">Max Salary</Label>
+                  <Input
+                    id="maxSalary"
+                    type="number"
+                    value={newGrade.maxSalary}
+                    onChange={(e) => setNewGrade({ ...newGrade, maxSalary: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="numberOfNotches">Number of Notches</Label>
+                <Input
+                  id="numberOfNotches"
+                  type="number"
+                  min="2"
+                  max="20"
+                  value={newGrade.numberOfNotches}
+                  onChange={(e) =>
+                    setNewGrade({ ...newGrade, numberOfNotches: Number.parseInt(e.target.value) || 5 })
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Button variant="outline" onClick={handleGenerateNotches} disabled={isGeneratingNotches}>
+                  {isGeneratingNotches ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    "Generate Notches"
+                  )}
+                </Button>
+                <span className="text-xs text-muted-foreground">{(newGrade.notches || []).length} notches ready</span>
+              </div>
+              {(newGrade.notches || []).length > 0 && (
+                <div className="bg-gray-50 border rounded-md p-3 max-h-40 overflow-y-auto space-y-1">
+                  {newGrade.notches.map((notch) => (
+                    <div key={notch.step} className="flex justify-between text-xs">
+                      <span>Step {notch.step}</span>
+                      <span className="font-medium">₵{Number(notch.amount || 0).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex justify-end space-x-3 pt-2">
+                <Button variant="outline" onClick={() => setShowSalaryGradeModal(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveSalaryGrade} className="bg-black text-white hover:bg-gray-800">
+                  {editingGrade ? "Update Grade" : "Save Grade"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Unstructured Salary Grade Modal */}
+      {showUnstructuredModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">
+                {editingUnstructured ? "Edit Unstructured Grade" : "Add Unstructured Grade"}
+              </h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowUnstructuredModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="unstructuredName">Grade Name</Label>
+                <Input
+                  id="unstructuredName"
+                  value={newUnstructured.name}
+                  onChange={(e) => setNewUnstructured({ ...newUnstructured, name: e.target.value })}
+                  placeholder="e.g., Management Level"
+                />
+              </div>
+              <div>
+                <Label htmlFor="unstructuredDescription">Description</Label>
+                <Textarea
+                  id="unstructuredDescription"
+                  value={newUnstructured.description}
+                  onChange={(e) => setNewUnstructured({ ...newUnstructured, description: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>General Increment Type</Label>
+                  <Select
+                    value={newUnstructured.generalIncrement.type}
+                    onValueChange={(value) =>
+                      setNewUnstructured({
+                        ...newUnstructured,
+                        generalIncrement: { ...newUnstructured.generalIncrement, type: value },
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="percentage">Percentage</SelectItem>
+                      <SelectItem value="fixed">Fixed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>General Increment Value</Label>
+                  <Input
+                    type="number"
+                    value={newUnstructured.generalIncrement.value}
+                    onChange={(e) =>
+                      setNewUnstructured({
+                        ...newUnstructured,
+                        generalIncrement: {
+                          ...newUnstructured.generalIncrement,
+                          value: Number.parseFloat(e.target.value) || 0,
+                        },
+                      })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Performance Increment Type</Label>
+                  <Select
+                    value={newUnstructured.performanceIncrement.type}
+                    onValueChange={(value) =>
+                      setNewUnstructured({
+                        ...newUnstructured,
+                        performanceIncrement: { ...newUnstructured.performanceIncrement, type: value },
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="percentage">Percentage</SelectItem>
+                      <SelectItem value="fixed">Fixed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Performance Increment Value</Label>
+                  <Input
+                    type="number"
+                    value={newUnstructured.performanceIncrement.value}
+                    onChange={(e) =>
+                      setNewUnstructured({
+                        ...newUnstructured,
+                        performanceIncrement: {
+                          ...newUnstructured.performanceIncrement,
+                          value: Number.parseFloat(e.target.value) || 0,
+                        },
+                      })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3 pt-2">
+                <Button variant="outline" onClick={() => setShowUnstructuredModal(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveUnstructuredGrade} className="bg-black text-white hover:bg-gray-800">
+                  {editingUnstructured ? "Update Grade" : "Save Grade"}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}
