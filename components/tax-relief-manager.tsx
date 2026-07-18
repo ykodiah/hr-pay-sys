@@ -76,12 +76,14 @@ export default function TaxReliefManager({
     }
   }, [reliefs, onReliefsChange]);
 
-  const filteredReliefs = reliefs.filter(relief => {
-    const matchesSearch = relief.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         relief.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         relief.graCode.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = filterCategory === 'all' || relief.category === filterCategory;
-    return matchesSearch && matchesCategory;
+  const filteredReliefs = (reliefs || []).filter((relief) => {
+    const term = searchTerm.toLowerCase()
+    const matchesSearch =
+      String(relief?.name ?? "").toLowerCase().includes(term) ||
+      String(relief?.description ?? "").toLowerCase().includes(term) ||
+      String(relief?.graCode ?? "").toLowerCase().includes(term)
+    const matchesCategory = filterCategory === "all" || relief?.category === filterCategory
+    return matchesSearch && matchesCategory
   });
 
   const handleSyncFromGRA = async () => {
@@ -457,23 +459,23 @@ export default function TaxReliefManager({
                         <div className="space-y-2">
                           {editingRelief === index ? (
                             <Input
-                              value={relief.name}
+                              value={relief.name ?? ""}
                               onChange={(e) => handleReliefFieldChange(index, 'name', e.target.value)}
                               placeholder="Relief name"
                               className="font-medium"
                             />
                           ) : (
-                            <h3 className="font-medium text-lg">{relief.name}</h3>
+                            <h3 className="font-medium text-lg">{relief.name || "Untitled relief"}</h3>
                           )}
                           {editingRelief === index ? (
                             <Textarea
-                              value={relief.description}
+                              value={relief.description ?? ""}
                               onChange={(e) => handleReliefFieldChange(index, 'description', e.target.value)}
                               placeholder="Description"
                               rows={2}
                             />
                           ) : (
-                            <p className="text-sm text-gray-600">{relief.description}</p>
+                            <p className="text-sm text-gray-600">{relief.description || ""}</p>
                           )}
                         </div>
                       </div>
@@ -497,7 +499,7 @@ export default function TaxReliefManager({
                           </div>
                           {editingRelief === index ? (
                             <Select
-                              value={relief.category}
+                              value={categories.includes(relief.category) ? relief.category : "Personal"}
                               onValueChange={(value) => handleReliefFieldChange(index, 'category', value)}
                             >
                               <SelectTrigger>
@@ -520,14 +522,14 @@ export default function TaxReliefManager({
                         <div className="space-y-2">
                           {editingRelief === index ? (
                             <Input
-                              value={relief.graCode}
+                              value={relief.graCode ?? ""}
                               onChange={(e) => handleReliefFieldChange(index, 'graCode', e.target.value)}
                               placeholder="GRA Code"
                             />
                           ) : (
                             <div className="flex items-center space-x-2">
                               <span className="text-sm text-gray-500">GRA Code:</span>
-                              <code className="text-sm bg-gray-100 px-2 py-1 rounded">{relief.graCode}</code>
+                              <code className="text-sm bg-gray-100 px-2 py-1 rounded">{relief.graCode || "—"}</code>
                             </div>
                           )}
                           <div className="flex items-center space-x-2">

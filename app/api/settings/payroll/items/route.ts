@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
       })),
       taxReliefs: (reliefRows || []).map((r) => ({
         id: r.id,
-        name: r.name,
+        name: r.name || r.description || r.gra_code || r.code || "Untitled relief",
         description: r.description || "",
         amount: Number(r.amount || 0),
         currency: r.currency || "GHS",

@@ -1797,10 +1797,19 @@ export default function SettingsPage() {
         const { config } = await configRes.json()
         if (config) {
           clearClientDemoSession()
-          if (config.pay_frequency) setPayFrequency(config.pay_frequency)
+          if (config.pay_frequency) {
+            const freq = String(config.pay_frequency).toLowerCase()
+            setPayFrequency(
+              ["weekly", "biweekly", "monthly"].includes(freq) ? freq : "monthly",
+            )
+          }
           if (config.currency) {
-            setCurrencyPref(config.currency)
-            setSelectedCurrency(config.currency)
+            const currency = String(config.currency).toLowerCase()
+            const normalized = ["ghs", "usd", "eur", "ngn"].includes(currency)
+              ? currency
+              : "ghs"
+            setCurrencyPref(normalized)
+            setSelectedCurrency(normalized)
           }
           if (typeof config.minimum_wage === "number") setMinimumWage(config.minimum_wage)
           if (typeof config.overtime_weekday_multiplier === "number") setOvertimeWeekdayRate(config.overtime_weekday_multiplier)
@@ -1861,9 +1870,52 @@ export default function SettingsPage() {
         `/api/settings/payroll/items?company_id=${encodeURIComponent(targetCompanyId)}`,
       )
       clearClientDemoSession()
-      setAllowances(Array.isArray(items.allowances) ? items.allowances : [])
-      setDeductions(Array.isArray(items.deductions) ? items.deductions : [])
-      setTaxReliefs(Array.isArray(items.taxReliefs) ? items.taxReliefs : [])
+      const normalizeItemType = (type: unknown) => {
+        const t = String(type || "FIXED").toUpperCase()
+        return t === "VARIABLE" || t === "PERCENTAGE" ? "VARIABLE" : "FIXED"
+      }
+      setAllowances(
+        Array.isArray(items.allowances)
+          ? items.allowances.map((a: any) => ({
+              ...a,
+              code: a?.code || "",
+              description: a?.description || "",
+              type: normalizeItemType(a?.type),
+              amount: Number(a?.amount || 0),
+              percentage: Number(a?.percentage || 0),
+              taxable: Boolean(a?.taxable),
+              recurring: a?.recurring !== false,
+            }))
+          : [],
+      )
+      setDeductions(
+        Array.isArray(items.deductions)
+          ? items.deductions.map((d: any) => ({
+              ...d,
+              code: d?.code || "",
+              description: d?.description || "",
+              type: normalizeItemType(d?.type),
+              amount: Number(d?.amount || 0),
+              percentage: Number(d?.percentage || 0),
+              taxable: Boolean(d?.taxable),
+              recurring: d?.recurring !== false,
+            }))
+          : [],
+      )
+      setTaxReliefs(
+        Array.isArray(items.taxReliefs)
+          ? items.taxReliefs.map((r: any) => ({
+              ...r,
+              name: r?.name || r?.description || r?.graCode || "Untitled relief",
+              description: r?.description || "",
+              graCode: r?.graCode || "",
+              category: r?.category || "Personal",
+              currency: r?.currency || "GHS",
+              amount: Number(r?.amount || 0),
+              isActive: r?.isActive !== false,
+            }))
+          : [],
+      )
     } catch (error) {
       console.error("[v0] Failed to load payroll configuration", error)
       toast({
@@ -5396,6 +5448,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
         onValueChange={(value) => {
           setActiveSettingsTab(value)
           if (value === "subsidiaries") void loadSubsidiaries()
+          if (value === "payroll") void loadPayrollData()
           if (value === "notifications") void loadNotificationSettings()
           if (value === "roles") void loadRoles()
           if (value === "access") void loadAccessAndSecurityData()
@@ -6611,7 +6664,10 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   <div>
                     <Label htmlFor="payFrequency">Pay Frequency</Label>
-                    <Select value={payFrequency} onValueChange={setPayFrequency}>
+                    <Select
+                      value={["weekly", "biweekly", "monthly"].includes(payFrequency) ? payFrequency : "monthly"}
+                      onValueChange={setPayFrequency}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -6625,7 +6681,10 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
                   <div>
                     <Label htmlFor="currency">Currency</Label>
-                    <Select value={selectedCurrency} onValueChange={(v) => { handleCurrencyChange(v); setCurrencyPref(v) }}>
+                    <Select
+                      value={["ghs", "usd", "eur", "ngn"].includes(selectedCurrency) ? selectedCurrency : "ghs"}
+                      onValueChange={(v) => { handleCurrencyChange(v); setCurrencyPref(v) }}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -7099,7 +7158,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                           </td>
                           <td className="border border-gray-200 px-4 py-3 text-center">
                             <Select
-                              value={allowance.type}
+                              value={allowance.type === "VARIABLE" ? "VARIABLE" : "FIXED"}
                               onValueChange={(value) => handleAllowanceFieldChange(index, "type", value)}
                             >
                               <SelectTrigger className="border-0 bg-transparent p-0 h-auto">
@@ -7213,7 +7272,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                           </td>
                           <td className="border border-gray-200 px-4 py-3 text-center">
                             <Select
-                              value={deduction.type}
+                              value={deduction.type === "VARIABLE" ? "VARIABLE" : "FIXED"}
                               onValueChange={(value) => handleDeductionFieldChange(index, "type", value)}
                             >
                               <SelectTrigger className="border-0 bg-transparent p-0 h-auto">
