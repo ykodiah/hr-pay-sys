@@ -142,6 +142,99 @@ interface Role {
   description: string
   permissions: string[]
   user_count: number
+  code?: string | null
+  level?: number
+  is_system_role?: boolean
+  is_active?: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Role permission model (module x access-level matrix)
+// Permissions are persisted as a flat JSONB array of `module:action` strings,
+// e.g. ["employees:view", "employees:edit"]. "*:all" grants everything.
+// ---------------------------------------------------------------------------
+const ROLE_MODULES: { key: string; label: string; description: string }[] = [
+  { key: "dashboard", label: "Dashboard", description: "Overview metrics and insights" },
+  { key: "employees", label: "Employees", description: "Employee records and profiles" },
+  { key: "payroll", label: "Payroll", description: "Payroll runs and payslips" },
+  { key: "leave", label: "Leave", description: "Leave requests and policies" },
+  { key: "attendance", label: "Attendance", description: "Time and attendance tracking" },
+  { key: "performance", label: "Performance", description: "Appraisals and goals" },
+  { key: "documents", label: "Documents", description: "Document vault and files" },
+  { key: "reports", label: "Reports", description: "Analytics and exports" },
+  { key: "multi_company", label: "Multi-Company", description: "Subsidiary management" },
+  { key: "notifications", label: "Notifications", description: "Templates and preferences" },
+  { key: "settings", label: "Settings", description: "Company configuration" },
+  { key: "roles", label: "Roles & Access", description: "Roles, permissions and security" },
+]
+
+const ROLE_ACTIONS: { key: string; label: string }[] = [
+  { key: "view", label: "View" },
+  { key: "create", label: "Create" },
+  { key: "edit", label: "Edit" },
+  { key: "delete", label: "Delete" },
+  { key: "approve", label: "Approve" },
+  { key: "export", label: "Export" },
+]
+
+type PermissionMatrix = Record<string, string[]>
+
+const emptyPermissionMatrix = (): PermissionMatrix =>
+  ROLE_MODULES.reduce<PermissionMatrix>((acc, m) => {
+    acc[m.key] = []
+    return acc
+  }, {})
+
+/** Expand stored permission strings into a module x action matrix. */
+const permissionsToMatrix = (permissions: string[] | undefined | null): PermissionMatrix => {
+  const matrix = emptyPermissionMatrix()
+  const list = Array.isArray(permissions) ? permissions : []
+  const grantAll = list.includes("all") || list.includes("*") || list.includes("*:all")
+  for (const module of ROLE_MODULES) {
+    if (grantAll) {
+      matrix[module.key] = ROLE_ACTIONS.map((a) => a.key)
+    }
+  }
+  for (const raw of list) {
+    if (!raw || raw === "all" || raw === "*" || raw === "*:all") continue
+    const [moduleKey, actionKey] = String(raw).includes(":")
+      ? String(raw).split(":")
+      : [String(raw), "view"]
+    if (!matrix[moduleKey]) continue
+    if (actionKey === "all") {
+      matrix[moduleKey] = ROLE_ACTIONS.map((a) => a.key)
+    } else if (ROLE_ACTIONS.some((a) => a.key === actionKey) && !matrix[moduleKey].includes(actionKey)) {
+      matrix[moduleKey].push(actionKey)
+    }
+  }
+  return matrix
+}
+
+/** Flatten a matrix back to `module:action` strings for persistence. */
+const matrixToPermissions = (matrix: PermissionMatrix): string[] => {
+  const result: string[] = []
+  for (const module of ROLE_MODULES) {
+    const actions = matrix[module.key] || []
+    if (actions.length === ROLE_ACTIONS.length) {
+      result.push(`${module.key}:all`)
+    } else {
+      for (const action of actions) result.push(`${module.key}:${action}`)
+    }
+  }
+  return result
+}
+
+const countMatrixGrants = (matrix: PermissionMatrix): number =>
+  Object.values(matrix).reduce((sum, actions) => sum + (actions?.length || 0), 0)
+
+const summarizeRolePermissions = (permissions: string[] | undefined | null): string => {
+  const matrix = permissionsToMatrix(permissions)
+  const modules = ROLE_MODULES.filter((m) => (matrix[m.key] || []).length > 0)
+  if (!modules.length) return "No module access"
+  if (modules.length === ROLE_MODULES.length && modules.every((m) => matrix[m.key].length === ROLE_ACTIONS.length)) {
+    return "Full access (all modules)"
+  }
+  return modules.map((m) => m.label).join(", ")
 }
 
 // Added for Access Control and Security
@@ -372,10 +465,13 @@ export default function SettingsPage() {
   const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([])
   const [roles, setRoles] = useState<Role[]>([])
   const [showRoleModal, setShowRoleModal] = useState(false)
-  const [roleModalType, setRoleModalType] = useState<"add" | "edit">("add")
+  const [roleModalType, setRoleModalType] = useState<"add" | "edit" | "view">("add")
   const [editingRole, setEditingRole] = useState<Role | null>(null)
-  const [roleForm, setRoleForm] = useState({ name: "", description: "", permissions: "" })
+  const [roleForm, setRoleForm] = useState({ name: "", description: "" })
+  const [rolePermissionMatrix, setRolePermissionMatrix] = useState<PermissionMatrix>(emptyPermissionMatrix())
   const [isSavingRole, setIsSavingRole] = useState(false)
+  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
+  const [isDeletingRole, setIsDeletingRole] = useState(false)
   const [syncPrefs, setSyncPrefs] = useState({
     sync_hr_policies: true,
     sync_payroll_config: true,
@@ -1531,66 +1627,24 @@ export default function SettingsPage() {
 
   const loadRoles = async (companyId?: string) => {
     console.log("[v0] Loading roles...")
-
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock roles data")
-      setRoles([
-        {
-          id: "role-001",
-          name: "Administrator",
-          description: "Full system access and management capabilities",
-          permissions: ["all"],
-          user_count: 2,
-        },
-        {
-          id: "role-002",
-          name: "HR Manager",
-          description: "Human resources management and employee oversight",
-          permissions: ["hr", "employees", "reports"],
-          user_count: 3,
-        },
-        {
-          id: "role-003",
-          name: "Employee",
-          description: "Standard employee access to personal information",
-          permissions: ["profile", "payslip", "leave"],
-          user_count: 45,
-        },
-      ])
-      return
-    }
-
+    // Always read from the service-role API (same pattern as HR / Payroll / Notifications).
     try {
-      const targetCompanyId = companyId || companyData.id
-      const qs = targetCompanyId ? `?company_id=${encodeURIComponent(targetCompanyId)}` : ""
+      let targetCompanyId = companyId || companyData.id
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        targetCompanyId = (await loadCompanyData()) || targetCompanyId
+      }
+      const qs =
+        targetCompanyId && !String(targetCompanyId).startsWith("demo-")
+          ? `?company_id=${encodeURIComponent(targetCompanyId)}`
+          : ""
       const { roles: roleRows } = await settingsFetch(`/api/settings/roles${qs}`)
-      setRoles(roleRows || [])
+      clearClientDemoSession()
+      setRoles(Array.isArray(roleRows) ? roleRows : [])
     } catch (error) {
       console.error("Error loading roles:", error)
-      if (error.message && error.message.includes("infinite recursion detected in policy")) {
-        console.log("[v0] Database policy error detected, falling back to demo mode for roles")
-        document.cookie = "demo-session=active; path=/; max-age=86400"
-        setRoles([
-          {
-            id: "role-001",
-            name: "Administrator",
-            description: "Full system access",
-            permissions: ["read", "write", "delete", "admin"],
-            status: "active",
-          },
-          {
-            id: "role-002",
-            name: "HR Manager",
-            description: "Human Resources management",
-            permissions: ["read", "write"],
-            status: "active",
-          },
-        ])
-        return
-      }
       toast({
         title: "Error",
-        description: "Failed to load roles",
+        description: error instanceof Error ? error.message : "Failed to load roles",
         variant: "destructive",
       })
     }
@@ -2240,20 +2294,51 @@ export default function SettingsPage() {
   const handleAddRoleInner = () => {
     setRoleModalType("add")
     setEditingRole(null)
-    setRoleForm({ name: "", description: "", permissions: "hr, employees, reports" })
+    setRoleForm({ name: "", description: "" })
+    setRolePermissionMatrix(emptyPermissionMatrix())
+    setShowRoleModal(true)
+  }
+
+  const openRoleModal = (role: Role, mode: "edit" | "view") => {
+    setRoleModalType(mode)
+    setEditingRole(role)
+    setRoleForm({ name: role?.name || "", description: role?.description || "" })
+    setRolePermissionMatrix(permissionsToMatrix(role?.permissions))
     setShowRoleModal(true)
   }
 
   const handleEditRoleInner = (roleName: string) => {
-    const role = roles.find((r) => r.name === roleName) || null
-    setRoleModalType("edit")
-    setEditingRole(role)
-    setRoleForm({
-      name: role?.name || roleName,
-      description: role?.description || "",
-      permissions: Array.isArray(role?.permissions) ? role.permissions.join(", ") : "",
+    const role = roles.find((r) => r.name === roleName)
+    if (role) openRoleModal(role, "edit")
+  }
+
+  const toggleRolePermission = (moduleKey: string, actionKey: string) => {
+    setRolePermissionMatrix((prev) => {
+      const current = prev[moduleKey] || []
+      const next = current.includes(actionKey)
+        ? current.filter((a) => a !== actionKey)
+        : [...current, actionKey]
+      return { ...prev, [moduleKey]: next }
     })
-    setShowRoleModal(true)
+  }
+
+  const toggleRoleModuleAll = (moduleKey: string) => {
+    setRolePermissionMatrix((prev) => {
+      const current = prev[moduleKey] || []
+      const allKeys = ROLE_ACTIONS.map((a) => a.key)
+      const next = current.length === allKeys.length ? [] : allKeys
+      return { ...prev, [moduleKey]: next }
+    })
+  }
+
+  const setAllRolePermissions = (grant: boolean) => {
+    setRolePermissionMatrix(() => {
+      const matrix = emptyPermissionMatrix()
+      if (grant) {
+        for (const module of ROLE_MODULES) matrix[module.key] = ROLE_ACTIONS.map((a) => a.key)
+      }
+      return matrix
+    })
   }
 
   const handleSaveRole = async () => {
@@ -2261,38 +2346,34 @@ export default function SettingsPage() {
       toast({ title: "Validation Error", description: "Role name is required", variant: "destructive" })
       return
     }
+    const permissions = matrixToPermissions(rolePermissionMatrix)
+    if (!permissions.length) {
+      toast({
+        title: "Validation Error",
+        description: "Select at least one module permission for this role.",
+        variant: "destructive",
+      })
+      return
+    }
     setIsSavingRole(true)
     try {
-      if (isDemoMode()) {
-        const demoRole = {
-          id: editingRole?.id || `role-${Date.now()}`,
-          name: roleForm.name.trim(),
-          description: roleForm.description.trim(),
-          permissions: roleForm.permissions.split(",").map((p) => p.trim()).filter(Boolean),
-          user_count: editingRole?.user_count || 0,
-        }
-        setRoles((prev) =>
-          roleModalType === "edit"
-            ? prev.map((r) => (r.id === demoRole.id || r.name === editingRole?.name ? demoRole : r))
-            : [demoRole, ...prev],
-        )
-      } else {
-        const payload = await settingsFetch("/api/settings/roles", {
-          method: "POST",
-          body: JSON.stringify({
-            action: "save",
-            company_id: companyData.id,
-            role: {
-              id: editingRole?.id,
-              name: roleForm.name.trim(),
-              description: roleForm.description.trim(),
-              permissions: roleForm.permissions.split(",").map((p) => p.trim()).filter(Boolean),
-            },
-          }),
-        })
-        await loadRoles(companyData.id)
-        void payload
-      }
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/roles", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save",
+          company_id: companyId,
+          role: {
+            id: editingRole?.id,
+            name: roleForm.name.trim(),
+            description: roleForm.description.trim(),
+            permissions,
+            level: editingRole?.level,
+            is_system_role: editingRole?.is_system_role,
+          },
+        }),
+      })
+      await loadRoles(companyId)
       setShowRoleModal(false)
       toast({
         title: roleModalType === "edit" ? "Role Updated" : "Role Created",
@@ -2309,25 +2390,26 @@ export default function SettingsPage() {
     }
   }
 
-  const handleDeleteRole = async (roleId: string) => {
-    if (!confirm("Delete this role?")) return
+  const handleConfirmDeleteRole = async () => {
+    if (!roleToDelete) return
+    setIsDeletingRole(true)
     try {
-      if (isDemoMode()) {
-        setRoles((prev) => prev.filter((r) => r.id !== roleId))
-      } else {
-        await settingsFetch("/api/settings/roles", {
-          method: "POST",
-          body: JSON.stringify({ action: "delete", company_id: companyData.id, id: roleId }),
-        })
-        await loadRoles(companyData.id)
-      }
-      toast({ title: "Role Deleted", description: "Role removed successfully" })
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/roles", {
+        method: "POST",
+        body: JSON.stringify({ action: "delete", company_id: companyId, id: roleToDelete.id }),
+      })
+      await loadRoles(companyId)
+      toast({ title: "Role Deleted", description: `${roleToDelete.name} was removed successfully` })
+      setRoleToDelete(null)
     } catch (error) {
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to delete role",
         variant: "destructive",
       })
+    } finally {
+      setIsDeletingRole(false)
     }
   }
 
@@ -5378,6 +5460,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
           setActiveSettingsTab(value)
           if (value === "subsidiaries") void loadSubsidiaries()
           if (value === "notifications") void loadNotificationSettings()
+          if (value === "roles") void loadRoles()
         }}
         className="space-y-6"
       >
@@ -8372,90 +8455,303 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   <span>Roles & Permissions</span>
                 </CardTitle>
                 <div className="flex items-center space-x-2">
-                  <Button variant="outline" onClick={handleAddRoleInner}>
+                  <Button variant="outline" onClick={() => loadRoles()}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
+                  </Button>
+                  <Button onClick={handleAddRoleInner}>
+                    <Plus className="w-4 h-4 mr-2" />
                     Add Role
                   </Button>
                 </div>
               </div>
-              <CardDescription>Manage user roles and permissions</CardDescription>
+              <CardDescription>
+                Define roles and grant module-level access (view, create, edit, delete, approve, export)
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-3">
-                {roles.map((role) => (
-                  <Card key={role.id} className="border-l-4 border-l-indigo-500">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-base font-semibold">{role.name}</h3>
-                          <p className="text-xs text-gray-600">{role.description}</p>
-                          {Array.isArray(role.permissions) && role.permissions.length > 0 && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Permissions: {role.permissions.join(", ")}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-500">{role.user_count || 0} Users</span>
-                          <Button variant="outline" size="sm" onClick={() => handleEditRoleInner(role.name)}>
-                            Edit
-                          </Button>
-                          <Button variant="destructive" size="sm" onClick={() => handleDeleteRole(role.id)}>
-                            Delete
-                          </Button>
-                        </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <Shield className="w-5 h-5 text-indigo-600" />
+                      <div>
+                        <p className="text-sm font-medium">Total Roles</p>
+                        <p className="text-2xl font-bold">{roles.length}</p>
                       </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <Users className="w-5 h-5 text-green-600" />
+                      <div>
+                        <p className="text-sm font-medium">Assigned Users</p>
+                        <p className="text-2xl font-bold">
+                          {roles.reduce((sum, r) => sum + (r.user_count || 0), 0)}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <Settings className="w-5 h-5 text-purple-600" />
+                      <div>
+                        <p className="text-sm font-medium">Managed Modules</p>
+                        <p className="text-2xl font-bold">{ROLE_MODULES.length}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="space-y-3">
+                {roles.map((role) => {
+                  const matrix = permissionsToMatrix(role.permissions)
+                  const grantedModules = ROLE_MODULES.filter((m) => (matrix[m.key] || []).length > 0)
+                  return (
+                    <Card key={role.id} className="border-l-4 border-l-indigo-500">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="text-base font-semibold">{role.name}</h3>
+                              {role.is_system_role && (
+                                <Badge variant="secondary" className="text-xs">
+                                  System
+                                </Badge>
+                              )}
+                              <Badge variant="outline" className="text-xs">
+                                {role.user_count || 0} Users
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-gray-600 mt-1">{role.description || "No description"}</p>
+                            <div className="flex flex-wrap gap-1.5 mt-3">
+                              {grantedModules.length === 0 && (
+                                <span className="text-xs text-muted-foreground">No module access granted</span>
+                              )}
+                              {grantedModules.map((m) => (
+                                <Badge key={m.key} variant="secondary" className="text-xs font-normal">
+                                  {m.label}
+                                  <span className="ml-1 text-muted-foreground">
+                                    ({(matrix[m.key] || []).length === ROLE_ACTIONS.length
+                                      ? "Full"
+                                      : (matrix[m.key] || []).length})
+                                  </span>
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Button variant="outline" size="sm" onClick={() => openRoleModal(role, "view")}>
+                              <Eye className="w-4 h-4 mr-1" />
+                              View
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => openRoleModal(role, "edit")}>
+                              <Edit className="w-4 h-4 mr-1" />
+                              Edit
+                            </Button>
+                            <Button variant="destructive" size="sm" onClick={() => setRoleToDelete(role)}>
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+                {roles.length === 0 && (
+                  <Card>
+                    <CardContent className="p-8 text-center">
+                      <Shield className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No Roles Yet</h3>
+                      <p className="text-gray-600 mb-4">
+                        Create your first role and grant module-level permissions.
+                      </p>
+                      <Button onClick={handleAddRoleInner}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add First Role
+                      </Button>
                     </CardContent>
                   </Card>
-                ))}
-                {roles.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No roles yet. Click Add Role to create one.</p>
                 )}
               </div>
             </CardContent>
           </Card>
 
           {showRoleModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <Card className="w-full max-w-lg mx-4">
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
                 <CardHeader>
-                  <CardTitle>{roleModalType === "edit" ? "Edit Role" : "Add Role"}</CardTitle>
-                  <CardDescription>Define the role name, description, and permission tags</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>
+                        {roleModalType === "edit"
+                          ? "Edit Role"
+                          : roleModalType === "view"
+                            ? `Role: ${roleForm.name}`
+                            : "Add Role"}
+                      </CardTitle>
+                      <CardDescription>
+                        {roleModalType === "view"
+                          ? "Review this role's module-level access"
+                          : "Define the role and grant module-level access"}
+                      </CardDescription>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => setShowRoleModal(false)}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="roleName">Role Name</Label>
-                    <Input
-                      id="roleName"
-                      value={roleForm.name}
-                      onChange={(e) => setRoleForm((f) => ({ ...f, name: e.target.value }))}
-                      placeholder="HR Manager"
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="roleName">Role Name</Label>
+                      <Input
+                        id="roleName"
+                        value={roleForm.name}
+                        disabled={roleModalType === "view"}
+                        onChange={(e) => setRoleForm((f) => ({ ...f, name: e.target.value }))}
+                        placeholder="HR Manager"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="roleDescription">Description</Label>
+                      <Input
+                        id="roleDescription"
+                        value={roleForm.description}
+                        disabled={roleModalType === "view"}
+                        onChange={(e) => setRoleForm((f) => ({ ...f, description: e.target.value }))}
+                        placeholder="What this role can manage"
+                      />
+                    </div>
                   </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="roleDescription">Description</Label>
-                    <Textarea
-                      id="roleDescription"
-                      value={roleForm.description}
-                      onChange={(e) => setRoleForm((f) => ({ ...f, description: e.target.value }))}
-                      placeholder="What this role can manage"
-                    />
+                    <div className="flex items-center justify-between">
+                      <Label>Module Permissions</Label>
+                      {roleModalType !== "view" && (
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={() => setAllRolePermissions(true)}>
+                            Grant All
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => setAllRolePermissions(false)}>
+                            Clear All
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="border rounded-lg overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-muted/50 border-b">
+                            <th className="text-left font-medium px-3 py-2 min-w-[180px]">Module</th>
+                            {ROLE_ACTIONS.map((action) => (
+                              <th key={action.key} className="text-center font-medium px-3 py-2">
+                                {action.label}
+                              </th>
+                            ))}
+                            <th className="text-center font-medium px-3 py-2">Full</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ROLE_MODULES.map((module) => {
+                            const actions = rolePermissionMatrix[module.key] || []
+                            const allChecked = actions.length === ROLE_ACTIONS.length
+                            return (
+                              <tr key={module.key} className="border-b last:border-0 hover:bg-muted/30">
+                                <td className="px-3 py-2">
+                                  <div className="font-medium">{module.label}</div>
+                                  <div className="text-xs text-muted-foreground">{module.description}</div>
+                                </td>
+                                {ROLE_ACTIONS.map((action) => (
+                                  <td key={action.key} className="text-center px-3 py-2">
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 rounded border-gray-300"
+                                      disabled={roleModalType === "view"}
+                                      checked={actions.includes(action.key)}
+                                      onChange={() => toggleRolePermission(module.key, action.key)}
+                                    />
+                                  </td>
+                                ))}
+                                <td className="text-center px-3 py-2">
+                                  <input
+                                    type="checkbox"
+                                    className="h-4 w-4 rounded border-gray-300"
+                                    disabled={roleModalType === "view"}
+                                    checked={allChecked}
+                                    onChange={() => toggleRoleModuleAll(module.key)}
+                                  />
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {countMatrixGrants(rolePermissionMatrix)} permission(s) selected across{" "}
+                      {ROLE_MODULES.filter((m) => (rolePermissionMatrix[m.key] || []).length > 0).length} module(s)
+                    </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="rolePermissions">Permissions (comma separated)</Label>
-                    <Input
-                      id="rolePermissions"
-                      value={roleForm.permissions}
-                      onChange={(e) => setRoleForm((f) => ({ ...f, permissions: e.target.value }))}
-                      placeholder="hr, employees, payroll, reports"
-                    />
-                  </div>
+
                   <div className="flex justify-end space-x-2">
                     <Button variant="ghost" onClick={() => setShowRoleModal(false)}>
+                      {roleModalType === "view" ? "Close" : "Cancel"}
+                    </Button>
+                    {roleModalType === "view" ? (
+                      <Button onClick={() => setRoleModalType("edit")}>
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit Role
+                      </Button>
+                    ) : (
+                      <Button onClick={handleSaveRole} disabled={isSavingRole}>
+                        {isSavingRole ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="w-4 h-4 mr-2" />
+                        )}
+                        {roleModalType === "edit" ? "Save Changes" : "Create Role"}
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {roleToDelete && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <Card className="w-full max-w-md">
+                <CardHeader>
+                  <CardTitle className="text-xl">Delete Role</CardTitle>
+                  <CardDescription>
+                    Are you sure you want to delete <span className="font-medium">{roleToDelete.name}</span>? This
+                    action cannot be undone.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="ghost" onClick={() => setRoleToDelete(null)} disabled={isDeletingRole}>
                       Cancel
                     </Button>
-                    <Button onClick={handleSaveRole} disabled={isSavingRole}>
-                      {isSavingRole ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                      {roleModalType === "edit" ? "Save Changes" : "Create Role"}
+                    <Button variant="destructive" onClick={handleConfirmDeleteRole} disabled={isDeletingRole}>
+                      {isDeletingRole ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete Role
+                        </>
+                      )}
                     </Button>
                   </div>
                 </CardContent>
