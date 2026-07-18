@@ -1587,121 +1587,21 @@ export default function SettingsPage() {
   const loadSubsidiaries = async (companyId?: string) => {
     console.log("[v0] Loading subsidiaries...")
 
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock subsidiaries data")
-      setSubsidiaries([
-        {
-          id: "sub-001",
-          company_id: "comp-001",
-          name: "Akwaaba Digital Solutions",
-          email_address: "info@akwaabadigital.com",
-          phone_number: "+233 30 276 5432",
-          tax_id: "TIN-ADS-2023-001",
-          ssnit_number: "SSNIT-ADS-789012",
-          address: "15 Liberation Road, Ridge, Accra, Ghana",
-          status: "active",
-          industry: "Digital Marketing & Web Development",
-          divisions: ["Digital Marketing", "Web Development", "Mobile Apps"],
-          departments: ["Marketing", "Development", "Design", "Sales"],
-          locations: ["Accra - Ridge", "Kumasi Branch"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 2,
-          employee_count: 45,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-002",
-          company_id: "comp-001",
-          name: "Akwaaba Consulting Group",
-          email_address: "consulting@akwaaba.com",
-          phone_number: "+233 30 276 5433",
-          tax_id: "TIN-ACG-2023-002",
-          ssnit_number: "SSNIT-ACG-789013",
-          address: "8 Airport Residential Area, Accra, Ghana",
-          status: "active",
-          industry: "Business Consulting & Strategy",
-          divisions: ["Strategy Consulting", "Digital Transformation", "Process Optimization"],
-          departments: ["Consulting", "Strategy", "Operations", "Client Relations"],
-          locations: ["Accra - Airport", "Tema Office"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 2,
-          employee_count: 32,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-003",
-          company_id: "comp-001",
-          name: "Akwaaba Financial Services",
-          email_address: "finance@akwaabafs.com",
-          phone_number: "+233 30 276 5434",
-          tax_id: "TIN-AFS-2023-003",
-          ssnit_number: "SSNIT-AFS-789014",
-          address: "25 Independence Avenue, Accra, Ghana",
-          status: "active",
-          industry: "Financial Technology & Services",
-          divisions: ["Fintech Solutions", "Payment Processing", "Financial Advisory"],
-          departments: ["Finance", "Technology", "Compliance", "Customer Service"],
-          locations: ["Accra - Independence Ave", "Ho Regional Office"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 2,
-          employee_count: 28,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-004",
-          company_id: "comp-001",
-          name: "Akwaaba Logistics Ltd",
-          email_address: "logistics@akwaabalog.com",
-          phone_number: "+233 30 276 5435",
-          tax_id: "TIN-ALL-2023-004",
-          ssnit_number: "SSNIT-ALL-789015",
-          address: "12 Spintex Road, Accra, Ghana",
-          status: "active",
-          industry: "Supply Chain & Logistics",
-          divisions: ["Transportation", "Warehousing", "Supply Chain Management"],
-          departments: ["Operations", "Fleet Management", "Warehousing", "Customer Service"],
-          locations: ["Accra - Spintex", "Takoradi Port", "Tamale Hub"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 3,
-          employee_count: 67,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-005",
-          company_id: "comp-001",
-          name: "Akwaaba Training Institute",
-          email_address: "training@akwaabainstitute.com",
-          phone_number: "+233 30 276 5436",
-          tax_id: "TIN-ATI-2023-005",
-          ssnit_number: "SSNIT-ATI-789016",
-          address: "5 Cantonments Road, Accra, Ghana",
-          status: "active",
-          industry: "Education & Professional Training",
-          divisions: ["Corporate Training", "IT Certification", "Professional Development"],
-          departments: ["Training", "Curriculum Development", "Student Services", "Administration"],
-          locations: ["Accra - Cantonments", "Kumasi Campus", "Online Platform"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 3,
-          employee_count: 23,
-          created_at: new Date().toISOString(),
-        },
-      ])
-      return
-    }
-
     try {
-      const targetCompanyId = companyId || companyData.id
-      const qs = targetCompanyId ? `?company_id=${encodeURIComponent(targetCompanyId)}` : ""
-      const [{ subsidiaries: processedSubsidiaries }, prefsPayload] = await Promise.all([
+      let targetCompanyId = companyId || companyData.id
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        targetCompanyId = (await loadCompanyData()) || targetCompanyId
+      }
+      const qs =
+        targetCompanyId && !String(targetCompanyId).startsWith("demo-")
+          ? `?company_id=${encodeURIComponent(targetCompanyId)}`
+          : ""
+      const [listPayload, prefsPayload] = await Promise.all([
         settingsFetch(`/api/settings/subsidiaries${qs}`),
         settingsFetch(`/api/settings/subsidiaries${qs}${qs ? "&" : "?"}action=sync_preferences`).catch(() => null),
       ])
-      setSubsidiaries(processedSubsidiaries || [])
+      setSubsidiaries(listPayload.subsidiaries || [])
+      clearClientDemoSession()
       if (prefsPayload?.preferences) {
         setSyncPrefs({
           sync_hr_policies: !!prefsPayload.preferences.sync_hr_policies,
@@ -1710,12 +1610,16 @@ export default function SettingsPage() {
           sync_roles_permissions: !!prefsPayload.preferences.sync_roles_permissions,
         })
       }
-      console.log("[v0] Loaded subsidiaries:", (processedSubsidiaries || []).length)
+      console.log("[v0] Loaded subsidiaries:", (listPayload.subsidiaries || []).length)
     } catch (error) {
       console.error("Subsidiaries loading error:", error)
+      if (isDemoMode()) {
+        setSubsidiaries([])
+        return
+      }
       toast({
         title: "Error",
-        description: "Failed to load subsidiaries",
+        description: error instanceof Error ? error.message : "Failed to load subsidiaries",
         variant: "destructive",
       })
     }
@@ -2072,20 +1976,12 @@ export default function SettingsPage() {
   // Subsidiary Management Functions
   const syncSubsidiarySettings = async (subsidiaryId: string) => {
     console.log("[v0] Syncing settings for subsidiary:", subsidiaryId)
-
-    if (isDemoMode()) {
-      toast({
-        title: "Settings Synced",
-        description: "Subsidiary settings synchronized successfully (Demo Mode)",
-      })
-      return
-    }
-
     try {
-      await settingsFetch("/api/settings/subsidiaries", {
+      const companyId = companyData.id || (await loadCompanyData())
+      const result = await settingsFetch("/api/settings/subsidiaries", {
         method: "POST",
         body: JSON.stringify({
-          company_id: companyData.id,
+          company_id: companyId,
           action: "sync",
           subsidiary_id: subsidiaryId,
           sync_types: [
@@ -2096,16 +1992,16 @@ export default function SettingsPage() {
           ].filter(Boolean),
         }),
       })
-      await loadSubsidiaries(companyData.id)
+      await loadSubsidiaries(companyId || undefined)
       toast({
         title: "Settings Synced",
-        description: "Subsidiary settings synchronized successfully",
+        description: `Synced ${(result.sync_types || []).join(", ") || "selected settings"} to subsidiary.`,
       })
     } catch (error) {
       console.error("Sync settings error:", error)
       toast({
         title: "Error",
-        description: "Failed to sync subsidiary settings",
+        description: error instanceof Error ? error.message : "Failed to sync subsidiary settings",
         variant: "destructive",
       })
     }
@@ -2113,32 +2009,27 @@ export default function SettingsPage() {
 
   const refreshEmployeeCount = async (subsidiaryId: string) => {
     console.log("[v0] Refreshing employee count for subsidiary:", subsidiaryId)
-
-    if (isDemoMode()) {
-      // Simulate employee count refresh in demo mode
-      const mockCount = Math.floor(Math.random() * 100) + 10 // Random count between 10-110
-      const updatedSubsidiaries = subsidiaries.map((sub) =>
-        sub.id === subsidiaryId ? { ...sub, employee_count: mockCount } : sub,
-      )
-      setSubsidiaries(updatedSubsidiaries)
-
-      if (selectedSubsidiary?.id === subsidiaryId) {
-        setSelectedSubsidiary({ ...selectedSubsidiary, employee_count: mockCount })
-      }
-      return mockCount
-    }
-
     try {
-      const { count, error } = await supabase
-        .from("employees")
-        .select("*", { count: "exact", head: true })
-        .eq("subsidiary_id", subsidiaryId)
-
-      if (error) throw error
-
-      const employeeCount = count || 0
-      await updateSubsidiary(subsidiaryId, { employee_count: employeeCount })
-
+      const companyId = companyData.id || (await loadCompanyData())
+      const payload = await settingsFetch(
+        `/api/settings/subsidiaries?action=employees&company_id=${encodeURIComponent(companyId || "")}&subsidiary_id=${encodeURIComponent(subsidiaryId)}`,
+      )
+      const employeeCount = (payload.employees || []).length
+      await settingsFetch("/api/settings/subsidiaries", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "update",
+          company_id: companyId,
+          id: subsidiaryId,
+          employee_count: employeeCount,
+        }),
+      })
+      setSubsidiaries((prev) =>
+        prev.map((sub) => (sub.id === subsidiaryId ? { ...sub, employee_count: employeeCount } : sub)),
+      )
+      if (selectedSubsidiary?.id === subsidiaryId) {
+        setSelectedSubsidiary({ ...selectedSubsidiary, employee_count: employeeCount })
+      }
       return employeeCount
     } catch (error) {
       console.error("Refresh employee count error:", error)
@@ -2148,42 +2039,25 @@ export default function SettingsPage() {
 
   const viewSubsidiaryEmployees = async (subsidiaryId: string) => {
     console.log("[v0] Viewing employees for subsidiary:", subsidiaryId)
-
-    const currentCount = await refreshEmployeeCount(subsidiaryId)
-
-    if (isDemoMode()) {
-      const mockEmployees = Array.from({ length: currentCount }, (_, i) => ({
-        id: `emp-${i + 1}`,
-        name: `Employee ${i + 1}`,
-        position: ["Software Engineer", "Marketing Manager", "HR Specialist", "Sales Representative", "Accountant"][
-          i % 5
-        ],
-        department: ["Technology", "Marketing", "Human Resources", "Sales", "Finance"][i % 5],
-        email: `employee${i + 1}@company.com`,
-      }))
-
-      setViewEmployeesModal({
-        isOpen: true,
-        subsidiaryId,
-        employees: mockEmployees,
-      })
-      return
-    }
-
     try {
+      const companyId = companyData.id || (await loadCompanyData())
       const payload = await settingsFetch(
-        `/api/settings/subsidiaries?action=employees&company_id=${encodeURIComponent(companyData.id || "")}&subsidiary_id=${encodeURIComponent(subsidiaryId)}`,
+        `/api/settings/subsidiaries?action=employees&company_id=${encodeURIComponent(companyId || "")}&subsidiary_id=${encodeURIComponent(subsidiaryId)}`,
+      )
+      const employees = payload.employees || []
+      setSubsidiaries((prev) =>
+        prev.map((sub) => (sub.id === subsidiaryId ? { ...sub, employee_count: employees.length } : sub)),
       )
       setViewEmployeesModal({
         isOpen: true,
         subsidiaryId,
-        employees: payload.employees || [],
+        employees,
       })
     } catch (error) {
       console.error("View employees error:", error)
       toast({
         title: "Error",
-        description: "Failed to load employees",
+        description: error instanceof Error ? error.message : "Failed to load employees",
         variant: "destructive",
       })
     }
@@ -2191,46 +2065,15 @@ export default function SettingsPage() {
 
   const addNewSubsidiary = async (subsidiaryData: Partial<Subsidiary>) => {
     console.log("[v0] Adding new subsidiary:", subsidiaryData)
-
-    if (isDemoMode()) {
-      const newSubsidiary: Subsidiary = {
-        id: `sub-${Date.now()}`,
-        company_id: "comp-001",
-        name: subsidiaryData.name || "New Subsidiary",
-        tax_id: subsidiaryData.tax_id || `TIN-${Date.now()}`,
-        ssnit_number: subsidiaryData.ssnit_number || `SSNIT-${Date.now()}`,
-        address: subsidiaryData.address || "",
-        phone_number: subsidiaryData.phone_number || "",
-        email_address: subsidiaryData.email_address || "",
-        status: "active",
-        industry: subsidiaryData.industry || "",
-        divisions: subsidiaryData.divisions || [],
-        departments: subsidiaryData.departments || [],
-        locations: subsidiaryData.locations || [],
-        divisions_count: 0,
-        departments_count: 0,
-        locations_count: 0,
-        employee_count: 0,
-        created_at: new Date().toISOString(),
-        logo_url: subsidiaryLogoPreview || "", // Include uploaded logo URL
-      }
-      setSubsidiaries((prev) => [newSubsidiary, ...prev])
-
-      setSubsidiaryLogoPreview("")
-
-      toast({
-        title: "Subsidiary Added",
-        description: "New subsidiary created successfully (Demo Mode)",
-      })
-      return
-    }
-
     try {
+      const companyId = companyData.id || (await loadCompanyData())
+      if (!companyId) throw new Error("No company identifier available")
+
       await settingsFetch("/api/settings/subsidiaries", {
         method: "POST",
         body: JSON.stringify({
           action: "create",
-          company_id: companyData?.id,
+          company_id: companyId,
           name: subsidiaryData.name,
           tax_id: subsidiaryData.tax_id,
           ssnit_number: subsidiaryData.ssnit_number,
@@ -2242,21 +2085,22 @@ export default function SettingsPage() {
           divisions: subsidiaryData.divisions || [],
           departments: subsidiaryData.departments || [],
           locations: subsidiaryData.locations || [],
-          logo_url: subsidiaryLogoPreview || "",
+          logo_url: subsidiaryLogoPreview || subsidiaryData.logo_url || "",
         }),
       })
 
-      await loadSubsidiaries(companyData?.id)
+      await loadSubsidiaries(companyId)
       setSubsidiaryLogoPreview("")
+      setShowAddSubsidiary(false)
       toast({
         title: "Subsidiary Added",
-        description: "New subsidiary created successfully",
+        description: "New subsidiary created and saved to the database.",
       })
     } catch (error) {
       console.error("Add subsidiary error:", error)
       toast({
         title: "Error",
-        description: "Failed to add subsidiary",
+        description: error instanceof Error ? error.message : "Failed to add subsidiary",
         variant: "destructive",
       })
     }
@@ -2264,61 +2108,30 @@ export default function SettingsPage() {
 
   const updateSubsidiary = async (subsidiaryId: string, updates: Partial<Subsidiary>) => {
     console.log("[v0] Updating subsidiary:", subsidiaryId, updates)
-
-    if (isDemoMode()) {
-      // Update in local state for demo mode
-      const updatedSubsidiaries = subsidiaries.map((sub) => {
-        if (sub.id === subsidiaryId) {
-          const updatedSub = {
-            ...sub,
-            ...updates,
-            // Recalculate counts based on arrays
-            divisions_count: Array.isArray(updates.divisions) ? updates.divisions.length : sub.divisions_count,
-            departments_count: Array.isArray(updates.departments) ? updates.departments.length : sub.departments_count,
-            locations_count: Array.isArray(updates.locations) ? updates.locations.length : sub.locations_count,
-            updated_at: new Date().toISOString(),
-          }
-          return updatedSub
-        }
-        return sub
-      })
-      setSubsidiaries(updatedSubsidiaries)
-
-      // Update selectedSubsidiary if it matches
-      if (selectedSubsidiary?.id === subsidiaryId) {
-        const updatedSelected = updatedSubsidiaries.find((sub) => sub.id === subsidiaryId)
-        if (updatedSelected) {
-          setSelectedSubsidiary(updatedSelected)
-        }
-      }
-
-      toast({
-        title: "Success",
-        description: "Subsidiary updated successfully (Demo Mode)",
-      })
-      return
-    }
-
     try {
-      await settingsFetch("/api/settings/subsidiaries", {
+      const companyId = companyData.id || (await loadCompanyData())
+      const result = await settingsFetch("/api/settings/subsidiaries", {
         method: "POST",
         body: JSON.stringify({
           action: "update",
-          company_id: companyData?.id,
+          company_id: companyId,
           id: subsidiaryId,
           ...updates,
         }),
       })
-      await loadSubsidiaries(companyData?.id)
+      await loadSubsidiaries(companyId || undefined)
+      if (result.subsidiary && selectedSubsidiary?.id === subsidiaryId) {
+        setSelectedSubsidiary(result.subsidiary)
+      }
       toast({
         title: "Success",
-        description: "Subsidiary updated successfully",
+        description: "Subsidiary updated in the database.",
       })
     } catch (error) {
       console.error("Update subsidiary error:", error)
       toast({
         title: "Error",
-        description: "Failed to update subsidiary",
+        description: error instanceof Error ? error.message : "Failed to update subsidiary",
         variant: "destructive",
       })
     }
@@ -2351,30 +2164,22 @@ export default function SettingsPage() {
       return
     }
 
-    if (isDemoMode()) {
-      setSubsidiaries((prev) => prev.filter((s) => s.id !== subsidiaryId))
-      toast({
-        title: "Subsidiary Deleted",
-        description: "Subsidiary has been deleted successfully (Demo Mode)",
-      })
-      return
-    }
-
     try {
+      const companyId = companyData.id || (await loadCompanyData())
       await settingsFetch("/api/settings/subsidiaries", {
         method: "POST",
-        body: JSON.stringify({ action: "delete", company_id: companyData?.id, id: subsidiaryId }),
+        body: JSON.stringify({ action: "delete", company_id: companyId, id: subsidiaryId }),
       })
       setSubsidiaries((prev) => prev.filter((s) => s.id !== subsidiaryId))
       toast({
         title: "Subsidiary Deleted",
-        description: "Subsidiary has been deleted successfully",
+        description: "Subsidiary has been deleted from the database.",
       })
     } catch (error) {
       console.error("Subsidiary deletion error:", error)
       toast({
         title: "Error",
-        description: "Failed to delete subsidiary",
+        description: error instanceof Error ? error.message : "Failed to delete subsidiary",
         variant: "destructive",
       })
     }
@@ -2540,21 +2345,22 @@ export default function SettingsPage() {
 
   const handleSyncAllSettings = async () => {
     console.log("[v0] Syncing all subsidiary settings")
-
-    if (isDemoMode()) {
-      toast({
-        title: "Syncing All Settings",
-        description: "Synchronizing settings across all subsidiaries... (Demo Mode)",
-      })
-      return
-    }
-
     try {
+      const companyId = companyData.id || (await loadCompanyData())
+      // Persist sync option checkboxes first, then sync all subsidiaries.
       await settingsFetch("/api/settings/subsidiaries", {
         method: "POST",
         body: JSON.stringify({
+          action: "save_sync_preferences",
+          company_id: companyId,
+          ...syncPrefs,
+        }),
+      })
+      const result = await settingsFetch("/api/settings/subsidiaries", {
+        method: "POST",
+        body: JSON.stringify({
           action: "sync",
-          company_id: companyData.id,
+          company_id: companyId,
           sync_types: [
             syncPrefs.sync_hr_policies ? "hr_policies" : null,
             syncPrefs.sync_payroll_config ? "payroll_config" : null,
@@ -2563,16 +2369,16 @@ export default function SettingsPage() {
           ].filter(Boolean),
         }),
       })
-      await loadSubsidiaries(companyData.id)
+      await loadSubsidiaries(companyId || undefined)
       toast({
         title: "Settings Synchronized",
-        description: "All subsidiary settings have been synchronized successfully",
+        description: `Synced ${result.synced || 0} subsidiaries (${(result.sync_types || []).join(", ") || "selected"}).`,
       })
     } catch (error) {
       console.error("Sync all settings error:", error)
       toast({
         title: "Error",
-        description: "Failed to sync all subsidiary settings",
+        description: error instanceof Error ? error.message : "Failed to sync all subsidiary settings",
         variant: "destructive",
       })
     }
@@ -2650,6 +2456,7 @@ export default function SettingsPage() {
       })
 
       await loadSubsidiaries(companyId || undefined)
+      setImportModal(false)
     } catch (error) {
       console.error("Import error:", error)
       toast({
@@ -2711,7 +2518,9 @@ export default function SettingsPage() {
 
       toast({
         title: "Company Settings Saved",
-        description: "Company details and logo were saved to the database.",
+        description: saved?.warnings?.length
+          ? `Saved successfully. Note: ${saved.warnings[0]}`
+          : "Company details and logo were saved to the database.",
       })
     } catch (error) {
       console.error("Save settings error:", error)
@@ -2727,19 +2536,10 @@ export default function SettingsPage() {
 
   // Enhanced Save button with loading state and better feedback
   const handleSaveSubsidiaryChanges = async () => {
-    console.log("[v0] Saving subsidiary changes")
+    console.log("[v0] Saving subsidiary sync preferences")
     setIsSavingSubsidiary(true)
 
     try {
-      if (isDemoMode()) {
-        await new Promise((resolve) => setTimeout(resolve, 400))
-        toast({
-          title: "Changes Saved",
-          description: "Subsidiary changes have been saved successfully (Demo Mode)",
-        })
-        return
-      }
-
       const companyId = companyData.id || (await loadCompanyData())
       if (!companyId) throw new Error("No company identifier available")
 
@@ -2755,14 +2555,14 @@ export default function SettingsPage() {
       await loadSubsidiaries(companyId)
 
       toast({
-        title: "Changes Saved",
-        description: "Subsidiary sync preferences saved and list refreshed",
+        title: "Sync Settings Saved",
+        description: "Sync options were saved to the database for this tenant.",
       })
     } catch (error) {
       console.error("Save subsidiary changes error:", error)
       toast({
         title: "Error",
-        description: "Failed to save subsidiary changes. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to save subsidiary sync settings",
         variant: "destructive",
       })
     } finally {
@@ -6309,10 +6109,10 @@ Format the response in a professional, actionable manner for HR decision-makers.
                             variant="outline"
                             size="sm"
                             className="w-full justify-start bg-transparent"
-                            onClick={handleSaveSettings}
-                            disabled={isSavingSettings}
+                            onClick={handleSaveSubsidiaryChanges}
+                            disabled={isSavingSubsidiary}
                           >
-                            {isSavingSettings ? (
+                            {isSavingSubsidiary ? (
                               <>
                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                 Saving...
