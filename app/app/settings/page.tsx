@@ -618,59 +618,23 @@ export default function SettingsPage() {
   const [selectedCurrency, setSelectedCurrency] = useState("ghs")
   const [payeTaxBands, setPayeTaxBands] = useState(currencyConfig.ghs.taxBands)
 
-  const [notificationTemplates, setNotificationTemplates] = useState([
-    {
-      id: "1",
-      name: "Employee Welcome",
-      category: "HR",
-      type: "Email",
-      status: "Active",
-      lastModified: "2024-01-15",
-      description: "Welcome email sent to new employees",
-    },
-    {
-      id: "2",
-      name: "Payroll Processed",
-      category: "Payroll",
-      type: "Email",
-      status: "Active",
-      lastModified: "2024-01-10",
-      description: "Notification when payroll is processed",
-    },
-    {
-      id: "3",
-      name: "Leave Request Approved",
-      category: "Leave",
-      type: "Email",
-      status: "Active",
-      lastModified: "2024-01-08",
-      description: "Notification when leave is approved",
-    },
-    {
-      id: "4",
-      name: "Attendance Alert",
-      category: "Attendance",
-      type: "SMS",
-      status: "Draft",
-      lastModified: "2024-01-05",
-      description: "Alert for attendance issues",
-    },
-  ])
+  const [notificationTemplates, setNotificationTemplates] = useState<any[]>([])
 
   const [emailConfig, setEmailConfig] = useState({
     provider: "smtp",
-    smtpHost: "smtp.gmail.com",
+    smtpHost: "",
     smtpPort: 587,
     smtpUsername: "",
     smtpPassword: "",
-    fromEmail: "hr@company.com",
-    fromName: "HR Department",
-    replyTo: "noreply@company.com",
+    fromEmail: "",
+    fromName: "",
+    replyTo: "",
     enableTLS: true,
     enableSSL: false,
   })
 
   const [notificationSettings, setNotificationSettings] = useState({
+    welcomeNotifications: true,
     payrollNotifications: true,
     leaveNotifications: true,
     attendanceAlerts: true,
@@ -1871,29 +1835,32 @@ export default function SettingsPage() {
   }
 
   const loadNotificationSettings = async (companyId?: string) => {
-    if (isDemoMode()) {
-      return
-    }
-
-    const targetCompanyId = companyId || companyData.id
-
-    if (!targetCompanyId) {
-      console.warn("[v0] Unable to load notification settings without a company id")
-      return
-    }
-
+    // Always hit the service-role API first (same pattern as Company / HR / Payroll).
     try {
-      const payload = await settingsFetch(
-        `/api/settings/notifications?company_id=${encodeURIComponent(targetCompanyId)}`,
-      )
-      if (payload.templates?.length) setNotificationTemplates(payload.templates)
-      if (payload.emailConfig) setEmailConfig(payload.emailConfig)
-      if (payload.preferences) setNotificationSettings((prev) => ({ ...prev, ...payload.preferences }))
+      let targetCompanyId = companyId || companyData.id
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        targetCompanyId = (await loadCompanyData()) || targetCompanyId
+      }
+
+      const qs =
+        targetCompanyId && !String(targetCompanyId).startsWith("demo-")
+          ? `?company_id=${encodeURIComponent(targetCompanyId)}`
+          : ""
+      const payload = await settingsFetch(`/api/settings/notifications${qs}`)
+      clearClientDemoSession()
+
+      setNotificationTemplates(Array.isArray(payload.templates) ? payload.templates : [])
+      if (payload.emailConfig) {
+        setEmailConfig((prev) => ({ ...prev, ...payload.emailConfig }))
+      }
+      if (payload.preferences) {
+        setNotificationSettings((prev) => ({ ...prev, ...payload.preferences }))
+      }
     } catch (error) {
       console.error("[v0] Failed to load notification settings", error)
       toast({
         title: "Error",
-        description: "Unable to load notification preferences.",
+        description: error instanceof Error ? error.message : "Unable to load notification preferences.",
         variant: "destructive",
       })
     }
@@ -4299,71 +4266,30 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
     setIsSaving(true)
     try {
-      if (!isDemoMode() && companyData.id) {
-        const saved = await settingsFetch("/api/settings/notifications", {
-          method: "POST",
-          body: JSON.stringify({
-            action: "save_template",
-            company_id: companyData.id,
-            template: {
-              id: templateModalType === "edit" ? editingTemplate?.id : undefined,
-              name: newTemplate.name,
-              category: newTemplate.category,
-              type: newTemplate.type,
-              subject: newTemplate.subject,
-              description: newTemplate.subject,
-              body: newTemplate.body,
-              variables: newTemplate.variables,
-              status: "Active",
-            },
-          }),
-        })
-        await loadNotificationSettings(companyData.id)
-        toast({
-          title: templateModalType === "edit" ? "Template Updated" : "Template Created",
-          description: `${newTemplate.name} has been saved successfully`,
-        })
-        void saved
-      } else if (templateModalType === "edit" && editingTemplate) {
-        const updatedTemplates = notificationTemplates.map((template) =>
-          template.id === editingTemplate.id
-            ? {
-                ...template,
-                name: newTemplate.name,
-                category: newTemplate.category,
-                type: newTemplate.type,
-                description: newTemplate.subject,
-                subject: newTemplate.subject,
-                body: newTemplate.body,
-                variables: newTemplate.variables,
-                lastModified: new Date().toLocaleDateString(),
-              }
-            : template,
-        )
-        setNotificationTemplates(updatedTemplates)
-        toast({
-          title: "Template Updated",
-          description: `${newTemplate.name} has been updated successfully`,
-        })
-      } else {
-        const template = {
-          id: Date.now().toString(),
-          name: newTemplate.name,
-          category: newTemplate.category,
-          type: newTemplate.type,
-          description: newTemplate.subject,
-          status: "Active",
-          lastModified: new Date().toLocaleDateString(),
-          subject: newTemplate.subject,
-          body: newTemplate.body,
-          variables: newTemplate.variables,
-        }
-        setNotificationTemplates([...notificationTemplates, template])
-        toast({
-          title: "Template Created",
-          description: `${newTemplate.name} has been created successfully`,
-        })
-      }
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/notifications", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_template",
+          company_id: companyId,
+          template: {
+            id: templateModalType === "edit" ? editingTemplate?.id || selectedTemplate?.id : undefined,
+            name: newTemplate.name,
+            category: newTemplate.category,
+            type: newTemplate.type,
+            subject: newTemplate.subject,
+            description: newTemplate.subject,
+            body: newTemplate.body,
+            variables: newTemplate.variables,
+            status: "Active",
+          },
+        }),
+      })
+      await loadNotificationSettings(companyId)
+      toast({
+        title: templateModalType === "edit" ? "Template Updated" : "Template Created",
+        description: `${newTemplate.name} has been saved successfully`,
+      })
 
       // Close modal and reset state
       setShowTemplateModal(false)
@@ -4382,7 +4308,6 @@ Format the response in a professional, actionable manner for HR decision-makers.
       setCurrentAIModel(null)
       setShowModelUpgrade(false)
 
-      // Reset form
       setNewTemplate({
         name: "",
         category: "HR",
@@ -4394,7 +4319,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to save template. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to save template. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -4420,13 +4345,12 @@ Format the response in a professional, actionable manner for HR decision-makers.
   const handleDeleteTemplate = async (templateId) => {
     setIsSaving(true)
     try {
-      if (!isDemoMode() && companyData.id && String(templateId).includes("-")) {
-        await settingsFetch("/api/settings/notifications", {
-          method: "POST",
-          body: JSON.stringify({ action: "delete_template", company_id: companyData.id, id: templateId }),
-        })
-      }
-      setNotificationTemplates(notificationTemplates.filter((t) => t.id !== templateId))
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/notifications", {
+        method: "POST",
+        body: JSON.stringify({ action: "delete_template", company_id: companyId, id: templateId }),
+      })
+      await loadNotificationSettings(companyId)
       toast({
         title: "Template Deleted",
         description: "Template has been deleted successfully",
@@ -4434,7 +4358,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to delete template",
+        description: error instanceof Error ? error.message : "Failed to delete template",
         variant: "destructive",
       })
     } finally {
@@ -4648,18 +4572,15 @@ Format the response in a professional, actionable manner for HR decision-makers.
   const handleTestEmail = async () => {
     setTestConnectionStatus("testing")
     try {
-      if (!isDemoMode() && companyData.id) {
-        await settingsFetch("/api/settings/notifications", {
-          method: "POST",
-          body: JSON.stringify({
-            action: "test_email",
-            company_id: companyData.id,
-            config: emailConfig,
-          }),
-        })
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, 800))
-      }
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/notifications", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "test_email",
+          company_id: companyId,
+          config: emailConfig,
+        }),
+      })
       setTestConnectionStatus("success")
       toast({
         title: "Connection Test Passed",
@@ -4680,18 +4601,16 @@ Format the response in a professional, actionable manner for HR decision-makers.
   const handleSaveEmailConfig = async () => {
     setIsSaving(true)
     try {
-      if (!isDemoMode() && companyData.id) {
-        await settingsFetch("/api/settings/notifications", {
-          method: "POST",
-          body: JSON.stringify({
-            action: "save_email_config",
-            company_id: companyData.id,
-            config: emailConfig,
-          }),
-        })
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, 400))
-      }
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/notifications", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_email_config",
+          company_id: companyId,
+          config: emailConfig,
+        }),
+      })
+      await loadNotificationSettings(companyId)
       toast({
         title: "Email Configuration Saved",
         description: "Email settings have been updated successfully",
@@ -4710,18 +4629,16 @@ Format the response in a professional, actionable manner for HR decision-makers.
   const handleSaveNotificationPreferences = async () => {
     setIsSaving(true)
     try {
-      if (!isDemoMode() && companyData.id) {
-        await settingsFetch("/api/settings/notifications", {
-          method: "POST",
-          body: JSON.stringify({
-            action: "save_preferences",
-            company_id: companyData.id,
-            preferences: notificationSettings,
-          }),
-        })
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, 400))
-      }
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/notifications", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_preferences",
+          company_id: companyId,
+          preferences: notificationSettings,
+        }),
+      })
+      await loadNotificationSettings(companyId)
       toast({
         title: "Preferences Saved",
         description: "Notification preferences have been updated successfully",
@@ -7308,6 +7225,11 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     </div>
                   </div>
 
+                  {notificationTemplates.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      No notification templates yet. Click Add Template to create one.
+                    </p>
+                  )}
                   <div className="border rounded-lg">
                     <Table>
                       <TableHeader>
@@ -7458,9 +7380,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         }}>
                           Close
                         </Button>
-                        <Button onClick={() => {
-                          setTemplateModalType("edit")
-                        }}>
+                        <Button onClick={() => handleEditTemplate(selectedTemplate)}>
                           Edit Template
                         </Button>
                       </div>
@@ -8241,9 +8161,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
                             <p className="text-sm text-muted-foreground">Send welcome email to new employees</p>
                           </div>
                           <Switch
-                            checked={notificationSettings.payrollNotifications} // Corrected to use a relevant setting
+                            checked={notificationSettings.welcomeNotifications}
                             onCheckedChange={(checked) =>
-                              setNotificationSettings({ ...notificationSettings, payrollNotifications: checked })
+                              setNotificationSettings({ ...notificationSettings, welcomeNotifications: checked })
                             }
                           />
                         </div>
