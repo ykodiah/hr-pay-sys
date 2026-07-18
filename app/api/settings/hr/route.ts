@@ -124,12 +124,13 @@ export async function GET(req: NextRequest) {
 
     const leavePolicies = (policies || []).map((p) => ({
       id: p.id,
-      name: p.name,
-      days: p.days,
-      usage: p.usage_rate || "0%",
+      // Support both 059 (name/days) and older 014 (policy_name/max_days) schemas
+      name: p.name || p.policy_name || "Leave Policy",
+      days: Number(p.days ?? p.max_days ?? 0),
+      usage: p.usage_rate || (p.usage_percentage != null ? `${p.usage_percentage}%` : "0%"),
       trend: p.trend || "stable",
       description: p.description || "",
-      carryOver: !!p.carry_over,
+      carryOver: !!(p.carry_over ?? (Number(p.carry_over_days || 0) > 0)),
     }))
 
     const salaryGrades = (structuredGrades || []).map((grade) => {
@@ -210,47 +211,117 @@ export async function POST(req: NextRequest) {
 
     if (action === "save_leave_policy") {
       const policy = body.policy || body
-      const row = {
-        company_id: companyId,
-        name: policy.name,
-        days: Number(policy.days || 0),
-        description: policy.description || "",
-        carry_over: !!policy.carryOver,
-        usage_rate: policy.usage || "0%",
-        trend: policy.trend || "new",
-        is_active: true,
-        updated_at: now,
+      const policyName = String(policy.name || "").trim()
+      if (!policyName) {
+        return NextResponse.json({ error: "Leave policy name is required" }, { status: 400 })
       }
-      if (isUuid(policy.id)) {
-        const { data, error } = await service
+      const days = Number(policy.days || 0)
+      const lowered = policyName.toLowerCase()
+      const policyType =
+        String(policy.policy_type || policy.type || "").trim().toLowerCase() ||
+        (lowered.includes("sick")
+          ? "sick"
+          : lowered.includes("maternity")
+            ? "maternity"
+            : lowered.includes("paternity")
+              ? "paternity"
+              : "annual")
+
+      // Dual-write payloads for 014 (policy_name/max_days) and 059 (name/days)
+      const attempts = [
+        {
+          company_id: companyId,
+          name: policyName,
+          policy_name: policyName,
+          policy_type: policyType,
+          days,
+          max_days: days,
+          description: policy.description || "",
+          carry_over: !!policy.carryOver,
+          carry_over_days: policy.carryOver ? days : 0,
+          usage_rate: policy.usage || "0%",
+          trend: policy.trend || "new",
+          is_active: true,
+          updated_at: now,
+        },
+        {
+          company_id: companyId,
+          policy_name: policyName,
+          policy_type: policyType,
+          max_days: days,
+          description: policy.description || "",
+          is_active: true,
+          updated_at: now,
+        },
+        {
+          company_id: companyId,
+          name: policyName,
+          days,
+          description: policy.description || "",
+          carry_over: !!policy.carryOver,
+          usage_rate: policy.usage || "0%",
+          trend: policy.trend || "new",
+          is_active: true,
+          updated_at: now,
+        },
+      ]
+
+      const isColumnError = (error: any) => {
+        const msg = String(error?.message || "").toLowerCase()
+        return (
+          error?.code === "PGRST204" ||
+          msg.includes("column") ||
+          msg.includes("could not find") ||
+          msg.includes("schema cache")
+        )
+      }
+
+      const writeLeave = async (rowId?: string) => {
+        let lastError: any = null
+        for (const attempt of attempts) {
+          const query = rowId
+            ? service.from("leave_policies").update(attempt).eq("id", rowId).eq("company_id", companyId)
+            : service.from("leave_policies").insert({ ...attempt, created_at: now })
+          const { data, error } = await query.select().single()
+          if (!error) return data
+          lastError = error
+          if (isColumnError(error)) continue
+          throw error
+        }
+        throw lastError || new Error("Failed to save leave policy")
+      }
+
+      let targetId = isUuid(policy.id) ? policy.id : null
+      if (!targetId) {
+        const { data: existing } = await service
           .from("leave_policies")
-          .update(row)
-          .eq("id", policy.id)
+          .select("id")
           .eq("company_id", companyId)
-          .select()
-          .single()
-        if (error) throw error
-        return NextResponse.json({ success: true, policy: data })
+          .or(`name.eq."${policyName}",policy_name.eq."${policyName}"`)
+          .limit(1)
+          .maybeSingle()
+        if (existing?.id) targetId = existing.id
       }
-      const { data, error } = await service
-        .from("leave_policies")
-        .insert({ ...row, created_at: now })
-        .select()
-        .single()
-      if (error) {
-        // Name collision: reactivate / update existing row
+
+      try {
+        const data = await writeLeave(targetId || undefined)
+        return NextResponse.json({ success: true, policy: data })
+      } catch (error: any) {
         if (String(error.message || "").toLowerCase().includes("duplicate") || error.code === "23505") {
-          const { data: existing, error: upsertError } = await service
+          const { data: byName } = await service
             .from("leave_policies")
-            .upsert(row, { onConflict: "company_id,name" })
-            .select()
-            .single()
-          if (upsertError) throw upsertError
-          return NextResponse.json({ success: true, policy: existing })
+            .select("id")
+            .eq("company_id", companyId)
+            .or(`name.eq."${policyName}",policy_name.eq."${policyName}"`)
+            .limit(1)
+            .maybeSingle()
+          if (byName?.id) {
+            const data = await writeLeave(byName.id)
+            return NextResponse.json({ success: true, policy: data })
+          }
         }
         throw error
       }
-      return NextResponse.json({ success: true, policy: data })
     }
 
     if (action === "delete_leave_policy") {
@@ -258,7 +329,7 @@ export async function POST(req: NextRequest) {
       const name = body.name
       let query = service.from("leave_policies").update({ is_active: false, updated_at: now }).eq("company_id", companyId)
       if (isUuid(id)) query = query.eq("id", id)
-      else if (name) query = query.eq("name", name)
+      else if (name) query = query.or(`name.eq."${name}",policy_name.eq."${name}"`)
       else return NextResponse.json({ error: "id or name required" }, { status: 400 })
       const { error } = await query
       if (error) throw error
