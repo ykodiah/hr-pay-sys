@@ -241,6 +241,30 @@ const toTitleCase = (value: string) =>
     .toLowerCase()
     .replace(/\b\w/g, (char) => char.toUpperCase())
 
+type NotificationPreference = {
+  key: string
+  label: string
+  description: string
+  enabled: boolean
+  channels: string[]
+}
+
+async function settingsFetch(url: string, init?: RequestInit) {
+  const res = await fetch(url, {
+    credentials: "include",
+    ...init,
+    headers: {
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.headers || {}),
+    },
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(data.error || data.message || `Request failed (${res.status})`)
+  }
+  return data
+}
+
 const ensureStringArray = (value: unknown): string[] => {
   if (Array.isArray(value)) {
     return value.filter((item): item is string => typeof item === "string")
@@ -359,6 +383,18 @@ export default function SettingsPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([])
   const [roles, setRoles] = useState<Role[]>([])
+  const [showRoleModal, setShowRoleModal] = useState(false)
+  const [roleModalType, setRoleModalType] = useState<"add" | "edit">("add")
+  const [editingRole, setEditingRole] = useState<Role | null>(null)
+  const [roleForm, setRoleForm] = useState({ name: "", description: "", permissions: "" })
+  const [isSavingRole, setIsSavingRole] = useState(false)
+  const [syncPrefs, setSyncPrefs] = useState({
+    sync_hr_policies: true,
+    sync_payroll_config: true,
+    sync_leave_types: true,
+    sync_roles_permissions: false,
+  })
+  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreference[]>([])
   const [isBackingUp, setIsBackingUp] = useState<boolean>(false)
   const [lastBackupTime, setLastBackupTime] = useState<string | null>(null)
   const [showAddSubsidiary, setShowAddSubsidiary] = useState<boolean>(false)
@@ -1345,34 +1381,14 @@ export default function SettingsPage() {
 
     try {
       const currentCompanyId = await fetchCurrentCompanyId()
-
-      const companyBaseQuery = supabase.from("companies").select("*")
-
-      const companyRequest = currentCompanyId
-        ? companyBaseQuery.eq("id", currentCompanyId).maybeSingle()
-        : companyBaseQuery.order("created_at", { ascending: false }).limit(1).maybeSingle()
-
-      const { data, error } = await companyRequest
-
-      if (error) throw error
-
+      const qs = currentCompanyId ? `?company_id=${encodeURIComponent(currentCompanyId)}` : ""
+      const payload = await settingsFetch(`/api/settings/company${qs}`)
+      const data = payload.company
       if (data) {
-        const { data: rawCompanySettings, error: companySettingsError } = await supabase
-          .from("company_settings")
-          .select("settings_data, fiscal_year_start, default_currency, timezone, language")
-          .eq("company_id", data.id)
-          .maybeSingle()
-
-        if (companySettingsError) {
-          console.warn("[v0] Unable to load company_settings entry", companySettingsError)
-        }
-
-        const settingsPayload = rawCompanySettings?.settings_data || {}
-        const divisions = ensureStringArray(settingsPayload.divisions ?? data.divisions)
-        const departments = ensureStringArray(settingsPayload.departments ?? data.departments)
-        const locations = ensureStringArray(settingsPayload.locations ?? data.locations)
-        const logoFromSettings = typeof settingsPayload.logo_url === "string" ? settingsPayload.logo_url : undefined
-        const resolvedLogoUrl = (data.logo_url as string | undefined) || logoFromSettings || ""
+        const divisions = ensureStringArray(data.divisions)
+        const departments = ensureStringArray(data.departments)
+        const locations = ensureStringArray(data.locations)
+        const resolvedLogoUrl = data.logo_url || ""
 
         setCompanyData({
           id: data.id,
@@ -1630,52 +1646,21 @@ export default function SettingsPage() {
 
     try {
       const targetCompanyId = companyId || companyData.id
-
-      let subsidiariesQuery = supabase.from("subsidiaries").select("*").order("created_at", { ascending: false })
-
-      if (targetCompanyId) {
-        subsidiariesQuery = subsidiariesQuery.eq("company_id", targetCompanyId)
-      }
-
-      const employeeQuery = targetCompanyId
-        ? supabase.from("employees").select("id, subsidiary_id").eq("company_id", targetCompanyId)
-        : supabase.from("employees").select("id, subsidiary_id")
-
-      const [{ data: subsidiariesData, error: subsidiariesError }, { data: employeesData, error: employeesError }] = await Promise.all([
-        subsidiariesQuery,
-        employeeQuery,
+      const qs = targetCompanyId ? `?company_id=${encodeURIComponent(targetCompanyId)}` : ""
+      const [{ subsidiaries: processedSubsidiaries }, prefsPayload] = await Promise.all([
+        settingsFetch(`/api/settings/subsidiaries${qs}`),
+        settingsFetch(`/api/settings/subsidiaries${qs}${qs ? "&" : "?"}action=sync_preferences`).catch(() => null),
       ])
-
-      if (subsidiariesError) throw subsidiariesError
-      if (employeesError) throw employeesError
-
-      const employeeCounts = (employeesData || []).reduce<Record<string, number>>((acc, employee) => {
-        if (employee.subsidiary_id) {
-          acc[employee.subsidiary_id] = (acc[employee.subsidiary_id] || 0) + 1
-        }
-        return acc
-      }, {})
-
-      const processedSubsidiaries = (subsidiariesData || []).map((sub: any) => {
-        const divisions = ensureStringArray(sub.divisions)
-        const departments = ensureStringArray(sub.departments)
-        const locations = ensureStringArray(sub.locations)
-
-        return {
-          ...sub,
-          divisions,
-          departments,
-          locations,
-          divisions_count: divisions.length,
-          departments_count: departments.length,
-          locations_count: locations.length,
-          employee_count: employeeCounts[sub.id] ?? sub.employee_count ?? 0,
-          logo_url: sub.logo_url || null,
-        }
-      })
-
-      setSubsidiaries(processedSubsidiaries)
-      console.log("[v0] Loaded subsidiaries:", processedSubsidiaries.length)
+      setSubsidiaries(processedSubsidiaries || [])
+      if (prefsPayload?.preferences) {
+        setSyncPrefs({
+          sync_hr_policies: !!prefsPayload.preferences.sync_hr_policies,
+          sync_payroll_config: !!prefsPayload.preferences.sync_payroll_config,
+          sync_leave_types: !!prefsPayload.preferences.sync_leave_types,
+          sync_roles_permissions: !!prefsPayload.preferences.sync_roles_permissions,
+        })
+      }
+      console.log("[v0] Loaded subsidiaries:", (processedSubsidiaries || []).length)
     } catch (error) {
       console.error("Subsidiaries loading error:", error)
       toast({
@@ -1719,16 +1704,9 @@ export default function SettingsPage() {
 
     try {
       const targetCompanyId = companyId || companyData.id
-      let query = supabase.from("roles").select("*").order("created_at", { ascending: false })
-
-      if (targetCompanyId) {
-        query = query.eq("company_id", targetCompanyId)
-      }
-
-      const { data, error } = await query
-
-      if (error) throw error
-      setRoles(data || [])
+      const qs = targetCompanyId ? `?company_id=${encodeURIComponent(targetCompanyId)}` : ""
+      const { roles: roleRows } = await settingsFetch(`/api/settings/roles${qs}`)
+      setRoles(roleRows || [])
     } catch (error) {
       console.error("Error loading roles:", error)
       if (error.message && error.message.includes("infinite recursion detected in policy")) {
@@ -1840,95 +1818,19 @@ export default function SettingsPage() {
     }
 
     try {
-      const [
-        { data: accessData, error: accessError },
-        { data: securityData, error: securityError },
-        { data: backupRows, error: backupError },
-        { data: sessionsData, error: sessionsError },
-        { data: auditData, error: auditError },
-      ] = await Promise.all([
-        supabase.from("access_control_settings").select("*").eq("company_id", targetCompanyId).maybeSingle(),
-        supabase.from("security_settings").select("*").eq("company_id", targetCompanyId).maybeSingle(),
-        supabase
-          .from("backup_history")
-          .select("id, backup_status, backup_size, started_at, completed_at")
-          .eq("company_id", targetCompanyId)
-          .order("started_at", { ascending: false })
-          .limit(1),
-        supabase
-          .from("active_sessions")
-          .select("id, user_email, ip_address, device, last_activity, is_active")
-          .order("last_activity", { ascending: false })
-          .limit(12),
-        supabase
-          .from("access_logs")
-          .select(
-            `id, action, ip_address, created_at, success, failure_reason, employees:employee_id (full_name, corporate_email)`
-          )
-          .eq("company_id", targetCompanyId)
-          .order("created_at", { ascending: false })
-          .limit(12),
+      const qs = `?company_id=${encodeURIComponent(targetCompanyId)}`
+      const [accessPayload, securityPayload] = await Promise.all([
+        settingsFetch(`/api/settings/access${qs}`),
+        settingsFetch(`/api/settings/security${qs}`),
       ])
 
-      if (accessError) throw accessError
-      if (securityError) throw securityError
-      if (backupError) throw backupError
-      if (sessionsError) throw sessionsError
-      if (auditError) throw auditError
-
-      if (accessData) {
-        setAccessSettings({
-          twoFactorEnabled: !!accessData.two_factor_enabled,
-          ssoEnabled: !!accessData.sso_enabled,
-          passwordExpiryEnabled: !!accessData.password_expiry_enabled,
-          sessionTimeout: accessData.session_timeout ?? 30,
-          maxLoginAttempts: accessData.max_login_attempts ?? 5,
-          passwordMinLength: accessData.password_min_length ?? 8,
-          ipRestrictionsEnabled: !!accessData.ip_restrictions_enabled,
-          allowedIPs: ensureStringArray(accessData.allowed_ips),
-        })
-      }
-
-      if (securityData) {
-        setSecuritySettings({
-          dataEncryptionEnabled: !!securityData.data_encryption_enabled,
-          auditLoggingEnabled: !!securityData.audit_logging_enabled,
-          autoBackupEnabled: !!securityData.auto_backup_enabled,
-          backupFrequency: securityData.backup_frequency || "daily",
-          dataRetentionDays: securityData.data_retention_days ?? 90,
-        })
-      }
-
-      const latestBackup = backupRows?.[0]
-      setLastBackupTime(latestBackup?.completed_at || latestBackup?.started_at || null)
-      setBackupStatus(latestBackup?.backup_status ? toTitleCase(latestBackup.backup_status) : null)
-      setBackupSize(formatBytes(latestBackup?.backup_size))
-
-      if (sessionsData) {
-        const active = sessionsData.filter((session) => session.is_active !== false)
-        setActiveSessions(
-          active.map((session) => ({
-            id: session.id,
-            user_email: session.user_email || "Unknown",
-            ip_address: session.ip_address || "—",
-            device: session.device || "Unspecified",
-            last_activity: session.last_activity || new Date().toISOString(),
-          }))
-        )
-      }
-
-      if (auditData) {
-        setAuditLogs(
-          auditData.map((log) => ({
-            id: log.id,
-            user_email: log.employees?.corporate_email || log.employees?.full_name || "Unknown user",
-            action: log.action || log.failure_reason || "Access event",
-            timestamp: log.created_at,
-            ip_address: log.ip_address || "—",
-            severity: log.success === false ? "high" : "low",
-          }))
-        )
-      }
+      if (accessPayload.accessSettings) setAccessSettings(accessPayload.accessSettings)
+      if (accessPayload.activeSessions) setActiveSessions(accessPayload.activeSessions)
+      if (securityPayload.securitySettings) setSecuritySettings(securityPayload.securitySettings)
+      setLastBackupTime(securityPayload.lastBackupTime || null)
+      setBackupStatus(securityPayload.backupStatus || null)
+      setBackupSize(securityPayload.backupSize || "0 MB")
+      if (securityPayload.auditLogs) setAuditLogs(securityPayload.auditLogs)
 
       console.log("[v0] Access and security data loaded from database.")
     } catch (error) {
@@ -1954,45 +1856,12 @@ export default function SettingsPage() {
     }
 
     try {
-      const [{ data: configuration, error: configError }, { data: documents, error: documentsError }] = await Promise.all([
-        supabase.from("hr_configuration").select("*").eq("company_id", targetCompanyId).maybeSingle(),
-        supabase
-          .from("hr_documents")
-          .select("id, document_name, document_type, file_path, file_size, visible_to_all, created_at")
-          .eq("company_id", targetCompanyId)
-          .order("created_at", { ascending: false }),
-      ])
-
-      if (configError) throw configError
-      if (documentsError) throw documentsError
-
-      if (configuration) {
-        setHrConfig({
-          leaveYearStart: configuration.leave_year_start || "January",
-          probationPeriod: configuration.probation_period ?? 3,
-          workingHoursPerDay: configuration.working_hours_per_day ?? 8,
-          workingDaysPerWeek: configuration.working_days_per_week ?? 5,
-          autoApproveLeave: !!configuration.auto_approve_leave,
-          emailNotifications: !!configuration.email_notifications,
-          aiRecommendations: !!configuration.ai_recommendations,
-          smartScheduling: !!configuration.smart_scheduling,
-          performanceTracking: !!configuration.performance_tracking,
-        })
-      }
-
-      if (documents) {
-        setHrDocuments(
-          documents.map((doc) => ({
-            id: String(doc.id),
-            name: doc.document_name,
-            type: doc.document_type,
-            size: formatBytes(doc.file_size),
-            visibleToAll: !!doc.visible_to_all,
-            fileUrl: doc.file_path,
-            uploadedAt: doc.created_at || new Date().toISOString(),
-          }))
-        )
-      }
+      const payload = await settingsFetch(`/api/settings/hr?company_id=${encodeURIComponent(targetCompanyId)}`)
+      if (payload.hrConfig) setHrConfig(payload.hrConfig)
+      if (payload.hrDocuments) setHrDocuments(payload.hrDocuments)
+      if (payload.leavePolicies?.length) setCurrentPolicies(payload.leavePolicies)
+      if (payload.salaryGrades) setSalaryGrades(payload.salaryGrades)
+      if (payload.unstructuredGrades) setUnstructuredGrades(payload.unstructuredGrades)
     } catch (error) {
       console.error("[v0] Failed to load HR configuration/documents", error)
       toast({
@@ -2057,105 +1926,15 @@ export default function SettingsPage() {
     void loadPayrollSettings(targetCompanyId)
 
     try {
-      const [
-        { data: structuredGrades, error: structuredError },
-        { data: unstructured, error: unstructuredError },
-        { data: allowanceRows },
-        { data: deductionRows },
-      ] = await Promise.all([
-        supabase
-          .from("salary_grades")
-          .select("id, grade_name, grade_level, step_1, step_2, step_3, step_4, step_5")
-          .eq("company_id", targetCompanyId)
-          .order("grade_level", { ascending: true }),
-        supabase
-          .from("unstructured_salary_grades")
-          .select(
-            "id, grade_name, description, general_increment_type, general_increment_value, performance_increment_type, performance_increment_value"
-          )
-          .eq("company_id", targetCompanyId)
-          .order("created_at", { ascending: true }),
-        supabase
-          .from("payroll_allowances")
-          .select("code, description, taxable, recurring, amount, percentage, type, is_active")
-          .eq("company_id", targetCompanyId)
-          .eq("is_active", true)
-          .order("code"),
-        supabase
-          .from("payroll_deductions")
-          .select("code, description, taxable, recurring, amount, percentage, type, is_active")
-          .eq("company_id", targetCompanyId)
-          .eq("is_active", true)
-          .order("code"),
+      const [items, hr] = await Promise.all([
+        settingsFetch(`/api/settings/payroll/items?company_id=${encodeURIComponent(targetCompanyId)}`),
+        settingsFetch(`/api/settings/hr?company_id=${encodeURIComponent(targetCompanyId)}`),
       ])
-
-      if (structuredError) throw structuredError
-      if (unstructuredError) throw unstructuredError
-
-      if (allowanceRows?.length) {
-        setAllowances(
-          allowanceRows.map((a) => ({
-            code: a.code,
-            description: a.description,
-            taxable: Boolean(a.taxable),
-            recurring: a.recurring !== false,
-            amount: Number(a.amount || 0),
-            percentage: Number(a.percentage || 0),
-            type: a.type || "FIXED",
-          })),
-        )
-      }
-      if (deductionRows?.length) {
-        setDeductions(
-          deductionRows.map((d) => ({
-            code: d.code,
-            description: d.description,
-            recurring: d.recurring !== false,
-            amount: Number(d.amount || 0),
-            percentage: Number(d.percentage || 0),
-            type: d.type || "FIXED",
-          })),
-        )
-      }
-
-      if (structuredGrades) {
-        setSalaryGrades(
-          structuredGrades.map((grade) => {
-            const stepValues = [grade.step_1, grade.step_2, grade.step_3, grade.step_4, grade.step_5].filter(
-              (value) => typeof value === "number",
-            ) as number[]
-
-            const notches = stepValues.map((amount, index) => ({ step: index + 1, amount: Number(amount) }))
-
-            return {
-              id: grade.id,
-              name: grade.grade_name || `Grade ${grade.grade_level}`,
-              description: grade.grade_name,
-              minSalary: notches[0]?.amount ?? 0,
-              maxSalary: notches[notches.length - 1]?.amount ?? notches[0]?.amount ?? 0,
-              notches,
-            }
-          })
-        )
-      }
-
-      if (unstructured) {
-        setUnstructuredGrades(
-          unstructured.map((grade) => ({
-            id: grade.id,
-            name: grade.grade_name,
-            description: grade.description || "",
-            generalIncrement: {
-              type: (grade.general_increment_type || "percentage") as "percentage" | "fixed",
-              value: Number(grade.general_increment_value ?? 0),
-            },
-            performanceIncrement: {
-              type: (grade.performance_increment_type || "percentage") as "percentage" | "fixed",
-              value: Number(grade.performance_increment_value ?? 0),
-            },
-          }))
-        )
-      }
+      if (items.allowances?.length) setAllowances(items.allowances)
+      if (items.deductions?.length) setDeductions(items.deductions)
+      if (items.taxReliefs?.length) setTaxReliefs(items.taxReliefs)
+      if (hr.salaryGrades) setSalaryGrades(hr.salaryGrades)
+      if (hr.unstructuredGrades) setUnstructuredGrades(hr.unstructuredGrades)
     } catch (error) {
       console.error("[v0] Failed to load payroll configuration", error)
       toast({
@@ -2179,48 +1958,12 @@ export default function SettingsPage() {
     }
 
     try {
-      const { data, error } = await supabase
-        .from("notification_settings")
-        .select("id, category, notification_type, is_enabled, delivery_method")
-        .eq("company_id", targetCompanyId)
-        .limit(200)
-
-      if (error) throw error
-
-      if (!data || data.length === 0) {
-        return
-      }
-
-      const aggregated = new Map<string, NotificationPreference>()
-
-      data.forEach((row) => {
-        const key = `${row.category}:${row.notification_type}`
-        const channels = ensureStringArray(row.delivery_method)
-        const label = toTitleCase(row.notification_type || row.category)
-        const description = `Control delivery for ${toTitleCase(row.category)} notifications`
-
-        if (aggregated.has(key)) {
-          const existing = aggregated.get(key)!
-          existing.enabled = existing.enabled || row.is_enabled
-          channels.forEach((channel) => {
-            if (!existing.channels.includes(channel)) {
-              existing.channels.push(channel)
-            }
-          })
-        } else {
-          aggregated.set(key, {
-            key,
-            label,
-            description,
-            enabled: row.is_enabled,
-            channels,
-          })
-        }
-      })
-
-      if (aggregated.size > 0) {
-        setNotificationPreferences(Array.from(aggregated.values()))
-      }
+      const payload = await settingsFetch(
+        `/api/settings/notifications?company_id=${encodeURIComponent(targetCompanyId)}`,
+      )
+      if (payload.templates?.length) setNotificationTemplates(payload.templates)
+      if (payload.emailConfig) setEmailConfig(payload.emailConfig)
+      if (payload.preferences) setNotificationSettings((prev) => ({ ...prev, ...payload.preferences }))
     } catch (error) {
       console.error("[v0] Failed to load notification settings", error)
       toast({
@@ -2289,17 +2032,21 @@ export default function SettingsPage() {
     }
 
     try {
-      // Simulate settings sync process
-      const { error } = await supabase
-        .from("subsidiaries")
-        .update({
-          settings_synced_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", subsidiaryId)
-
-      if (error) throw error
-
+      await settingsFetch("/api/settings/subsidiaries", {
+        method: "POST",
+        body: JSON.stringify({
+          company_id: companyData.id,
+          action: "sync",
+          subsidiary_id: subsidiaryId,
+          sync_types: [
+            syncPrefs.sync_hr_policies ? "hr_policies" : null,
+            syncPrefs.sync_payroll_config ? "payroll_config" : null,
+            syncPrefs.sync_leave_types ? "leave_types" : null,
+            syncPrefs.sync_roles_permissions ? "roles" : null,
+          ].filter(Boolean),
+        }),
+      })
+      await loadSubsidiaries(companyData.id)
       toast({
         title: "Settings Synced",
         description: "Subsidiary settings synchronized successfully",
@@ -2374,14 +2121,13 @@ export default function SettingsPage() {
     }
 
     try {
-      const { data: employees, error } = await supabase.from("employees").select("*").eq("subsidiary_id", subsidiaryId)
-
-      if (error) throw error
-
+      const payload = await settingsFetch(
+        `/api/settings/subsidiaries?action=employees&company_id=${encodeURIComponent(companyData.id || "")}&subsidiary_id=${encodeURIComponent(subsidiaryId)}`,
+      )
       setViewEmployeesModal({
         isOpen: true,
         subsidiaryId,
-        employees: employees || [],
+        employees: payload.employees || [],
       })
     } catch (error) {
       console.error("View employees error:", error)
@@ -2430,33 +2176,28 @@ export default function SettingsPage() {
     }
 
     try {
-      const { data, error } = await supabase
-        .from("subsidiaries")
-        .insert([
-          {
-            company_id: companyData?.id,
-            name: subsidiaryData.name,
-            tax_id: subsidiaryData.tax_id,
-            ssnit_number: subsidiaryData.ssnit_number,
-            address: subsidiaryData.address,
-            phone_number: subsidiaryData.phone_number,
-            email_address: subsidiaryData.email_address,
-            industry: subsidiaryData.industry,
-            status: "active",
-            divisions: subsidiaryData.divisions || [],
-            departments: subsidiaryData.departments || [],
-            locations: subsidiaryData.locations || [],
-            logo_url: subsidiaryLogoPreview || "", // Include uploaded logo URL
-          },
-        ])
-        .select()
+      await settingsFetch("/api/settings/subsidiaries", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "create",
+          company_id: companyData?.id,
+          name: subsidiaryData.name,
+          tax_id: subsidiaryData.tax_id,
+          ssnit_number: subsidiaryData.ssnit_number,
+          address: subsidiaryData.address,
+          phone_number: subsidiaryData.phone_number,
+          email_address: subsidiaryData.email_address,
+          industry: subsidiaryData.industry,
+          status: "active",
+          divisions: subsidiaryData.divisions || [],
+          departments: subsidiaryData.departments || [],
+          locations: subsidiaryData.locations || [],
+          logo_url: subsidiaryLogoPreview || "",
+        }),
+      })
 
-      if (error) throw error
-
-      await loadSubsidiaries() // Reload the list
-
+      await loadSubsidiaries(companyData?.id)
       setSubsidiaryLogoPreview("")
-
       toast({
         title: "Subsidiary Added",
         description: "New subsidiary created successfully",
@@ -2509,19 +2250,16 @@ export default function SettingsPage() {
     }
 
     try {
-      const { error } = await supabase
-        .from("subsidiaries")
-        .update({
+      await settingsFetch("/api/settings/subsidiaries", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "update",
+          company_id: companyData?.id,
+          id: subsidiaryId,
           ...updates,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", subsidiaryId)
-
-      if (error) throw error
-
-      // Reload subsidiaries to get fresh data
-      await loadSubsidiaries()
-
+        }),
+      })
+      await loadSubsidiaries(companyData?.id)
       toast({
         title: "Success",
         description: "Subsidiary updated successfully",
@@ -2573,10 +2311,10 @@ export default function SettingsPage() {
     }
 
     try {
-      const { error } = await supabase.from("subsidiaries").delete().eq("id", subsidiaryId)
-
-      if (error) throw error
-
+      await settingsFetch("/api/settings/subsidiaries", {
+        method: "POST",
+        body: JSON.stringify({ action: "delete", company_id: companyData?.id, id: subsidiaryId }),
+      })
       setSubsidiaries((prev) => prev.filter((s) => s.id !== subsidiaryId))
       toast({
         title: "Subsidiary Deleted",
@@ -2653,39 +2391,101 @@ export default function SettingsPage() {
   }
 
   const handleAddRoleInner = () => {
-    toast({
-      title: "Add Role",
-      description: "Opening role creation form...",
-    })
+    setRoleModalType("add")
+    setEditingRole(null)
+    setRoleForm({ name: "", description: "", permissions: "hr, employees, reports" })
+    setShowRoleModal(true)
   }
 
   const handleEditRoleInner = (roleName: string) => {
-    toast({
-      title: "Edit Role",
-      description: `Editing ${roleName} role...`,
+    const role = roles.find((r) => r.name === roleName) || null
+    setRoleModalType("edit")
+    setEditingRole(role)
+    setRoleForm({
+      name: role?.name || roleName,
+      description: role?.description || "",
+      permissions: Array.isArray(role?.permissions) ? role.permissions.join(", ") : "",
     })
+    setShowRoleModal(true)
   }
 
-  const handleBackupNowInner = async () => {
-    setIsBackingUp(true)
+  const handleSaveRole = async () => {
+    if (!roleForm.name.trim()) {
+      toast({ title: "Validation Error", description: "Role name is required", variant: "destructive" })
+      return
+    }
+    setIsSavingRole(true)
     try {
-      // Simulate backup process
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-      setLastBackupTime(new Date().toISOString())
-      setBackupSize("55 MB") // Simulate updated size
-      setBackupStatus("Completed")
+      if (isDemoMode()) {
+        const demoRole = {
+          id: editingRole?.id || `role-${Date.now()}`,
+          name: roleForm.name.trim(),
+          description: roleForm.description.trim(),
+          permissions: roleForm.permissions.split(",").map((p) => p.trim()).filter(Boolean),
+          user_count: editingRole?.user_count || 0,
+        }
+        setRoles((prev) =>
+          roleModalType === "edit"
+            ? prev.map((r) => (r.id === demoRole.id || r.name === editingRole?.name ? demoRole : r))
+            : [demoRole, ...prev],
+        )
+      } else {
+        const payload = await settingsFetch("/api/settings/roles", {
+          method: "POST",
+          body: JSON.stringify({
+            action: "save",
+            company_id: companyData.id,
+            role: {
+              id: editingRole?.id,
+              name: roleForm.name.trim(),
+              description: roleForm.description.trim(),
+              permissions: roleForm.permissions.split(",").map((p) => p.trim()).filter(Boolean),
+            },
+          }),
+        })
+        await loadRoles(companyData.id)
+        void payload
+      }
+      setShowRoleModal(false)
       toast({
-        title: "Backup Successful",
-        description: "Manual backup completed.",
+        title: roleModalType === "edit" ? "Role Updated" : "Role Created",
+        description: `${roleForm.name} has been saved successfully`,
       })
     } catch (error) {
       toast({
-        title: "Backup Failed",
-        description: "Failed to complete system backup.",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save role",
+        variant: "destructive",
       })
     } finally {
-      setIsBackingUp(false)
+      setIsSavingRole(false)
     }
+  }
+
+  const handleDeleteRole = async (roleId: string) => {
+    if (!confirm("Delete this role?")) return
+    try {
+      if (isDemoMode()) {
+        setRoles((prev) => prev.filter((r) => r.id !== roleId))
+      } else {
+        await settingsFetch("/api/settings/roles", {
+          method: "POST",
+          body: JSON.stringify({ action: "delete", company_id: companyData.id, id: roleId }),
+        })
+        await loadRoles(companyData.id)
+      }
+      toast({ title: "Role Deleted", description: "Role removed successfully" })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete role",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleBackupNowInner = async () => {
+    await handleBackupNow()
   }
 
   const handleSyncAllSettings = async () => {
@@ -2700,16 +2500,20 @@ export default function SettingsPage() {
     }
 
     try {
-      const { error } = await supabase
-        .from("subsidiaries")
-        .update({
-          settings_synced_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .neq("id", "00000000-0000-0000-0000-000000000000")
-
-      if (error) throw error
-
+      await settingsFetch("/api/settings/subsidiaries", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "sync",
+          company_id: companyData.id,
+          sync_types: [
+            syncPrefs.sync_hr_policies ? "hr_policies" : null,
+            syncPrefs.sync_payroll_config ? "payroll_config" : null,
+            syncPrefs.sync_leave_types ? "leave_types" : null,
+            syncPrefs.sync_roles_permissions ? "roles" : null,
+          ].filter(Boolean),
+        }),
+      })
+      await loadSubsidiaries(companyData.id)
       toast({
         title: "Settings Synchronized",
         description: "All subsidiary settings have been synchronized successfully",
@@ -2728,7 +2532,11 @@ export default function SettingsPage() {
     console.log("[v0] Exporting settings template")
 
     try {
-      const response = await fetch("/api/subsidiaries/export")
+      const companyId = companyData.id || (await loadCompanyData())
+      const response = await fetch(
+        `/api/settings/subsidiaries?action=export&company_id=${encodeURIComponent(companyId || "")}`,
+        { credentials: "include" },
+      )
 
       if (!response.ok) throw new Error("Export failed")
 
@@ -2760,25 +2568,38 @@ export default function SettingsPage() {
     console.log("[v0] Importing settings from file:", file.name)
 
     try {
-      const formData = new FormData()
-      formData.append("file", file)
+      const text = await file.text()
+      const lines = text.split("\n").filter((line) => line.trim())
+      if (lines.length < 2) throw new Error("Invalid file format")
+      const rows = lines.slice(1).map((line) => {
+        const fields = line.split(",").map((field) => field.replace(/"/g, "").trim())
+        return {
+          name: fields[0],
+          tax_id: fields[1],
+          ssnit_number: fields[2],
+          address: fields[3],
+          phone_number: fields[4],
+          email_address: fields[5],
+          industry: fields[6],
+          status: fields[7] || "active",
+          divisions: fields[8] ? fields[8].split(";").map((d) => d.trim()) : [],
+          departments: fields[9] ? fields[9].split(";").map((d) => d.trim()) : [],
+          locations: fields[10] ? fields[10].split(";").map((l) => l.trim()) : [],
+        }
+      }).filter((r) => r.name)
 
-      const response = await fetch("/api/subsidiaries/import", {
+      const companyId = companyData.id || (await loadCompanyData())
+      const result = await settingsFetch("/api/settings/subsidiaries", {
         method: "POST",
-        body: formData,
+        body: JSON.stringify({ action: "import", company_id: companyId, rows }),
       })
-
-      const result = await response.json()
-
-      if (!response.ok) throw new Error(result.error)
 
       toast({
         title: "Import Successful",
-        description: result.message,
+        description: `Successfully imported ${result.count || rows.length} subsidiaries`,
       })
 
-      // Refresh subsidiaries list
-      await loadSubsidiaries()
+      await loadSubsidiaries(companyId || undefined)
     } catch (error) {
       console.error("Import error:", error)
       toast({
@@ -2820,9 +2641,10 @@ export default function SettingsPage() {
         return value || null
       })()
 
-      const { error: companyError } = await supabase
-        .from("companies")
-        .update({
+      await settingsFetch("/api/settings/company", {
+        method: "POST",
+        body: JSON.stringify({
+          company_id: companyId,
           name: companyData.name,
           industry: companyData.industry,
           tax_id: companyData.tax_id,
@@ -2834,50 +2656,26 @@ export default function SettingsPage() {
           departments,
           locations,
           logo_url: normalizedCompanyLogo,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", companyId)
+        }),
+      })
 
-      if (companyError) throw companyError
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_config",
+          company_id: companyId,
+          config: hrConfig,
+        }),
+      })
 
-      const { error: companySettingsError } = await supabase
-        .from("company_settings")
-        .upsert(
-          {
-            company_id: companyId,
-            settings_data: {
-              divisions,
-              departments,
-              locations,
-              logo_url: normalizedCompanyLogo,
-            },
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "company_id" },
-        )
-
-      if (companySettingsError) throw companySettingsError
-
-      const { error: hrConfigError } = await supabase
-        .from("hr_configuration")
-        .upsert(
-          {
-            company_id: companyId,
-            leave_year_start: hrConfig.leaveYearStart,
-            probation_period: hrConfig.probationPeriod,
-            working_hours_per_day: hrConfig.workingHoursPerDay,
-            working_days_per_week: hrConfig.workingDaysPerWeek,
-            auto_approve_leave: hrConfig.autoApproveLeave,
-            email_notifications: hrConfig.emailNotifications,
-            ai_recommendations: hrConfig.aiRecommendations,
-            smart_scheduling: hrConfig.smartScheduling,
-            performance_tracking: hrConfig.performanceTracking,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "company_id" },
-        )
-
-      if (hrConfigError) throw hrConfigError
+      await settingsFetch("/api/settings/subsidiaries", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_sync_preferences",
+          company_id: companyId,
+          ...syncPrefs,
+        }),
+      }).catch(() => null)
 
       await loadAllData()
 
@@ -2904,23 +2702,31 @@ export default function SettingsPage() {
 
     try {
       if (isDemoMode()) {
-        // Simulate saving delay for demo
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-
+        await new Promise((resolve) => setTimeout(resolve, 400))
         toast({
           title: "Changes Saved",
           description: "Subsidiary changes have been saved successfully (Demo Mode)",
         })
-        setIsSavingSubsidiary(false)
         return
       }
 
-      // Save any pending subsidiary changes
-      await loadSubsidiaries()
+      const companyId = companyData.id || (await loadCompanyData())
+      if (!companyId) throw new Error("No company identifier available")
+
+      await settingsFetch("/api/settings/subsidiaries", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_sync_preferences",
+          company_id: companyId,
+          ...syncPrefs,
+        }),
+      })
+
+      await loadSubsidiaries(companyId)
 
       toast({
         title: "Changes Saved",
-        description: "Subsidiary changes have been saved and updated successfully",
+        description: "Subsidiary sync preferences saved and list refreshed",
       })
     } catch (error) {
       console.error("Save subsidiary changes error:", error)
@@ -2958,8 +2764,17 @@ export default function SettingsPage() {
 
     setIsSavingPolicy(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
+      if (!isDemoMode() && companyData.id) {
+        await settingsFetch("/api/settings/hr", {
+          method: "POST",
+          body: JSON.stringify({
+            action: "delete_leave_policy",
+            company_id: companyData.id,
+            id: selectedPolicy.id,
+            name: selectedPolicy.name,
+          }),
+        })
+      }
       setCurrentPolicies((prev) => prev.filter((policy) => policy.name !== selectedPolicy.name))
       setShowPolicyModal(false)
 
@@ -2978,14 +2793,35 @@ export default function SettingsPage() {
     }
   }
 
-  const handleToggleDocumentVisibility = (docId: number) => {
-    setHrDocuments((prev) => prev.map((doc) => (doc.id === docId ? { ...doc, visibleToAll: !doc.visibleToAll } : doc)))
-
-    const doc = hrDocuments.find((d) => d.id === docId)
-    toast({
-      title: "Visibility Updated",
-      description: `${doc?.name} is now ${doc?.visibleToAll ? "hidden from" : "visible to"} all employees.`,
-    })
+  const handleToggleDocumentVisibility = async (docId: number | string) => {
+    const doc = hrDocuments.find((d) => String(d.id) === String(docId))
+    const nextVisible = !doc?.visibleToAll
+    setHrDocuments((prev) =>
+      prev.map((d) => (String(d.id) === String(docId) ? { ...d, visibleToAll: nextVisible } : d)),
+    )
+    try {
+      if (!isDemoMode() && companyData.id && doc && String(doc.id).includes("-")) {
+        await settingsFetch("/api/settings/hr", {
+          method: "POST",
+          body: JSON.stringify({
+            action: "toggle_document_visibility",
+            company_id: companyData.id,
+            id: doc.id,
+            visible_to_all: nextVisible,
+          }),
+        })
+      }
+      toast({
+        title: "Visibility Updated",
+        description: `${doc?.name} is now ${nextVisible ? "visible to" : "hidden from"} all employees.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update document visibility",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleEditDocument = async () => {
@@ -3000,25 +2836,52 @@ export default function SettingsPage() {
 
     setIsSavingDocument(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const fileUrl = uploadedFile ? URL.createObjectURL(uploadedFile) : selectedDocument?.fileUrl
+      const fileType = uploadedFile
+        ? uploadedFile.type.includes("pdf")
+          ? "PDF"
+          : uploadedFile.type.includes("word")
+            ? "DOC"
+            : "FILE"
+        : selectedDocument?.type
 
-      setHrDocuments((prev) =>
-        prev.map((doc) => {
-          if (doc.id === selectedDocument.id) {
-            const updates: any = { name: documentName }
-
-            // If a new file was uploaded, update the file URL
-            if (uploadedFile) {
-              updates.fileUrl = URL.createObjectURL(uploadedFile)
-              updates.type = uploadedFile.type.includes("pdf") ? "PDF" : uploadedFile.type.includes("word") ? "DOC" : "FILE"
-              updates.size = `${(uploadedFile.size / (1024 * 1024)).toFixed(1)}MB`
-            }
-
-            return { ...doc, ...updates }
-          }
-          return doc
-        }),
-      )
+      if (!isDemoMode() && companyData.id) {
+        const saved = await settingsFetch("/api/settings/hr", {
+          method: "POST",
+          body: JSON.stringify({
+            action: "save_document",
+            company_id: companyData.id,
+            document: {
+              id: selectedDocument?.id,
+              name: documentName,
+              type: fileType,
+              fileUrl,
+              visibleToAll: selectedDocument?.visibleToAll,
+              file_size: uploadedFile?.size,
+            },
+          }),
+        })
+        await loadHrData(companyData.id)
+        void saved
+      } else {
+        setHrDocuments((prev) =>
+          prev.map((doc) =>
+            doc.id === selectedDocument.id
+              ? {
+                  ...doc,
+                  name: documentName,
+                  ...(uploadedFile
+                    ? {
+                        fileUrl,
+                        type: fileType,
+                        size: `${(uploadedFile.size / (1024 * 1024)).toFixed(1)}MB`,
+                      }
+                    : {}),
+                }
+              : doc,
+          ),
+        )
+      }
 
       setShowDocumentModal(false)
       setDocumentName("")
@@ -3100,14 +2963,25 @@ export default function SettingsPage() {
 
     setIsSavingPolicy(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
       const newPolicy = {
         name: newLeaveType.name,
         days: newLeaveType.days,
         usage: "0%",
         trend: "new",
         description: newLeaveType.description,
+        carryOver: !!newLeaveType.carryOver,
+      }
+
+      if (!isDemoMode() && companyData.id) {
+        const saved = await settingsFetch("/api/settings/hr", {
+          method: "POST",
+          body: JSON.stringify({
+            action: "save_leave_policy",
+            company_id: companyData.id,
+            policy: newPolicy,
+          }),
+        })
+        newPolicy.id = saved.policy?.id
       }
 
       setCurrentPolicies((prev) => [...prev, newPolicy])
@@ -3149,9 +3023,26 @@ export default function SettingsPage() {
   const handleSavePolicyChanges = async () => {
     setIsSavingPolicy(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const updated = {
+        id: selectedPolicy.id,
+        name: editingPolicy.name,
+        days: editingPolicy.days,
+        description: editingPolicy.description,
+        usage: selectedPolicy.usage,
+        trend: selectedPolicy.trend,
+      }
 
-      // Update the policy in current policies
+      if (!isDemoMode() && companyData.id) {
+        await settingsFetch("/api/settings/hr", {
+          method: "POST",
+          body: JSON.stringify({
+            action: "save_leave_policy",
+            company_id: companyData.id,
+            policy: updated,
+          }),
+        })
+      }
+
       setCurrentPolicies((prev) =>
         prev.map((policy) =>
           policy.name === selectedPolicy.name
@@ -3846,43 +3737,62 @@ This document contains important information about ${document.name.toLowerCase()
         content = await parseFileContent(uploadedFile)
       }
 
-      // Upload file to Vercel Blob storage
-      const formData = new FormData()
-      formData.append('file', uploadedFile)
-
-      // Simulate file upload - in production, this would upload to Blob storage
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      // Create a temporary URL for the uploaded file
-      const fileUrl = URL.createObjectURL(uploadedFile)
-
-      // Determine file type more accurately
-      let fileType = "FILE"
-      const fileName = uploadedFile.name.toLowerCase()
-      if (uploadedFile.type.includes("pdf") || fileName.endsWith('.pdf')) {
-        fileType = "PDF"
-      } else if (uploadedFile.type.includes("word") || fileName.endsWith('.docx')) {
-        fileType = "DOCX"
-      } else if (fileName.endsWith('.doc')) {
-        fileType = "DOC"
+      let fileUrl = URL.createObjectURL(uploadedFile)
+      try {
+        const formData = new FormData()
+        formData.append("file", uploadedFile)
+        const uploadRes = await fetch("/api/upload", { method: "POST", body: formData, credentials: "include" })
+        if (uploadRes.ok) {
+          const uploaded = await uploadRes.json()
+          if (uploaded.url) fileUrl = uploaded.url
+        }
+      } catch {
+        // keep object URL fallback
       }
 
+      let fileType = "FILE"
+      const fileName = uploadedFile.name.toLowerCase()
+      if (uploadedFile.type.includes("pdf") || fileName.endsWith(".pdf")) fileType = "PDF"
+      else if (uploadedFile.type.includes("word") || fileName.endsWith(".docx")) fileType = "DOCX"
+      else if (fileName.endsWith(".doc")) fileType = "DOC"
+
       const newDoc = {
-        id: Date.now(),
+        id: String(Date.now()),
         name: documentName,
         type: fileType,
         size: `${(uploadedFile.size / (1024 * 1024)).toFixed(1)}MB`,
         visibleToAll: false,
-        fileUrl: fileUrl,
+        fileUrl,
         uploadedAt: new Date().toISOString(),
-        content: content // Store the parsed content
+        content,
       }
 
-      setHrDocuments((prev) => [...prev, newDoc])
+      if (!isDemoMode() && companyData.id) {
+        const saved = await settingsFetch("/api/settings/hr", {
+          method: "POST",
+          body: JSON.stringify({
+            action: "save_document",
+            company_id: companyData.id,
+            document: {
+              name: documentName,
+              type: fileType,
+              fileUrl,
+              visibleToAll: false,
+              file_size: uploadedFile.size,
+              content,
+            },
+          }),
+        })
+        if (saved.document?.id) newDoc.id = String(saved.document.id)
+        await loadHrData(companyData.id)
+      } else {
+        setHrDocuments((prev) => [...prev, newDoc])
+      }
+
       setShowDocumentModal(false)
       setDocumentName("")
       setUploadedFile(null)
-      setDocumentPreviewContent("") // Clear preview content
+      setDocumentPreviewContent("")
 
       toast({
         title: "Document Added",
@@ -3902,8 +3812,13 @@ This document contains important information about ${document.name.toLowerCase()
 
   const handleDeleteDocument = async (docId) => {
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId))
+      if (!isDemoMode() && companyData.id && String(docId).includes("-")) {
+        await settingsFetch("/api/settings/hr", {
+          method: "POST",
+          body: JSON.stringify({ action: "delete_document", company_id: companyData.id, id: docId }),
+        })
+      }
+      setHrDocuments((prev) => prev.filter((doc) => String(doc.id) !== String(docId)))
       setShowDocumentModal(false)
       toast({
         title: "Document Deleted",
@@ -3962,15 +3877,18 @@ This document contains important information about ${document.name.toLowerCase()
   const handleSaveHRConfig = async () => {
     setIsSaving(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      if (isDemoMode) {
+      if (isDemoMode()) {
         toast({
           title: "HR Configuration Saved",
           description: "HR settings updated successfully (Demo Mode)",
         })
       } else {
-        // Real database update would go here
+        const companyId = companyData.id || (await loadCompanyData())
+        if (!companyId) throw new Error("No company identifier available")
+        await settingsFetch("/api/settings/hr", {
+          method: "POST",
+          body: JSON.stringify({ action: "save_config", company_id: companyId, config: hrConfig }),
+        })
         toast({
           title: "HR Configuration Saved",
           description: "HR settings updated successfully",
@@ -3979,7 +3897,7 @@ This document contains important information about ${document.name.toLowerCase()
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to save HR configuration",
+        description: error instanceof Error ? error.message : "Failed to save HR configuration",
         variant: "destructive",
       })
     } finally {
@@ -4037,17 +3955,11 @@ This document contains important information about ${document.name.toLowerCase()
   }
 
   const handleAddRole = () => {
-    toast({
-      title: "Add Role",
-      description: "Opening role creation form...",
-    })
+    handleAddRoleInner()
   }
 
   const handleEditRole = (roleName: string) => {
-    toast({
-      title: "Edit Role",
-      description: `Editing ${roleName} role...`,
-    })
+    handleEditRoleInner(roleName)
   }
 
   const handleBackupNow = async () => {
@@ -4072,29 +3984,14 @@ This document contains important information about ${document.name.toLowerCase()
         throw new Error("No company identifier available")
       }
 
-      const backupSizeBytes = Math.round((Math.random() * 40 + 10) * 1024 * 1024) // 10MB - 50MB
-      const timestamp = new Date().toISOString()
+      const result = await settingsFetch("/api/settings/security", {
+        method: "POST",
+        body: JSON.stringify({ action: "backup_now", company_id: companyId }),
+      })
 
-      const { data, error } = await supabase
-        .from("backup_history")
-        .insert({
-          company_id: companyId,
-          backup_type: "manual",
-          backup_status: "completed",
-          backup_size: backupSizeBytes,
-          backup_location: "supabase",
-          started_at: timestamp,
-          completed_at: timestamp,
-          triggered_by: "manual",
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      setLastBackupTime(data.completed_at || data.started_at || timestamp)
-      setBackupSize(formatBytes(data.backup_size))
-      setBackupStatus(toTitleCase(data.backup_status || "completed"))
+      setLastBackupTime(result.backup?.lastBackupTime || new Date().toISOString())
+      setBackupSize(result.backup?.backupSize || "0 MB")
+      setBackupStatus(result.backup?.backupStatus || "Completed")
 
       toast({
         title: "Backup Successful",
@@ -4260,50 +4157,18 @@ Format the response in a professional, actionable manner for HR decision-makers.
         return
       }
 
-      // 1. Save allowances & deductions to their dedicated tables
-      const allowanceRows = allowances.map((a) => ({
-        company_id: companyId,
-        code: a.code,
-        description: a.description,
-        taxable: Boolean(a.taxable),
-        recurring: a.recurring !== false,
-        amount: Number(a.amount || 0),
-        percentage: Number(a.percentage || 0),
-        type: a.type || "FIXED",
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      }))
-      const deductionRows = deductions.map((d) => ({
-        company_id: companyId,
-        code: d.code,
-        description: d.description,
-        taxable: Boolean((d as any).taxable),
-        recurring: d.recurring !== false,
-        amount: Number(d.amount || 0),
-        percentage: Number(d.percentage || 0),
-        type: d.type || "FIXED",
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      }))
-
-      if (allowanceRows.length) {
-        const { error } = await supabase
-          .from("payroll_allowances")
-          .upsert(allowanceRows, { onConflict: "company_id,code" })
-        if (error) throw error
-      }
-      if (deductionRows.length) {
-        const { error } = await supabase
-          .from("payroll_deductions")
-          .upsert(deductionRows, { onConflict: "company_id,code" })
-        if (error) throw error
-      }
-
-      // 2. Save payroll configuration fields to system_settings via API route
-      const configRes = await fetch("/api/settings/payroll", {
+      await settingsFetch("/api/settings/payroll/items", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        body: JSON.stringify({
+          action: "save_allowances_deductions",
+          company_id: companyId,
+          allowances,
+          deductions,
+        }),
+      })
+
+      await settingsFetch("/api/settings/payroll", {
+        method: "POST",
         body: JSON.stringify({
           company_id: companyId,
           config: {
@@ -4319,11 +4184,6 @@ Format the response in a professional, actionable manner for HR decision-makers.
           },
         }),
       })
-
-      if (!configRes.ok) {
-        const body = await configRes.json().catch(() => ({}))
-        throw new Error(body.error ?? "Failed to save payroll config")
-      }
 
       toast({
         title: "Payroll configuration saved",
@@ -4518,8 +4378,19 @@ Format the response in a professional, actionable manner for HR decision-makers.
     console.log("[v0] Saving tax reliefs...")
 
     try {
-      // Simulate save operation
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const companyId = companyData?.id
+      if (!companyId || String(companyId).startsWith("demo-")) {
+        await new Promise((resolve) => setTimeout(resolve, 400))
+      } else {
+        await settingsFetch("/api/settings/payroll/items", {
+          method: "POST",
+          body: JSON.stringify({
+            action: "save_tax_reliefs",
+            company_id: companyId,
+            taxReliefs,
+          }),
+        })
+      }
 
       toast({
         title: "Tax Reliefs Saved",
@@ -4628,10 +4499,32 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
     setIsSaving(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      if (templateModalType === "edit" && editingTemplate) {
-        // Update existing template
+      if (!isDemoMode() && companyData.id) {
+        const saved = await settingsFetch("/api/settings/notifications", {
+          method: "POST",
+          body: JSON.stringify({
+            action: "save_template",
+            company_id: companyData.id,
+            template: {
+              id: templateModalType === "edit" ? editingTemplate?.id : undefined,
+              name: newTemplate.name,
+              category: newTemplate.category,
+              type: newTemplate.type,
+              subject: newTemplate.subject,
+              description: newTemplate.subject,
+              body: newTemplate.body,
+              variables: newTemplate.variables,
+              status: "Active",
+            },
+          }),
+        })
+        await loadNotificationSettings(companyData.id)
+        toast({
+          title: templateModalType === "edit" ? "Template Updated" : "Template Created",
+          description: `${newTemplate.name} has been saved successfully`,
+        })
+        void saved
+      } else if (templateModalType === "edit" && editingTemplate) {
         const updatedTemplates = notificationTemplates.map((template) =>
           template.id === editingTemplate.id
             ? {
@@ -4645,16 +4538,14 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 variables: newTemplate.variables,
                 lastModified: new Date().toLocaleDateString(),
               }
-            : template
+            : template,
         )
         setNotificationTemplates(updatedTemplates)
-        
         toast({
           title: "Template Updated",
           description: `${newTemplate.name} has been updated successfully`,
         })
       } else {
-        // Create new template
         const template = {
           id: Date.now().toString(),
           name: newTemplate.name,
@@ -4667,9 +4558,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
           body: newTemplate.body,
           variables: newTemplate.variables,
         }
-
         setNotificationTemplates([...notificationTemplates, template])
-        
         toast({
           title: "Template Created",
           description: `${newTemplate.name} has been created successfully`,
@@ -4729,9 +4618,14 @@ Format the response in a professional, actionable manner for HR decision-makers.
   }
 
   const handleDeleteTemplate = async (templateId) => {
-    setIsSaving(true) // Use the general saving state
+    setIsSaving(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      if (!isDemoMode() && companyData.id && String(templateId).includes("-")) {
+        await settingsFetch("/api/settings/notifications", {
+          method: "POST",
+          body: JSON.stringify({ action: "delete_template", company_id: companyData.id, id: templateId }),
+        })
+      }
       setNotificationTemplates(notificationTemplates.filter((t) => t.id !== templateId))
       toast({
         title: "Template Deleted",
@@ -4954,38 +4848,50 @@ Format the response in a professional, actionable manner for HR decision-makers.
   const handleTestEmail = async () => {
     setTestConnectionStatus("testing")
     try {
-      // Simulate API call to test SMTP connection
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-
-      // Simulate random success/failure for demo
-      const isSuccess = Math.random() > 0.3
-
-      if (isSuccess) {
-        setTestConnectionStatus("success")
-        toast({
-          title: "Connection Successful! ✅",
-          description: "SMTP connection established successfully. Email configuration is working properly.",
+      if (!isDemoMode() && companyData.id) {
+        await settingsFetch("/api/settings/notifications", {
+          method: "POST",
+          body: JSON.stringify({
+            action: "test_email",
+            company_id: companyData.id,
+            config: emailConfig,
+          }),
         })
       } else {
-        throw new Error("Connection failed")
+        await new Promise((resolve) => setTimeout(resolve, 800))
       }
+      setTestConnectionStatus("success")
+      toast({
+        title: "Connection Test Passed",
+        description: "Email configuration validated. Save settings to persist SMTP credentials.",
+      })
     } catch (error) {
       setTestConnectionStatus("error")
       toast({
-        title: "Connection Failed ❌",
-        description: "Unable to connect to SMTP server. Please check your credentials and settings.",
+        title: "Connection Failed",
+        description: error instanceof Error ? error.message : "Unable to validate email configuration.",
         variant: "destructive",
       })
     }
 
-    // Reset status after 5 seconds
     setTimeout(() => setTestConnectionStatus("idle"), 5000)
   }
 
   const handleSaveEmailConfig = async () => {
-    setIsSaving(true) // Use the general saving state
+    setIsSaving(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      if (!isDemoMode() && companyData.id) {
+        await settingsFetch("/api/settings/notifications", {
+          method: "POST",
+          body: JSON.stringify({
+            action: "save_email_config",
+            company_id: companyData.id,
+            config: emailConfig,
+          }),
+        })
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 400))
+      }
       toast({
         title: "Email Configuration Saved",
         description: "Email settings have been updated successfully",
@@ -4993,7 +4899,37 @@ Format the response in a professional, actionable manner for HR decision-makers.
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to save email configuration",
+        description: error instanceof Error ? error.message : "Failed to save email configuration",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleSaveNotificationPreferences = async () => {
+    setIsSaving(true)
+    try {
+      if (!isDemoMode() && companyData.id) {
+        await settingsFetch("/api/settings/notifications", {
+          method: "POST",
+          body: JSON.stringify({
+            action: "save_preferences",
+            company_id: companyData.id,
+            preferences: notificationSettings,
+          }),
+        })
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 400))
+      }
+      toast({
+        title: "Preferences Saved",
+        description: "Notification preferences have been updated successfully",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save preferences",
         variant: "destructive",
       })
     } finally {
@@ -5066,13 +5002,14 @@ Format the response in a professional, actionable manner for HR decision-makers.
         await new Promise((resolve) => setTimeout(resolve, 500))
         setActiveSessions((prev) => prev.filter((session) => session.id !== sessionId))
       } else {
-        const { error } = await supabase
-          .from("active_sessions")
-          .update({ is_active: false, expires_at: new Date().toISOString() })
-          .eq("id", sessionId)
-
-        if (error) throw error
-
+        await settingsFetch("/api/settings/access", {
+          method: "POST",
+          body: JSON.stringify({
+            action: "terminate_session",
+            company_id: companyData.id,
+            session_id: sessionId,
+          }),
+        })
         setActiveSessions((prev) => prev.filter((session) => session.id !== sessionId))
       }
       toast({ title: "Session Terminated", description: "The selected session has been terminated." })
@@ -5103,25 +5040,14 @@ Format the response in a professional, actionable manner for HR decision-makers.
         throw new Error("No company identifier available")
       }
 
-      const { error } = await supabase
-        .from("access_control_settings")
-        .upsert(
-          {
-            company_id: companyId,
-            two_factor_enabled: accessSettings.twoFactorEnabled,
-            sso_enabled: accessSettings.ssoEnabled,
-            password_expiry_enabled: accessSettings.passwordExpiryEnabled,
-            session_timeout: accessSettings.sessionTimeout,
-            max_login_attempts: accessSettings.maxLoginAttempts,
-            password_min_length: accessSettings.passwordMinLength,
-            ip_restrictions_enabled: accessSettings.ipRestrictionsEnabled,
-            allowed_ips: accessSettings.allowedIPs,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "company_id" },
-        )
-
-      if (error) throw error
+      await settingsFetch("/api/settings/access", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save",
+          company_id: companyId,
+          settings: accessSettings,
+        }),
+      })
 
       toast({ title: "Access Settings Saved", description: "Access control settings have been updated." })
     } catch (error) {
@@ -5164,22 +5090,14 @@ Format the response in a professional, actionable manner for HR decision-makers.
         throw new Error("No company identifier available")
       }
 
-      const { error } = await supabase
-        .from("security_settings")
-        .upsert(
-          {
-            company_id: companyId,
-            data_encryption_enabled: securitySettings.dataEncryptionEnabled,
-            audit_logging_enabled: securitySettings.auditLoggingEnabled,
-            auto_backup_enabled: securitySettings.autoBackupEnabled,
-            backup_frequency: securitySettings.backupFrequency,
-            data_retention_days: securitySettings.dataRetentionDays,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "company_id" },
-        )
-
-      if (error) throw error
+      await settingsFetch("/api/settings/security", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save",
+          company_id: companyId,
+          settings: securitySettings,
+        }),
+      })
 
       toast({ title: "Security Settings Saved", description: "Security configurations have been updated." })
     } catch (error) {
@@ -5194,18 +5112,54 @@ Format the response in a professional, actionable manner for HR decision-makers.
     }
   }
 
-  const handleViewAllLogs = () => {
-    console.log("[v0] Navigating to Audit Logs page...")
-    // In a real app, this would navigate to a dedicated audit logs page
-    toast({ title: "View All Logs", description: "Navigating to the full audit log history." })
+  const handleViewAllLogs = async () => {
+    try {
+      if (!isDemoMode() && companyData.id) {
+        const payload = await settingsFetch(
+          `/api/settings/security?company_id=${encodeURIComponent(companyData.id)}&limit=100`,
+        )
+        if (payload.auditLogs) setAuditLogs(payload.auditLogs)
+      }
+      toast({ title: "Audit Logs Loaded", description: "Showing the latest security audit events." })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Unable to load full audit log history.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleExportSecurityReport = async () => {
     setIsExportingReport(true)
-    console.log("[v0] Exporting security report...")
-    await new Promise((resolve) => setTimeout(resolve, 2000)) // Simulate export process
-    setIsExportingReport(false)
-    toast({ title: "Report Exported", description: "Security report generated and downloaded." })
+    try {
+      const companyId = companyData.id || (await loadCompanyData())
+      const res = await fetch("/api/settings/security", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "export_report", company_id: companyId }),
+      })
+      if (!res.ok) throw new Error("Export failed")
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `security-report-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      toast({ title: "Report Exported", description: "Security report generated and downloaded." })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to export security report.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsExportingReport(false)
+    }
   }
 
   const handleAddSalaryGrade = () => {
@@ -5272,7 +5226,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     })
   }
 
-  const handleSaveSalaryGrade = () => {
+  const handleSaveSalaryGrade = async () => {
     if (!newGrade.name || !newGrade.minSalary || !newGrade.maxSalary) {
       toast({
         title: "Missing Information",
@@ -5291,38 +5245,69 @@ Format the response in a professional, actionable manner for HR decision-makers.
       notches: newGrade.notches,
     }
 
-    if (editingGrade) {
-      setSalaryGrades((prev) => prev.map((grade) => (grade.id === editingGrade.id ? gradeToAdd : grade)))
+    try {
+      if (!isDemoMode() && companyData.id) {
+        const saved = await settingsFetch("/api/settings/hr", {
+          method: "POST",
+          body: JSON.stringify({
+            action: "save_salary_grade",
+            company_id: companyData.id,
+            grade: gradeToAdd,
+          }),
+        })
+        if (saved.grade?.id) gradeToAdd.id = saved.grade.id
+        await loadHrData(companyData.id)
+      } else if (editingGrade) {
+        setSalaryGrades((prev) => prev.map((grade) => (grade.id === editingGrade.id ? gradeToAdd : grade)))
+      } else {
+        setSalaryGrades((prev) => [...prev, gradeToAdd])
+      }
+
       toast({
-        title: "Grade Updated",
-        description: "Salary grade has been updated successfully.",
+        title: editingGrade ? "Grade Updated" : "Grade Added",
+        description: editingGrade
+          ? "Salary grade has been updated successfully."
+          : "New salary grade has been added successfully.",
       })
-    } else {
-      setSalaryGrades((prev) => [...prev, gradeToAdd])
+      setShowSalaryGradeModal(false)
+      setEditingGrade(null)
+      setNewGrade({
+        name: "",
+        description: "",
+        minSalary: "",
+        maxSalary: "",
+        numberOfNotches: 5,
+        notches: [],
+      })
+    } catch (error) {
       toast({
-        title: "Grade Added",
-        description: "New salary grade has been added successfully.",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save salary grade",
+        variant: "destructive",
       })
     }
-
-    setShowSalaryGradeModal(false)
-    setEditingGrade(null)
-    setNewGrade({
-      name: "",
-      description: "",
-      minSalary: "",
-      maxSalary: "",
-      numberOfNotches: 5,
-      notches: [],
-    })
   }
 
-  const handleDeleteSalaryGrade = (gradeId) => {
-    setSalaryGrades((prev) => prev.filter((grade) => grade.id !== gradeId))
-    toast({
-      title: "Grade Deleted",
-      description: "Salary grade has been deleted successfully.",
-    })
+  const handleDeleteSalaryGrade = async (gradeId) => {
+    try {
+      if (!isDemoMode() && companyData.id && String(gradeId).includes("-")) {
+        await settingsFetch("/api/settings/hr", {
+          method: "POST",
+          body: JSON.stringify({ action: "delete_salary_grade", company_id: companyData.id, id: gradeId }),
+        })
+      }
+      setSalaryGrades((prev) => prev.filter((grade) => grade.id !== gradeId))
+      toast({
+        title: "Grade Deleted",
+        description: "Salary grade has been deleted successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete salary grade",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleAddDivision = () => {
@@ -5419,7 +5404,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     setShowUnstructuredModal(true)
   }
 
-  const handleSaveUnstructuredGrade = () => {
+  const handleSaveUnstructuredGrade = async () => {
     if (!newUnstructured.name) {
       toast({
         title: "Missing Information",
@@ -5437,36 +5422,71 @@ Format the response in a professional, actionable manner for HR decision-makers.
       performanceIncrement: newUnstructured.performanceIncrement,
     }
 
-    if (editingUnstructured) {
-      setUnstructuredGrades((prev) => prev.map((grade) => (grade.id === editingUnstructured.id ? gradeToAdd : grade)))
+    try {
+      if (!isDemoMode() && companyData.id) {
+        const saved = await settingsFetch("/api/settings/hr", {
+          method: "POST",
+          body: JSON.stringify({
+            action: "save_unstructured_grade",
+            company_id: companyData.id,
+            grade: gradeToAdd,
+          }),
+        })
+        if (saved.grade?.id) gradeToAdd.id = saved.grade.id
+        await loadHrData(companyData.id)
+      } else if (editingUnstructured) {
+        setUnstructuredGrades((prev) => prev.map((grade) => (grade.id === editingUnstructured.id ? gradeToAdd : grade)))
+      } else {
+        setUnstructuredGrades((prev) => [...prev, gradeToAdd])
+      }
+
       toast({
-        title: "Grade Updated",
-        description: "Unstructured salary grade has been updated successfully.",
+        title: editingUnstructured ? "Grade Updated" : "Grade Added",
+        description: editingUnstructured
+          ? "Unstructured salary grade has been updated successfully."
+          : "New unstructured salary grade has been added successfully.",
       })
-    } else {
-      setUnstructuredGrades((prev) => [...prev, gradeToAdd])
+      setShowUnstructuredModal(false)
+      setEditingUnstructured(null)
+      setNewUnstructured({
+        name: "",
+        description: "",
+        generalIncrement: { type: "percentage", value: 0 },
+        performanceIncrement: { type: "percentage", value: 0 },
+      })
+    } catch (error) {
       toast({
-        title: "Grade Added",
-        description: "New unstructured salary grade has been added successfully.",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save unstructured grade",
+        variant: "destructive",
       })
     }
-
-    setShowUnstructuredModal(false)
-    setEditingUnstructured(null)
-    setNewUnstructured({
-      name: "",
-      description: "",
-      generalIncrement: { type: "percentage", value: 0 },
-      performanceIncrement: { type: "percentage", value: 0 },
-    })
   }
 
-  const handleDeleteUnstructuredGrade = (gradeId) => {
-    setUnstructuredGrades((prev) => prev.filter((grade) => grade.id !== gradeId))
-    toast({
-      title: "Grade Deleted",
-      description: "Unstructured salary grade has been deleted successfully.",
-    })
+  const handleDeleteUnstructuredGrade = async (gradeId) => {
+    try {
+      if (!isDemoMode() && companyData.id && String(gradeId).includes("-")) {
+        await settingsFetch("/api/settings/hr", {
+          method: "POST",
+          body: JSON.stringify({
+            action: "delete_unstructured_grade",
+            company_id: companyData.id,
+            id: gradeId,
+          }),
+        })
+      }
+      setUnstructuredGrades((prev) => prev.filter((grade) => grade.id !== gradeId))
+      toast({
+        title: "Grade Deleted",
+        description: "Unstructured salary grade has been deleted successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete unstructured grade",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
@@ -6187,21 +6207,52 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <h4 className="font-medium mb-2">Sync Options</h4>
                         <div className="space-y-2">
                           <label className="flex items-center space-x-2">
-                            <input type="checkbox" className="rounded" defaultChecked />
+                            <input
+                              type="checkbox"
+                              className="rounded"
+                              checked={syncPrefs.sync_hr_policies}
+                              onChange={(e) => setSyncPrefs((p) => ({ ...p, sync_hr_policies: e.target.checked }))}
+                            />
                             <span className="text-sm">HR Policies</span>
                           </label>
                           <label className="flex items-center space-x-2">
-                            <input type="checkbox" className="rounded" defaultChecked />
+                            <input
+                              type="checkbox"
+                              className="rounded"
+                              checked={syncPrefs.sync_payroll_config}
+                              onChange={(e) => setSyncPrefs((p) => ({ ...p, sync_payroll_config: e.target.checked }))}
+                            />
                             <span className="text-sm">Payroll Configuration</span>
                           </label>
                           <label className="flex items-center space-x-2">
-                            <input type="checkbox" className="rounded" />
+                            <input
+                              type="checkbox"
+                              className="rounded"
+                              checked={syncPrefs.sync_leave_types}
+                              onChange={(e) => setSyncPrefs((p) => ({ ...p, sync_leave_types: e.target.checked }))}
+                            />
                             <span className="text-sm">Leave Types</span>
                           </label>
                           <label className="flex items-center space-x-2">
-                            <input type="checkbox" className="rounded" />
+                            <input
+                              type="checkbox"
+                              className="rounded"
+                              checked={syncPrefs.sync_roles_permissions}
+                              onChange={(e) =>
+                                setSyncPrefs((p) => ({ ...p, sync_roles_permissions: e.target.checked }))
+                              }
+                            />
                             <span className="text-sm">Roles & Permissions</span>
                           </label>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start bg-transparent"
+                            onClick={handleSyncAllSettings}
+                          >
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Sync Selected Settings
+                          </Button>
                         </div>
                       </div>
                       <div>
@@ -8460,19 +8511,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   </div>
 
                   <div className="flex justify-end">
-                    <Button
-                      onClick={() => {
-                        setIsSaving(true) // Use the general saving state
-                        setTimeout(() => {
-                          setIsSaving(false)
-                          toast({
-                            title: "Preferences Saved",
-                            description: "Notification preferences have been updated successfully",
-                          })
-                        }, 1500)
-                      }}
-                      disabled={isSaving}
-                    >
+                    <Button onClick={handleSaveNotificationPreferences} disabled={isSaving}>
                       {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                       Save Preferences
                     </Button>
@@ -8508,20 +8547,80 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <div>
                           <h3 className="text-base font-semibold">{role.name}</h3>
                           <p className="text-xs text-gray-600">{role.description}</p>
+                          {Array.isArray(role.permissions) && role.permissions.length > 0 && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Permissions: {role.permissions.join(", ")}
+                            </p>
+                          )}
                         </div>
-                        <div className="flex items-center space-x-4">
-                          <span className="text-sm text-gray-500">{role.user_count} Users</span>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm text-gray-500">{role.user_count || 0} Users</span>
                           <Button variant="outline" size="sm" onClick={() => handleEditRoleInner(role.name)}>
                             Edit
+                          </Button>
+                          <Button variant="destructive" size="sm" onClick={() => handleDeleteRole(role.id)}>
+                            Delete
                           </Button>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
                 ))}
+                {roles.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No roles yet. Click Add Role to create one.</p>
+                )}
               </div>
             </CardContent>
           </Card>
+
+          {showRoleModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <Card className="w-full max-w-lg mx-4">
+                <CardHeader>
+                  <CardTitle>{roleModalType === "edit" ? "Edit Role" : "Add Role"}</CardTitle>
+                  <CardDescription>Define the role name, description, and permission tags</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="roleName">Role Name</Label>
+                    <Input
+                      id="roleName"
+                      value={roleForm.name}
+                      onChange={(e) => setRoleForm((f) => ({ ...f, name: e.target.value }))}
+                      placeholder="HR Manager"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="roleDescription">Description</Label>
+                    <Textarea
+                      id="roleDescription"
+                      value={roleForm.description}
+                      onChange={(e) => setRoleForm((f) => ({ ...f, description: e.target.value }))}
+                      placeholder="What this role can manage"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="rolePermissions">Permissions (comma separated)</Label>
+                    <Input
+                      id="rolePermissions"
+                      value={roleForm.permissions}
+                      onChange={(e) => setRoleForm((f) => ({ ...f, permissions: e.target.value }))}
+                      placeholder="hr, employees, payroll, reports"
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="ghost" onClick={() => setShowRoleModal(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveRole} disabled={isSavingRole}>
+                      {isSavingRole ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                      {roleModalType === "edit" ? "Save Changes" : "Create Role"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
 
         {/* Access Control Tab Content */}
