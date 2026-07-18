@@ -8,6 +8,10 @@ function normalizeSubsidiary(sub: any, employeeCount = 0) {
   const locations = ensureArray(sub.locations)
   return {
     ...sub,
+    phone_number: sub.phone_number || sub.phone || "",
+    email_address: sub.email_address || sub.email || "",
+    logo_url: sub.logo_url || sub.logo || null,
+    industry: sub.industry || "",
     divisions,
     departments,
     locations,
@@ -15,7 +19,6 @@ function normalizeSubsidiary(sub: any, employeeCount = 0) {
     departments_count: departments.length,
     locations_count: locations.length,
     employee_count: employeeCount || sub.employee_count || 0,
-    logo_url: sub.logo_url || null,
   }
 }
 
@@ -255,9 +258,9 @@ export async function POST(req: NextRequest) {
     if (action === "create") {
       const payload = {
         company_id: companyId,
-        name: body.name,
-        tax_id: body.tax_id,
-        ssnit_number: body.ssnit_number,
+        name: String(body.name || "").trim(),
+        tax_id: body.tax_id || "",
+        ssnit_number: body.ssnit_number || "",
         address: body.address || "",
         phone_number: body.phone_number || "",
         email_address: body.email_address || "",
@@ -272,14 +275,50 @@ export async function POST(req: NextRequest) {
         updated_at: now,
       }
 
-      let { data, error } = await service.from("subsidiaries").insert(payload).select().single()
-      if (error) {
-        // Retry without optional columns that older schemas may lack
-        const { industry, employee_count, logo_url, ...core } = payload
-        const retry = await service.from("subsidiaries").insert(core).select().single()
-        if (retry.error) throw retry.error
-        data = retry.data
+      if (!payload.name) {
+        return NextResponse.json({ error: "Subsidiary name is required" }, { status: 400 })
       }
+
+      // Progressive compatibility with old phone/email/logo schemas.
+      const attempts = [
+        payload,
+        (({ industry, employee_count, settings_synced_at, ...core }) => core)(payload),
+        {
+          company_id: companyId,
+          name: payload.name,
+          tax_id: payload.tax_id,
+          ssnit_number: payload.ssnit_number,
+          address: payload.address,
+          phone: payload.phone_number,
+          email: payload.email_address,
+          logo: payload.logo_url,
+          divisions: payload.divisions,
+          departments: payload.departments,
+          locations: payload.locations,
+          status: payload.status,
+          created_at: now,
+          updated_at: now,
+        },
+      ]
+
+      let data: any = null
+      let lastError: any = null
+      for (const attempt of attempts) {
+        const result = await service.from("subsidiaries").insert(attempt).select().single()
+        if (!result.error) {
+          data = result.data
+          break
+        }
+        lastError = result.error
+        const message = String(result.error.message || "").toLowerCase()
+        const schemaMismatch =
+          result.error.code === "PGRST204" ||
+          message.includes("column") ||
+          message.includes("schema cache") ||
+          message.includes("could not find")
+        if (!schemaMismatch) break
+      }
+      if (!data) throw lastError || new Error("Failed to create subsidiary")
       return NextResponse.json({ success: true, subsidiary: normalizeSubsidiary(data) })
     }
 

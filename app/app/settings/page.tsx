@@ -308,6 +308,7 @@ export default function SettingsPage() {
 
   const { toast } = useToast()
   const supabase = createClient()
+  const [activeSettingsTab, setActiveSettingsTab] = useState("company")
 
   const [companyData, setCompanyData] = useState<Company>({
     id: "",
@@ -388,6 +389,22 @@ export default function SettingsPage() {
   const [showEditSubsidiary, setShowEditSubsidiary] = useState(false)
   const [showSubsidiaryDetails, setShowSubsidiaryDetails] = useState(false)
   const [selectedSubsidiary, setSelectedSubsidiary] = useState<Subsidiary | null>(null)
+  const emptySubsidiaryForm = {
+    name: "",
+    industry: "",
+    tax_id: "",
+    ssnit_number: "",
+    email_address: "",
+    phone_number: "",
+    address: "",
+    divisions: [] as string[],
+    departments: [] as string[],
+    locations: [] as string[],
+  }
+  const [newSubsidiary, setNewSubsidiary] = useState(emptySubsidiaryForm)
+  const [newSubsidiaryDivision, setNewSubsidiaryDivision] = useState("")
+  const [newSubsidiaryDepartment, setNewSubsidiaryDepartment] = useState("")
+  const [newSubsidiaryLocation, setNewSubsidiaryLocation] = useState("")
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState<boolean>(false)
   const [showReactivateConfirm, setShowReactivateConfirm] = useState<boolean>(false)
   const [subsidiaryToToggle, setSubsidiaryToToggle] = useState<Subsidiary | null>(null)
@@ -1504,10 +1521,6 @@ export default function SettingsPage() {
       console.log("[v0] Loaded subsidiaries:", (listPayload.subsidiaries || []).length)
     } catch (error) {
       console.error("Subsidiaries loading error:", error)
-      if (isDemoMode()) {
-        setSubsidiaries([])
-        return
-      }
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to load subsidiaries",
@@ -2003,9 +2016,12 @@ export default function SettingsPage() {
 
   const addNewSubsidiary = async (subsidiaryData: Partial<Subsidiary>) => {
     console.log("[v0] Adding new subsidiary:", subsidiaryData)
+    setIsSavingSubsidiary(true)
     try {
       const companyId = companyData.id || (await loadCompanyData())
-      if (!companyId) throw new Error("No company identifier available")
+      if (!companyId || String(companyId).startsWith("demo-")) {
+        throw new Error("No company identifier available")
+      }
 
       await settingsFetch("/api/settings/subsidiaries", {
         method: "POST",
@@ -2029,6 +2045,10 @@ export default function SettingsPage() {
 
       await loadSubsidiaries(companyId)
       setSubsidiaryLogoPreview("")
+      setNewSubsidiary(emptySubsidiaryForm)
+      setNewSubsidiaryDivision("")
+      setNewSubsidiaryDepartment("")
+      setNewSubsidiaryLocation("")
       setShowAddSubsidiary(false)
       toast({
         title: "Subsidiary Added",
@@ -2041,7 +2061,41 @@ export default function SettingsPage() {
         description: error instanceof Error ? error.message : "Failed to add subsidiary",
         variant: "destructive",
       })
+    } finally {
+      setIsSavingSubsidiary(false)
     }
+  }
+
+  const openAddSubsidiary = () => {
+    setNewSubsidiary(emptySubsidiaryForm)
+    setNewSubsidiaryDivision("")
+    setNewSubsidiaryDepartment("")
+    setNewSubsidiaryLocation("")
+    setSubsidiaryLogoPreview("")
+    setShowAddSubsidiary(true)
+  }
+
+  const handleCreateSubsidiary = async () => {
+    const name = newSubsidiary.name.trim()
+    if (!name) {
+      toast({
+        title: "Validation Error",
+        description: "Subsidiary name is required.",
+        variant: "destructive",
+      })
+      return
+    }
+    await addNewSubsidiary({
+      ...newSubsidiary,
+      name,
+      industry: newSubsidiary.industry.trim(),
+      tax_id: newSubsidiary.tax_id.trim(),
+      ssnit_number: newSubsidiary.ssnit_number.trim(),
+      email_address: newSubsidiary.email_address.trim(),
+      phone_number: newSubsidiary.phone_number.trim(),
+      address: newSubsidiary.address.trim(),
+      logo_url: subsidiaryLogoPreview || null,
+    })
   }
 
   const updateSubsidiary = async (subsidiaryId: string, updates: Partial<Subsidiary>) => {
@@ -5318,7 +5372,15 @@ Format the response in a professional, actionable manner for HR decision-makers.
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="company" className="space-y-6">
+      <Tabs
+        value={activeSettingsTab}
+        onValueChange={(value) => {
+          setActiveSettingsTab(value)
+          if (value === "subsidiaries") void loadSubsidiaries()
+          if (value === "notifications") void loadNotificationSettings()
+        }}
+        className="space-y-6"
+      >
         <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="company">Company</TabsTrigger>
           <TabsTrigger value="subsidiaries">Multi-Company</TabsTrigger>
@@ -5629,7 +5691,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   <span>Multi-Company Management</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Button onClick={() => setShowAddSubsidiary(true)}>
+                  <Button onClick={openAddSubsidiary}>
                     <Plus className="w-4 h-4 mr-2" />
                     Add Subsidiary
                   </Button>
@@ -5902,7 +5964,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <p className="text-gray-600 mb-4">
                           Get started by adding your first subsidiary company to manage multiple entities.
                         </p>
-                        <Button onClick={() => setShowAddSubsidiary(true)}>
+                        <Button onClick={openAddSubsidiary}>
                           <Plus className="w-4 h-4 mr-2" />
                           Add First Subsidiary
                         </Button>
@@ -9272,70 +9334,292 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <Label htmlFor="subsidiaryName">Subsidiary Name</Label>
-                      <Input id="subsidiaryName" placeholder="Enter subsidiary name" />
+                      <Input
+                        id="subsidiaryName"
+                        placeholder="Enter subsidiary name"
+                        value={newSubsidiary.name}
+                        onChange={(e) => setNewSubsidiary({ ...newSubsidiary, name: e.target.value })}
+                      />
                     </div>
                     <div>
                       <Label htmlFor="subsidiaryIndustry">Industry</Label>
-                      <Input id="subsidiaryIndustry" placeholder="Enter industry" />
+                      <Input
+                        id="subsidiaryIndustry"
+                        placeholder="Enter industry"
+                        value={newSubsidiary.industry}
+                        onChange={(e) => setNewSubsidiary({ ...newSubsidiary, industry: e.target.value })}
+                      />
                     </div>
                     <div>
                       <Label htmlFor="subsidiaryTaxId">Tax ID</Label>
-                      <Input id="subsidiaryTaxId" placeholder="Enter tax ID" />
+                      <Input
+                        id="subsidiaryTaxId"
+                        placeholder="Enter tax ID"
+                        value={newSubsidiary.tax_id}
+                        onChange={(e) => setNewSubsidiary({ ...newSubsidiary, tax_id: e.target.value })}
+                      />
                     </div>
                     <div>
                       <Label htmlFor="subsidiarySsnit">SSNIT Number</Label>
-                      <Input id="subsidiarySsnit" placeholder="Enter SSNIT number" />
+                      <Input
+                        id="subsidiarySsnit"
+                        placeholder="Enter SSNIT number"
+                        value={newSubsidiary.ssnit_number}
+                        onChange={(e) => setNewSubsidiary({ ...newSubsidiary, ssnit_number: e.target.value })}
+                      />
                     </div>
                     <div>
                       <Label htmlFor="subsidiaryEmail">Email Address</Label>
-                      <Input id="subsidiaryEmail" type="email" placeholder="Enter email address" />
+                      <Input
+                        id="subsidiaryEmail"
+                        type="email"
+                        placeholder="Enter email address"
+                        value={newSubsidiary.email_address}
+                        onChange={(e) => setNewSubsidiary({ ...newSubsidiary, email_address: e.target.value })}
+                      />
                     </div>
                     <div>
                       <Label htmlFor="subsidiaryPhone">Phone Number</Label>
-                      <Input id="subsidiaryPhone" placeholder="Enter phone number" />
+                      <Input
+                        id="subsidiaryPhone"
+                        placeholder="Enter phone number"
+                        value={newSubsidiary.phone_number}
+                        onChange={(e) => setNewSubsidiary({ ...newSubsidiary, phone_number: e.target.value })}
+                      />
                     </div>
                   </div>
 
                   <div>
                     <Label htmlFor="subsidiaryAddress">Address</Label>
-                    <Textarea id="subsidiaryAddress" placeholder="Enter address" />
+                    <Textarea
+                      id="subsidiaryAddress"
+                      placeholder="Enter address"
+                      value={newSubsidiary.address}
+                      onChange={(e) => setNewSubsidiary({ ...newSubsidiary, address: e.target.value })}
+                    />
                   </div>
 
                   <div className="space-y-2">
                     <Label>Divisions</Label>
                     <div className="space-y-2">
-                      <Input placeholder="Enter division" />
-                      <Button variant="outline" size="sm">
+                      {newSubsidiary.divisions.map((division, index) => (
+                        <div key={`${division}-${index}`} className="flex items-center gap-2">
+                          <Input
+                            value={division}
+                            onChange={(e) =>
+                              setNewSubsidiary({
+                                ...newSubsidiary,
+                                divisions: newSubsidiary.divisions.map((item, i) =>
+                                  i === index ? e.target.value : item,
+                                ),
+                              })
+                            }
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setNewSubsidiary({
+                                ...newSubsidiary,
+                                divisions: newSubsidiary.divisions.filter((_, i) => i !== index),
+                              })
+                            }
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="Enter division"
+                          value={newSubsidiaryDivision}
+                          onChange={(e) => setNewSubsidiaryDivision(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault()
+                              const value = newSubsidiaryDivision.trim()
+                              if (value) {
+                                setNewSubsidiary({
+                                  ...newSubsidiary,
+                                  divisions: [...newSubsidiary.divisions, value],
+                                })
+                                setNewSubsidiaryDivision("")
+                              }
+                            }
+                          }}
+                        />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!newSubsidiaryDivision.trim()}
+                        onClick={() => {
+                          const value = newSubsidiaryDivision.trim()
+                          if (!value) return
+                          setNewSubsidiary({
+                            ...newSubsidiary,
+                            divisions: [...newSubsidiary.divisions, value],
+                          })
+                          setNewSubsidiaryDivision("")
+                        }}
+                      >
                         Add Division
                       </Button>
+                      </div>
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label>Departments</Label>
                     <div className="space-y-2">
-                      <Input placeholder="Enter department" />
-                      <Button variant="outline" size="sm">
+                      {newSubsidiary.departments.map((department, index) => (
+                        <div key={`${department}-${index}`} className="flex items-center gap-2">
+                          <Input
+                            value={department}
+                            onChange={(e) =>
+                              setNewSubsidiary({
+                                ...newSubsidiary,
+                                departments: newSubsidiary.departments.map((item, i) =>
+                                  i === index ? e.target.value : item,
+                                ),
+                              })
+                            }
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setNewSubsidiary({
+                                ...newSubsidiary,
+                                departments: newSubsidiary.departments.filter((_, i) => i !== index),
+                              })
+                            }
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="Enter department"
+                          value={newSubsidiaryDepartment}
+                          onChange={(e) => setNewSubsidiaryDepartment(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault()
+                              const value = newSubsidiaryDepartment.trim()
+                              if (value) {
+                                setNewSubsidiary({
+                                  ...newSubsidiary,
+                                  departments: [...newSubsidiary.departments, value],
+                                })
+                                setNewSubsidiaryDepartment("")
+                              }
+                            }
+                          }}
+                        />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!newSubsidiaryDepartment.trim()}
+                        onClick={() => {
+                          const value = newSubsidiaryDepartment.trim()
+                          if (!value) return
+                          setNewSubsidiary({
+                            ...newSubsidiary,
+                            departments: [...newSubsidiary.departments, value],
+                          })
+                          setNewSubsidiaryDepartment("")
+                        }}
+                      >
                         Add Department
                       </Button>
+                      </div>
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label>Locations</Label>
                     <div className="space-y-2">
-                      <Input placeholder="Enter location name" />
-                      <Button variant="outline" size="sm">
+                      {newSubsidiary.locations.map((location, index) => (
+                        <div key={`${location}-${index}`} className="flex items-center gap-2">
+                          <Input
+                            value={location}
+                            onChange={(e) =>
+                              setNewSubsidiary({
+                                ...newSubsidiary,
+                                locations: newSubsidiary.locations.map((item, i) =>
+                                  i === index ? e.target.value : item,
+                                ),
+                              })
+                            }
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setNewSubsidiary({
+                                ...newSubsidiary,
+                                locations: newSubsidiary.locations.filter((_, i) => i !== index),
+                              })
+                            }
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="Enter location name"
+                          value={newSubsidiaryLocation}
+                          onChange={(e) => setNewSubsidiaryLocation(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault()
+                              const value = newSubsidiaryLocation.trim()
+                              if (value) {
+                                setNewSubsidiary({
+                                  ...newSubsidiary,
+                                  locations: [...newSubsidiary.locations, value],
+                                })
+                                setNewSubsidiaryLocation("")
+                              }
+                            }
+                          }}
+                        />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!newSubsidiaryLocation.trim()}
+                        onClick={() => {
+                          const value = newSubsidiaryLocation.trim()
+                          if (!value) return
+                          setNewSubsidiary({
+                            ...newSubsidiary,
+                            locations: [...newSubsidiary.locations, value],
+                          })
+                          setNewSubsidiaryLocation("")
+                        }}
+                      >
                         Add Location
                       </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
                 <div className="flex justify-end space-x-2">
-                  <Button variant="ghost" onClick={() => setShowAddSubsidiary(false)}>
+                  <Button variant="ghost" onClick={() => setShowAddSubsidiary(false)} disabled={isSavingSubsidiary}>
                     Cancel
                   </Button>
-                  <Button onClick={() => setShowAddSubsidiary(false)}>Add Subsidiary</Button>
+                  <Button onClick={handleCreateSubsidiary} disabled={isSavingSubsidiary || !newSubsidiary.name.trim()}>
+                    {isSavingSubsidiary ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Add Subsidiary"
+                    )}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
