@@ -184,6 +184,9 @@ interface HrDocumentItem {
   visibleToAll: boolean
   fileUrl: string | null
   uploadedAt: string
+  content?: string
+  vaultDocumentId?: string | null
+  fileType?: string | null
 }
 
 interface StructuredSalaryGrade {
@@ -444,41 +447,9 @@ export default function SettingsPage() {
   const [editingAllowance, setEditingAllowance] = useState<number | null>(null)
   const [editingDeduction, setEditingDeduction] = useState<number | null>(null)
 
-  const [allowances, setAllowances] = useState([
-    {
-      code: "TRANS",
-      description: "Transport Allowance",
-      taxable: true,
-      recurring: true,
-      amount: 0,
-      percentage: 0,
-      type: "FIXED",
-    },
-    {
-      code: "HOUSE",
-      description: "Housing Allowance",
-      taxable: true,
-      recurring: true,
-      amount: 0,
-      percentage: 0,
-      type: "FIXED",
-    },
-    {
-      code: "MED",
-      description: "Medical Allowance",
-      taxable: false,
-      recurring: true,
-      amount: 0,
-      percentage: 0,
-      type: "FIXED",
-    },
-  ])
+  const [allowances, setAllowances] = useState<any[]>([])
 
-  const [deductions, setDeductions] = useState([
-    { code: "TAX", description: "Tax Deduction", recurring: true, amount: 0, percentage: 0, type: "VARIABLE" },
-    { code: "SSNIT", description: "SSNIT Deduction", recurring: true, amount: 0, percentage: 5.5, type: "VARIABLE" },
-    { code: "LOAN", description: "Loan Deduction", recurring: true, amount: 0, percentage: 0, type: "FIXED" },
-  ])
+  const [deductions, setDeductions] = useState<any[]>([])
 
   // Act 766: Tier 1 (SSNIT) 0.5% ee / 13% er — Tier 2 is separate (5% ee / 0% er)
   const [ssnitRates, setSsnitRates] = useState({
@@ -517,42 +488,8 @@ export default function SettingsPage() {
   const [isOverviewExpanded, setIsOverviewExpanded] = useState(false)
   const [isOverviewRefreshing, setIsOverviewRefreshing] = useState(false)
 
-  // Tax Relief State
-  const [taxReliefs, setTaxReliefs] = useState([
-    {
-      id: 1,
-      name: "Personal Relief",
-      description: "Basic personal tax relief",
-      amount: 402,
-      currency: "GHS",
-      isActive: true,
-      category: "Personal",
-      effectiveDate: "2024-01-01",
-      lastUpdated: "2024-01-01T00:00:00Z"
-    },
-    {
-      id: 2,
-      name: "Child Relief",
-      description: "Tax relief for dependent children",
-      amount: 150,
-      currency: "GHS",
-      isActive: true,
-      category: "Family",
-      effectiveDate: "2024-01-01",
-      lastUpdated: "2024-01-01T00:00:00Z"
-    },
-    {
-      id: 3,
-      name: "Old Age Relief",
-      description: "Tax relief for elderly citizens",
-      amount: 200,
-      currency: "GHS",
-      isActive: true,
-      category: "Age",
-      effectiveDate: "2024-01-01",
-      lastUpdated: "2024-01-01T00:00:00Z"
-    }
-  ])
+  // Tax Relief State — loaded from tax_reliefs via /api/settings/payroll/items
+  const [taxReliefs, setTaxReliefs] = useState<any[]>([])
   const [isSyncingReliefs, setIsSyncingReliefs] = useState(false)
   const [reliefsLastSync, setReliefsLastSync] = useState<string | null>("2024-01-01T00:00:00Z")
   const [editingRelief, setEditingRelief] = useState<number | null>(null)
@@ -1091,10 +1028,35 @@ export default function SettingsPage() {
     console.log(`[v0] Syncing ${currency} tax rates with government API...`)
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      const selectedConfig = getCurrencyConfig(currency)
+      const nextBands = selectedConfig?.taxBands || payeTaxBands
+      const nextSsnit = selectedConfig?.socialSecurity
+        ? {
+            employee: selectedConfig.socialSecurity.employee,
+            employer: selectedConfig.socialSecurity.employer,
+            total: selectedConfig.socialSecurity.total,
+          }
+        : ssnitRates
+      const nextTier2 = selectedConfig?.tier2
+        ? {
+            employee: selectedConfig.tier2.employee,
+            employer: selectedConfig.tier2.employer,
+            total: selectedConfig.tier2.total,
+          }
+        : tier2Rates
+      const nextTier3 = selectedConfig?.tier3
+        ? {
+            employee: selectedConfig.tier3.employee,
+            employer: selectedConfig.tier3.employer,
+            total: selectedConfig.tier3.total,
+          }
+        : tier3Rates
 
-      // Update API status
+      setPayeTaxBands(nextBands)
+      setSsnitRates(nextSsnit)
+      setTier2Rates(nextTier2)
+      setTier3Rates(nextTier3)
+
       setApiStatus((prev) => ({
         ...prev,
         [currency]: {
@@ -1105,15 +1067,37 @@ export default function SettingsPage() {
         },
       }))
 
+      // Persist using the synced values (avoid stale React state)
+      const companyId = await resolveHrCompanyId()
+      const taxYear = new Date().getFullYear()
+      const payeBands = nextBands.map((b: any, i: number) => ({
+        band_order: i + 1,
+        rate: Number(b.rate || 0),
+        threshold_amount: b.to === Number.POSITIVE_INFINITY ? 999999999 : Number(b.to || 0),
+        is_remaining_amount: b.to === Number.POSITIVE_INFINITY,
+        description: `${b.rate}% band`,
+      }))
+      await settingsFetch("/api/settings/tax", {
+        method: "POST",
+        body: JSON.stringify({
+          company_id: companyId,
+          tax_year: taxYear,
+          ssnit: { employee: nextSsnit.employee, employer: nextSsnit.employer },
+          tier2: { employee: nextTier2.employee, employer: nextTier2.employer },
+          tier3: { employee: nextTier3.employee, employer: nextTier3.employer },
+          paye_bands: payeBands,
+        }),
+      })
+
       toast({
         title: "Success",
-        description: `${currency.toUpperCase()} tax rates synced successfully`,
+        description: `${currency.toUpperCase()} tax rates synced and saved`,
       })
     } catch (error) {
       console.error(`[v0] Error syncing ${currency} tax rates:`, error)
       toast({
         title: "Error",
-        description: "Failed to sync tax rates",
+        description: error instanceof Error ? error.message : "Failed to sync tax rates",
         variant: "destructive",
       })
     } finally {
@@ -1782,8 +1766,24 @@ export default function SettingsPage() {
     }
   }
 
+  const mapDbBandsToUi = (bands: any[]) => {
+    const sorted = [...(bands || [])].sort((a, b) => Number(a.band_order || 0) - Number(b.band_order || 0))
+    let previousTo = 0
+    return sorted.map((band) => {
+      const to = band.is_remaining_amount ? Number.POSITIVE_INFINITY : Number(band.threshold_amount || 0)
+      const from = previousTo
+      previousTo = Number.isFinite(to) ? to : previousTo
+      return {
+        rate: Number(band.rate || 0),
+        from,
+        to,
+        cumulativeTax: 0,
+      }
+    })
+  }
+
   const loadPayrollSettings = async (cid: string) => {
-    if (isDemoMode() || !cid || cid.startsWith("demo-")) return
+    if (!cid || String(cid).startsWith("demo-")) return
     try {
       const [configRes, taxRes] = await Promise.all([
         fetch(`/api/settings/payroll?company_id=${encodeURIComponent(cid)}`, { credentials: "include" }),
@@ -1792,8 +1792,12 @@ export default function SettingsPage() {
       if (configRes.ok) {
         const { config } = await configRes.json()
         if (config) {
+          clearClientDemoSession()
           if (config.pay_frequency) setPayFrequency(config.pay_frequency)
-          if (config.currency) setCurrencyPref(config.currency)
+          if (config.currency) {
+            setCurrencyPref(config.currency)
+            setSelectedCurrency(config.currency)
+          }
           if (typeof config.minimum_wage === "number") setMinimumWage(config.minimum_wage)
           if (typeof config.overtime_weekday_multiplier === "number") setOvertimeWeekdayRate(config.overtime_weekday_multiplier)
           if (typeof config.overtime_weekend_multiplier === "number") setOvertimeWeekendRate(config.overtime_weekend_multiplier)
@@ -1806,13 +1810,28 @@ export default function SettingsPage() {
       if (taxRes.ok) {
         const tax = await taxRes.json()
         if (tax.ssnit) {
-          setSsnitRates({ employee: tax.ssnit.employee_rate, employer: tax.ssnit.employer_rate, total: tax.ssnit.employee_rate + tax.ssnit.employer_rate })
+          setSsnitRates({
+            employee: tax.ssnit.employee_rate,
+            employer: tax.ssnit.employer_rate,
+            total: tax.ssnit.employee_rate + tax.ssnit.employer_rate,
+          })
         }
         if (tax.tier2) {
-          setTier2Rates({ employee: tax.tier2.employee_rate, employer: tax.tier2.employer_rate, total: tax.tier2.employee_rate + tax.tier2.employer_rate })
+          setTier2Rates({
+            employee: tax.tier2.employee_rate,
+            employer: tax.tier2.employer_rate,
+            total: tax.tier2.employee_rate + tax.tier2.employer_rate,
+          })
         }
         if (tax.tier3) {
-          setTier3Rates({ employee: tax.tier3.employee_rate, employer: tax.tier3.employer_rate, total: tax.tier3.employee_rate + tax.tier3.employer_rate })
+          setTier3Rates({
+            employee: tax.tier3.employee_rate,
+            employer: tax.tier3.employer_rate,
+            total: tax.tier3.employee_rate + tax.tier3.employer_rate,
+          })
+        }
+        if (Array.isArray(tax.paye_bands) && tax.paye_bands.length) {
+          setPayeTaxBands(mapDbBandsToUi(tax.paye_bands))
         }
       }
     } catch (err) {
@@ -1821,35 +1840,31 @@ export default function SettingsPage() {
   }
 
   const loadPayrollData = async (companyId?: string) => {
-    if (isDemoMode()) {
-      return
-    }
-
-    const targetCompanyId = companyId || companyData.id
-
-    if (!targetCompanyId) {
-      console.warn("[v0] Unable to load payroll data without a company id")
-      return
-    }
-
-    // Load payroll config + tax rates from DB
-    void loadPayrollSettings(targetCompanyId)
-
+    // Always hit service-role APIs first (same pattern as Company / HR).
     try {
-      const [items, hr] = await Promise.all([
-        settingsFetch(`/api/settings/payroll/items?company_id=${encodeURIComponent(targetCompanyId)}`),
-        settingsFetch(`/api/settings/hr?company_id=${encodeURIComponent(targetCompanyId)}`),
-      ])
-      if (items.allowances?.length) setAllowances(items.allowances)
-      if (items.deductions?.length) setDeductions(items.deductions)
-      if (items.taxReliefs?.length) setTaxReliefs(items.taxReliefs)
-      if (Array.isArray(hr.salaryGrades)) setSalaryGrades(hr.salaryGrades)
-      if (Array.isArray(hr.unstructuredGrades)) setUnstructuredGrades(hr.unstructuredGrades)
+      let targetCompanyId = companyId || companyData.id
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        targetCompanyId = (await loadCompanyData()) || targetCompanyId
+      }
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        console.warn("[v0] Unable to load payroll data without a company id")
+        return
+      }
+
+      await loadPayrollSettings(targetCompanyId)
+
+      const items = await settingsFetch(
+        `/api/settings/payroll/items?company_id=${encodeURIComponent(targetCompanyId)}`,
+      )
+      clearClientDemoSession()
+      setAllowances(Array.isArray(items.allowances) ? items.allowances : [])
+      setDeductions(Array.isArray(items.deductions) ? items.deductions : [])
+      setTaxReliefs(Array.isArray(items.taxReliefs) ? items.taxReliefs : [])
     } catch (error) {
       console.error("[v0] Failed to load payroll configuration", error)
       toast({
         title: "Error",
-        description: "Unable to load salary grades.",
+        description: error instanceof Error ? error.message : "Unable to load payroll settings.",
         variant: "destructive",
       })
     }
@@ -3015,10 +3030,27 @@ This document contains important information about ${document.name.toLowerCase()
 
 
   // Parse document content based on document type and name
+  const isPdfDocument = (document: any) => {
+    const type = String(document?.type || document?.fileType || "").toLowerCase()
+    const url = String(document?.fileUrl || "")
+    return type.includes("pdf") || url.toLowerCase().includes(".pdf") || url.startsWith("data:application/pdf")
+  }
+
+  const isImageDocument = (document: any) => {
+    const type = String(document?.type || document?.fileType || "").toLowerCase()
+    const url = String(document?.fileUrl || "")
+    return type.startsWith("image/") || /\.(png|jpe?g|gif|webp)(\?|$)/i.test(url) || url.startsWith("data:image/")
+  }
+
   const parseDocumentContent = (document: any) => {
-    // If document has stored content from uploaded file, use that
-    if (document.content) {
+    // Prefer stored extracted content from the uploaded file
+    if (document.content && String(document.content).trim()) {
       return document.content
+    }
+
+    // If we have a file URL, don't invent fake handbook text — viewer will embed the file
+    if (document.fileUrl) {
+      return ""
     }
 
     // Document templates with realistic content for default documents
@@ -3288,16 +3320,16 @@ This document contains important information about ${document.name.toLowerCase()
     setSelectedDocument(document)
     setDocumentModalType("view")
     setShowDocumentModal(true)
-    setShowDocumentPreview(false) // Reset preview state
+    setShowDocumentPreview(false)
+    setDocumentZoom(100)
+    setDocumentRotation(0)
+    setCurrentPage(1)
+    setSearchTerm("")
 
-    // Immediately parse and set the document content
     const parsedContent = parseDocumentContent(document)
     setDocumentPreviewContent(parsedContent)
-    
-    // In a real PDF viewer, you'd set totalPages here based on loaded PDF
     setTotalPages(1)
-    
-    // Show preview after a brief delay to ensure smooth transition
+
     setTimeout(() => {
       setShowDocumentPreview(true)
     }, 100)
@@ -3897,21 +3929,36 @@ Format the response in a professional, actionable manner for HR decision-makers.
   const [aiInsightsLoading, setAiInsightsLoading] = useState(false)
 
   const handleAddTaxBand = () => {
-    console.log("[v0] Adding new tax band...")
-    const currentConfig = getCurrencyConfig(selectedCurrency)
-    const newBand = {
-      rate: 0,
-      from: 0,
-      to: 0,
-      cumulativeTax: 0,
-    }
-
-    // Update the currency config with new band
-    const updatedBands = [...currentConfig.taxBands, newBand]
-    // This would typically update the state or database
+    const last = payeTaxBands[payeTaxBands.length - 1]
+    const from = last && Number.isFinite(last.to) ? Number(last.to) : Number(last?.from || 0)
+    setPayeTaxBands([
+      ...payeTaxBands.map((b) =>
+        b.to === Number.POSITIVE_INFINITY ? { ...b, to: from || b.from || 0 } : b,
+      ),
+      {
+        rate: 0,
+        from: from || 0,
+        to: Number.POSITIVE_INFINITY,
+        cumulativeTax: 0,
+      },
+    ])
     toast({
-      title: "Success",
-      description: "New tax band added successfully",
+      title: "Tax Band Added",
+      description: "Edit the new band values, then click Save Tax Configuration.",
+    })
+  }
+
+  const handleUpdateTaxBand = (index: number, field: string, value: number) => {
+    setPayeTaxBands((prev) =>
+      prev.map((band, i) => (i === index ? { ...band, [field]: value } : band)),
+    )
+  }
+
+  const handleDeleteTaxBand = (index: number) => {
+    setPayeTaxBands((prev) => prev.filter((_, i) => i !== index))
+    toast({
+      title: "Tax Band Removed",
+      description: "Save Tax Configuration to persist this change.",
     })
   }
 
@@ -3919,13 +3966,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     setIsSavingPayroll(true)
 
     try {
-      const supabase = createClient()
-      const companyId = companyData?.id
-      if (!companyId || String(companyId).startsWith("demo-")) {
-        await new Promise((resolve) => setTimeout(resolve, 400))
-        toast({ title: "Success", description: "Payroll configuration saved (demo)." })
-        return
-      }
+      const companyId = await resolveHrCompanyId()
 
       await settingsFetch("/api/settings/payroll/items", {
         method: "POST",
@@ -3943,7 +3984,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
           company_id: companyId,
           config: {
             pay_frequency: payFrequency,
-            currency,
+            currency: selectedCurrency || currency,
             minimum_wage: minimumWage,
             overtime_weekday_multiplier: overtimeWeekdayRate,
             overtime_weekend_multiplier: overtimeWeekendRate,
@@ -3954,6 +3995,8 @@ Format the response in a professional, actionable manner for HR decision-makers.
           },
         }),
       })
+
+      await loadPayrollData(companyId)
 
       toast({
         title: "Payroll configuration saved",
@@ -3975,29 +4018,21 @@ Format the response in a professional, actionable manner for HR decision-makers.
     setIsSavingTax(true)
 
     try {
-      const companyId = companyData?.id
-      if (!companyId || String(companyId).startsWith("demo-")) {
-        await new Promise((resolve) => setTimeout(resolve, 400))
-        toast({ title: "Success", description: "Tax configuration saved (demo)." })
-        return
-      }
-
+      const companyId = await resolveHrCompanyId()
       const taxYear = new Date().getFullYear()
 
-      // Build PAYE bands from the current currency config (editable in UI)
-      const currentConfig = getCurrencyConfig(selectedCurrency)
-      const payeBands = currentConfig.taxBands.map((b: any, i: number) => ({
+      const payeBands = payeTaxBands.map((b: any, i: number) => ({
         band_order: i + 1,
-        rate: b.rate,
-        threshold_amount: b.to === Number.POSITIVE_INFINITY ? 999999999 : b.to,
+        rate: Number(b.rate || 0),
+        threshold_amount: b.to === Number.POSITIVE_INFINITY ? 999999999 : Number(b.to || 0),
         is_remaining_amount: b.to === Number.POSITIVE_INFINITY,
-        description: `${b.rate}% — ${b.from.toLocaleString()} to ${b.to === Number.POSITIVE_INFINITY ? "∞" : b.to.toLocaleString()}`,
+        description: `${b.rate}% — ${Number(b.from || 0).toLocaleString()} to ${
+          b.to === Number.POSITIVE_INFINITY ? "∞" : Number(b.to || 0).toLocaleString()
+        }`,
       }))
 
-      const res = await fetch("/api/settings/tax", {
+      const data = await settingsFetch("/api/settings/tax", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({
           company_id: companyId,
           tax_year: taxYear,
@@ -4008,12 +4043,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
         }),
       })
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? "Failed to save tax configuration")
-
       toast({
         title: "Tax configuration saved",
-        description: `SSNIT/Tier rates and ${data.saved_bands ?? 0} PAYE bands saved to database.`,
+        description: `SSNIT/Tier rates and ${data.saved_bands ?? payeBands.length} PAYE bands saved to database.`,
       })
     } catch (error) {
       console.error("Error saving tax config:", error)
@@ -4143,24 +4175,22 @@ Format the response in a professional, actionable manner for HR decision-makers.
     }
   }
 
-  const handleSaveReliefs = async () => {
+  const handleSaveReliefs = async (reliefsOverride?: any[]) => {
     setIsSavingReliefs(true)
     console.log("[v0] Saving tax reliefs...")
 
     try {
-      const companyId = companyData?.id
-      if (!companyId || String(companyId).startsWith("demo-")) {
-        await new Promise((resolve) => setTimeout(resolve, 400))
-      } else {
-        await settingsFetch("/api/settings/payroll/items", {
-          method: "POST",
-          body: JSON.stringify({
-            action: "save_tax_reliefs",
-            company_id: companyId,
-            taxReliefs,
-          }),
-        })
-      }
+      const companyId = await resolveHrCompanyId()
+      const payload = Array.isArray(reliefsOverride) ? reliefsOverride : taxReliefs
+      await settingsFetch("/api/settings/payroll/items", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_tax_reliefs",
+          company_id: companyId,
+          taxReliefs: payload,
+        }),
+      })
+      await loadPayrollData(companyId)
 
       toast({
         title: "Tax Reliefs Saved",
@@ -4170,7 +4200,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
       console.error("[v0] Error saving tax reliefs:", error)
       toast({
         title: "Save Failed",
-        description: "Failed to save tax reliefs. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to save tax reliefs. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -6740,32 +6770,56 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         </tr>
                       </thead>
                       <tbody>
-                        {getCurrencyConfig(selectedCurrency)?.taxBands.map((band, index) => (
+                        {payeTaxBands.map((band, index) => (
                           <tr key={index} className="hover:bg-gray-50">
-                            <td className="border border-gray-200 px-4 py-3 font-medium">{band.rate}</td>
+                            <td className="border border-gray-200 px-4 py-3 font-medium">{index + 1}</td>
                             <td className="border border-gray-200 px-4 py-3">
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                {band.rate}%
-                              </span>
+                              <Input
+                                type="number"
+                                step="0.1"
+                                className="w-24"
+                                value={band.rate}
+                                onChange={(e) =>
+                                  handleUpdateTaxBand(index, "rate", Number.parseFloat(e.target.value) || 0)
+                                }
+                              />
                             </td>
                             <td className="border border-gray-200 px-4 py-3">
-                              {band.from ? band.from.toLocaleString() : "0"}
+                              <Input
+                                type="number"
+                                className="w-32"
+                                value={band.from ?? 0}
+                                onChange={(e) =>
+                                  handleUpdateTaxBand(index, "from", Number.parseFloat(e.target.value) || 0)
+                                }
+                              />
                             </td>
                             <td className="border border-gray-200 px-4 py-3">
-                              {band.to ? band.to.toLocaleString() : "∞"}
+                              <Input
+                                type="number"
+                                className="w-32"
+                                value={band.to === Number.POSITIVE_INFINITY ? "" : band.to ?? ""}
+                                placeholder="∞"
+                                onChange={(e) => {
+                                  const raw = e.target.value
+                                  handleUpdateTaxBand(
+                                    index,
+                                    "to",
+                                    raw === "" ? Number.POSITIVE_INFINITY : Number.parseFloat(raw) || 0,
+                                  )
+                                }}
+                              />
                             </td>
                             <td className="border border-gray-200 px-4 py-3 font-medium text-green-600">
-                              {band.cumulativeTax ? band.cumulativeTax.toLocaleString() : "0"}
+                              {band.cumulativeTax ? Number(band.cumulativeTax).toLocaleString() : "0"}
                             </td>
                             <td className="border border-gray-200 px-4 py-3 text-center">
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => {
-                                  console.log("[v0] Editing tax band:", band)
-                                }}
+                                onClick={() => handleDeleteTaxBand(index)}
                               >
-                                Edit
+                                <Trash2 className="w-4 h-4" />
                               </Button>
                             </td>
                           </tr>
@@ -7221,9 +7275,11 @@ Format the response in a professional, actionable manner for HR decision-makers.
             )}
 
             {/* Enhanced Tax Reliefs Section */}
-            <TaxReliefManager 
+            <TaxReliefManager
               onReliefsChange={setTaxReliefs}
               initialReliefs={taxReliefs}
+              companyId={companyData.id}
+              onSaveReliefs={handleSaveReliefs}
             />
           </div>
         </TabsContent>
@@ -9069,50 +9125,77 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   </div>
                 </div>
 
-                {/* Document Preview Area */}
+                {/* Document Preview Area — prefer real file embed when available */}
                 <div className={`border border-gray-300 rounded-md bg-gray-50 ${isFullscreen ? 'h-[calc(100vh-200px)]' : 'h-[600px]'} overflow-auto`}>
-                  <div
-                    className="bg-white shadow-lg min-h-full"
-                    style={{
-                      transform: `scale(${documentZoom / 100}) rotate(${documentRotation}deg)`,
-                      transition: 'transform 0.3s ease',
-                    }}
-                  >
-                    {documentPreviewContent ? (
-                      <div className="p-8 max-w-4xl mx-auto">
-                        <div className="prose prose-lg max-w-none">
-                          <div 
-                            className="whitespace-pre-wrap text-gray-800 leading-relaxed"
-                            dangerouslySetInnerHTML={{
-                              __html: documentPreviewContent
-                                .replace(/# (.*)/g, '<h1 class="text-3xl font-bold text-gray-900 mb-6 border-b-2 border-gray-200 pb-2">$1</h1>')
-                                .replace(/## (.*)/g, '<h2 class="text-2xl font-semibold text-gray-800 mb-4 mt-8">$1</h2>')
-                                .replace(/### (.*)/g, '<h3 class="text-xl font-medium text-gray-700 mb-3 mt-6">$1</h3>')
-                                .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
-                                .replace(/- (.*)/g, '<li class="mb-2 text-gray-700">$1</li>')
-                                .replace(/(\d+)\. (.*)/g, '<li class="mb-2 text-gray-700"><span class="font-medium">$1.</span> $2</li>')
-                                .replace(/\n\n/g, '</p><p class="mb-4 text-gray-700">')
-                                .replace(/^(?!<[h|l])/gm, '<p class="mb-4 text-gray-700">')
-                                .replace(/<li/g, '<ul class="list-disc list-inside mb-4"><li')
-                                .replace(/<\/li>/g, '</li></ul>')
-                                .replace(/<ul class="list-disc list-inside mb-4"><ul class="list-disc list-inside mb-4">/g, '<ul class="list-disc list-inside mb-4">')
-                                .replace(/<\/ul><\/ul>/g, '</ul>')
-                            }}
-                          />
-                        </div>
+                  {selectedDocument.fileUrl && isPdfDocument(selectedDocument) ? (
+                    <iframe
+                      title={selectedDocument.name}
+                      src={selectedDocument.fileUrl}
+                      className="w-full h-full min-h-[560px] bg-white"
+                      style={{
+                        transform: `scale(${documentZoom / 100})`,
+                        transformOrigin: "top left",
+                        width: `${10000 / documentZoom}%`,
+                        height: `${10000 / documentZoom}%`,
+                      }}
+                    />
+                  ) : selectedDocument.fileUrl && isImageDocument(selectedDocument) ? (
+                    <div className="w-full h-full flex items-center justify-center p-4">
+                      <img
+                        src={selectedDocument.fileUrl}
+                        alt={selectedDocument.name}
+                        className="max-w-full max-h-full object-contain"
+                        style={{
+                          transform: `scale(${documentZoom / 100}) rotate(${documentRotation}deg)`,
+                          transition: "transform 0.3s ease",
+                        }}
+                      />
+                    </div>
+                  ) : selectedDocument.fileUrl && !documentPreviewContent ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-4 p-6">
+                      <FileText className="w-16 h-16 text-gray-400" />
+                      <div className="text-center">
+                        <p className="text-lg font-semibold text-gray-700">{selectedDocument.name}</p>
+                        <p className="text-sm text-gray-500 mb-4">
+                          Preview is not available for this file type. Open or download the original file.
+                        </p>
+                        <Button asChild variant="outline">
+                          <a href={selectedDocument.fileUrl} target="_blank" rel="noreferrer">
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            Open Document
+                          </a>
+                        </Button>
                       </div>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <div className="text-center space-y-4">
-                          <FileText className="w-16 h-16 mx-auto text-gray-400" />
-                          <div>
-                            <p className="text-lg font-semibold text-gray-700">{selectedDocument.name}</p>
-                            <p className="text-sm text-gray-500">Loading document preview...</p>
+                    </div>
+                  ) : (
+                    <div
+                      className="bg-white shadow-lg min-h-full"
+                      style={{
+                        transform: `scale(${documentZoom / 100}) rotate(${documentRotation}deg)`,
+                        transition: "transform 0.3s ease",
+                      }}
+                    >
+                      {documentPreviewContent ? (
+                        <div className="p-8 max-w-4xl mx-auto">
+                          <div className="prose prose-lg max-w-none">
+                            <div className="whitespace-pre-wrap text-gray-800 leading-relaxed">
+                              {documentPreviewContent}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center min-h-[400px]">
+                          <div className="text-center space-y-4">
+                            <FileText className="w-16 h-16 mx-auto text-gray-400" />
+                            <div>
+                              <p className="text-lg font-semibold text-gray-700">{selectedDocument.name}</p>
+                              <p className="text-sm text-gray-500">No preview content available for this document.</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Viewer Info */}
@@ -9120,13 +9203,27 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   <div className="flex items-center space-x-2">
                     <Shield className="w-5 h-5 text-blue-600" />
                     <p className="text-sm text-blue-800">
-                      This document is protected. Downloading is disabled for security purposes.
+                      {selectedDocument.vaultDocumentId
+                        ? "A copy of this document is stored in Document Vault."
+                        : selectedDocument.fileUrl
+                          ? "Showing the uploaded file contents."
+                          : "Showing available document content."}
                     </p>
                   </div>
-                  <Button variant="outline" size="sm" onClick={handleResetViewer}>
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Reset View
-                  </Button>
+                  <div className="flex items-center space-x-2">
+                    {selectedDocument.fileUrl && (
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={selectedDocument.fileUrl} target="_blank" rel="noreferrer">
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Open File
+                        </a>
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" onClick={handleResetViewer}>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Reset View
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="flex justify-end space-x-3 mt-4">

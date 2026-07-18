@@ -8,31 +8,62 @@
 import { NextRequest, NextResponse } from "next/server"
 import { jsonError, resolveTenantContext } from "@/lib/settings/resolve-tenant"
 
+function isMissingRelation(error: any) {
+  const message = String(error?.message || error || "").toLowerCase()
+  return (
+    error?.code === "42P01" ||
+    error?.code === "PGRST205" ||
+    message.includes("does not exist") ||
+    message.includes("could not find the table")
+  )
+}
+
+async function safeRows(query: PromiseLike<{ data: any; error: any }>, label: string) {
+  const { data, error } = await query
+  if (error) {
+    if (isMissingRelation(error)) {
+      console.warn(`[settings/payroll/items] ${label} missing:`, error.message)
+      return []
+    }
+    throw error
+  }
+  return data || []
+}
+
 export async function GET(req: NextRequest) {
   try {
     const ctx = await resolveTenantContext(req)
     if (ctx instanceof NextResponse) return ctx
     const { companyId, service } = ctx
 
-    const [{ data: allowanceRows }, { data: deductionRows }, { data: reliefRows }] = await Promise.all([
-      service
-        .from("payroll_allowances")
-        .select("code, description, taxable, recurring, amount, percentage, type, is_active")
-        .eq("company_id", companyId)
-        .eq("is_active", true)
-        .order("code"),
-      service
-        .from("payroll_deductions")
-        .select("code, description, taxable, recurring, amount, percentage, type, is_active")
-        .eq("company_id", companyId)
-        .eq("is_active", true)
-        .order("code"),
-      service
-        .from("tax_reliefs")
-        .select("*")
-        .eq("company_id", companyId)
-        .eq("is_active", true)
-        .order("created_at", { ascending: true }),
+    const [allowanceRows, deductionRows, reliefRows] = await Promise.all([
+      safeRows(
+        service
+          .from("payroll_allowances")
+          .select("code, description, taxable, recurring, amount, percentage, type, is_active")
+          .eq("company_id", companyId)
+          .eq("is_active", true)
+          .order("code"),
+        "payroll_allowances",
+      ),
+      safeRows(
+        service
+          .from("payroll_deductions")
+          .select("code, description, taxable, recurring, amount, percentage, type, is_active")
+          .eq("company_id", companyId)
+          .eq("is_active", true)
+          .order("code"),
+        "payroll_deductions",
+      ),
+      safeRows(
+        service
+          .from("tax_reliefs")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("is_active", true)
+          .order("created_at", { ascending: true }),
+        "tax_reliefs",
+      ),
     ])
 
     return NextResponse.json({
@@ -64,6 +95,7 @@ export async function GET(req: NextRequest) {
         category: r.category || "Personal",
         effectiveDate: r.effective_date || null,
         lastUpdated: r.last_updated || r.updated_at || null,
+        graCode: r.gra_code || r.code || "",
       })),
     })
   } catch (err) {

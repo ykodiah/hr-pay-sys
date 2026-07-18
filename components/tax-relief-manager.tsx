@@ -37,9 +37,16 @@ import GRAPortalIntegration from './gra-portal-integration';
 interface TaxReliefManagerProps {
   onReliefsChange?: (reliefs: GRATaxRelief[]) => void;
   initialReliefs?: GRATaxRelief[];
+  companyId?: string | null;
+  onSaveReliefs?: (reliefs: GRATaxRelief[]) => Promise<void> | void;
 }
 
-export default function TaxReliefManager({ onReliefsChange, initialReliefs = [] }: TaxReliefManagerProps) {
+export default function TaxReliefManager({
+  onReliefsChange,
+  initialReliefs = [],
+  companyId,
+  onSaveReliefs,
+}: TaxReliefManagerProps) {
   const { toast } = useToast();
   const [reliefs, setReliefs] = useState<GRATaxRelief[]>(initialReliefs);
   const [editingRelief, setEditingRelief] = useState<number | null>(null);
@@ -55,6 +62,13 @@ export default function TaxReliefManager({ onReliefsChange, initialReliefs = [] 
     'Personal', 'Family', 'Age', 'Disability', 'Education', 
     'Medical', 'Housing', 'Investment', 'Other'
   ];
+
+  // Sync from parent when DB load replaces reliefs (by id signature)
+  const initialSignature = (initialReliefs || []).map((r) => r.id || r.name).join("|")
+  useEffect(() => {
+    setReliefs(initialReliefs || [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSignature])
 
   useEffect(() => {
     if (onReliefsChange) {
@@ -157,17 +171,36 @@ export default function TaxReliefManager({ onReliefsChange, initialReliefs = [] 
 
   const handleSaveReliefs = async () => {
     try {
-      // Simulate save operation
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      if (onSaveReliefs) {
+        await onSaveReliefs(reliefs);
+        return;
+      }
+
+      if (!companyId || String(companyId).startsWith("demo-")) {
+        throw new Error("No company identifier available");
+      }
+
+      const res = await fetch("/api/settings/payroll/items", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save_tax_reliefs",
+          company_id: companyId,
+          taxReliefs: reliefs,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to save tax reliefs");
+
       toast({
         title: "Tax Reliefs Saved",
-        description: "Tax reliefs have been saved successfully.",
+        description: "Tax reliefs have been saved to the database.",
       });
     } catch (error) {
       toast({
         title: "Save Failed",
-        description: "Failed to save tax reliefs. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to save tax reliefs. Please try again.",
         variant: "destructive",
       });
     }

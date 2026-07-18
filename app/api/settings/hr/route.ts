@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from "next/server"
 import { jsonError, resolveTenantContext } from "@/lib/settings/resolve-tenant"
+import { persistVaultDocument } from "@/lib/employees/persist-vault-document"
 
 function formatBytes(bytes?: number | null) {
   if (!bytes || bytes <= 0) return "0 MB"
@@ -60,14 +61,25 @@ export async function GET(req: NextRequest) {
         service.from("hr_configuration").select("*").eq("company_id", companyId).maybeSingle(),
         "hr_configuration",
       ),
-      safeSelect(
-        service
+      (async () => {
+        const full = await service
           .from("hr_documents")
-          .select("id, document_name, document_type, file_path, file_size, visible_to_all, created_at, content")
+          .select(
+            "id, document_name, document_type, file_path, file_size, visible_to_all, created_at, content, vault_document_id, file_type",
+          )
           .eq("company_id", companyId)
-          .order("created_at", { ascending: false }),
-        "hr_documents",
-      ),
+          .order("created_at", { ascending: false })
+        if (!full.error) return full.data || []
+        // Older schemas may lack vault_document_id / content
+        return safeSelect(
+          service
+            .from("hr_documents")
+            .select("id, document_name, document_type, file_path, file_size, visible_to_all, created_at")
+            .eq("company_id", companyId)
+            .order("created_at", { ascending: false }),
+          "hr_documents",
+        )
+      })(),
       safeSelect(
         service
           .from("leave_policies")
@@ -120,6 +132,8 @@ export async function GET(req: NextRequest) {
       fileUrl: doc.file_path,
       uploadedAt: doc.created_at || new Date().toISOString(),
       content: doc.content || "",
+      vaultDocumentId: doc.vault_document_id || null,
+      fileType: doc.file_type || doc.document_type || null,
     }))
 
     const leavePolicies = (policies || []).map((p) => ({
@@ -338,32 +352,84 @@ export async function POST(req: NextRequest) {
 
     if (action === "save_document") {
       const doc = body.document || body
+      const documentName = doc.name || doc.document_name || "HR Document"
+      const documentType = doc.type || doc.document_type || "FILE"
+      const fileUrl = doc.fileUrl || doc.file_path || null
+      const fileSize = typeof doc.file_size === "number" ? doc.file_size : 0
+      const fileType = doc.file_type || documentType || "application/octet-stream"
+
+      // Always keep a copy in Document Vault for company-wide HR policies
+      let vaultDocumentId = isUuid(doc.vaultDocumentId) ? doc.vaultDocumentId : null
+      if (fileUrl) {
+        const vault = await persistVaultDocument(service, {
+          employee_id: null,
+          employee_name: "Company HR",
+          document_type: documentType,
+          file_name: documentName,
+          file_size: fileSize,
+          file_type: fileType,
+          file_url: fileUrl,
+          uploaded_by: userId,
+          status: "approved",
+          notes: doc.content ? String(doc.content).slice(0, 2000) : "HR settings document",
+          source: "settings-hr",
+          category: "hr-policy",
+          company_id: companyId,
+        })
+        if (vault.ok && vault.id) vaultDocumentId = vault.id
+        else console.warn("[settings/hr] vault copy skipped:", vault.error)
+      }
+
       const row = {
         company_id: companyId,
-        document_name: doc.name || doc.document_name,
-        document_type: doc.type || doc.document_type || "FILE",
-        file_path: doc.fileUrl || doc.file_path || null,
-        file_size: typeof doc.file_size === "number" ? doc.file_size : null,
-        file_type: doc.file_type || doc.type || null,
+        document_name: documentName,
+        document_type: documentType,
+        file_path: fileUrl,
+        file_size: fileSize || null,
+        file_type: fileType,
         visible_to_all: !!(doc.visibleToAll ?? doc.visible_to_all),
         content: doc.content || null,
+        vault_document_id: vaultDocumentId,
         uploaded_by: userId,
         updated_at: now,
       }
-      if (isUuid(doc.id)) {
-        const { data, error } = await service
-          .from("hr_documents")
-          .update(row)
-          .eq("id", doc.id)
-          .eq("company_id", companyId)
-          .select()
-          .single()
-        if (error) throw error
-        return NextResponse.json({ success: true, document: data })
+
+      const persistHrDoc = async (payload: Record<string, any>, mode: "update" | "insert") => {
+        const attempts = [
+          payload,
+          (({ vault_document_id, ...rest }) => rest)(payload),
+          (({ vault_document_id, content, ...rest }) => rest)(payload),
+        ]
+        let lastError: any = null
+        for (const attempt of attempts) {
+          const query =
+            mode === "update"
+              ? service.from("hr_documents").update(attempt).eq("id", doc.id).eq("company_id", companyId)
+              : service.from("hr_documents").insert({ ...attempt, created_at: now })
+          const { data, error } = await query.select().single()
+          if (!error) return data
+          lastError = error
+          const msg = String(error.message || "").toLowerCase()
+          if (error.code === "PGRST204" || msg.includes("column") || msg.includes("schema cache")) continue
+          throw error
+        }
+        throw lastError || new Error("Failed to save HR document")
       }
-      const { data, error } = await service.from("hr_documents").insert({ ...row, created_at: now }).select().single()
-      if (error) throw error
-      return NextResponse.json({ success: true, document: data })
+
+      if (isUuid(doc.id)) {
+        const data = await persistHrDoc(row, "update")
+        return NextResponse.json({
+          success: true,
+          document: data,
+          vault_document_id: vaultDocumentId,
+        })
+      }
+      const data = await persistHrDoc(row, "insert")
+      return NextResponse.json({
+        success: true,
+        document: data,
+        vault_document_id: vaultDocumentId,
+      })
     }
 
     if (action === "toggle_document_visibility") {
