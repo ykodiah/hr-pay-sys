@@ -242,9 +242,15 @@ interface AccessSettings {
   twoFactorEnabled: boolean
   ssoEnabled: boolean
   passwordExpiryEnabled: boolean
+  passwordExpiryDays: number
   sessionTimeout: number
   maxLoginAttempts: number
+  lockoutDuration: number
   passwordMinLength: number
+  passwordRequireUppercase: boolean
+  passwordRequireLowercase: boolean
+  passwordRequireNumbers: boolean
+  passwordRequireSpecial: boolean
   ipRestrictionsEnabled: boolean
   allowedIPs: string[]
 }
@@ -313,7 +319,10 @@ interface ActiveSession {
   user_email: string
   ip_address: string
   device: string
+  browser?: string
+  os?: string
   last_activity: string
+  is_current?: boolean
 }
 
 const isDemoMode = () => {
@@ -787,15 +796,23 @@ export default function SettingsPage() {
     twoFactorEnabled: false,
     ssoEnabled: false,
     passwordExpiryEnabled: true,
+    passwordExpiryDays: 90,
     sessionTimeout: 30,
     maxLoginAttempts: 5,
+    lockoutDuration: 15,
     passwordMinLength: 8,
+    passwordRequireUppercase: true,
+    passwordRequireLowercase: true,
+    passwordRequireNumbers: true,
+    passwordRequireSpecial: false,
     ipRestrictionsEnabled: false,
     allowedIPs: [],
   })
   const [isSavingAccessSettings, setIsSavingAccessSettings] = useState(false)
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([])
   const [isRefreshingSessions, setIsRefreshingSessions] = useState(false)
+  const [sessionToTerminate, setSessionToTerminate] = useState<ActiveSession | null>(null)
+  const [isTerminatingSession, setIsTerminatingSession] = useState(false)
 
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
     dataEncryptionEnabled: true,
@@ -1654,77 +1671,12 @@ export default function SettingsPage() {
   const loadAccessAndSecurityData = async (companyId?: string) => {
     console.log("[v0] Loading access and security data...")
 
-    if (isDemoMode()) {
-      // Retain enriched demo experience in offline mode
-      setAccessSettings({
-        twoFactorEnabled: true,
-        ssoEnabled: false,
-        passwordExpiryEnabled: true,
-        sessionTimeout: 30,
-        maxLoginAttempts: 5,
-        passwordMinLength: 10,
-        ipRestrictionsEnabled: true,
-        allowedIPs: ["192.168.1.0/24", "10.0.0.1"],
-      })
-      setSecuritySettings({
-        dataEncryptionEnabled: true,
-        auditLoggingEnabled: true,
-        autoBackupEnabled: true,
-        backupFrequency: "daily",
-        dataRetentionDays: 180,
-      })
-      setLastBackupTime(new Date("2024-03-10T10:00:00Z").toISOString())
-      setBackupSize("50 MB")
-      setBackupStatus("Completed")
-      setAuditLogs([
-        {
-          id: "log-001",
-          user_email: "admin@example.com",
-          action: "User logged in",
-          timestamp: new Date("2024-03-11T09:00:00Z").toISOString(),
-          ip_address: "192.168.1.10",
-          severity: "low",
-        },
-        {
-          id: "log-002",
-          user_email: "hr@example.com",
-          action: "Updated employee record",
-          timestamp: new Date("2024-03-11T09:05:00Z").toISOString(),
-          ip_address: "192.168.1.11",
-          severity: "medium",
-        },
-        {
-          id: "log-003",
-          user_email: "admin@example.com",
-          action: "Security settings modified",
-          timestamp: new Date("2024-03-11T09:10:00Z").toISOString(),
-          ip_address: "192.168.1.10",
-          severity: "high",
-        },
-      ])
-      setActiveSessions([
-        {
-          id: "session-001",
-          user_email: "admin@example.com",
-          ip_address: "192.168.1.10",
-          device: "Desktop",
-          last_activity: new Date("2024-03-11T09:10:00Z").toISOString(),
-        },
-        {
-          id: "session-002",
-          user_email: "user@example.com",
-          ip_address: "10.0.0.5",
-          device: "Mobile",
-          last_activity: new Date("2024-03-11T08:30:00Z").toISOString(),
-        },
-      ])
-      console.log("[v0] Access and security data loaded in demo mode.")
-      return
+    let targetCompanyId = companyId || companyData.id
+    if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+      targetCompanyId = (await loadCompanyData()) || targetCompanyId
     }
 
-    const targetCompanyId = companyId || companyData.id
-
-    if (!targetCompanyId) {
+    if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
       console.warn("[v0] Unable to load access/security data without a company id")
       return
     }
@@ -1735,9 +1687,10 @@ export default function SettingsPage() {
         settingsFetch(`/api/settings/access${qs}`),
         settingsFetch(`/api/settings/security${qs}`),
       ])
+      clearClientDemoSession()
 
-      if (accessPayload.accessSettings) setAccessSettings(accessPayload.accessSettings)
-      if (accessPayload.activeSessions) setActiveSessions(accessPayload.activeSessions)
+      if (accessPayload.accessSettings) setAccessSettings((prev) => ({ ...prev, ...accessPayload.accessSettings }))
+      setActiveSessions(Array.isArray(accessPayload.activeSessions) ? accessPayload.activeSessions : [])
       if (securityPayload.securitySettings) setSecuritySettings(securityPayload.securitySettings)
       setLastBackupTime(securityPayload.lastBackupTime || null)
       setBackupStatus(securityPayload.backupStatus || null)
@@ -4812,34 +4765,14 @@ Format the response in a professional, actionable manner for HR decision-makers.
     setIsRefreshingSessions(true)
     console.log("[v0] Refreshing active sessions...")
     try {
-      if (isDemoMode()) {
-        await new Promise((resolve) => setTimeout(resolve, 800))
-        setActiveSessions([
-          {
-            id: "session-001",
-            user_email: "admin@example.com",
-            ip_address: "192.168.1.10",
-            device: "Desktop",
-            last_activity: new Date().toISOString(),
-          },
-          {
-            id: "session-003",
-            user_email: "newuser@example.com",
-            ip_address: "192.168.1.15",
-            device: "Laptop",
-            last_activity: new Date().toISOString(),
-          },
-        ])
-      } else {
-        const companyId = companyData.id || (await loadCompanyData())
-        await loadAccessAndSecurityData(companyId || undefined)
-      }
+      const companyId = await resolveHrCompanyId()
+      await loadAccessAndSecurityData(companyId)
       toast({ title: "Sessions Refreshed", description: "Active sessions have been updated." })
     } catch (error) {
       console.error("[v0] Failed to refresh sessions", error)
       toast({
         title: "Error",
-        description: "Unable to refresh active sessions.",
+        description: error instanceof Error ? error.message : "Unable to refresh active sessions.",
         variant: "destructive",
       })
     } finally {
@@ -4847,30 +4780,47 @@ Format the response in a professional, actionable manner for HR decision-makers.
     }
   }
 
-  const handleTerminateSession = async (sessionId: string) => {
-    console.log(`[v0] Terminating session: ${sessionId}`)
-    if (!confirm("Are you sure you want to terminate this session?")) return
+  const handleConfirmTerminateSession = async () => {
+    if (!sessionToTerminate) return
+    setIsTerminatingSession(true)
     try {
-      if (isDemoMode()) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        setActiveSessions((prev) => prev.filter((session) => session.id !== sessionId))
-      } else {
-        await settingsFetch("/api/settings/access", {
-          method: "POST",
-          body: JSON.stringify({
-            action: "terminate_session",
-            company_id: companyData.id,
-            session_id: sessionId,
-          }),
-        })
-        setActiveSessions((prev) => prev.filter((session) => session.id !== sessionId))
-      }
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/access", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "terminate_session",
+          company_id: companyId,
+          session_id: sessionToTerminate.id,
+        }),
+      })
+      setActiveSessions((prev) => prev.filter((session) => session.id !== sessionToTerminate.id))
       toast({ title: "Session Terminated", description: "The selected session has been terminated." })
+      setSessionToTerminate(null)
     } catch (error) {
       console.error("[v0] Failed to terminate session", error)
       toast({
         title: "Error",
-        description: "Unable to terminate the selected session.",
+        description: error instanceof Error ? error.message : "Unable to terminate the selected session.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsTerminatingSession(false)
+    }
+  }
+
+  const handleTerminateAllSessions = async () => {
+    try {
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/access", {
+        method: "POST",
+        body: JSON.stringify({ action: "terminate_all_sessions", company_id: companyId }),
+      })
+      setActiveSessions([])
+      toast({ title: "Sessions Terminated", description: "All active sessions have been terminated." })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Unable to terminate sessions.",
         variant: "destructive",
       })
     }
@@ -4881,18 +4831,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     console.log("[v0] Saving access settings...")
 
     try {
-      if (isDemoMode()) {
-        await new Promise((resolve) => setTimeout(resolve, 700))
-        toast({ title: "Access Settings Saved", description: "Access control settings have been updated." })
-        return
-      }
-
-      const companyId = companyData.id || (await loadCompanyData())
-
-      if (!companyId) {
-        throw new Error("No company identifier available")
-      }
-
+      const companyId = await resolveHrCompanyId()
       await settingsFetch("/api/settings/access", {
         method: "POST",
         body: JSON.stringify({
@@ -4901,13 +4840,13 @@ Format the response in a professional, actionable manner for HR decision-makers.
           settings: accessSettings,
         }),
       })
-
+      await loadAccessAndSecurityData(companyId)
       toast({ title: "Access Settings Saved", description: "Access control settings have been updated." })
     } catch (error) {
       console.error("[v0] Failed to save access settings", error)
       toast({
         title: "Error",
-        description: "Unable to save access control settings.",
+        description: error instanceof Error ? error.message : "Unable to save access control settings.",
         variant: "destructive",
       })
     } finally {
@@ -5461,6 +5400,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
           if (value === "subsidiaries") void loadSubsidiaries()
           if (value === "notifications") void loadNotificationSettings()
           if (value === "roles") void loadRoles()
+          if (value === "access") void loadAccessAndSecurityData()
         }}
         className="space-y-6"
       >
@@ -8764,178 +8704,11 @@ Format the response in a professional, actionable manner for HR decision-makers.
         <TabsContent value="access">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Shield className="w-5 h-5" />
-                <span>Access Control</span>
-              </CardTitle>
-              <CardDescription>Manage user access and authentication settings</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Authentication Settings */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Authentication Settings</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="twoFactor">Two-Factor Authentication</Label>
-                      <Switch
-                        id="twoFactor"
-                        checked={accessSettings.twoFactorEnabled}
-                        onCheckedChange={(checked) =>
-                          setAccessSettings({ ...accessSettings, twoFactorEnabled: checked })
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="ssoEnabled">Single Sign-On (SSO)</Label>
-                      <Switch
-                        id="ssoEnabled"
-                        checked={accessSettings.ssoEnabled}
-                        onCheckedChange={(checked) => setAccessSettings({ ...accessSettings, ssoEnabled: checked })}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="passwordExpiry">Password Expiry</Label>
-                      <Switch
-                        id="passwordExpiry"
-                        checked={accessSettings.passwordExpiryEnabled}
-                        onCheckedChange={(checked) =>
-                          setAccessSettings({ ...accessSettings, passwordExpiryEnabled: checked })
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
-                      <Input
-                        id="sessionTimeout"
-                        type="number"
-                        value={accessSettings.sessionTimeout}
-                        onChange={(e) =>
-                          setAccessSettings({ ...accessSettings, sessionTimeout: Number.parseInt(e.target.value) })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="maxLoginAttempts">Max Login Attempts</Label>
-                      <Input
-                        id="maxLoginAttempts"
-                        type="number"
-                        value={accessSettings.maxLoginAttempts}
-                        onChange={(e) =>
-                          setAccessSettings({ ...accessSettings, maxLoginAttempts: Number.parseInt(e.target.value) })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="passwordMinLength">Minimum Password Length</Label>
-                      <Input
-                        id="passwordMinLength"
-                        type="number"
-                        value={accessSettings.passwordMinLength}
-                        onChange={(e) =>
-                          setAccessSettings({ ...accessSettings, passwordMinLength: Number.parseInt(e.target.value) })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* IP Restrictions */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">IP Access Control</h3>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="ipRestrictions">Enable IP Restrictions</Label>
-                    <Switch
-                      id="ipRestrictions"
-                      checked={accessSettings.ipRestrictionsEnabled}
-                      onCheckedChange={(checked) =>
-                        setAccessSettings({ ...accessSettings, ipRestrictionsEnabled: checked })
-                      }
-                    />
-                  </div>
-                  {accessSettings.ipRestrictionsEnabled && (
-                    <div className="space-y-2">
-                      <Label>Allowed IP Addresses</Label>
-                      {accessSettings.allowedIPs.map((ip, index) => (
-                        <div key={index} className="flex items-center space-x-2">
-                          <Input
-                            value={ip}
-                            onChange={(e) => {
-                              const newIPs = [...accessSettings.allowedIPs]
-                              newIPs[index] = e.target.value
-                              setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
-                            }}
-                            placeholder="192.168.1.0/24"
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const newIPs = accessSettings.allowedIPs.filter((_, i) => i !== index)
-                              setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setAccessSettings({
-                            ...accessSettings,
-                            allowedIPs: [...accessSettings.allowedIPs, ""],
-                          })
-                        }
-                      >
-                        Add IP Range
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Active Sessions */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Active Sessions</h3>
-                  <Button variant="outline" onClick={handleRefreshSessions} disabled={isRefreshingSessions}>
-                    {isRefreshingSessions ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                    )}
-                    Refresh
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  {activeSessions.map((session) => (
-                    <Card key={session.id}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{session.user_email}</p>
-                            <p className="text-sm text-gray-600">
-                              {session.ip_address} • {session.device} • Last active:{" "}
-                              {new Date(session.last_activity).toLocaleString()}
-                            </p>
-                          </div>
-                          <Button variant="outline" size="sm" onClick={() => handleTerminateSession(session.id)}>
-                            Terminate
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex justify-end">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center space-x-2">
+                  <Shield className="w-5 h-5" />
+                  <span>Access Control</span>
+                </CardTitle>
                 <Button
                   className="bg-emerald-600 hover:bg-emerald-700"
                   onClick={handleSaveAccessSettings}
@@ -8954,8 +8727,386 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   )}
                 </Button>
               </div>
+              <CardDescription>Manage authentication, password policy, IP access and active sessions</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              {/* Overview stats */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Shield className="w-5 h-5 text-emerald-600" />
+                        <p className="text-sm font-medium">Two-Factor</p>
+                      </div>
+                      <Badge variant={accessSettings.twoFactorEnabled ? "default" : "secondary"}>
+                        {accessSettings.twoFactorEnabled ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Wifi className="w-5 h-5 text-blue-600" />
+                        <p className="text-sm font-medium">IP Restrictions</p>
+                      </div>
+                      <Badge variant={accessSettings.ipRestrictionsEnabled ? "default" : "secondary"}>
+                        {accessSettings.ipRestrictionsEnabled
+                          ? `${accessSettings.allowedIPs.filter((ip) => ip.trim()).length} allowed`
+                          : "Off"}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Users className="w-5 h-5 text-purple-600" />
+                        <p className="text-sm font-medium">Active Sessions</p>
+                      </div>
+                      <Badge variant="outline">{activeSessions.length}</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Authentication Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Authentication</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <Label htmlFor="twoFactor">Two-Factor Authentication</Label>
+                        <p className="text-xs text-muted-foreground">Require a second factor at sign-in</p>
+                      </div>
+                      <Switch
+                        id="twoFactor"
+                        checked={accessSettings.twoFactorEnabled}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, twoFactorEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <Label htmlFor="ssoEnabled">Single Sign-On (SSO)</Label>
+                        <p className="text-xs text-muted-foreground">Allow identity-provider login</p>
+                      </div>
+                      <Switch
+                        id="ssoEnabled"
+                        checked={accessSettings.ssoEnabled}
+                        onCheckedChange={(checked) => setAccessSettings({ ...accessSettings, ssoEnabled: checked })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
+                      <Input
+                        id="sessionTimeout"
+                        type="number"
+                        min="1"
+                        value={accessSettings.sessionTimeout}
+                        onChange={(e) =>
+                          setAccessSettings({ ...accessSettings, sessionTimeout: Number.parseInt(e.target.value) || 0 })
+                        }
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="maxLoginAttempts">Max Login Attempts</Label>
+                        <Input
+                          id="maxLoginAttempts"
+                          type="number"
+                          min="1"
+                          value={accessSettings.maxLoginAttempts}
+                          onChange={(e) =>
+                            setAccessSettings({
+                              ...accessSettings,
+                              maxLoginAttempts: Number.parseInt(e.target.value) || 0,
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="lockoutDuration">Lockout (minutes)</Label>
+                        <Input
+                          id="lockoutDuration"
+                          type="number"
+                          min="1"
+                          value={accessSettings.lockoutDuration}
+                          onChange={(e) =>
+                            setAccessSettings({
+                              ...accessSettings,
+                              lockoutDuration: Number.parseInt(e.target.value) || 0,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Password Policy */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Password Policy</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="passwordMinLength">Minimum Password Length</Label>
+                      <Input
+                        id="passwordMinLength"
+                        type="number"
+                        min="4"
+                        value={accessSettings.passwordMinLength}
+                        onChange={(e) =>
+                          setAccessSettings({
+                            ...accessSettings,
+                            passwordMinLength: Number.parseInt(e.target.value) || 0,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <Label htmlFor="passwordExpiry">Password Expiry</Label>
+                        <p className="text-xs text-muted-foreground">Force periodic password changes</p>
+                      </div>
+                      <Switch
+                        id="passwordExpiry"
+                        checked={accessSettings.passwordExpiryEnabled}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, passwordExpiryEnabled: checked })
+                        }
+                      />
+                    </div>
+                    {accessSettings.passwordExpiryEnabled && (
+                      <div>
+                        <Label htmlFor="passwordExpiryDays">Expiry Period (days)</Label>
+                        <Input
+                          id="passwordExpiryDays"
+                          type="number"
+                          min="1"
+                          value={accessSettings.passwordExpiryDays}
+                          onChange={(e) =>
+                            setAccessSettings({
+                              ...accessSettings,
+                              passwordExpiryDays: Number.parseInt(e.target.value) || 0,
+                            })
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    <Label>Complexity Requirements</Label>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <span className="text-sm">Require uppercase letter</span>
+                      <Switch
+                        checked={accessSettings.passwordRequireUppercase}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, passwordRequireUppercase: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <span className="text-sm">Require lowercase letter</span>
+                      <Switch
+                        checked={accessSettings.passwordRequireLowercase}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, passwordRequireLowercase: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <span className="text-sm">Require number</span>
+                      <Switch
+                        checked={accessSettings.passwordRequireNumbers}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, passwordRequireNumbers: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <span className="text-sm">Require special character</span>
+                      <Switch
+                        checked={accessSettings.passwordRequireSpecial}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, passwordRequireSpecial: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* IP Restrictions */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">IP Access Control</h3>
+                  <Switch
+                    id="ipRestrictions"
+                    checked={accessSettings.ipRestrictionsEnabled}
+                    onCheckedChange={(checked) =>
+                      setAccessSettings({ ...accessSettings, ipRestrictionsEnabled: checked })
+                    }
+                  />
+                </div>
+                {accessSettings.ipRestrictionsEnabled ? (
+                  <div className="space-y-2">
+                    <Label>Allowed IP Addresses / Ranges</Label>
+                    {accessSettings.allowedIPs.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        No IP ranges yet. Add one below to restrict access.
+                      </p>
+                    )}
+                    {accessSettings.allowedIPs.map((ip, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <Input
+                          value={ip}
+                          onChange={(e) => {
+                            const newIPs = [...accessSettings.allowedIPs]
+                            newIPs[index] = e.target.value
+                            setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
+                          }}
+                          placeholder="192.168.1.0/24"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const newIPs = accessSettings.allowedIPs.filter((_, i) => i !== index)
+                            setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setAccessSettings({
+                          ...accessSettings,
+                          allowedIPs: [...accessSettings.allowedIPs, ""],
+                        })
+                      }
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add IP Range
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    IP restrictions are disabled. Enable to limit access to specific networks.
+                  </p>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Active Sessions */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Active Sessions</h3>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={handleRefreshSessions} disabled={isRefreshingSessions}>
+                      {isRefreshingSessions ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                      )}
+                      Refresh
+                    </Button>
+                    {activeSessions.length > 0 && (
+                      <Button variant="destructive" size="sm" onClick={handleTerminateAllSessions}>
+                        <X className="w-4 h-4 mr-2" />
+                        Terminate All
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {activeSessions.length === 0 && (
+                    <Card>
+                      <CardContent className="p-6 text-center text-sm text-muted-foreground">
+                        No active sessions recorded.
+                      </CardContent>
+                    </Card>
+                  )}
+                  {activeSessions.map((session) => (
+                    <Card key={session.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">{session.user_email}</p>
+                            <p className="text-sm text-gray-600">
+                              {session.ip_address} • {session.device}
+                              {session.browser ? ` • ${session.browser}` : ""} • Last active:{" "}
+                              {new Date(session.last_activity).toLocaleString()}
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSessionToTerminate(session)}
+                          >
+                            <X className="w-4 h-4 mr-1" />
+                            Terminate
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
             </CardContent>
           </Card>
+
+          {sessionToTerminate && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <Card className="w-full max-w-md">
+                <CardHeader>
+                  <CardTitle className="text-xl">Terminate Session</CardTitle>
+                  <CardDescription>
+                    End the session for <span className="font-medium">{sessionToTerminate.user_email}</span> (
+                    {sessionToTerminate.ip_address})? The user will need to sign in again.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="ghost" onClick={() => setSessionToTerminate(null)} disabled={isTerminatingSession}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={handleConfirmTerminateSession}
+                      disabled={isTerminatingSession}
+                    >
+                      {isTerminatingSession ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Terminating...
+                        </>
+                      ) : (
+                        "Terminate Session"
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
 
         {/* Security Tab Content */}
