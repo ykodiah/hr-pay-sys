@@ -463,9 +463,13 @@ function openClientPdf(rows: WorksheetRow[], payPeriod: string, companyName?: st
 
 export default function PayrollPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [companyId, setCompanyId] = useState("")
   const [company, setCompany] = useState<CompanyInfo | null>(null)
-  const [payPeriod, setPayPeriod] = useState(currentPeriod())
+  const [payPeriod, setPayPeriod] = useState(() => {
+    const fromQuery = searchParams?.get("pay_period") || ""
+    return /^\d{4}-\d{2}$/.test(fromQuery) ? fromQuery : currentPeriod()
+  })
   const [rows, setRows] = useState<WorksheetRow[]>([])
   const [runs, setRuns] = useState<PayrollRunSummary[]>([])
   const [activeRun, setActiveRun] = useState<PayrollRunSummary | null>(null)
