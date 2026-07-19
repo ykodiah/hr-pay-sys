@@ -1,27 +1,19 @@
-import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { requireApiUser } from "@/lib/auth/api-user"
-import { resolveCompanyId } from "@/lib/employees/resolve-company"
+import { NextRequest, NextResponse } from "next/server"
+import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const apiUser = await requireApiUser()
-    if (!apiUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const ctx = await resolveTenantContext(request)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId, service } = ctx
 
-    const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     const employee_id = searchParams.get("employee_id")
-    let company_id = searchParams.get("company_id")
     const status = searchParams.get("status")
     const from = searchParams.get("from")
     const to = searchParams.get("to")
 
-    if (!company_id) {
-      const resolved = await resolveCompanyId(supabase, apiUser.isDemo ? null : apiUser.id)
-      company_id = resolved?.companyId ?? null
-    }
-
-    let query = supabase
+    let query = service
       .from("leave_requests")
       .select(`
         *,
@@ -30,18 +22,18 @@ export async function GET(request: Request) {
         ),
         leave_types!leave_requests_leave_type_id_fkey(name)
       `)
+      .eq("company_id", companyId)
       .order("created_at", { ascending: false })
 
     if (employee_id) query = query.eq("employee_id", employee_id)
     if (status) query = query.eq("status", status)
     if (from) query = query.gte("start_date", from)
     if (to) query = query.lte("end_date", to)
-    if (company_id) query = query.eq("company_id", company_id)
 
     const { data, error } = await query
     if (error) {
-      // Fallback without company column on leave_requests
-      let fallback = supabase
+      // Fallback: filter via employee.company_id when leave_requests.company_id missing
+      let fallback = service
         .from("leave_requests")
         .select(`
           *,
@@ -55,10 +47,9 @@ export async function GET(request: Request) {
       if (status) fallback = fallback.eq("status", status)
       const fb = await fallback
       if (fb.error) throw new Error(fb.error.message)
-      let rows = fb.data ?? []
-      if (company_id) {
-        rows = rows.filter((r: any) => r.employees?.company_id === company_id || r.company_id === company_id)
-      }
+      const rows = (fb.data ?? []).filter(
+        (r: any) => r.employees?.company_id === companyId || r.company_id === companyId,
+      )
       const mapped = rows.map((r: any) => ({
         ...r,
         employee_name: r.employees ? `${r.employees.first_name} ${r.employees.last_name}` : null,
@@ -67,7 +58,7 @@ export async function GET(request: Request) {
         position: r.employees?.position ?? null,
         leave_type_name: r.leave_types?.name ?? r.leave_type_name ?? null,
       }))
-      return NextResponse.json({ requests: mapped })
+      return NextResponse.json({ requests: mapped, company_id: companyId })
     }
 
     const mapped = (data ?? []).map((r: any) => ({
@@ -79,44 +70,40 @@ export async function GET(request: Request) {
       leave_type_name: r.leave_types?.name ?? r.leave_type_name ?? null,
     }))
 
-    return NextResponse.json({ requests: mapped })
+    return NextResponse.json({ requests: mapped, company_id: companyId })
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 })
+    return jsonError(err, "Failed to load leave requests")
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const apiUser = await requireApiUser()
-    if (!apiUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-    const supabase = await createClient()
     const body = await request.json()
-    const { employee_id, leave_type_id, leave_type_name, start_date, end_date, days_requested, reason } = body
+    const ctx = await resolveTenantContext(request, body.company_id)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId, service } = ctx
 
+    const { employee_id, leave_type_id, leave_type_name, start_date, end_date, days_requested, reason } = body
     if (!employee_id || !start_date || !end_date) {
       return NextResponse.json({ error: "employee_id, start_date, end_date required" }, { status: 400 })
     }
 
-    let company_id = body.company_id as string | undefined
-    if (!company_id) {
-      const { data: emp } = await supabase
-        .from("employees")
-        .select("company_id")
-        .eq("id", employee_id)
-        .maybeSingle()
-      company_id = emp?.company_id
-    }
-    if (!company_id) {
-      const resolved = await resolveCompanyId(supabase, apiUser.isDemo ? null : apiUser.id)
-      company_id = resolved?.companyId
+    // Ensure employee belongs to this tenant
+    const { data: emp } = await service
+      .from("employees")
+      .select("id, company_id")
+      .eq("id", employee_id)
+      .eq("company_id", companyId)
+      .maybeSingle()
+    if (!emp?.id) {
+      return NextResponse.json({ error: "Employee not found in your company" }, { status: 403 })
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await service
       .from("leave_requests")
       .insert({
         employee_id,
-        company_id: company_id ?? null,
+        company_id: companyId,
         leave_type_id: leave_type_id ?? null,
         leave_type_name: leave_type_name ?? null,
         start_date,
@@ -131,6 +118,6 @@ export async function POST(request: Request) {
     if (error) throw new Error(error.message)
     return NextResponse.json({ request: data }, { status: 201 })
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 })
+    return jsonError(err, "Failed to create leave request")
   }
 }

@@ -12,8 +12,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createServiceClient, isMockSupabaseClient } from "@/lib/supabase/server"
-import { requireApiUserOrGuest } from "@/lib/auth/api-user"
+import { isMockSupabaseClient } from "@/lib/supabase/server"
+import { resolveTenantContext } from "@/lib/settings/resolve-tenant"
 import { createPayrollService } from "@/lib/services"
 
 type ProcessRow = {
@@ -319,41 +319,43 @@ async function persistRowsFromWorksheet(
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireApiUserOrGuest()
-
     const body = await req.json()
+    const ctx = await resolveTenantContext(req, body.company_id)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId: company_id, userId, demo, service: client } = ctx
+    const user = { id: userId, isDemo: demo }
+
     const {
-      company_id,
       pay_period,
       payroll_run_id,
       submit_for_approval = true,
       rows,
     } = body as {
-      company_id: string
       pay_period: string
       payroll_run_id?: string
       submit_for_approval?: boolean
       rows?: ProcessRow[]
     }
 
-    if (!company_id || !pay_period) {
-      return NextResponse.json({ error: "company_id and pay_period are required" }, { status: 400 })
+    if (!pay_period) {
+      return NextResponse.json({ error: "pay_period is required" }, { status: 400 })
     }
 
-    // Use service-role client so payroll writes bypass RLS
-    const client = createServiceClient()
     const bounds = periodBounds(pay_period)
     let runId = payroll_run_id
     const worksheetRows = Array.isArray(rows) ? rows.filter((r) => r && r.employeeId) : []
 
-    // Never reuse approved/paid/cancelled runs
+    // Never reuse approved/paid/cancelled runs — always scoped to this tenant
     if (runId) {
       const { data: existingRun } = await client
         .from("payroll_runs")
-        .select("id, status")
+        .select("id, status, company_id")
         .eq("id", runId)
+        .eq("company_id", company_id)
         .maybeSingle()
-      if (existingRun && ["approved", "paid", "cancelled"].includes(String(existingRun.status))) {
+      if (!existingRun) {
+        runId = undefined
+      } else if (["approved", "paid", "cancelled"].includes(String(existingRun.status))) {
         runId = undefined
       }
     }
@@ -380,7 +382,7 @@ export async function POST(req: NextRequest) {
         approval_stage: "pending",
         updated_at: new Date().toISOString(),
       }
-      if (!user.isDemo) insertPayload.created_by = user.id
+      if (!user.isDemo && user.id) insertPayload.created_by = user.id
 
       let { data: created, error } = await client
         .from("payroll_runs")

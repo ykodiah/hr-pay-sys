@@ -4,8 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { requireApiUserOrGuest } from "@/lib/auth/api-user"
+import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
 
 function periodBounds(payPeriod: string) {
   const [y, m] = payPeriod.split("-").map(Number)
@@ -22,21 +21,20 @@ function periodBounds(payPeriod: string) {
 
 export async function GET(req: NextRequest) {
   try {
-    await requireApiUserOrGuest()
+    const ctx = await resolveTenantContext(req)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId, service } = ctx
 
     const { searchParams } = new URL(req.url)
-    const companyId = searchParams.get("company_id")
     const status = searchParams.get("status")
     const limit = Math.min(Number(searchParams.get("limit") ?? 100), 500)
 
-    const client = await createClient()
-    let query = client
+    let query = service
       .from("payroll_runs")
       .select("*")
+      .eq("company_id", companyId)
       .order("pay_date", { ascending: false })
       .limit(limit)
-
-    if (companyId) query = query.eq("company_id", companyId)
 
     if (status && status !== "all") {
       if (status === "pending") {
@@ -53,7 +51,7 @@ export async function GET(req: NextRequest) {
     const counts = new Map<string, number>()
 
     if (runIds.length > 0) {
-      const { data: items } = await client
+      const { data: items } = await service
         .from("payroll_items")
         .select("payroll_run_id")
         .in("payroll_run_id", runIds)
@@ -62,10 +60,9 @@ export async function GET(req: NextRequest) {
         counts.set(item.payroll_run_id, (counts.get(item.payroll_run_id) ?? 0) + 1)
       }
 
-      // Fallback count from payslips when payroll_items empty
       const missing = runIds.filter((id) => !counts.has(id))
       if (missing.length > 0) {
-        const { data: slips } = await client
+        const { data: slips } = await service
           .from("payslips")
           .select("payroll_run_id")
           .in("payroll_run_id", missing)
@@ -85,40 +82,37 @@ export async function GET(req: NextRequest) {
       success: true,
       runs: enriched,
       data: enriched,
+      company_id: companyId,
       meta: { fetched_at: new Date().toISOString(), count: enriched.length },
     })
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to list payroll runs" },
-      { status: 500 },
-    )
+    return jsonError(err, "Failed to list payroll runs")
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireApiUserOrGuest()
-
     const body = await req.json()
-    const { company_id, pay_period, subsidiary_id, notes } = body as {
-      company_id: string
+    const ctx = await resolveTenantContext(req, body.company_id)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId, userId, service } = ctx
+
+    const { pay_period, subsidiary_id, notes } = body as {
       pay_period: string
       subsidiary_id?: string
       notes?: string
     }
 
-    if (!company_id || !pay_period) {
-      return NextResponse.json({ error: "company_id and pay_period are required" }, { status: 400 })
+    if (!pay_period) {
+      return NextResponse.json({ error: "pay_period is required" }, { status: 400 })
     }
 
     const bounds = periodBounds(pay_period)
-    const client = await createClient()
 
-    // Reuse existing draft/processing run for same company + period when present
-    const { data: existing } = await client
+    const { data: existing } = await service
       .from("payroll_runs")
       .select("*")
-      .eq("company_id", company_id)
+      .eq("company_id", companyId)
       .eq("pay_period_start", bounds.pay_period_start)
       .in("status", ["draft", "processing", "pending"])
       .order("created_at", { ascending: false })
@@ -130,7 +124,7 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = {
-      company_id,
+      company_id: companyId,
       subsidiary_id: subsidiary_id ?? null,
       ...bounds,
       status: "draft",
@@ -139,18 +133,15 @@ export async function POST(req: NextRequest) {
       total_deductions: 0,
       total_net_pay: 0,
       notes: notes ?? null,
-      created_by: user.isDemo ? null : user.id,
+      created_by: userId,
       updated_at: new Date().toISOString(),
     }
 
-    const { data, error } = await client.from("payroll_runs").insert(payload).select().single()
+    const { data, error } = await service.from("payroll_runs").insert(payload).select().single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     return NextResponse.json({ success: true, run: data, reused: false })
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to create payroll run" },
-      { status: 500 },
-    )
+    return jsonError(err, "Failed to create payroll run")
   }
 }

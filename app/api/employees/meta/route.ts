@@ -1,55 +1,29 @@
 /**
  * GET /api/employees/meta?company_id=
  * Company org structure + payroll allowance/deduction catalogs for the employee form.
+ * Always tenant-scoped via resolveTenantContext (service role + membership check).
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { requireApiUser } from "@/lib/auth/api-user"
-import { resolveCompanyId } from "@/lib/employees/resolve-company"
+import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
 import { extractOrgOptions } from "@/lib/employees/form-mapper"
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await requireApiUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-    const client = await createClient()
-    let companyId = new URL(req.url).searchParams.get("company_id")
-    const resolved = await resolveCompanyId(
-      client,
-      user.isDemo ? null : user.id,
-      user.isDemo ? null : user,
-    )
-    if (!companyId) {
-      companyId = resolved?.companyId ?? null
-    } else if (resolved?.companyId && companyId !== resolved.companyId) {
-      return NextResponse.json(
-        { error: "company_id does not belong to the authenticated user" },
-        { status: 403 },
-      )
-    }
-    if (!companyId) {
-      return NextResponse.json(
-        {
-          error:
-            "Unable to resolve company for this user. Open Company settings and save your company, or set company_id on the user profile.",
-        },
-        { status: 400 },
-      )
-    }
+    const ctx = await resolveTenantContext(req)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId, service, demo } = ctx
 
     const [{ data: company }, { data: settings }, { data: subsidiaries }] = await Promise.all([
-      client.from("companies").select("*").eq("id", companyId).maybeSingle(),
-      client.from("company_settings").select("settings_data").eq("company_id", companyId).maybeSingle(),
-      client.from("subsidiaries").select("*").eq("company_id", companyId).eq("status", "active"),
+      service.from("companies").select("*").eq("id", companyId).maybeSingle(),
+      service.from("company_settings").select("settings_data").eq("company_id", companyId).maybeSingle(),
+      service.from("subsidiaries").select("*").eq("company_id", companyId).eq("status", "active"),
     ])
 
     const settingsData = (settings?.settings_data as any) || {}
-    const org = extractOrgOptions(company, settingsData, { allowDemoFallback: Boolean(user.isDemo) })
+    const org = extractOrgOptions(company, settingsData, { allowDemoFallback: Boolean(demo) })
 
-    // Supervisors / HODs from this tenant's employees only
-    const { data: people } = await client
+    const { data: people } = await service
       .from("employees")
       .select("id, first_name, last_name, full_name, display_name, department, special_role, position, status")
       .eq("company_id", companyId)
@@ -82,16 +56,15 @@ export async function GET(req: NextRequest) {
       )
     })
 
-    // Catalog is tenant-owned — never auto-seed predefined allowances/deductions.
-    // Configure them in Settings → Payroll.
-    const { data: allowances } = await client
+    // Catalog from THIS tenant only — never seed defaults
+    const { data: allowances } = await service
       .from("payroll_allowances")
       .select("id, code, description, taxable, recurring, amount, percentage, type, is_active")
       .eq("company_id", companyId)
       .eq("is_active", true)
       .order("code")
 
-    const { data: deductions } = await client
+    const { data: deductions } = await service
       .from("payroll_deductions")
       .select("id, code, description, taxable, recurring, amount, percentage, type, is_active")
       .eq("company_id", companyId)
@@ -139,6 +112,6 @@ export async function GET(req: NextRequest) {
       deductions: deductions ?? [],
     })
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 })
+    return jsonError(err, "Failed to load employee meta")
   }
 }

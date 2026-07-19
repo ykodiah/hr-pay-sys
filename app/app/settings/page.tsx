@@ -1659,53 +1659,49 @@ export default function SettingsPage() {
     }
 
     try {
-      const targetCompanyId = companyId || companyData.id
-      let query = supabase.from("employees").select("*").order("created_at", { ascending: false })
-
-      if (targetCompanyId) {
-        query = query.eq("company_id", targetCompanyId)
+      // Never run an unscoped client query — that leaks other tenants' headcount.
+      let targetCompanyId = companyId || companyData.id
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        targetCompanyId = (await loadCompanyData()) || targetCompanyId
       }
-
-      const { data, error } = await query
-
-      if (error) throw error
-      setEmployees(data || [])
-    } catch (error) {
-      console.error("Error loading employees:", error)
-      if (error.message && error.message.includes("infinite recursion detected in policy")) {
-        console.log("[v0] Database policy error detected, falling back to demo mode for employees")
-        document.cookie = "demo-session=active; path=/; max-age=86400"
-        setEmployees([
-          {
-            id: "emp-001",
-            first_name: "John",
-            last_name: "Doe",
-            full_name: "John Doe",
-            corporate_email: "john.doe@akwaaba.com",
-            personal_email: "john.doe@gmail.com",
-            position: "Software Engineer",
-            department: "Technology",
-            status: "active",
-          },
-          {
-            id: "emp-002",
-            first_name: "Jane",
-            last_name: "Smith",
-            full_name: "Jane Smith",
-            corporate_email: "jane.smith@akwaaba.com",
-            personal_email: "jane.smith@gmail.com",
-            position: "HR Manager",
-            department: "Human Resources",
-            status: "active",
-          },
-        ])
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        setEmployees([])
         return
       }
-      toast({
-        title: "Error",
-        description: "Failed to load employees",
-        variant: "destructive",
+
+      const empRes = await fetch(
+        `/api/employees?company_id=${encodeURIComponent(targetCompanyId)}&limit=500`,
+        { credentials: "include", cache: "no-store" },
+      )
+      if (empRes.ok) {
+        const payload = await empRes.json()
+        setEmployees(payload.employees || payload.data || [])
+        return
+      }
+
+      // Fallback: dashboard summary headcount only (still tenant-scoped)
+      const dashRes = await fetch("/api/dashboard/summary", {
+        credentials: "include",
+        cache: "no-store",
       })
+      if (dashRes.ok) {
+        const dash = await dashRes.json()
+        const count = Number(dash.totalEmployees || 0)
+        setEmployees(
+          Array.from({ length: count }, (_, i) => ({
+            id: `hc-${i}`,
+            first_name: "",
+            last_name: "",
+            status: "active",
+          })),
+        )
+        return
+      }
+
+      setEmployees([])
+    } catch (error) {
+      console.error("Error loading employees:", error)
+      setEmployees([])
     }
   }
 
@@ -4463,15 +4459,16 @@ Format the response in a professional, actionable manner for HR decision-makers.
           taxReliefs: payload,
         }),
       })
-      // Keep the in-memory catalog (payload) so a reload glitch never blanks the UI.
-      setTaxReliefs(payload as any)
+      // Prefer server-normalized catalog; never blank the UI after a successful save.
+      const savedList = Array.isArray(saveResult?.taxReliefs) ? saveResult.taxReliefs : payload
+      setTaxReliefs(savedList as any)
       await loadPayrollData(companyId, { silent: true }).catch(() => null)
 
       toast({
         title: "Tax Reliefs Saved",
         description: saveResult?.warning
-          ? `Saved successfully. Note: ${saveResult.warning}`
-          : "Tax reliefs have been saved successfully.",
+          ? `Saved ${savedList.length} reliefs. Note: ${saveResult.warning}`
+          : `${savedList.length} tax reliefs saved successfully.`,
       })
     } catch (error) {
       console.error("[v0] Error saving tax reliefs:", error)

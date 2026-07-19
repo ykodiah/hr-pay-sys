@@ -334,22 +334,9 @@ export default function EmployeesPage() {
     profilePictureFile: null,
   })
 
-  const [companyAllowances, setCompanyAllowances] = useState([
-    { code: "TRANS", description: "Transport Allowance", taxable: true, recurring: true },
-    { code: "HOUSE", description: "Housing Allowance", taxable: true, recurring: true },
-    { code: "MED", description: "Medical Allowance", taxable: false, recurring: true },
-    { code: "MEAL", description: "Meal Allowance", taxable: false, recurring: true },
-    { code: "UNIFORM", description: "Uniform Allowance", taxable: false, recurring: true },
-    { code: "COMM", description: "Communication Allowance", taxable: false, recurring: true },
-  ])
-
-  const [companyDeductions, setCompanyDeductions] = useState([
-    { code: "TAX", description: "Tax Deduction", recurring: true },
-    { code: "SSNIT", description: "SSNIT Deduction", recurring: true },
-    { code: "TIER3", description: "Tier 3 Contribution", recurring: true },
-    { code: "LOAN", description: "Loan Deduction", recurring: true },
-    { code: "ADVANCE", description: "Advance Deduction", recurring: true },
-  ])
+  // Loaded from tenant DB via /api/employees/meta — no hardcoded cross-tenant defaults
+  const [companyAllowances, setCompanyAllowances] = useState<any[]>([])
+  const [companyDeductions, setCompanyDeductions] = useState<any[]>([])
 
   const [selectedAllowances, setSelectedAllowances] = useState<
     Array<{
@@ -679,12 +666,9 @@ export default function EmployeesPage() {
         setDivisions(meta.divisions || [])
         setDepartments(meta.departments || [])
         setLocations(meta.locations || [])
-        if (Array.isArray(meta.allowances) && meta.allowances.length) {
-          setCompanyAllowances(meta.allowances)
-        }
-        if (Array.isArray(meta.deductions) && meta.deductions.length) {
-          setCompanyDeductions(meta.deductions)
-        }
+        // Always apply tenant catalog (including empty) — never keep hardcoded defaults
+        if (Array.isArray(meta.allowances)) setCompanyAllowances(meta.allowances)
+        if (Array.isArray(meta.deductions)) setCompanyDeductions(meta.deductions)
         if (Array.isArray(meta.subsidiaries)) {
           setSubsidiaries(meta.subsidiaries)
         }
@@ -846,14 +830,15 @@ export default function EmployeesPage() {
       const json = await res.json()
 
       if (!res.ok) {
-        // Fallback: direct supabase query scoped by company when available
+        // Fail closed — never run an unscoped client query (cross-tenant leak).
+        const scopedCompany = cid || companyId
+        if (!scopedCompany) throw new Error(json.error || "Unable to resolve company")
         const supabase = createClient()
-        let query = supabase
+        const { data, error } = await supabase
           .from("employees")
           .select(`*, subsidiaries:subsidiary_id(name, id), financial:employee_financial(*)`)
+          .eq("company_id", scopedCompany)
           .order("created_at", { ascending: false })
-        if (cid || companyId) query = query.eq("company_id", cid || companyId)
-        const { data, error } = await query
         if (error) throw new Error(json.error || error.message)
         const rows = data || []
         if (!rows.length && isDemoMode()) {
@@ -2262,29 +2247,12 @@ function AddEmployeeForm({
   const [phoneCountryCode, setPhoneCountryCode] = useState("+233")
   const [emergencyCountryCode, setEmergencyCountryCode] = useState("+233")
 
-  const [companyAllowances, setCompanyAllowances] = useState(
-    companyAllowancesCatalog.length
-      ? companyAllowancesCatalog
-      : [
-          { code: "TRANS", description: "Transport Allowance", taxable: true, recurring: true },
-          { code: "HOUSE", description: "Housing Allowance", taxable: true, recurring: true },
-          { code: "MED", description: "Medical Allowance", taxable: false, recurring: true },
-          { code: "MEAL", description: "Meal Allowance", taxable: false, recurring: true },
-          { code: "UNIFORM", description: "Uniform Allowance", taxable: false, recurring: true },
-          { code: "COMM", description: "Communication Allowance", taxable: false, recurring: true },
-        ],
+  const [companyAllowances, setCompanyAllowances] = useState<any[]>(
+    Array.isArray(companyAllowancesCatalog) ? companyAllowancesCatalog : [],
   )
 
-  const [companyDeductions, setCompanyDeductions] = useState(
-    companyDeductionsCatalog.length
-      ? companyDeductionsCatalog
-      : [
-          { code: "TAX", description: "Tax Deduction", recurring: true, taxable: false },
-          { code: "SSNIT", description: "SSNIT Deduction", recurring: true, taxable: false },
-          { code: "TIER3", description: "Tier 3 Contribution", recurring: true, taxable: false },
-          { code: "LOAN", description: "Loan Deduction", recurring: true, taxable: false },
-          { code: "ADVANCE", description: "Advance Deduction", recurring: true, taxable: false },
-        ],
+  const [companyDeductions, setCompanyDeductions] = useState<any[]>(
+    Array.isArray(companyDeductionsCatalog) ? companyDeductionsCatalog : [],
   )
 
   const [selectedAllowances, setSelectedAllowances] = useState<
@@ -2457,12 +2425,12 @@ function AddEmployeeForm({
         setDivisions(json.divisions || [])
         setDepartments(json.departments || [])
         setLocations(json.locations || [])
-        if (json.allowances?.length) setCompanyAllowances(json.allowances)
-        if (json.deductions?.length) setCompanyDeductions(json.deductions)
+        setCompanyAllowances(Array.isArray(json.allowances) ? json.allowances : [])
+        setCompanyDeductions(Array.isArray(json.deductions) ? json.deductions : [])
       } catch {
         loadParentCompanyData()
-        if (companyAllowancesCatalog?.length) setCompanyAllowances(companyAllowancesCatalog)
-        if (companyDeductionsCatalog?.length) setCompanyDeductions(companyDeductionsCatalog)
+        setCompanyAllowances(Array.isArray(companyAllowancesCatalog) ? companyAllowancesCatalog : [])
+        setCompanyDeductions(Array.isArray(companyDeductionsCatalog) ? companyDeductionsCatalog : [])
       }
     }
     void loadMeta()

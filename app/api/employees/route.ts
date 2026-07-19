@@ -4,39 +4,23 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { requireApiUser } from "@/lib/auth/api-user"
-import { resolveCompanyId } from "@/lib/employees/resolve-company"
+import { resolveTenantContext } from "@/lib/settings/resolve-tenant"
 import { ACTIVE_EMPLOYEE_STATUSES, normalizeEmployeeStatus } from "@/lib/employees/status"
 import { mapEmployeeRow, toEmployeeOption } from "@/lib/employees/dto"
 import { persistVaultDocument } from "@/lib/employees/persist-vault-document"
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await requireApiUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const ctx = await resolveTenantContext(req)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId, service: client } = ctx
 
-    const client = await createClient()
     const { searchParams } = new URL(req.url)
-    let companyId = searchParams.get("company_id")
     const status = searchParams.get("status")
     const q = searchParams.get("q")?.trim()
     const includeFinancial = searchParams.get("include_financial") === "true"
     const optionsOnly = searchParams.get("options") === "true"
     const limit = Math.min(Number(searchParams.get("limit") ?? 500), 2000)
-
-    if (!companyId) {
-      const resolved = await resolveCompanyId(
-        client,
-        user.isDemo ? null : user.id,
-        user.isDemo ? null : user,
-      )
-      companyId = resolved?.companyId ?? null
-    }
-
-    if (!companyId) {
-      return NextResponse.json({ error: "company_id is required" }, { status: 400 })
-    }
 
     const select = includeFinancial
       ? `*, financial:employee_financial(*), subsidiaries:subsidiary_id(id, name)`
@@ -120,24 +104,10 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireApiUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-    const client = await createClient()
     const body = await req.json()
-
-    let companyId = body.company_id as string | undefined
-    if (!companyId) {
-      const resolved = await resolveCompanyId(
-        client,
-        user.isDemo ? null : user.id,
-        user.isDemo ? null : user,
-      )
-      companyId = resolved?.companyId
-    }
-    if (!companyId) {
-      return NextResponse.json({ error: "company_id is required" }, { status: 400 })
-    }
+    const ctx = await resolveTenantContext(req, body.company_id)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId, service: client } = ctx
 
     // Prevent attaching another tenant's subsidiary to this company
     if (body.subsidiary_id) {
