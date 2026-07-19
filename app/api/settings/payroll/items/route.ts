@@ -108,6 +108,54 @@ function resolveReliefName(r: any) {
   return (name || "Tax relief").slice(0, RELIEF_NAME_MAX)
 }
 
+/** Legacy DB check tax_relief_relief_type_check — prefer fixed|percentage, with GRA aliases. */
+function resolveReliefType(r: any) {
+  const raw = String(r.relief_type || r.reliefType || r.type || "")
+    .trim()
+    .toLowerCase()
+  if (raw && RELIEF_TYPE_FALLBACKS.includes(raw)) return raw
+  if (raw === "percent" || raw === "%" || raw === "pct") return "percentage"
+  if (raw === "amount" || raw === "flat") return "fixed"
+  const code = String(r.gra_code || r.graCode || r.relief_code || r.code || "")
+  const category = String(r.category || "")
+  const amount = Number(r.amount ?? r.annualAmount ?? 0)
+  // Prefer calculation-style values first (most common CHECK lists)
+  const cat = category.toLowerCase()
+  if (cat.includes("disab") || (amount === 25 && cat.includes("disab"))) return "percentage"
+  if (cat.includes("disab")) return "percentage"
+  return resolveReliefTypeFromCode(code, category, amount) === "percentage" ? "percentage" : "fixed"
+}
+
+const RELIEF_TYPE_FALLBACKS = [
+  "fixed",
+  "percentage",
+  "standard",
+  "personal",
+  "marriage",
+  "child_education",
+  "disability",
+  "old_age",
+  "dependent",
+  "education",
+  "mortgage",
+  "other",
+  "custom",
+]
+
+function resolveReliefTypeFromCode(code: string, category: string, amount: number) {
+  const c = String(code || "").toUpperCase()
+  if (c.includes("DIS") || String(category).toLowerCase().includes("disab") || amount === 25) {
+    return "percentage"
+  }
+  if (c.includes("MRR") || c.includes("MARRIAGE")) return "marriage"
+  if (c.includes("CER") || c.includes("CHILD")) return "child_education"
+  if (c.includes("OAR") || c.includes("OLD")) return "old_age"
+  if (c.includes("ADR") || c.includes("DEPEND")) return "dependent"
+  if (c.includes("ETR") || c.includes("TRAIN") || c.includes("EDU")) return "education"
+  if (c.includes("MIR") || c.includes("MORT")) return "mortgage"
+  return "fixed"
+}
+
 function normalizeReliefPayload(reliefs: any[], companyId: string, now: string) {
   return reliefs
     .filter((r: any) => r?.name || r?.relief_name || r?.reliefName)
@@ -115,6 +163,7 @@ function normalizeReliefPayload(reliefs: any[], companyId: string, now: string) 
       const amount = Number(r.amount ?? r.annualAmount ?? 0)
       const graCode = resolveReliefCode(r, index)
       const reliefName = resolveReliefName(r)
+      const reliefType = resolveReliefType(r)
       const effective = r.effectiveDate || r.effective_date || null
       return {
         company_id: companyId,
@@ -126,6 +175,7 @@ function normalizeReliefPayload(reliefs: any[], companyId: string, now: string) 
         annual_amount: amount,
         currency: r.currency || "GHS",
         category: r.category || "Personal",
+        relief_type: reliefType,
         gra_code: graCode,
         relief_code: graCode,
         code: graCode,
@@ -294,6 +344,7 @@ function withRequiredReliefFields(row: Record<string, any>, companyId: string, n
   // Full names remain in company_settings JSON backup and are merged back on GET.
   const reliefName = fullName.slice(0, RELIEF_CODE_MAX)
   const amount = Number(row.amount ?? row.annual_amount ?? 0)
+  const reliefType = resolveReliefType(row)
   const out: Record<string, any> = {
     company_id: companyId,
     name: reliefName,
@@ -303,6 +354,7 @@ function withRequiredReliefFields(row: Record<string, any>, companyId: string, n
     gra_code: code,
     relief_code: code,
     code,
+    relief_type: reliefType,
     is_active: row.is_active !== false && row.isActive !== false,
     updated_at: now,
     last_updated: row.last_updated || now,
@@ -401,6 +453,35 @@ function applyMissingColumnHint(payload: Record<string, any>, error: any) {
   return next
 }
 
+/** Rotate relief_type through known allow-list when CHECK constraint fails. */
+function applyCheckConstraintHint(payload: Record<string, any>, error: any) {
+  const message = String(error?.message || "")
+  if (!/check constraint/i.test(message)) return null
+  if (!/relief_type/i.test(message)) return null
+
+  const current = String(payload.relief_type || "").toLowerCase()
+  const tried = Array.isArray(payload.__tried_relief_types)
+    ? payload.__tried_relief_types
+    : current
+      ? [current]
+      : []
+  const nextType = RELIEF_TYPE_FALLBACKS.find((t) => !tried.includes(t))
+  if (!nextType) {
+    if ("relief_type" in payload) {
+      const next = { ...payload }
+      delete next.relief_type
+      delete next.__tried_relief_types
+      return next
+    }
+    return null
+  }
+  return {
+    ...payload,
+    relief_type: nextType,
+    __tried_relief_types: [...tried, nextType],
+  }
+}
+
 async function upsertTaxReliefRow(
   service: any,
   companyId: string,
@@ -427,6 +508,7 @@ async function upsertTaxReliefRow(
       gra_code: full.gra_code,
       relief_code: full.relief_code,
       code: full.code,
+      relief_type: full.relief_type,
       is_active: active,
       updated_at: now,
       created_at: now,
@@ -437,6 +519,7 @@ async function upsertTaxReliefRow(
       relief_name: full.relief_name,
       amount: full.amount,
       relief_code: full.relief_code,
+      relief_type: full.relief_type,
       is_active: active,
       updated_at: now,
     },
@@ -444,44 +527,57 @@ async function upsertTaxReliefRow(
       company_id: companyId,
       relief_name: full.relief_name,
       relief_code: full.relief_code,
+      relief_type: full.relief_type,
       amount: full.amount,
       is_active: active,
       updated_at: now,
     },
   ]
 
+  const toDbPayload = (payload: Record<string, any>) => {
+    const out: Record<string, any> = {}
+    for (const [k, v] of Object.entries(payload)) {
+      if (k.startsWith("__")) continue
+      out[k] = v
+    }
+    return out
+  }
+
   let lastError: any = null
   for (const attempt of attempts) {
     let payload = { ...attempt }
-    for (let retry = 0; retry < 8; retry++) {
+    for (let retry = 0; retry < 12; retry++) {
       if (existingId) {
-        const { created_at: _c, ...updatePayload } = payload
+        const { created_at: _c, ...rest } = toDbPayload(payload)
         const { error } = await service
           .from("tax_reliefs")
-          .update(updatePayload)
+          .update(rest)
           .eq("id", existingId)
           .eq("company_id", companyId)
         if (!error) return { ok: true, id: existingId }
         lastError = error
         if (isMissingRelation(error)) return { ok: false, error }
         const patched =
-          applyNotNullHint(updatePayload, error, full) ||
-          applyMissingColumnHint(updatePayload, error) ||
-          applyValueTooLongHint(updatePayload, error)
+          applyNotNullHint(rest, error, full) ||
+          applyMissingColumnHint(rest, error) ||
+          applyValueTooLongHint(rest, error) ||
+          applyCheckConstraintHint(payload, error)
         if (patched) {
           payload = patched
           continue
         }
         break
       } else {
-        const { data, error } = await service.from("tax_reliefs").insert(payload).select("id").maybeSingle()
+        const dbPayload = toDbPayload(payload)
+        const { data, error } = await service.from("tax_reliefs").insert(dbPayload).select("id").maybeSingle()
         if (!error) return { ok: true, id: data?.id }
         lastError = error
         if (isMissingRelation(error)) return { ok: false, error }
         const patched =
-          applyNotNullHint(payload, error, full) ||
-          applyMissingColumnHint(payload, error) ||
-          applyValueTooLongHint(payload, error)
+          applyNotNullHint(dbPayload, error, full) ||
+          applyMissingColumnHint(dbPayload, error) ||
+          applyValueTooLongHint(dbPayload, error) ||
+          applyCheckConstraintHint(payload, error)
         if (patched) {
           payload = patched
           continue

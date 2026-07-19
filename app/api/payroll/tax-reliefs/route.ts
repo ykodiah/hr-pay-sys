@@ -187,6 +187,11 @@ async function materializeCatalogFromSettings(service: any, companyId: string): 
     const graCode = (raw || `CUSTOM-${index + 1}`).slice(0, 20)
     const codeKey = graCode.toUpperCase()
     const match = byCode.get(codeKey)
+    const cat = String(r.category || "").toLowerCase()
+    const reliefType =
+      cat.includes("disab") || Number(amount) === 25 && cat.includes("disab")
+        ? "percentage"
+        : "fixed"
 
     const payloadVariants = [
       {
@@ -198,6 +203,7 @@ async function materializeCatalogFromSettings(service: any, companyId: string): 
         annual_amount: amount,
         currency: String(r.currency || "GHS").slice(0, 10),
         category: String(r.category || "Personal").slice(0, 20),
+        relief_type: reliefType,
         gra_code: graCode,
         relief_code: graCode,
         code: graCode,
@@ -212,6 +218,7 @@ async function materializeCatalogFromSettings(service: any, companyId: string): 
         amount,
         relief_code: graCode,
         gra_code: graCode,
+        relief_type: reliefType,
         is_active: true,
         updated_at: now,
       },
@@ -219,6 +226,16 @@ async function materializeCatalogFromSettings(service: any, companyId: string): 
         company_id: companyId,
         relief_name: reliefName,
         relief_code: graCode,
+        relief_type: "fixed",
+        amount,
+        is_active: true,
+        updated_at: now,
+      },
+      {
+        company_id: companyId,
+        relief_name: reliefName,
+        relief_code: graCode,
+        relief_type: "percentage",
         amount,
         is_active: true,
         updated_at: now,
