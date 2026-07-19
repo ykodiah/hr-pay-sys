@@ -138,8 +138,8 @@ export async function loadCompanyBrand(
   companyId: string | null | undefined,
 ): Promise<CompanyBrandInfo | null> {
   if (!companyId) {
-    const { data } = await client.from("companies").select("*").limit(1).maybeSingle()
-    return data
+    // Fail closed — never pick an arbitrary tenant via limit(1)
+    return null
   }
   const { data } = await client.from("companies").select("*").eq("id", companyId).maybeSingle()
   return data
