@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { calculateGhanaTax, DEFAULT_TAX_RATES, round2 } from "@/lib/ghana-tax/engine"
 import { toast } from "@/hooks/use-toast"
@@ -33,6 +33,7 @@ import {
   Loader2,
   ArrowRight,
   Zap,
+  Shield,
 } from "lucide-react"
 
 type PayInputApiRow = {
@@ -77,6 +78,12 @@ type PayInputApiRow = {
   }
 }
 
+type TaxReliefItem = {
+  relief_code: string
+  relief_name: string
+  annual_amount: number
+}
+
 type WorksheetRow = {
   employeeId: string
   employeeCode: string
@@ -102,6 +109,7 @@ type WorksheetRow = {
   paye: number
   overtimeTax: number
   bonusTax: number
+  taxReliefTotal: number
   totalDeductions: number
   netPay: number
   selected: boolean
@@ -192,6 +200,7 @@ function mapApiRow(row: PayInputApiRow): WorksheetRow {
     paye: 0,
     overtimeTax: 0,
     bonusTax: 0,
+    taxReliefTotal: 0,
     totalDeductions: 0,
     netPay: 0,
     selected: false,
@@ -199,7 +208,11 @@ function mapApiRow(row: PayInputApiRow): WorksheetRow {
   }
 }
 
-function calculateRow(row: WorksheetRow, taxRates = DEFAULT_TAX_RATES): WorksheetRow {
+function calculateRow(
+  row: WorksheetRow,
+  taxRates = DEFAULT_TAX_RATES,
+  annualTaxReliefs: TaxReliefItem[] = [],
+): WorksheetRow {
   const tax = calculateGhanaTax(
     {
       monthly_basic: row.basicSalary,
@@ -209,6 +222,7 @@ function calculateRow(row: WorksheetRow, taxRates = DEFAULT_TAX_RATES): Workshee
       tier2_applicable: row.tier2,
       tier3_applicable: row.tier3,
       tier3_employee_rate: row.tier3Rate || undefined,
+      annual_tax_reliefs: annualTaxReliefs,
       other_deductions: {
         loan: row.loan,
         advance: row.advance,
@@ -234,6 +248,7 @@ function calculateRow(row: WorksheetRow, taxRates = DEFAULT_TAX_RATES): Workshee
     paye: round2(tax.monthly_total_paye_withheld),
     overtimeTax: round2(tax.monthly_overtime_tax),
     bonusTax: round2(tax.monthly_bonus_tax),
+    taxReliefTotal: round2((tax.annual_tax_reliefs || 0) / 12),
     totalDeductions: round2(tax.monthly_total_employee_deductions),
     netPay: round2(tax.monthly_net_pay),
     status: "Calculated",
@@ -463,6 +478,8 @@ export default function PayrollPage() {
   const [isPending, startTransition] = useTransition()
   // Tax rates fetched from DB (falls back to GRA defaults if not configured)
   const [dbTaxRates, setDbTaxRates] = useState(DEFAULT_TAX_RATES)
+  // Employee → tax-year reliefs (loaded for the pay period's year)
+  const [reliefsByEmployee, setReliefsByEmployee] = useState<Record<string, TaxReliefItem[]>>({})
 
   // Prorate dialog state
   type ProrateEmployee = { employeeId: string; name: string; dateOfJoining: string; proratedDays: number; totalDays: number }
@@ -472,45 +489,55 @@ export default function PayrollPage() {
   const [pendingRunFn, setPendingRunFn] = useState<(() => void) | null>(null)
 
   const resolveCompany = useCallback(async () => {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from("companies")
-      .select("id, name, address, logo_url, phone, email, email_address, city, region, country")
-      .limit(1)
-      .maybeSingle()
-    if (data?.id) {
-      setCompanyId(data.id)
-      setCompany(data)
-      // Fetch saved tax rates from DB for this company
-      try {
-        const taxRes = await fetch(`/api/settings/tax?company_id=${encodeURIComponent(data.id)}`, { credentials: "include" })
-        if (taxRes.ok) {
-          const tax = await taxRes.json()
-          setDbTaxRates({
-            paye_bands: tax.paye_bands ?? DEFAULT_TAX_RATES.paye_bands,
-            paye_bands_are_monthly: DEFAULT_TAX_RATES.paye_bands_are_monthly,
-            ssnit: tax.ssnit
-              ? { employee_rate: tax.ssnit.employee_rate, employer_rate: tax.ssnit.employer_rate }
-              : DEFAULT_TAX_RATES.ssnit,
-            tier2: tax.tier2
-              ? { employee_rate: tax.tier2.employee_rate, employer_rate: tax.tier2.employer_rate }
-              : DEFAULT_TAX_RATES.tier2,
-            tier3: tax.tier3
-              ? { employee_rate: tax.tier3.employee_rate, employer_rate: tax.tier3.employer_rate }
-              : DEFAULT_TAX_RATES.tier3,
-          })
+    // Prefer authenticated meta resolution (tenant isolation) over first-company fallback
+    try {
+      const metaRes = await fetch("/api/employees/meta", { cache: "no-store", credentials: "include" })
+      const meta = await metaRes.json()
+      if (metaRes.ok && meta.company_id) {
+        setCompanyId(meta.company_id)
+        setCompany({
+          id: meta.company_id,
+          name: meta.company?.name,
+          address: meta.company?.address,
+          logo_url: meta.company?.logo_url,
+        })
+        try {
+          const taxRes = await fetch(
+            `/api/settings/tax?company_id=${encodeURIComponent(meta.company_id)}`,
+            { credentials: "include" },
+          )
+          if (taxRes.ok) {
+            const tax = await taxRes.json()
+            setDbTaxRates({
+              paye_bands: tax.paye_bands ?? DEFAULT_TAX_RATES.paye_bands,
+              paye_bands_are_monthly: DEFAULT_TAX_RATES.paye_bands_are_monthly,
+              ssnit: tax.ssnit
+                ? { employee_rate: tax.ssnit.employee_rate, employer_rate: tax.ssnit.employer_rate }
+                : DEFAULT_TAX_RATES.ssnit,
+              tier2: tax.tier2
+                ? { employee_rate: tax.tier2.employee_rate, employer_rate: tax.tier2.employer_rate }
+                : DEFAULT_TAX_RATES.tier2,
+              tier3: tax.tier3
+                ? { employee_rate: tax.tier3.employee_rate, employer_rate: tax.tier3.employer_rate }
+                : DEFAULT_TAX_RATES.tier3,
+            })
+          }
+        } catch {
+          // GRA defaults
         }
-      } catch {
-        // silently fall back to GRA defaults
+        return meta.company_id as string
       }
+    } catch {
+      // fall through
     }
-    return data?.id ?? ""
+    return ""
   }, [])
 
   const loadWorksheet = useCallback(async (cid: string, period: string) => { // eslint-disable-line react-hooks/exhaustive-deps
     setLoading(true)
     try {
-      const [inputRes, runsRes] = await Promise.all([
+      const taxYear = Number(String(period).split("-")[0]) || new Date().getFullYear()
+      const [inputRes, runsRes, reliefRes] = await Promise.all([
         fetch(
           `/api/payroll/input?company_id=${encodeURIComponent(cid)}&pay_period=${encodeURIComponent(period)}`,
           { cache: "no-store", credentials: "include" },
@@ -519,6 +546,10 @@ export default function PayrollPage() {
           cache: "no-store",
           credentials: "include",
         }),
+        fetch(
+          `/api/payroll/tax-reliefs?company_id=${encodeURIComponent(cid)}&tax_year=${taxYear}&mode=payroll_map`,
+          { cache: "no-store", credentials: "include" },
+        ),
       ])
 
       const inputJson = await inputRes.json()
@@ -527,7 +558,14 @@ export default function PayrollPage() {
       const runsJson = runsRes.ok ? await runsRes.json() : { runs: [] }
       const periodRuns: PayrollRunSummary[] = runsJson.runs ?? runsJson.data ?? []
 
-      const mapped = (inputJson.rows ?? []).map((r: PayInputApiRow) => calculateRow(mapApiRow(r), dbTaxRates))
+      const reliefJson = reliefRes.ok ? await reliefRes.json() : { by_employee: {} }
+      const byEmp: Record<string, TaxReliefItem[]> = reliefJson.by_employee || {}
+      setReliefsByEmployee(byEmp)
+
+      const mapped = (inputJson.rows ?? []).map((r: PayInputApiRow) => {
+        const base = mapApiRow(r)
+        return calculateRow(base, dbTaxRates, byEmp[base.employeeId] || [])
+      })
       const matchingRun =
         periodRuns.find((r) => String(r.pay_period_start ?? "").startsWith(period)) ?? null
 
@@ -547,7 +585,7 @@ export default function PayrollPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [dbTaxRates])
 
   useEffect(() => {
     ensureDemoSessionCookie()
@@ -588,8 +626,15 @@ export default function PayrollPage() {
   }
 
   const handleRecalculate = () => {
-    setRows((prev) => prev.map((r) => (r.selected ? calculateRow(r) : r)))
-    toast({ title: "Recalculated", description: "Preview figures refreshed from loaded DB values." })
+    setRows((prev) =>
+      prev.map((r) =>
+        r.selected ? calculateRow(r, dbTaxRates, reliefsByEmployee[r.employeeId] || []) : r,
+      ),
+    )
+    toast({
+      title: "Recalculated",
+      description: `Preview refreshed using ${payPeriod.slice(0, 4)} tax reliefs and current rates.`,
+    })
   }
 
   const handleProcess = async () => {
@@ -646,6 +691,10 @@ export default function PayrollPage() {
               ssnitEmployee: r.ssnitEmployee,
               taxableIncome: r.taxableIncome,
               paye: r.paye,
+              overtimeTax: r.overtimeTax,
+              bonusTax: r.bonusTax,
+              tier2Employee: r.tier2Employee,
+              taxReliefTotal: r.taxReliefTotal,
               totalDeductions: r.totalDeductions,
               netPay: r.netPay,
             })),
@@ -883,6 +932,10 @@ export default function PayrollPage() {
               ssnitEmployee: r.ssnitEmployee,
               taxableIncome: r.taxableIncome,
               paye: r.paye,
+              overtimeTax: r.overtimeTax,
+              bonusTax: r.bonusTax,
+              tier2Employee: r.tier2Employee,
+              taxReliefTotal: r.taxReliefTotal,
               totalDeductions: r.totalDeductions,
               netPay: r.netPay,
             })),
@@ -996,6 +1049,12 @@ export default function PayrollPage() {
             <Link href="/app/payroll/input">
               <ClipboardList className="h-4 w-4 mr-2" />
               Pay Inputs
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/app/payroll/tax-reliefs">
+              <Shield className="h-4 w-4 mr-2" />
+              Tax Reliefs
             </Link>
           </Button>
           <Button variant="outline" asChild>

@@ -211,6 +211,7 @@ import {
   FolderKey,
   FolderEye,
   FolderEyeOff,
+  Receipt,
 } from "lucide-react"
 import { AdvancedDocumentService, AdvancedDocument } from "@/lib/storage/advancedDocumentService"
 
@@ -718,7 +719,16 @@ export default function FullyFunctionalDocumentVaultPage() {
         (doc.tags || []).some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
       
       const matchesEmployee = selectedEmployee === "all" || doc.employeeId === selectedEmployee
-      const matchesDocumentType = selectedDocumentType === "all" || doc.documentType === selectedDocumentType
+      const matchesDocumentType =
+        selectedDocumentType === "all" ||
+        doc.documentType === selectedDocumentType ||
+        (selectedDocumentType === "tax-relief" &&
+          (doc.category === "tax-relief" || doc.source === "payroll-tax-reliefs"))
+      const matchesCategory =
+        selectedCategory === "all" ||
+        doc.category === selectedCategory ||
+        (selectedCategory === "tax-relief" &&
+          (doc.documentType === "tax-relief" || doc.source === "payroll-tax-reliefs"))
       const matchesStatus = selectedStatus === "all" || doc.status === selectedStatus
       const matchesAccessLevel = selectedAccessLevel === "all" || doc.accessLevel === selectedAccessLevel
       const matchesSignatureStatus = selectedSignatureStatus === "all" || doc.signatureStatus === selectedSignatureStatus
@@ -726,7 +736,7 @@ export default function FullyFunctionalDocumentVaultPage() {
       const matchesArchived = showArchived ? doc.isArchived : !doc.isArchived
       const matchesDeleted = showDeleted ? doc.status === "deleted" : doc.status !== "deleted"
       
-      return matchesSearch && matchesEmployee && matchesDocumentType && matchesStatus && 
+      return matchesSearch && matchesEmployee && matchesDocumentType && matchesCategory && matchesStatus && 
              matchesTab && matchesArchived && matchesDeleted && matchesAccessLevel && matchesSignatureStatus
     })
   }
@@ -815,8 +825,25 @@ export default function FullyFunctionalDocumentVaultPage() {
     const signed = documents.filter((doc) => doc.signatureStatus === "signed").length
     const confidential = documents.filter((doc) => doc.accessLevel === "confidential").length
     const restricted = documents.filter((doc) => doc.accessLevel === "restricted").length
-    
-    return { total, approved, pending, rejected, archived, requiresSignature, signed, confidential, restricted }
+    const taxRelief = documents.filter(
+      (doc) =>
+        doc.category === "tax-relief" ||
+        doc.documentType === "tax-relief" ||
+        doc.source === "payroll-tax-reliefs",
+    ).length
+
+    return {
+      total,
+      approved,
+      pending,
+      rejected,
+      archived,
+      requiresSignature,
+      signed,
+      confidential,
+      restricted,
+      taxRelief,
+    }
   }
 
   const stats = getDocumentStats()
@@ -875,7 +902,7 @@ export default function FullyFunctionalDocumentVaultPage() {
       </div>
 
       {/* Enhanced Stats Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -884,6 +911,25 @@ export default function FullyFunctionalDocumentVaultPage() {
                 <p className="text-sm text-gray-600">Total Documents</p>
               </div>
               <FolderOpen className="w-8 h-8 text-gray-400" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card
+          className="cursor-pointer hover:border-emerald-400 transition-colors"
+          onClick={() => {
+            setSelectedCategory("tax-relief")
+            setSelectedDocumentType("tax-relief")
+            setSelectedSource("payroll-tax-reliefs")
+            setActiveTab("all")
+          }}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold text-emerald-700">{stats.taxRelief}</div>
+                <p className="text-sm text-gray-600">Tax Relief</p>
+              </div>
+              <Receipt className="w-8 h-8 text-emerald-400" />
             </div>
           </CardContent>
         </Card>

@@ -37,6 +37,7 @@ type ProcessRow = {
   paye?: number
   overtimeTax?: number
   bonusTax?: number
+  taxReliefTotal?: number
   totalDeductions?: number
   netPay?: number
 }
@@ -152,6 +153,7 @@ async function persistRowsFromWorksheet(
         n(row.totalDeductions) || n(ssnit + tier2 + pf + paye + loan + advance + other)
       const net = n(row.netPay) || n(gross - totalDeductions)
       const taxable = n(row.taxableIncome)
+      const taxReliefTotal = n(row.taxReliefTotal)
 
       // Get individual allowance breakdown from employee_financial
       const fin = finByEmp.get(row.employeeId)
@@ -203,12 +205,14 @@ async function persistRowsFromWorksheet(
         net_pay: net,
         taxable_income: taxable,
         paye_taxable_income: taxable,
+        tax_relief_total: taxReliefTotal,
         allowances: { total: allowances },
         calculation_breakdown: {
           allowances,
           ssnit_employee: ssnit,
           tier2_employee: tier2,
           tier3_employee: pf,
+          tax_relief_monthly: taxReliefTotal,
           paye_base: basePaye,
           overtime_tax: overtimeTax,
           bonus_tax: bonusTax,
@@ -269,6 +273,7 @@ async function persistRowsFromWorksheet(
         tier3_employee: pf,
         paye_taxable_income: taxable,
         paye_tax: paye,
+        tax_relief_total: taxReliefTotal,
         overtime_tax: overtimeTax,
         bonus_tax: bonusTax,
         loan_deduction: loan,

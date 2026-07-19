@@ -305,6 +305,7 @@ export default function ClientAppLayout({
         items: [
           { name: "Pay Inputs", href: "/app/payroll/input", icon: ClipboardList, description: "Period emoluments & adjustments" },
           { name: "Process Payroll", href: "/app/payroll", icon: Calculator, description: "Run statutory payroll" },
+          { name: "Tax Reliefs", href: "/app/payroll/tax-reliefs", icon: Shield, description: "Assign employee tax reliefs by year" },
           { name: "Payslips", href: "/app/payroll/payslips", icon: Receipt, description: "Generate & download payslips" },
           { name: "Payroll History", href: "/app/payroll/history", icon: History, description: "Past payroll records" },
           { name: "Approvals", href: "/app/approvals", icon: CheckSquare, description: "Approve payroll, leave & overtime" },
