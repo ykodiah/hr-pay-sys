@@ -2686,12 +2686,13 @@ export default function SettingsPage() {
     setIsSavingSettings(true)
 
     try {
-      let companyId = companyData.id
-      if (!companyId || String(companyId).startsWith("demo-")) {
-        companyId = (await loadCompanyData()) || companyId
-      }
+      // Prefer an existing id, but do not block first-time save — the API creates
+      // the companies row and binds users.company_id when company_id is omitted.
+      let companyId =
+        companyData.id && !String(companyData.id).startsWith("demo-") ? companyData.id : ""
       if (!companyId) {
-        throw new Error("No company identifier available")
+        companyId = (await loadCompanyData()) || ""
+        if (companyId && String(companyId).startsWith("demo-")) companyId = ""
       }
 
       const normalizedCompanyLogo = isPlaceholderLogo(companyLogoPreview)
@@ -2701,19 +2702,24 @@ export default function SettingsPage() {
         : companyLogoPreview.trim()
 
       const saved = await persistCompanySettings({
-        company_id: companyId,
+        ...(companyId ? { company_id: companyId } : {}),
         logo_url: normalizedCompanyLogo,
         divisions,
         departments,
         locations,
       })
 
+      const savedCompanyId = saved.company?.id || saved.company_id || companyId
+      if (!savedCompanyId) {
+        throw new Error("Company was saved but no company id was returned. Please refresh and try again.")
+      }
+
       // Keep related settings in sync, but never let these wipe a successful company save.
       await settingsFetch("/api/settings/hr", {
         method: "POST",
         body: JSON.stringify({
           action: "save_config",
-          company_id: saved.company?.id || companyId,
+          company_id: savedCompanyId,
           config: hrConfig,
         }),
       }).catch((err) => console.warn("[v0] HR config save skipped:", err))
@@ -2722,7 +2728,7 @@ export default function SettingsPage() {
         method: "POST",
         body: JSON.stringify({
           action: "save_sync_preferences",
-          company_id: saved.company?.id || companyId,
+          company_id: savedCompanyId,
           ...syncPrefs,
         }),
       }).catch(() => null)
