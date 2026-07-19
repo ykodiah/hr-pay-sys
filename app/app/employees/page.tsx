@@ -265,6 +265,7 @@ export default function EmployeesPage() {
   const [locations, setLocations] = useState<string[]>([])
   const [supervisors, setSupervisors] = useState<any[]>([])
   const [headsOfDepartment, setHeadsOfDepartment] = useState<any[]>([])
+  const [tenantPeople, setTenantPeople] = useState<any[]>([])
   const [currentTab, setCurrentTab] = useState("personal")
   const [formData, setFormData] = useState<any>({
     employeeId: "",
@@ -687,16 +688,49 @@ export default function EmployeesPage() {
         if (Array.isArray(meta.subsidiaries)) {
           setSubsidiaries(meta.subsidiaries)
         }
+        if (Array.isArray(meta.employees)) setTenantPeople(meta.employees)
+        if (Array.isArray(meta.supervisors)) {
+          setSupervisors(
+            meta.supervisors.map((s: any) => ({
+              id: s.id,
+              first_name: s.name?.split(" ")[0] || "",
+              last_name: s.name?.split(" ").slice(1).join(" ") || "",
+              full_name: s.name,
+              display_name: s.name,
+              department: s.department,
+              special_role: s.special_role,
+              position: s.position,
+              status: "active",
+            })),
+          )
+        }
+        if (Array.isArray(meta.heads_of_department)) {
+          setHeadsOfDepartment(
+            meta.heads_of_department.map((s: any) => ({
+              id: s.id,
+              first_name: s.name?.split(" ")[0] || "",
+              last_name: s.name?.split(" ").slice(1).join(" ") || "",
+              full_name: s.name,
+              display_name: s.name,
+              department: s.department,
+              special_role: s.special_role,
+              position: s.position,
+              status: "active",
+            })),
+          )
+        }
         return meta.company_id as string
       }
 
       // Fail closed: do not pick an arbitrary first company (cross-tenant leak).
+      // Do not inject hardcoded demo org lists for real tenants.
       console.warn("[v0] Unable to resolve company for employees page", meta)
       setCompanyId("")
       setSubsidiaries([])
-      setDivisions(["Head Office", "Regional Office"])
-      setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
-      setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
+      setDivisions([])
+      setDepartments([])
+      setLocations([])
+      setTenantPeople([])
     } catch (error) {
       console.error("[v0] Error in loadCompanyData:", error)
     }
@@ -723,56 +757,76 @@ export default function EmployeesPage() {
   }, [formData.hasSubsidiary, formData.subsidiary, subsidiaries, loadParentCompanyData])
   // </CHANGE>
 
-  // Load supervisors and heads of department based on department selection
+  // Load supervisors and heads of department from tenant employee list (DB-backed)
   useEffect(() => {
-    const loadSupervisorsAndHeads = () => {
-      const activeEmployees = employees.filter(
-        (emp) => String(emp.status ?? "").toLowerCase() === "active",
-      )
-      const departmentEmployees = formData.department
-        ? activeEmployees.filter((emp) => emp.department === formData.department)
-        : activeEmployees
+    const pool =
+      employees.length > 0
+        ? employees
+        : tenantPeople.map((p) => ({
+            id: p.id,
+            first_name: p.name?.split(" ")[0] || "",
+            last_name: p.name?.split(" ").slice(1).join(" ") || "",
+            full_name: p.name,
+            display_name: p.name,
+            department: p.department,
+            special_role: p.special_role,
+            position: p.position,
+            status: "active",
+          }))
 
-      const roleOf = (emp: any) => String(emp.special_role || emp.specialRole || "").toLowerCase()
-      const supervisorsList = departmentEmployees.filter(
-        (emp) => roleOf(emp).includes("supervisor") || roleOf(emp).includes("direct"),
-      )
-      const headsList = departmentEmployees.filter(
-        (emp) => roleOf(emp).includes("head") || roleOf(emp).includes("hod"),
-      )
+    const activeEmployees = pool.filter((emp) => {
+      const s = String(emp.status ?? "").toLowerCase()
+      return !s || s === "active"
+    })
+    const departmentEmployees = formData.department
+      ? activeEmployees.filter((emp) => emp.department === formData.department)
+      : activeEmployees
 
-      // Prefer role-matched; else all department (or all active) employees
-      let finalSupervisors = supervisorsList.length > 0 ? supervisorsList : departmentEmployees
-      let finalHeads = headsList.length > 0 ? headsList : departmentEmployees
+    const roleOf = (emp: any) =>
+      `${emp.special_role || emp.specialRole || ""} ${emp.position || ""}`.toLowerCase()
+    const supervisorsList = departmentEmployees.filter(
+      (emp) =>
+        roleOf(emp).includes("supervisor") ||
+        roleOf(emp).includes("manager") ||
+        roleOf(emp).includes("lead") ||
+        roleOf(emp).includes("admin") ||
+        roleOf(emp).includes("hr"),
+    )
+    const headsList = departmentEmployees.filter(
+      (emp) =>
+        roleOf(emp).includes("head") ||
+        roleOf(emp).includes("hod") ||
+        roleOf(emp).includes("director") ||
+        roleOf(emp).includes("admin") ||
+        roleOf(emp).includes("ceo"),
+    )
 
-      // Always include currently saved supervisor/HOD so edit form can show the value
-      const ensureIncluded = (list: any[], id: string | undefined | null) => {
-        if (!id) return list
-        if (list.some((e) => e.id === id)) return list
-        const found = employees.find((e) => e.id === id)
-        return found ? [found, ...list] : list
-      }
-      finalSupervisors = ensureIncluded(
-        finalSupervisors,
-        formData.directSupervisor || selectedEmployee?.direct_supervisor,
-      )
-      finalHeads = ensureIncluded(
-        finalHeads,
-        formData.headOfDepartment || selectedEmployee?.head_of_department,
-      )
+    let finalSupervisors = supervisorsList.length > 0 ? supervisorsList : departmentEmployees
+    let finalHeads = headsList.length > 0 ? headsList : departmentEmployees
 
-      setSupervisors(finalSupervisors)
-      setHeadsOfDepartment(finalHeads)
+    const ensureIncluded = (list: any[], id: string | undefined | null) => {
+      if (!id) return list
+      if (list.some((e) => e.id === id)) return list
+      const found = pool.find((e) => e.id === id)
+      return found ? [found, ...list] : list
     }
+    finalSupervisors = ensureIncluded(
+      finalSupervisors,
+      formData.directSupervisor || selectedEmployee?.direct_supervisor,
+    )
+    finalHeads = ensureIncluded(
+      finalHeads,
+      formData.headOfDepartment || selectedEmployee?.head_of_department,
+    )
 
-    if (employees.length > 0) {
-      loadSupervisorsAndHeads()
-    }
+    setSupervisors(finalSupervisors)
+    setHeadsOfDepartment(finalHeads)
   }, [
     formData.department,
     formData.directSupervisor,
     formData.headOfDepartment,
     employees,
+    tenantPeople,
     selectedEmployee,
   ])
 

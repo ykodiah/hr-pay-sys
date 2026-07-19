@@ -22,23 +22,32 @@ export function parseOrgList(value: unknown, fallback: string[] = []): string[] 
   return [...fallback]
 }
 
-export function extractOrgOptions(source: any, settingsData?: any) {
+/**
+ * Extract org lists from the tenant company / company_settings only.
+ * No hardcoded Accra/demo fallbacks — empty means configure in Company Settings.
+ */
+export function extractOrgOptions(source: any, settingsData?: any, options?: { allowDemoFallback?: boolean }) {
   const merged = {
     divisions: settingsData?.divisions ?? source?.divisions,
     departments: settingsData?.departments ?? source?.departments,
     locations: settingsData?.locations ?? source?.locations,
   }
+  const demoFallback = options?.allowDemoFallback === true
   return {
-    divisions: parseOrgList(merged.divisions, ["Head Office", "Regional Office"]),
-    departments: parseOrgList(merged.departments, [
-      "Technology",
-      "Human Resources",
-      "Finance",
-      "Marketing",
-      "Sales",
-      "Operations",
-    ]),
-    locations: parseOrgList(merged.locations, ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"]),
+    divisions: parseOrgList(
+      merged.divisions,
+      demoFallback ? ["Head Office", "Regional Office"] : [],
+    ),
+    departments: parseOrgList(
+      merged.departments,
+      demoFallback
+        ? ["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"]
+        : [],
+    ),
+    locations: parseOrgList(
+      merged.locations,
+      demoFallback ? ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"] : [],
+    ),
   }
 }
 

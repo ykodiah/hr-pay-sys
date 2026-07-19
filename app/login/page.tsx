@@ -41,7 +41,6 @@ export default function LoginPage() {
       }
 
       if (data.user) {
-        // Get user's employee profile to determine role and redirect
         const { data: profile } = await supabase
           .from("employee_profiles")
           .select(
@@ -50,18 +49,37 @@ export default function LoginPage() {
             employee:employees(
               special_role,
               company_id,
-              id
+              id,
+              position,
+              department
             )
           `
           )
           .eq("id", data.user.id)
-          .single()
+          .maybeSingle()
 
-        if (profile?.employee) {
-          const isHR = profile.employee.special_role && ["HR", "Admin"].includes(profile.employee.special_role)
-          router.push(isHR ? "/app" : "/self-service")
+        const employee = Array.isArray(profile?.employee)
+          ? profile?.employee[0]
+          : profile?.employee
+
+        const { resolvePostLoginPath, isTenantAdminRole } = await import("@/lib/auth/resolve-portal")
+        const metaRole = data.user.user_metadata?.role || data.user.app_metadata?.role
+
+        // Tenant admins created from superadmin always go to /app even without employee row yet
+        if (isTenantAdminRole(metaRole) || data.user.app_metadata?.portal === "admin") {
+          router.push("/app")
+          return
+        }
+
+        if (employee) {
+          router.push(
+            resolvePostLoginPath({
+              userMetadata: data.user.user_metadata,
+              appMetadata: data.user.app_metadata,
+              employee,
+            }),
+          )
         } else {
-          // No employee profile, redirect to setup
           router.push("/auth/setup-profile")
         }
       }

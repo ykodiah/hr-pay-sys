@@ -263,81 +263,107 @@ export default function ClientAppLayout({
     setBreadcrumbs(breadcrumbItems)
   }, [])
 
-  // Navigation data structure for better organization
-    const navigationSections = [
+  // Navigation data — module codes align with superadmin_modules / ADMIN_PORTAL_MODULES
+  const allNavigationSections = [
       {
         title: "Overview",
         items: [
-          { name: "Dashboard", href: "/app", icon: LayoutDashboard, description: "Overview and key metrics" },
+          { code: "dashboard", name: "Dashboard", href: "/app", icon: LayoutDashboard, description: "Overview and key metrics" },
         ],
       },
       {
         title: "HR Management",
         items: [
-          { name: "Employees", href: "/app/employees", icon: Users, description: "Manage employee records" },
-          { name: "Recruitment", href: "/app/recruitment", icon: UserPlus, description: "Hire new talent" },
-          { name: "Org Chart", href: "/app/org-chart", icon: Sitemap, description: "Organizational structure" },
-          { name: "Documents", href: "/app/documents", icon: FileText, description: "Document vault" },
-          { name: "Communication", href: "/app/communication", icon: MessageSquare, description: "Team communication" },
-          { name: "Comm. Settings", href: "/app/communication/settings", icon: Cog, description: "Channels, templates & credentials" },
-          { name: "Meetings", href: "/app/meetings", icon: Video, description: "Secure meetings workspace" },
+          { code: "employees", name: "Employees", href: "/app/employees", icon: Users, description: "Manage employee records" },
+          { code: "recruitment", name: "Recruitment", href: "/app/recruitment", icon: UserPlus, description: "Hire new talent" },
+          { code: "org_chart", name: "Org Chart", href: "/app/org-chart", icon: Sitemap, description: "Organizational structure" },
+          { code: "documents", name: "Documents", href: "/app/documents", icon: FileText, description: "Document vault" },
+          { code: "communication", name: "Communication", href: "/app/communication", icon: MessageSquare, description: "Team communication" },
+          { code: "communication_settings", name: "Comm. Settings", href: "/app/communication/settings", icon: Cog, description: "Channels, templates & credentials" },
+          { code: "meetings", name: "Meetings", href: "/app/meetings", icon: Video, description: "Secure meetings workspace" },
         ],
       },
       {
         title: "Time & Attendance",
         items: [
-          { name: "Attendance", href: "/app/attendance", icon: Clock, description: "Track work hours" },
-          { name: "Attendance Alerts", href: "/attendance/alerts", icon: AlertCircle, description: "Alerts & attendance rules" },
-          { name: "Leave Management", href: "/app/leave", icon: Calendar, description: "Manage leave requests" },
-          { name: "Overtime", href: "/app/overtime", icon: Timer, description: "Overtime requests" },
+          { code: "attendance", name: "Attendance", href: "/app/attendance", icon: Clock, description: "Track work hours" },
+          { code: "attendance_alerts", name: "Attendance Alerts", href: "/attendance/alerts", icon: AlertCircle, description: "Alerts & attendance rules" },
+          { code: "leave", name: "Leave Management", href: "/app/leave", icon: Calendar, description: "Manage leave requests" },
+          { code: "overtime", name: "Overtime", href: "/app/overtime", icon: Timer, description: "Overtime requests" },
         ],
       },
       {
         title: "Performance",
         items: [
-          { name: "Performance", href: "/app/performance", icon: Target, description: "Performance reviews" },
-          { name: "Promotions", href: "/app/promotions", icon: Award, description: "Career advancement" },
-          { name: "Learning", href: "/app/learning", icon: BookOpen, description: "Training & development" },
+          { code: "performance", name: "Performance", href: "/app/performance", icon: Target, description: "Performance reviews" },
+          { code: "promotions", name: "Promotions", href: "/app/promotions", icon: Award, description: "Career advancement" },
+          { code: "learning", name: "Learning", href: "/app/learning", icon: BookOpen, description: "Training & development" },
         ],
       },
       {
         title: "Payroll",
         items: [
-          { name: "Pay Inputs", href: "/app/payroll/input", icon: ClipboardList, description: "Period emoluments & adjustments" },
-          { name: "Process Payroll", href: "/app/payroll", icon: Calculator, description: "Run statutory payroll" },
-          { name: "Tax Reliefs", href: "/app/payroll/tax-reliefs", icon: Shield, description: "Assign employee tax reliefs by year" },
-          { name: "Payslips", href: "/app/payroll/payslips", icon: Receipt, description: "Generate & download payslips" },
-          { name: "Payroll History", href: "/app/payroll/history", icon: History, description: "Past payroll records" },
-          { name: "Approvals", href: "/app/approvals", icon: CheckSquare, description: "Approve payroll, leave & overtime" },
-          { name: "Loans", href: "/app/loans", icon: CreditCard, description: "Employee loans" },
+          { code: "payroll_input", name: "Pay Inputs", href: "/app/payroll/input", icon: ClipboardList, description: "Period emoluments & adjustments" },
+          { code: "payroll", name: "Process Payroll", href: "/app/payroll", icon: Calculator, description: "Run statutory payroll" },
+          { code: "tax_reliefs", name: "Tax Reliefs", href: "/app/payroll/tax-reliefs", icon: Shield, description: "Assign employee tax reliefs by year" },
+          { code: "payslips", name: "Payslips", href: "/app/payroll/payslips", icon: Receipt, description: "Generate & download payslips" },
+          { code: "payroll_history", name: "Payroll History", href: "/app/payroll/history", icon: History, description: "Past payroll records" },
+          { code: "approvals", name: "Approvals", href: "/app/approvals", icon: CheckSquare, description: "Approve payroll, leave & overtime" },
+          { code: "loans", name: "Loans", href: "/app/loans", icon: CreditCard, description: "Employee loans" },
         ],
       },
       {
         title: "Analytics",
         items: [
-          { name: "Analytics", href: "/app/analytics", icon: BarChart3, description: "Reports & insights" },
-          { name: "Compliance Reports", href: "/app/reports", icon: FileCheck, description: "PAYE, SSNIT & statutory reports" },
-          { name: "ML Analytics", href: "/app/ml-analytics", icon: Brain, description: "AI-powered HR analytics" },
+          { code: "analytics", name: "Analytics", href: "/app/analytics", icon: BarChart3, description: "Reports & insights" },
+          { code: "compliance_reports", name: "Compliance Reports", href: "/app/reports", icon: FileCheck, description: "PAYE, SSNIT & statutory reports" },
+          { code: "ml_analytics", name: "ML Analytics", href: "/app/ml-analytics", icon: Brain, description: "AI-powered HR analytics" },
         ],
       },
       {
         title: "Employee Hub",
         items: [
-          { name: "My Portal", href: "/app/self-service", icon: UserCheck, description: "Personalised employee workspace" },
-          { name: "Update My Details", href: "/app/self-service/update-details", icon: FileCheck, description: "Submit change requests" },
-          { name: "Change Requests", href: "/app/hr/change-requests", icon: ClipboardList, description: "Review employee change requests" },
+          { code: "self_service", name: "My Portal", href: "/app/self-service", icon: UserCheck, description: "Personalised employee workspace" },
+          { code: "update_details", name: "Update My Details", href: "/app/self-service/update-details", icon: FileCheck, description: "Submit change requests" },
+          { code: "change_requests", name: "Change Requests", href: "/app/hr/change-requests", icon: ClipboardList, description: "Review employee change requests" },
         ],
       },
       {
         title: "Administration",
         items: [
-          { name: "Disciplinary", href: "/app/disciplinary", icon: Shield, description: "Disciplinary actions" },
-          { name: "Offboarding", href: "/app/offboarding", icon: LogOut, description: "Employee exit process" },
-          { name: "Integrations", href: "/app/integrations", icon: Plug, description: "Third-party integrations" },
-          { name: "Settings", href: "/app/settings", icon: Settings, description: "System settings" },
+          { code: "disciplinary", name: "Disciplinary", href: "/app/disciplinary", icon: Shield, description: "Disciplinary actions" },
+          { code: "offboarding", name: "Offboarding", href: "/app/offboarding", icon: LogOut, description: "Employee exit process" },
+          { code: "integrations", name: "Integrations", href: "/app/integrations", icon: Plug, description: "Third-party integrations" },
+          { code: "settings", name: "Settings", href: "/app/settings", icon: Settings, description: "System settings" },
         ],
       },
     ]
+
+  const [enabledModuleCodes, setEnabledModuleCodes] = useState<string[] | null>(null)
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const res = await fetch("/api/settings/modules", { credentials: "include", cache: "no-store" })
+        if (!res.ok) return
+        const data = await res.json()
+        if (Array.isArray(data.enabled_codes) && data.enabled_codes.length) {
+          setEnabledModuleCodes(data.enabled_codes)
+        }
+      } catch {
+        // keep full nav
+      }
+    })()
+  }, [])
+
+  const navigationSections = allNavigationSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter(
+        (item) => !enabledModuleCodes || enabledModuleCodes.includes(item.code),
+      ),
+    }))
+    .filter((section) => section.items.length > 0)
 
   // Quick actions for common tasks
   const quickActions = [

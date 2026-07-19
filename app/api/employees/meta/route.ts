@@ -63,7 +63,41 @@ export async function GET(req: NextRequest) {
     ])
 
     const settingsData = (settings?.settings_data as any) || {}
-    const org = extractOrgOptions(company, settingsData)
+    const org = extractOrgOptions(company, settingsData, { allowDemoFallback: Boolean(user.isDemo) })
+
+    // Supervisors / HODs from this tenant's employees only
+    const { data: people } = await client
+      .from("employees")
+      .select("id, first_name, last_name, full_name, display_name, department, special_role, position, status")
+      .eq("company_id", companyId)
+      .order("first_name", { ascending: true })
+      .limit(2000)
+
+    const activePeople = (people || []).filter((p) => {
+      const s = String(p.status || "").toLowerCase()
+      return !s || s === "active"
+    })
+
+    const supervisors = activePeople.filter((p) => {
+      const role = `${p.special_role || ""} ${p.position || ""}`.toLowerCase()
+      return (
+        role.includes("supervisor") ||
+        role.includes("manager") ||
+        role.includes("lead") ||
+        role.includes("admin") ||
+        role.includes("hr")
+      )
+    })
+    const heads = activePeople.filter((p) => {
+      const role = `${p.special_role || ""} ${p.position || ""}`.toLowerCase()
+      return (
+        role.includes("head") ||
+        role.includes("hod") ||
+        role.includes("director") ||
+        role.includes("admin") ||
+        role.includes("ceo")
+      )
+    })
 
     let { data: allowances } = await client
       .from("payroll_allowances")
@@ -120,6 +154,27 @@ export async function GET(req: NextRequest) {
       departments: org.departments,
       locations: org.locations,
       subsidiaries: subsidiaries ?? [],
+      supervisors: supervisors.map((p) => ({
+        id: p.id,
+        name: p.display_name || p.full_name || `${p.first_name} ${p.last_name}`.trim(),
+        department: p.department,
+        special_role: p.special_role,
+        position: p.position,
+      })),
+      heads_of_department: heads.map((p) => ({
+        id: p.id,
+        name: p.display_name || p.full_name || `${p.first_name} ${p.last_name}`.trim(),
+        department: p.department,
+        special_role: p.special_role,
+        position: p.position,
+      })),
+      employees: activePeople.map((p) => ({
+        id: p.id,
+        name: p.display_name || p.full_name || `${p.first_name} ${p.last_name}`.trim(),
+        department: p.department,
+        special_role: p.special_role,
+        position: p.position,
+      })),
       allowances: allowances ?? [],
       deductions: deductions ?? [],
     })

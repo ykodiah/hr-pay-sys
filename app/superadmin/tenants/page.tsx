@@ -48,10 +48,19 @@ export default function TenantsPage() {
     admin_first_name: '',
     admin_last_name: '',
   })
+  const [slugManual, setSlugManual] = useState(false)
   const [search, setSearch] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+
+  const autoSlug = (name: string) =>
+    name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60)
 
   useEffect(() => { fetchTenants() }, [])
 
@@ -107,6 +116,7 @@ export default function TenantsPage() {
         admin_first_name: '',
         admin_last_name: '',
       })
+      setSlugManual(false)
       setShowCreate(false)
       fetchTenants()
     } catch (err) {
@@ -152,7 +162,13 @@ export default function TenantsPage() {
           <h1 className="text-2xl font-bold text-slate-900">Tenants</h1>
           <p className="text-slate-500 mt-1 text-sm">Manage all tenant organisations and subscriptions.</p>
         </div>
-        <Button onClick={() => setShowCreate(true)} size="sm">
+        <Button
+          onClick={() => {
+            setSlugManual(false)
+            setShowCreate(true)
+          }}
+          size="sm"
+        >
           <Plus className="w-4 h-4 mr-1.5" /> New Tenant
         </Button>
       </div>
@@ -203,13 +219,32 @@ export default function TenantsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-slate-700">Tenant Name</label>
-                  <Input placeholder="Acme Corporation" value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+                  <Input
+                    placeholder="Acme Corporation"
+                    value={form.name}
+                    onChange={(e) => {
+                      const name = e.target.value
+                      setForm((prev) => ({
+                        ...prev,
+                        name,
+                        slug: slugManual ? prev.slug : autoSlug(name),
+                      }))
+                    }}
+                    required
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-slate-700">Slug</label>
-                  <Input placeholder="acme-corp" value={form.slug}
-                    onChange={(e) => setForm({ ...form, slug: e.target.value })} required />
+                  <Input
+                    placeholder="auto-from-name"
+                    value={form.slug}
+                    onChange={(e) => {
+                      setSlugManual(true)
+                      setForm({ ...form, slug: autoSlug(e.target.value) || e.target.value })
+                    }}
+                    required
+                  />
+                  <p className="text-[11px] text-slate-400">Auto-filled from the tenant name (editable).</p>
                 </div>
               </div>
               <div className="space-y-1.5">

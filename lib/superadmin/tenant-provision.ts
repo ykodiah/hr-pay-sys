@@ -156,7 +156,8 @@ export async function createProvisionedTenant(client: SupabaseClient, input: Pro
     throw new Error(error?.message || "Failed to create superadmin tenant")
   }
 
-  // Enable active modules (catalog only — does not seed HR payroll/employee data)
+  // Ensure catalog matches admin portal, then enable all active modules for the tenant.
+  await syncAdminPortalModules(client)
   const { data: modules } = await client.from("superadmin_modules").select("id").eq("is_active", true)
   if (modules?.length) {
     await client.from("superadmin_tenant_modules").insert(
@@ -170,6 +171,65 @@ export async function createProvisionedTenant(client: SupabaseClient, input: Pro
   }
 
   return tenant
+}
+
+/** Upsert every admin-portal module into superadmin_modules (by code/name). */
+export async function syncAdminPortalModules(client: SupabaseClient) {
+  const { ADMIN_PORTAL_MODULES } = await import("@/lib/modules/admin-portal-modules")
+
+  for (const mod of ADMIN_PORTAL_MODULES) {
+    const fullRow = {
+      name: mod.name,
+      description: mod.description,
+      monthly_cost: mod.monthly_cost,
+      is_active: true,
+      code: mod.code,
+      href: mod.href,
+      section: mod.section,
+      updated_at: new Date().toISOString(),
+    }
+
+    let existingId: string | undefined
+    try {
+      const { data } = await client.from("superadmin_modules").select("id").eq("code", mod.code).maybeSingle()
+      existingId = data?.id
+    } catch {
+      existingId = undefined
+    }
+    if (!existingId) {
+      const { data } = await client.from("superadmin_modules").select("id").eq("name", mod.name).maybeSingle()
+      existingId = data?.id
+    }
+
+    if (existingId) {
+      const { error } = await client.from("superadmin_modules").update(fullRow).eq("id", existingId)
+      if (error) {
+        await client
+          .from("superadmin_modules")
+          .update({
+            name: mod.name,
+            description: mod.description,
+            monthly_cost: mod.monthly_cost,
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingId)
+      }
+    } else {
+      const { error } = await client.from("superadmin_modules").insert({
+        ...fullRow,
+        created_at: new Date().toISOString(),
+      })
+      if (error) {
+        await client.from("superadmin_modules").insert({
+          name: mod.name,
+          description: mod.description,
+          monthly_cost: mod.monthly_cost,
+          is_active: true,
+        })
+      }
+    }
+  }
 }
 
 /**
@@ -244,7 +304,7 @@ export async function ensureDemoTenantPersisted(client: SupabaseClient) {
 }
 
 /**
- * Create a tenant admin: portal record + optional Supabase Auth user bound to company_id.
+ * Create a tenant admin: portal record + Auth user + HR employee (Admin) so login lands on /app.
  */
 export async function createTenantAdminUser(
   client: SupabaseClient,
@@ -262,12 +322,15 @@ export async function createTenantAdminUser(
   const bcrypt = await import("bcrypt")
   const password_hash = await bcrypt.hash(opts.password, 12)
   const role = opts.role || "admin"
+  const email = opts.email.trim().toLowerCase()
+  const isPortalAdmin = role === "owner" || role === "admin"
+  const now = new Date().toISOString()
 
   const { data: portalUser, error } = await client
     .from("superadmin_tenant_users")
     .insert({
       tenant_id: opts.tenantId,
-      email: opts.email.trim().toLowerCase(),
+      email,
       password_hash,
       first_name: opts.firstName,
       last_name: opts.lastName,
@@ -282,9 +345,12 @@ export async function createTenantAdminUser(
   }
 
   let authUserId: string | null = null
+  let employeeId: string | null = null
+  const warnings: string[] = []
+
   if (opts.createAuthUser !== false) {
     const { data: authData, error: authError } = await client.auth.admin.createUser({
-      email: opts.email.trim().toLowerCase(),
+      email,
       password: opts.password,
       email_confirm: true,
       user_metadata: {
@@ -292,32 +358,33 @@ export async function createTenantAdminUser(
         first_name: opts.firstName,
         last_name: opts.lastName,
         role,
+        portal_role: role,
+        portal: isPortalAdmin ? "admin" : "employee",
         tenant_id: opts.tenantId,
       },
       app_metadata: {
         company_id: opts.companyId,
         tenant_id: opts.tenantId,
+        role,
+        portal_role: role,
+        portal: isPortalAdmin ? "admin" : "employee",
       },
     })
 
     if (authError) {
-      // Portal user already created — surface warning but keep portal record
-      return {
-        user: portalUser,
-        authUserId: null,
-        warning: `Tenant admin saved in portal, but Auth user failed: ${authError.message}`,
-      }
+      warnings.push(`Auth user failed: ${authError.message}`)
+    } else {
+      authUserId = authData.user?.id || null
     }
 
-    authUserId = authData.user?.id || null
     if (authUserId && opts.companyId) {
       try {
         await client.from("users").upsert(
           {
             id: authUserId,
-            email: opts.email.trim().toLowerCase(),
+            email,
             company_id: opts.companyId,
-            updated_at: new Date().toISOString(),
+            updated_at: now,
           },
           { onConflict: "id" },
         )
@@ -327,5 +394,111 @@ export async function createTenantAdminUser(
     }
   }
 
-  return { user: portalUser, authUserId, warning: null as string | null }
+  // Create an HR employee row so admin login heuristics + employee form work.
+  if (opts.companyId && isPortalAdmin) {
+    const employeeCode = `ADM-${Date.now().toString(36).toUpperCase().slice(-6)}`
+    const fullName = `${opts.firstName} ${opts.lastName}`.trim()
+    const empPayload: Record<string, unknown> = {
+      company_id: opts.companyId,
+      employee_id: employeeCode,
+      first_name: opts.firstName,
+      last_name: opts.lastName,
+      full_name: fullName,
+      display_name: fullName,
+      corporate_email: email,
+      personal_email: email,
+      phone: "0000000000",
+      position: role === "owner" ? "System Administrator" : "Administrator",
+      department: "Administration",
+      division: "Head Office",
+      location: "",
+      special_role: "Admin",
+      status: "Active",
+      contract_type: "Permanent",
+      date_of_joining: now.slice(0, 10),
+      created_at: now,
+      updated_at: now,
+    }
+
+    let createdEmp: any = null
+    let empErr: any = null
+    ;({ data: createdEmp, error: empErr } = await client
+      .from("employees")
+      .insert(empPayload)
+      .select("id")
+      .single())
+
+    if (empErr) {
+      // Minimal insert for stricter schemas
+      ;({ data: createdEmp, error: empErr } = await client
+        .from("employees")
+        .insert({
+          company_id: opts.companyId,
+          employee_id: employeeCode,
+          first_name: opts.firstName,
+          last_name: opts.lastName,
+          full_name: fullName,
+          display_name: fullName,
+          corporate_email: email,
+          personal_email: email,
+          phone: "0000000000",
+          position: "Administrator",
+          department: "Administration",
+          location: "Head Office",
+          special_role: "Admin",
+          status: "Active",
+          date_of_joining: now.slice(0, 10),
+        })
+        .select("id")
+        .single())
+    }
+
+    if (empErr || !createdEmp?.id) {
+      warnings.push(`Employee row failed: ${empErr?.message || "unknown"}`)
+    } else {
+      employeeId = createdEmp.id
+      if (authUserId) {
+        try {
+          await client.from("employee_profiles").upsert(
+            { id: authUserId, employee_id: employeeId },
+            { onConflict: "id" },
+          )
+        } catch {
+          warnings.push("employee_profiles link skipped")
+        }
+      }
+
+      // Best-effort Administrator role binding
+      try {
+        const { data: adminRole } = await client
+          .from("roles")
+          .select("id")
+          .eq("company_id", opts.companyId)
+          .or("code.eq.administrator,name.ilike.Administrator")
+          .limit(1)
+          .maybeSingle()
+
+        if (adminRole?.id && authUserId) {
+          await client.from("user_roles").upsert(
+            {
+              user_id: authUserId,
+              role_id: adminRole.id,
+              company_id: opts.companyId,
+              employee_id: employeeId,
+            },
+            { onConflict: "user_id,role_id" },
+          )
+        }
+      } catch {
+        // roles optional
+      }
+    }
+  }
+
+  return {
+    user: portalUser,
+    authUserId,
+    employeeId,
+    warning: warnings.length ? warnings.join("; ") : null,
+  }
 }

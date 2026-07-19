@@ -109,8 +109,13 @@ export default function SuperadminLoginPage() {
           <h2 className="text-xl font-semibold text-white mb-6 text-center">System Access</h2>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
+            <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
               {error}
+            </div>
+          )}
+          {info && (
+            <div className="mb-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-sm text-emerald-300">
+              {info}
             </div>
           )}
 
@@ -187,9 +192,18 @@ export default function SuperadminLoginPage() {
             </button>
           </form>
 
+          <button
+            type="button"
+            onClick={repairSeedAccount}
+            disabled={repairing || loading}
+            className="w-full mt-3 px-4 py-2.5 text-sm border border-slate-600 text-slate-300 hover:bg-slate-700/40 rounded-lg transition disabled:opacity-50"
+          >
+            {repairing ? 'Repairing seed account…' : 'Repair seed account (admin@akwaabahrpay.com)'}
+          </button>
+
           {/* Footer */}
           <p className="mt-6 text-center text-xs text-slate-500">
-            System Administrator Access Only
+            System Administrator Access Only · Seed: admin@akwaabahrpay.com / Demo@12345
           </p>
         </div>
       </div>
