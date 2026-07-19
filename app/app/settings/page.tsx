@@ -4384,7 +4384,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
       console.error("[v0] Error saving tax reliefs:", error)
       toast({
         title: "Save Failed",
-        description: error instanceof Error ? error.message : "Failed to save tax reliefs. Please try again.",
+        description: settingsErrorMessage(error, "Failed to save tax reliefs. Please try again."),
         variant: "destructive",
       })
     } finally {
@@ -7407,7 +7407,16 @@ Format the response in a professional, actionable manner for HR decision-makers.
               <GhanaTaxSettings companyId={companyData.id} taxYear={new Date().getFullYear()} />
             )}
 
-            {/* Enhanced Tax Reliefs Section */}
+            {/* Enhanced Tax Reliefs Section — catalog only; assign per employee under Payroll */}
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">
+                Catalog of company tax reliefs. Assign them to employees by tax year in{" "}
+                <a href="/app/payroll/tax-reliefs" className="text-blue-600 underline">
+                  Payroll → Tax Reliefs
+                </a>
+                .
+              </p>
+            </div>
             <TaxReliefManager
               onReliefsChange={setTaxReliefs}
               initialReliefs={taxReliefs}
