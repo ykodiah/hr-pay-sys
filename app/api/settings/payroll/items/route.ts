@@ -83,6 +83,12 @@ async function purgeAccidentalSeedCatalog(
   return { allowances, deductions }
 }
 
+/** Legacy tax_reliefs columns are often VARCHAR(20) for codes / short labels. */
+const RELIEF_CODE_MAX = 20
+const RELIEF_NAME_MAX = 150
+const RELIEF_CATEGORY_MAX = 20
+const RELIEF_CURRENCY_MAX = 10
+
 function resolveReliefCode(r: any, index: number) {
   const raw = String(
     r.graCode ||
@@ -92,18 +98,14 @@ function resolveReliefCode(r: any, index: number) {
       r.code ||
       "",
   ).trim()
-  if (raw) return raw.slice(0, 50)
-  const fromName = String(r.name || "relief")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40)
-  return (fromName || "CUSTOM") + `-${index + 1}`
+  if (raw) return raw.slice(0, RELIEF_CODE_MAX)
+  // Keep generated codes short for VARCHAR(20) schemas: CUSTOM-1 … CUSTOM-99
+  return `CUSTOM-${index + 1}`.slice(0, RELIEF_CODE_MAX)
 }
 
 function resolveReliefName(r: any) {
   const name = String(r.name || r.relief_name || r.reliefName || r.description || "Tax relief").trim()
-  return (name || "Tax relief").slice(0, 150)
+  return (name || "Tax relief").slice(0, RELIEF_NAME_MAX)
 }
 
 function normalizeReliefPayload(reliefs: any[], companyId: string, now: string) {
@@ -283,8 +285,14 @@ async function loadTaxReliefsJsonBackup(service: any, companyId: string): Promis
 }
 
 function withRequiredReliefFields(row: Record<string, any>, companyId: string, now: string) {
-  const code = String(row.relief_code || row.gra_code || row.code || "CUSTOM").trim() || "CUSTOM"
-  const reliefName = String(row.relief_name || row.name || "Tax relief").trim().slice(0, 150) || "Tax relief"
+  const code =
+    String(row.relief_code || row.gra_code || row.code || "CUSTOM")
+      .trim()
+      .slice(0, RELIEF_CODE_MAX) || "CUSTOM"
+  const fullName = String(row.relief_name || row.name || "Tax relief").trim() || "Tax relief"
+  // Legacy live schemas use VARCHAR(20) for name/relief_name/code — truncate for inserts.
+  // Full names remain in company_settings JSON backup and are merged back on GET.
+  const reliefName = fullName.slice(0, RELIEF_CODE_MAX)
   const amount = Number(row.amount ?? row.annual_amount ?? 0)
   const out: Record<string, any> = {
     company_id: companyId,
@@ -299,11 +307,48 @@ function withRequiredReliefFields(row: Record<string, any>, companyId: string, n
     updated_at: now,
     last_updated: row.last_updated || now,
   }
-  if (row.description != null && row.description !== "") out.description = String(row.description)
-  if (row.currency) out.currency = String(row.currency)
-  if (row.category) out.category = String(row.category)
+  // Keep description short too — some legacy schemas use VARCHAR(20) on many text cols.
+  // Full name/description live in company_settings JSON and are merged on GET.
+  out.description = fullName.slice(0, RELIEF_CODE_MAX)
+  if (row.currency) out.currency = String(row.currency).slice(0, RELIEF_CURRENCY_MAX)
+  if (row.category) out.category = String(row.category).slice(0, RELIEF_CATEGORY_MAX)
   if (row.effective_date) out.effective_date = row.effective_date
   return out
+}
+
+/** Truncate string fields to fit character varying(N). Postgres rarely names the column. */
+function applyValueTooLongHint(payload: Record<string, any>, error: any) {
+  const message = String(error?.message || "")
+  const match = message.match(/value too long for type character varying\((\d+)\)/i)
+  if (!match) return null
+  const maxLen = Number(match[1])
+  if (!Number.isFinite(maxLen) || maxLen <= 0) return null
+
+  const next = { ...payload }
+  let changed = false
+  for (const [k, v] of Object.entries(next)) {
+    if (typeof v !== "string") continue
+    // Never truncate UUID / ISO timestamps blindly below usefulness — skip non-text columns
+    if (k === "company_id" || k.endsWith("_at") || k === "effective_date" || k === "last_updated") continue
+    if (v.length > maxLen) {
+      next[k] = v.slice(0, maxLen)
+      changed = true
+    }
+  }
+  // If names were truncated, keep fuller text in description when present and still over limit
+  // was already sliced; ensure name aliases stay in sync
+  if (typeof next.name === "string" && typeof next.relief_name === "string") {
+    const shortest = next.name.length <= next.relief_name.length ? next.name : next.relief_name
+    next.name = shortest
+    next.relief_name = shortest
+  }
+  if (typeof next.relief_code === "string") {
+    const code = next.relief_code.slice(0, Math.min(maxLen, RELIEF_CODE_MAX))
+    next.relief_code = code
+    if ("gra_code" in next) next.gra_code = code
+    if ("code" in next) next.code = code
+  }
+  return changed ? next : null
 }
 
 /** Fill NOT NULL columns reported by Postgres using known aliases. */
@@ -409,7 +454,9 @@ async function upsertTaxReliefRow(
         lastError = error
         if (isMissingRelation(error)) return { ok: false, error }
         const patched =
-          applyNotNullHint(payload, error, full) || applyMissingColumnHint(payload, error)
+          applyNotNullHint(payload, error, full) ||
+          applyMissingColumnHint(payload, error) ||
+          applyValueTooLongHint(payload, error)
         if (patched) {
           payload = patched
           continue
@@ -425,7 +472,9 @@ async function upsertTaxReliefRow(
         lastError = error
         if (isMissingRelation(error)) return { ok: false, error }
         const patched =
-          applyNotNullHint(payload, error, full) || applyMissingColumnHint(payload, error)
+          applyNotNullHint(payload, error, full) ||
+          applyMissingColumnHint(payload, error) ||
+          applyValueTooLongHint(payload, error)
         if (patched) {
           payload = patched
           continue
@@ -578,9 +627,30 @@ export async function GET(req: NextRequest) {
     )
 
     let taxReliefs = (reliefRows || []).map(toUiRelief)
+    const backup = await loadTaxReliefsJsonBackup(service, companyId)
     if (!taxReliefs.length) {
-      const backup = await loadTaxReliefsJsonBackup(service, companyId)
       taxReliefs = backup.map(toUiRelief)
+    } else if (backup.length) {
+      // Restore full names/descriptions from JSON when table cols are VARCHAR(20)-truncated
+      const byCode = new Map(
+        backup.map((b: any) => [
+          String(b.graCode || b.gra_code || b.relief_code || b.code || "")
+            .trim()
+            .toUpperCase(),
+          b,
+        ]),
+      )
+      taxReliefs = taxReliefs.map((r: any) => {
+        const hit = byCode.get(String(r.graCode || "").trim().toUpperCase())
+        if (!hit) return r
+        return {
+          ...r,
+          name: hit.name || r.name,
+          description: hit.description || r.description,
+          category: hit.category || r.category,
+          amount: Number(hit.amount ?? r.amount ?? 0),
+        }
+      })
     }
 
     return NextResponse.json({

@@ -76,7 +76,7 @@ function toEngineItem(row: any, relief?: any) {
   const catalog = relief || row.tax_relief || {}
   return {
     relief_code: catalog.gra_code || catalog.relief_code || catalog.code || catalog.name || "",
-    relief_name: catalog.name || "Tax relief",
+    relief_name: catalog.name || catalog.relief_name || "Tax relief",
     annual_amount: Number(row.override_amount ?? catalog.annual_amount ?? catalog.amount ?? 0),
   }
 }
@@ -137,26 +137,21 @@ async function materializeCatalogFromSettings(service: any, companyId: string): 
 
   const rows = active.map((r: any, index: number) => {
     const amount = Number(r.amount ?? r.annualAmount ?? 0)
-    const reliefName = String(r.name || r.relief_name || r.reliefName || "Tax relief")
-      .trim()
-      .slice(0, 150) || "Tax relief"
+    const fullName =
+      String(r.name || r.relief_name || r.reliefName || "Tax relief").trim() || "Tax relief"
+    // Legacy schemas often use VARCHAR(20) for name/code columns
+    const reliefName = fullName.slice(0, 20)
     const raw = String(r.graCode || r.gra_code || r.reliefCode || r.relief_code || r.code || "").trim()
-    const graCode =
-      raw ||
-      `${reliefName
-        .toUpperCase()
-        .replace(/[^A-Z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, 40) || "CUSTOM"}-${index + 1}`
+    const graCode = (raw || `CUSTOM-${index + 1}`).slice(0, 20)
     return {
       company_id: companyId,
       name: reliefName,
       relief_name: reliefName,
-      description: r.description || "",
+      description: String(r.description || fullName),
       amount,
       annual_amount: amount,
-      currency: r.currency || "GHS",
-      category: r.category || "Personal",
+      currency: String(r.currency || "GHS").slice(0, 10),
+      category: String(r.category || "Personal").slice(0, 20),
       gra_code: graCode,
       relief_code: graCode,
       code: graCode,
@@ -198,6 +193,22 @@ async function materializeCatalogFromSettings(service: any, companyId: string): 
     const { error } = await service.from("tax_reliefs").insert(payload)
     if (!error) break
     if (isMissingRelation(error)) return []
+    // Truncate strings if a VARCHAR(N) limit was hit
+    const tooLong = String(error?.message || "").match(/character varying\((\d+)\)/i)
+    if (tooLong) {
+      const maxLen = Number(tooLong[1])
+      const trimmed = payload.map((row: any) => {
+        const next: Record<string, any> = { ...row }
+        for (const [k, v] of Object.entries(next)) {
+          if (typeof v === "string" && v.length > maxLen && k !== "company_id" && !k.endsWith("_at")) {
+            next[k] = v.slice(0, maxLen)
+          }
+        }
+        return next
+      })
+      const { error: retryErr } = await service.from("tax_reliefs").insert(trimmed)
+      if (!retryErr) break
+    }
   }
 
   const { data: refreshed } = await service
