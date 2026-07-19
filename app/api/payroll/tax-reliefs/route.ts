@@ -24,7 +24,7 @@ function mapCatalogRow(r: any) {
   const annual = Number(r.annual_amount ?? r.amount ?? 0)
   return {
     id: r.id,
-    name: r.name || "Untitled relief",
+    name: r.name || r.relief_name || "Untitled relief",
     description: r.description || "",
     amount: annual,
     annualAmount: annual,
@@ -56,7 +56,7 @@ function mapAssignment(row: any, relief?: any, employee?: any) {
     documentSize: Number(row.document_size || 0),
     vaultDocumentId: row.vault_document_id || null,
     notes: row.notes || "",
-    reliefName: catalog.name || "",
+    reliefName: catalog.name || catalog.relief_name || "",
     reliefCode: catalog.gra_code || catalog.relief_code || catalog.code || "",
     category: catalog.category || "Personal",
     employeeName:
@@ -137,17 +137,21 @@ async function materializeCatalogFromSettings(service: any, companyId: string): 
 
   const rows = active.map((r: any, index: number) => {
     const amount = Number(r.amount ?? r.annualAmount ?? 0)
+    const reliefName = String(r.name || r.relief_name || r.reliefName || "Tax relief")
+      .trim()
+      .slice(0, 150) || "Tax relief"
     const raw = String(r.graCode || r.gra_code || r.reliefCode || r.relief_code || r.code || "").trim()
     const graCode =
       raw ||
-      `${String(r.name || "relief")
+      `${reliefName
         .toUpperCase()
         .replace(/[^A-Z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "")
         .slice(0, 40) || "CUSTOM"}-${index + 1}`
     return {
       company_id: companyId,
-      name: String(r.name).slice(0, 150),
+      name: reliefName,
+      relief_name: reliefName,
       description: r.description || "",
       amount,
       annual_amount: amount,
@@ -162,13 +166,14 @@ async function materializeCatalogFromSettings(service: any, companyId: string): 
     }
   })
 
-  // Insert best-effort — never strip relief_code (legacy schemas enforce NOT NULL)
+  // Insert best-effort — never strip relief_code / relief_name (legacy NOT NULL cols)
   const attempts = [
     rows,
     rows.map(({ annual_amount, currency, category, description, code, ...r }) => r),
     rows.map((r) => ({
       company_id: companyId,
       name: r.name,
+      relief_name: r.relief_name,
       amount: r.amount,
       gra_code: r.gra_code,
       relief_code: r.relief_code,
@@ -179,6 +184,7 @@ async function materializeCatalogFromSettings(service: any, companyId: string): 
     })),
     rows.map((r) => ({
       company_id: companyId,
+      relief_name: r.relief_name,
       name: r.name,
       amount: r.amount,
       relief_code: r.relief_code,

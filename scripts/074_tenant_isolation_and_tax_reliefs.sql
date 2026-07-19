@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS public.tax_reliefs (
 
 ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS company_id UUID;
 ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS name TEXT;
+ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS relief_name TEXT;
 ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS description TEXT;
 ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS amount NUMERIC DEFAULT 0;
 ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS annual_amount NUMERIC DEFAULT 0;

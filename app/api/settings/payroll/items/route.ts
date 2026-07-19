@@ -101,16 +101,24 @@ function resolveReliefCode(r: any, index: number) {
   return (fromName || "CUSTOM") + `-${index + 1}`
 }
 
+function resolveReliefName(r: any) {
+  const name = String(r.name || r.relief_name || r.reliefName || r.description || "Tax relief").trim()
+  return (name || "Tax relief").slice(0, 150)
+}
+
 function normalizeReliefPayload(reliefs: any[], companyId: string, now: string) {
   return reliefs
-    .filter((r: any) => r?.name)
+    .filter((r: any) => r?.name || r?.relief_name || r?.reliefName)
     .map((r: any, index: number) => {
       const amount = Number(r.amount ?? r.annualAmount ?? 0)
       const graCode = resolveReliefCode(r, index)
+      const reliefName = resolveReliefName(r)
       const effective = r.effectiveDate || r.effective_date || null
       return {
         company_id: companyId,
-        name: String(r.name).slice(0, 150),
+        name: reliefName,
+        // Legacy schemas use relief_name (NOT NULL) instead of / in addition to name
+        relief_name: reliefName,
         description: r.description ? String(r.description) : "",
         amount,
         annual_amount: amount,
@@ -130,7 +138,15 @@ function normalizeReliefPayload(reliefs: any[], companyId: string, now: string) 
 function toUiRelief(r: any) {
   return {
     id: r.id,
-    name: r.name || r.description || r.gra_code || r.code || r.graCode || "Untitled relief",
+    name:
+      r.name ||
+      r.relief_name ||
+      r.reliefName ||
+      r.description ||
+      r.gra_code ||
+      r.code ||
+      r.graCode ||
+      "Untitled relief",
     description: r.description || "",
     amount: Number(r.annual_amount ?? r.amount ?? 0),
     currency: r.currency || "GHS",
@@ -266,27 +282,78 @@ async function loadTaxReliefsJsonBackup(service: any, companyId: string): Promis
   return []
 }
 
-function withRequiredReliefCodes(row: Record<string, any>, companyId: string, now: string) {
+function withRequiredReliefFields(row: Record<string, any>, companyId: string, now: string) {
   const code = String(row.relief_code || row.gra_code || row.code || "CUSTOM").trim() || "CUSTOM"
+  const reliefName = String(row.relief_name || row.name || "Tax relief").trim().slice(0, 150) || "Tax relief"
+  const amount = Number(row.amount ?? row.annual_amount ?? 0)
   const out: Record<string, any> = {
     company_id: companyId,
-    name: String(row.name || "Tax relief").slice(0, 150),
-    amount: Number(row.amount ?? row.annual_amount ?? 0),
+    name: reliefName,
+    relief_name: reliefName,
+    amount,
+    annual_amount: Number(row.annual_amount ?? amount),
     gra_code: code,
     relief_code: code,
     code,
     is_active: true,
     updated_at: now,
+    last_updated: row.last_updated || now,
   }
   if (row.description != null && row.description !== "") out.description = String(row.description)
-  if (row.annual_amount != null) out.annual_amount = Number(row.annual_amount)
-  else out.annual_amount = out.amount
   if (row.currency) out.currency = String(row.currency)
   if (row.category) out.category = String(row.category)
   if (row.effective_date) out.effective_date = row.effective_date
-  if (row.last_updated) out.last_updated = row.last_updated
-  else out.last_updated = now
   return out
+}
+
+/** Fill NOT NULL columns reported by Postgres using known aliases. */
+function applyNotNullHint(payload: Record<string, any>, error: any, full: Record<string, any>) {
+  const message = String(error?.message || "")
+  const match = message.match(/null value in column "([^"]+)"/i)
+  if (!match) return null
+  const col = match[1]
+  if (payload[col] != null && payload[col] !== "") return null
+
+  const next = { ...payload }
+  if (col === "relief_name" || col === "name") {
+    next[col] = full.relief_name || full.name || "Tax relief"
+  } else if (col === "relief_code" || col === "gra_code" || col === "code") {
+    next[col] = full.relief_code || full.gra_code || full.code || "CUSTOM"
+  } else if (col === "amount" || col === "annual_amount") {
+    next[col] = Number(full.amount ?? full.annual_amount ?? 0)
+  } else if (col === "company_id") {
+    next.company_id = full.company_id
+  } else if (full[col] != null) {
+    next[col] = full[col]
+  } else {
+    // Last resort: non-null placeholder for unknown text NOT NULL cols
+    next[col] = full.relief_name || full.relief_code || "Tax relief"
+  }
+  return next
+}
+
+/** Drop columns PostgREST/schema-cache does not know about, keep aliases. */
+function applyMissingColumnHint(payload: Record<string, any>, error: any) {
+  if (!isMissingColumn(error)) return null
+  const message = String(error?.message || "")
+  const match =
+    message.match(/could not find the ['"]([^'"]+)['"] column/i) ||
+    message.match(/column ['"]([^'"]+)['"] of relation/i) ||
+    message.match(/column "([^"]+)" does not exist/i)
+  if (!match) return null
+  const col = match[1]
+  if (!(col in payload)) return null
+  const next = { ...payload }
+  delete next[col]
+  // Ensure at least one name + one code alias remains after stripping
+  if (!("name" in next) && !("relief_name" in next)) {
+    next.relief_name = payload.relief_name || payload.name || "Tax relief"
+    next.name = next.relief_name
+  }
+  if (!("relief_code" in next) && !("gra_code" in next) && !("code" in next)) {
+    next.relief_code = payload.relief_code || payload.gra_code || payload.code || "CUSTOM"
+  }
+  return next
 }
 
 async function upsertTaxReliefRow(
@@ -296,15 +363,16 @@ async function upsertTaxReliefRow(
   existingId: string | undefined,
   now: string,
 ): Promise<{ ok: boolean; id?: string; error?: any }> {
-  const full = withRequiredReliefCodes(row, companyId, now)
+  const full = withRequiredReliefFields(row, companyId, now)
 
-  // Progressive column strip — never drop relief_code / gra_code / code
+  // Progressive column strip — never drop name/relief_name or code aliases
   const attempts = [
     full,
     (({ effective_date, last_updated, annual_amount, currency, category, description, ...r }) => r)(full),
     {
       company_id: companyId,
       name: full.name,
+      relief_name: full.relief_name,
       amount: full.amount,
       gra_code: full.gra_code,
       relief_code: full.relief_code,
@@ -315,50 +383,59 @@ async function upsertTaxReliefRow(
     {
       company_id: companyId,
       name: full.name,
+      relief_name: full.relief_name,
       amount: full.amount,
       relief_code: full.relief_code,
+      is_active: true,
+      updated_at: now,
+    },
+    {
+      company_id: companyId,
+      relief_name: full.relief_name,
+      relief_code: full.relief_code,
+      amount: full.amount,
       is_active: true,
       updated_at: now,
     },
   ]
 
   let lastError: any = null
-  for (const payload of attempts) {
-    if (existingId) {
-      const { error } = await service.from("tax_reliefs").update(payload).eq("id", existingId).eq("company_id", companyId)
-      if (!error) return { ok: true, id: existingId }
-      lastError = error
-      if (isMissingRelation(error)) return { ok: false, error }
-    } else {
-      const { data, error } = await service
-        .from("tax_reliefs")
-        .insert({ ...payload, created_at: now })
-        .select("id")
-        .maybeSingle()
-      if (!error) return { ok: true, id: data?.id }
-      lastError = error
-      if (isMissingRelation(error)) return { ok: false, error }
+  for (let attempt of attempts) {
+    let payload = { ...attempt }
+    for (let retry = 0; retry < 6; retry++) {
+      if (existingId) {
+        const { error } = await service.from("tax_reliefs").update(payload).eq("id", existingId).eq("company_id", companyId)
+        if (!error) return { ok: true, id: existingId }
+        lastError = error
+        if (isMissingRelation(error)) return { ok: false, error }
+        const patched =
+          applyNotNullHint(payload, error, full) || applyMissingColumnHint(payload, error)
+        if (patched) {
+          payload = patched
+          continue
+        }
+        break
+      } else {
+        const { data, error } = await service
+          .from("tax_reliefs")
+          .insert({ ...payload, created_at: now })
+          .select("id")
+          .maybeSingle()
+        if (!error) return { ok: true, id: data?.id }
+        lastError = error
+        if (isMissingRelation(error)) return { ok: false, error }
+        const patched =
+          applyNotNullHint(payload, error, full) || applyMissingColumnHint(payload, error)
+        if (patched) {
+          payload = patched
+          continue
+        }
+        break
+      }
     }
   }
 
-  // Final attempt with absolute minimum NOT NULL fields
-  const minimal = {
-    company_id: companyId,
-    name: full.name,
-    relief_code: full.relief_code,
-    is_active: true,
-    updated_at: now,
-  }
-  if (existingId) {
-    const { error } = await service.from("tax_reliefs").update(minimal).eq("id", existingId).eq("company_id", companyId)
-    return error ? { ok: false, error } : { ok: true, id: existingId }
-  }
-  const { data, error } = await service
-    .from("tax_reliefs")
-    .insert({ ...minimal, created_at: now })
-    .select("id")
-    .maybeSingle()
-  return error ? { ok: false, error: error || lastError } : { ok: true, id: data?.id }
+  return { ok: false, error: lastError }
 }
 
 async function syncTaxReliefsTable(
