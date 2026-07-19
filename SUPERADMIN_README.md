@@ -12,14 +12,21 @@ The SuperAdmin Portal is a comprehensive enterprise-grade multi-tenant managemen
 
 ### Login Credentials
 ```
-Email: admin@superadmin.local
+Email: admin@akwaabahrpay.com
 Password: Demo@12345
 ```
+
+Change the password after login under **Settings → Change Superadmin Password**.
 
 ### Access Portal
 ```
 http://localhost:3000/superadmin/login
 ```
+
+### Tenant provisioning notes
+- Creating a tenant provisions a **blank** `companies` + `company_settings` row (no employees, payroll, or demo seed data).
+- The **Akwaaba Demo** tenant is auto-persisted into the portal on Tenants list load (slug `akwaaba-demo`).
+- Tenant detail tabs: Overview · Admins · Employees · Assign Tenant · Modules.
 
 ---
 

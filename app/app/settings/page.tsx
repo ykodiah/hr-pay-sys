@@ -1377,17 +1377,20 @@ export default function SettingsPage() {
 
   const persistCompanySettings = async (overrides: Record<string, unknown> = {}) => {
     // Allow empty company_id — API creates the company and binds the user on first save.
-    const companyId = ((overrides.company_id as string) || companyData.id || "").trim()
+    const rawCompanyId = String(
+      (overrides.company_id as string) || companyData.id || "",
+    ).trim()
     const usableCompanyId =
-      companyId && !companyId.startsWith("demo-") ? companyId : undefined
+      rawCompanyId && !rawCompanyId.startsWith("demo-") ? rawCompanyId : undefined
 
     const logoCandidate =
       (overrides.logo_url as string | null | undefined) ??
       (isPlaceholderLogo(companyLogoPreview) ? null : companyLogoPreview) ??
       (isPlaceholderLogo(companyData.logo_url) ? null : companyData.logo_url)
 
-    const payload = {
-      ...(usableCompanyId ? { company_id: usableCompanyId } : {}),
+    const { company_id: _ignoredCompanyId, ...safeOverrides } = overrides
+
+    const payload: Record<string, unknown> = {
       name: companyData.name,
       industry: companyData.industry,
       tax_id: companyData.tax_id,
@@ -1399,10 +1402,10 @@ export default function SettingsPage() {
       departments,
       locations,
       logo_url: logoCandidate,
-      ...overrides,
+      ...safeOverrides,
     }
-    if (!usableCompanyId) {
-      delete (payload as any).company_id
+    if (usableCompanyId) {
+      payload.company_id = usableCompanyId
     }
 
     const result = await settingsFetch("/api/settings/company", {

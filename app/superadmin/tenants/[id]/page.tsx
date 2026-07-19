@@ -1,9 +1,24 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
+import { useCallback, useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  ArrowLeft,
+  Building2,
+  UserPlus,
+  Users,
+  UserCog,
+  Link2,
+  Power,
+  Save,
+  Loader2,
+} from 'lucide-react'
+
+type Tab = 'overview' | 'admins' | 'employees' | 'assign' | 'modules'
 
 interface TenantDetail {
   id: string
@@ -13,6 +28,7 @@ interface TenantDetail {
   plan: string
   subscription_status: string
   description: string
+  company_id: string | null
   created_at: string
   updated_at: string
 }
@@ -27,358 +43,800 @@ interface TenantUser {
   created_at: string
 }
 
-interface TenantModule {
+interface EmployeeRow {
   id: string
-  module_id: string
-  status: string
-  enabled_at: string
-  superadmin_modules?: { name: string; monthly_cost: number }
+  employee_id?: string
+  first_name: string
+  last_name: string
+  corporate_email?: string
+  personal_email?: string
+  email?: string
+  position?: string
+  department?: string
+  status?: string
+  company_id?: string
 }
+
+interface CompanyRow {
+  id: string
+  name: string
+  email_address?: string
+  linked_tenant?: { id: string; name: string } | null
+}
+
+const TABS: { id: Tab; label: string; icon: typeof Building2 }[] = [
+  { id: 'overview', label: 'Overview', icon: Building2 },
+  { id: 'admins', label: 'Admins', icon: UserCog },
+  { id: 'employees', label: 'Employees', icon: Users },
+  { id: 'assign', label: 'Assign Tenant', icon: Link2 },
+  { id: 'modules', label: 'Modules', icon: Power },
+]
 
 export default function TenantDetailPage() {
   const params = useParams()
-  const router = useRouter()
   const tenantId = params.id as string
 
   const [tenant, setTenant] = useState<TenantDetail | null>(null)
   const [users, setUsers] = useState<TenantUser[]>([])
-  const [modules, setModules] = useState<TenantModule[]>([])
+  const [employees, setEmployees] = useState<EmployeeRow[]>([])
+  const [modules, setModules] = useState<any[]>([])
+  const [companies, setCompanies] = useState<CompanyRow[]>([])
+  const [unassigned, setUnassigned] = useState<EmployeeRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [editing, setEditing] = useState(false)
-  const [editForm, setEditForm] = useState({ name: '', status: '', plan: '' })
+  const [editForm, setEditForm] = useState({ name: '', status: '', plan: '', description: '' })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [busy, setBusy] = useState(false)
 
-  useEffect(() => {
-    fetchTenantDetails()
-  }, [tenantId])
+  const [adminForm, setAdminForm] = useState({
+    email: '',
+    password: '',
+    first_name: '',
+    last_name: '',
+    role: 'admin',
+  })
 
-  const fetchTenantDetails = async () => {
+  const [empForm, setEmpForm] = useState({
+    first_name: '',
+    last_name: '',
+    corporate_email: '',
+    position: '',
+    department: '',
+  })
+
+  const [assignCompanyId, setAssignCompanyId] = useState('')
+  const [selectedUnassigned, setSelectedUnassigned] = useState<Record<string, boolean>>({})
+
+  const fetchTenantDetails = useCallback(async () => {
     try {
       setLoading(true)
-      const res = await fetch(`/api/superadmin/tenants/${tenantId}`)
+      const res = await fetch(`/api/superadmin/tenants/${tenantId}`, { credentials: 'include' })
       if (!res.ok) throw new Error('Failed to fetch tenant')
       const data = await res.json()
       setTenant(data.tenant)
       setUsers(data.users || [])
+      setEmployees(data.employees || [])
       setModules(data.modules || [])
       setEditForm({
         name: data.tenant.name,
         status: data.tenant.status,
         plan: data.tenant.plan,
+        description: data.tenant.description || '',
       })
+      setAssignCompanyId(data.tenant.company_id || '')
     } catch (err) {
-      setError('Failed to load tenant details')
+      setError(err instanceof Error ? err.message : 'Failed to load tenant details')
     } finally {
       setLoading(false)
+    }
+  }, [tenantId])
+
+  useEffect(() => {
+    fetchTenantDetails()
+  }, [fetchTenantDetails])
+
+  useEffect(() => {
+    if (activeTab !== 'assign') return
+    ;(async () => {
+      const [cRes, uRes] = await Promise.all([
+        fetch('/api/superadmin/companies', { credentials: 'include' }),
+        fetch(`/api/superadmin/tenants/${tenantId}/employees?unassigned=true`, {
+          credentials: 'include',
+        }),
+      ])
+      if (cRes.ok) {
+        const d = await cRes.json()
+        setCompanies(d.companies || [])
+      }
+      if (uRes.ok) {
+        const d = await uRes.json()
+        setUnassigned(d.employees || [])
+      }
+    })()
+  }, [activeTab, tenantId])
+
+  const flash = (msg: string, isError = false) => {
+    if (isError) {
+      setError(msg)
+      setSuccess('')
+    } else {
+      setSuccess(msg)
+      setError('')
     }
   }
 
   const handleSaveChanges = async () => {
     try {
-      setError('')
+      setBusy(true)
       const res = await fetch(`/api/superadmin/tenants/${tenantId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(editForm),
       })
-
-      if (!res.ok) throw new Error('Failed to update tenant')
-      setSuccess('Tenant updated successfully!')
+      if (!res.ok) {
+        const d = await res.json()
+        throw new Error(d.error || 'Failed to update tenant')
+      }
+      flash('Tenant updated successfully')
       setEditing(false)
       fetchTenantDetails()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update')
+      flash(err instanceof Error ? err.message : 'Failed to update', true)
+    } finally {
+      setBusy(false)
     }
   }
 
-  const handleDeleteTenant = async () => {
-    if (!confirm('Are you sure you want to delete this tenant? This action cannot be undone.')) {
+  const handleDeactivate = async () => {
+    if (!confirm('Deactivate this tenant? Users will lose access until reactivated.')) return
+    try {
+      setBusy(true)
+      const res = await fetch(`/api/superadmin/tenants/${tenantId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: tenant?.status === 'active' ? 'deactivate' : 'activate' }),
+      })
+      if (!res.ok) throw new Error('Failed to update status')
+      flash(tenant?.status === 'active' ? 'Tenant deactivated' : 'Tenant reactivated')
+      fetchTenantDetails()
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Failed', true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleAddAdmin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      setBusy(true)
+      const res = await fetch(`/api/superadmin/tenants/${tenantId}/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(adminForm),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error || 'Failed to add admin')
+      flash(d.warning || 'Tenant admin created and bound to this company')
+      setAdminForm({ email: '', password: '', first_name: '', last_name: '', role: 'admin' })
+      fetchTenantDetails()
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Failed', true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const toggleAdminStatus = async (userId: string, status: string) => {
+    try {
+      setBusy(true)
+      const res = await fetch(`/api/superadmin/tenants/${tenantId}/users`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          user_id: userId,
+          action: status === 'active' ? 'deactivate' : 'activate',
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to update admin')
+      fetchTenantDetails()
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Failed', true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleCreateEmployee = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      setBusy(true)
+      const res = await fetch(`/api/superadmin/tenants/${tenantId}/employees`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(empForm),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error || 'Failed to create employee')
+      flash('Employee created and assigned to this tenant')
+      setEmpForm({ first_name: '', last_name: '', corporate_email: '', position: '', department: '' })
+      fetchTenantDetails()
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Failed', true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleAssignCompany = async () => {
+    if (!assignCompanyId) {
+      flash('Select a company to assign', true)
       return
     }
-
     try {
+      setBusy(true)
       const res = await fetch(`/api/superadmin/tenants/${tenantId}`, {
-        method: 'DELETE',
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ company_id: assignCompanyId }),
       })
-      if (!res.ok) throw new Error('Failed to delete tenant')
-      router.push('/superadmin/tenants')
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error || 'Failed to assign company')
+      flash('Company assigned to tenant')
+      fetchTenantDetails()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete')
+      flash(err instanceof Error ? err.message : 'Failed', true)
+    } finally {
+      setBusy(false)
     }
   }
 
-  if (loading) return <div className="text-center py-8">Loading...</div>
-  if (!tenant) return <div className="text-center py-8 text-red-600">Tenant not found</div>
+  const handleAssignEmployees = async () => {
+    const ids = Object.entries(selectedUnassigned)
+      .filter(([, v]) => v)
+      .map(([k]) => k)
+    if (!ids.length) {
+      flash('Select at least one employee', true)
+      return
+    }
+    try {
+      setBusy(true)
+      const res = await fetch(`/api/superadmin/tenants/${tenantId}/employees`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'assign', employee_ids: ids }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error || 'Failed to assign employees')
+      flash(`Assigned ${ids.length} employee(s) to this tenant`)
+      setSelectedUnassigned({})
+      fetchTenantDetails()
+      setActiveTab('employees')
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Failed', true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16 text-slate-500 text-sm gap-2">
+        <Loader2 className="w-4 h-4 animate-spin" /> Loading tenant...
+      </div>
+    )
+  }
+  if (!tenant) {
+    return <div className="text-center py-8 text-red-600">Tenant not found</div>
+  }
 
   const calculatedCost = modules.reduce(
-    (sum, m) => sum + ((m.superadmin_modules?.monthly_cost || 0) * 1),
-    0
+    (sum, m) => sum + (m.superadmin_modules?.monthly_cost || 0),
+    0,
   )
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <Link href="/superadmin/tenants" className="text-blue-600 hover:text-blue-700 text-sm">
-            ← Back to Tenants
+          <Link
+            href="/superadmin/tenants"
+            className="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-800 text-sm"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" /> Back to Tenants
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900 mt-2">{tenant.name}</h1>
-          <p className="text-gray-600 mt-1">{tenant.slug}</p>
+          <h1 className="text-2xl font-bold text-slate-900 mt-2">{tenant.name}</h1>
+          <p className="text-slate-500 text-sm mt-0.5 font-mono">{tenant.slug}</p>
+          <div className="flex flex-wrap gap-2 mt-2">
+            <span
+              className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
+                tenant.status === 'active'
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {tenant.status}
+            </span>
+            <span className="px-2 py-0.5 rounded-full text-xs font-medium capitalize bg-blue-100 text-blue-700">
+              {tenant.plan}
+            </span>
+            {tenant.company_id && (
+              <span className="px-2 py-0.5 rounded-full text-xs font-mono bg-slate-100 text-slate-600">
+                company {tenant.company_id.slice(0, 8)}…
+              </span>
+            )}
+          </div>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           {!editing && (
             <>
-              <Button onClick={() => setEditing(true)} variant="outline">
+              <Button onClick={() => setEditing(true)} variant="outline" size="sm">
                 Edit
               </Button>
               <Button
-                onClick={handleDeleteTenant}
-                className="bg-red-600 text-white hover:bg-red-700"
+                onClick={handleDeactivate}
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                className={
+                  tenant.status === 'active'
+                    ? 'text-amber-700 border-amber-300 hover:bg-amber-50'
+                    : 'text-emerald-700 border-emerald-300'
+                }
               >
-                Delete
+                {tenant.status === 'active' ? 'Deactivate' : 'Activate'}
               </Button>
             </>
           )}
         </div>
       </div>
 
-      {/* Messages */}
-      {error && <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{error}</div>}
-      {success && <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-700">{success}</div>}
-
-      {/* Edit Mode */}
-      {editing && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
-          <h2 className="font-bold text-lg">Edit Tenant</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-              <input
-                type="text"
-                value={editForm.name}
-                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Plan</label>
-              <select
-                value={editForm.plan}
-                onChange={(e) => setEditForm({ ...editForm, plan: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              >
-                <option value="basic">Basic</option>
-                <option value="professional">Professional</option>
-                <option value="enterprise">Enterprise</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select
-              value={editForm.status}
-              onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            >
-              <option value="active">Active</option>
-              <option value="suspended">Suspended</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-          <div className="flex gap-3 justify-end">
-            <Button onClick={() => setEditing(false)} variant="outline">
-              Cancel
-            </Button>
-            <Button onClick={handleSaveChanges} className="bg-blue-600 text-white hover:bg-blue-700">
-              Save Changes
-            </Button>
-          </div>
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-sm text-emerald-700">
+          {success}
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-4 border-b border-gray-200">
-        {['overview', 'users', 'modules', 'billing'].map((tab) => (
+      {editing && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Edit Tenant</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Name</label>
+                <Input
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Plan</label>
+                <select
+                  value={editForm.plan}
+                  onChange={(e) => setEditForm({ ...editForm, plan: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border rounded-md bg-background"
+                >
+                  <option value="basic">Basic</option>
+                  <option value="pro">Pro</option>
+                  <option value="enterprise">Enterprise</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Status</label>
+                <select
+                  value={editForm.status}
+                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border rounded-md bg-background"
+                >
+                  <option value="active">Active</option>
+                  <option value="suspended">Suspended</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-sm font-medium">Description</label>
+                <Input
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setEditing(false)}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleSaveChanges} disabled={busy}>
+                <Save className="w-3.5 h-3.5 mr-1.5" /> Save Changes
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="flex gap-1 border-b border-slate-200 overflow-x-auto">
+        {TABS.map(({ id, label, icon: Icon }) => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`pb-3 px-4 font-medium text-sm capitalize ${
-              activeTab === tab
-                ? 'border-b-2 border-blue-600 text-blue-600'
-                : 'text-gray-600 hover:text-gray-900'
+            key={id}
+            onClick={() => setActiveTab(id)}
+            className={`inline-flex items-center gap-1.5 pb-3 px-4 text-sm font-medium whitespace-nowrap ${
+              activeTab === id
+                ? 'border-b-2 border-emerald-600 text-emerald-700'
+                : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            {tab}
+            <Icon className="w-3.5 h-3.5" />
+            {label}
           </button>
         ))}
       </div>
 
-      {/* Overview Tab */}
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-2 gap-6">
-          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
-            <h3 className="font-bold text-lg">Subscription Info</h3>
-            <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="pt-5 space-y-3">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Subscription</p>
               <div>
-                <div className="text-sm text-gray-600">Plan</div>
-                <div className="font-semibold text-gray-900 capitalize">{tenant.plan}</div>
+                <p className="text-sm text-slate-500">Plan</p>
+                <p className="font-semibold capitalize">{tenant.plan}</p>
               </div>
               <div>
-                <div className="text-sm text-gray-600">Status</div>
-                <div
-                  className={`font-semibold capitalize ${
-                    tenant.status === 'active' ? 'text-green-600' : 'text-gray-600'
-                  }`}
+                <p className="text-sm text-slate-500">Status</p>
+                <p className="font-semibold capitalize">{tenant.status}</p>
+              </div>
+              <div>
+                <p className="text-sm text-slate-500">Subscription</p>
+                <p className="font-semibold capitalize">{tenant.subscription_status}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-5 space-y-3">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">People</p>
+              <div>
+                <p className="text-sm text-slate-500">Admins</p>
+                <p className="text-2xl font-bold">{users.length}</p>
+              </div>
+              <div>
+                <p className="text-sm text-slate-500">Employees</p>
+                <p className="text-2xl font-bold">{employees.length}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-5 space-y-3">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Dates</p>
+              <div>
+                <p className="text-sm text-slate-500">Created</p>
+                <p className="font-semibold">{new Date(tenant.created_at).toLocaleDateString()}</p>
+              </div>
+              <div>
+                <p className="text-sm text-slate-500">Updated</p>
+                <p className="font-semibold">{new Date(tenant.updated_at).toLocaleDateString()}</p>
+              </div>
+              {tenant.description && (
+                <p className="text-sm text-slate-600 pt-2 border-t">{tenant.description}</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {activeTab === 'admins' && (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <UserPlus className="w-4 h-4" /> Add Tenant Admin
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleAddAdmin} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Input
+                  placeholder="First name"
+                  value={adminForm.first_name}
+                  onChange={(e) => setAdminForm({ ...adminForm, first_name: e.target.value })}
+                  required
+                />
+                <Input
+                  placeholder="Last name"
+                  value={adminForm.last_name}
+                  onChange={(e) => setAdminForm({ ...adminForm, last_name: e.target.value })}
+                  required
+                />
+                <Input
+                  type="email"
+                  placeholder="Email"
+                  value={adminForm.email}
+                  onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
+                  required
+                />
+                <Input
+                  type="password"
+                  placeholder="Temporary password"
+                  value={adminForm.password}
+                  onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
+                  required
+                />
+                <select
+                  value={adminForm.role}
+                  onChange={(e) => setAdminForm({ ...adminForm, role: e.target.value })}
+                  className="px-3 py-2 text-sm border rounded-md bg-background"
                 >
-                  {tenant.status}
+                  <option value="owner">Owner</option>
+                  <option value="admin">Admin</option>
+                  <option value="user">User</option>
+                </select>
+                <div className="flex items-center">
+                  <Button type="submit" size="sm" disabled={busy}>
+                    Create Admin
+                  </Button>
                 </div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-600">Subscription Status</div>
-                <div className="font-semibold text-gray-900 capitalize">
-                  {tenant.subscription_status}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
-            <h3 className="font-bold text-lg">Dates</h3>
-            <div className="space-y-3">
-              <div>
-                <div className="text-sm text-gray-600">Created</div>
-                <div className="font-semibold text-gray-900">
-                  {new Date(tenant.created_at).toLocaleDateString()}
-                </div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-600">Last Updated</div>
-                <div className="font-semibold text-gray-900">
-                  {new Date(tenant.updated_at).toLocaleDateString()}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+              </form>
+              <p className="text-xs text-slate-500 mt-3">
+                Creates a portal admin record and a Supabase Auth login bound to this tenant&apos;s
+                company (empty account — no demo data).
+              </p>
+            </CardContent>
+          </Card>
 
-      {/* Users Tab */}
-      {activeTab === 'users' && (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="font-bold text-lg">Tenant Users</h3>
-          </div>
-          {users.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">No users found</div>
-          ) : (
+          <Card>
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                      Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                      Email
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                      Role
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                      Status
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {users.map((user) => (
-                    <tr key={user.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                        {user.first_name} {user.last_name}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
-                      <td className="px-6 py-4 text-sm capitalize text-gray-900">{user.role}</td>
-                      <td className="px-6 py-4 text-sm">
-                        <span
-                          className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                            user.status === 'active'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}
+              {users.length === 0 ? (
+                <div className="p-8 text-center text-sm text-slate-500">No admins yet</div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-slate-50/60">
+                      {['Name', 'Email', 'Role', 'Status', 'Actions'].map((h) => (
+                        <th
+                          key={h}
+                          className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase"
                         >
-                          {user.status}
-                        </span>
-                      </td>
+                          {h}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y">
+                    {users.map((u) => (
+                      <tr key={u.id}>
+                        <td className="px-4 py-3 font-medium">
+                          {u.first_name} {u.last_name}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{u.email}</td>
+                        <td className="px-4 py-3 capitalize">{u.role}</td>
+                        <td className="px-4 py-3 capitalize">{u.status}</td>
+                        <td className="px-4 py-3">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            onClick={() => toggleAdminStatus(u.id, u.status)}
+                          >
+                            {u.status === 'active' ? 'Deactivate' : 'Activate'}
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
-          )}
+          </Card>
         </div>
       )}
 
-      {/* Modules Tab */}
-      {activeTab === 'modules' && (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="font-bold text-lg">Enabled Modules</h3>
-            <p className="text-gray-600 text-sm mt-1">
-              Monthly cost: GHS {calculatedCost.toFixed(2)}
-            </p>
-          </div>
-          {modules.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">No modules enabled</div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {modules.map((m) => (
-                <div key={m.id} className="p-6 flex justify-between items-center hover:bg-gray-50">
-                  <div>
-                    <div className="font-semibold text-gray-900">
-                      {m.superadmin_modules?.name || 'Unknown Module'}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      Enabled: {new Date(m.enabled_at).toLocaleDateString()}
-                    </div>
+      {activeTab === 'employees' && (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <UserPlus className="w-4 h-4" /> Create Employee for Tenant
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleCreateEmployee} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Input
+                  placeholder="First name"
+                  value={empForm.first_name}
+                  onChange={(e) => setEmpForm({ ...empForm, first_name: e.target.value })}
+                  required
+                />
+                <Input
+                  placeholder="Last name"
+                  value={empForm.last_name}
+                  onChange={(e) => setEmpForm({ ...empForm, last_name: e.target.value })}
+                  required
+                />
+                <Input
+                  type="email"
+                  placeholder="Work email"
+                  value={empForm.corporate_email}
+                  onChange={(e) => setEmpForm({ ...empForm, corporate_email: e.target.value })}
+                />
+                <Input
+                  placeholder="Position"
+                  value={empForm.position}
+                  onChange={(e) => setEmpForm({ ...empForm, position: e.target.value })}
+                />
+                <Input
+                  placeholder="Department"
+                  value={empForm.department}
+                  onChange={(e) => setEmpForm({ ...empForm, department: e.target.value })}
+                />
+                <div className="flex items-center">
+                  <Button type="submit" size="sm" disabled={busy}>
+                    Create Employee
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <div className="overflow-x-auto">
+              {employees.length === 0 ? (
+                <div className="p-8 text-center text-sm text-slate-500">
+                  No employees assigned. New tenants start empty.
+                </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-slate-50/60">
+                      {['Name', 'Email', 'Position', 'Department', 'Status'].map((h) => (
+                        <th
+                          key={h}
+                          className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase"
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {employees.map((e) => (
+                      <tr key={e.id}>
+                        <td className="px-4 py-3 font-medium">
+                          {e.first_name} {e.last_name}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {e.corporate_email || e.email || e.personal_email || '—'}
+                        </td>
+                        <td className="px-4 py-3">{e.position || '—'}</td>
+                        <td className="px-4 py-3">{e.department || '—'}</td>
+                        <td className="px-4 py-3 capitalize">{e.status || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {activeTab === 'assign' && (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Assign Company to Tenant</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-slate-500">
+                Link this portal tenant to an HR <code>companies</code> row. New tenants are
+                auto-provisioned with an empty company; use this to reassign.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <select
+                  value={assignCompanyId}
+                  onChange={(e) => setAssignCompanyId(e.target.value)}
+                  className="flex-1 px-3 py-2 text-sm border rounded-md bg-background"
+                >
+                  <option value="">Select company…</option>
+                  {companies.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                      {c.linked_tenant && c.linked_tenant.id !== tenantId
+                        ? ` (linked: ${c.linked_tenant.name})`
+                        : ''}
+                    </option>
+                  ))}
+                </select>
+                <Button size="sm" onClick={handleAssignCompany} disabled={busy}>
+                  Assign Company
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Assign Unassigned Employees</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {unassigned.length === 0 ? (
+                <p className="text-sm text-slate-500">No unassigned employees available.</p>
+              ) : (
+                <>
+                  <div className="max-h-64 overflow-y-auto border rounded-md divide-y">
+                    {unassigned.map((e) => (
+                      <label
+                        key={e.id}
+                        className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!selectedUnassigned[e.id]}
+                          onChange={(ev) =>
+                            setSelectedUnassigned((prev) => ({
+                              ...prev,
+                              [e.id]: ev.target.checked,
+                            }))
+                          }
+                        />
+                        <span className="font-medium">
+                          {e.first_name} {e.last_name}
+                        </span>
+                        <span className="text-slate-500">
+                          {e.corporate_email || e.email || ''}
+                        </span>
+                      </label>
+                    ))}
                   </div>
-                  <div className="text-right">
-                    <div className="font-bold text-gray-900">
-                      GHS {(m.superadmin_modules?.monthly_cost || 0).toFixed(2)}/mo
+                  <Button size="sm" onClick={handleAssignEmployees} disabled={busy}>
+                    Assign Selected to Tenant
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {activeTab === 'modules' && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Enabled Modules</CardTitle>
+            <p className="text-sm text-slate-500">Monthly cost: GHS {calculatedCost.toFixed(2)}</p>
+          </CardHeader>
+          <CardContent>
+            {modules.length === 0 ? (
+              <p className="text-sm text-slate-500">No modules enabled</p>
+            ) : (
+              <div className="divide-y">
+                {modules.map((m) => (
+                  <div key={m.id} className="py-3 flex justify-between items-center">
+                    <div>
+                      <p className="font-medium">{m.superadmin_modules?.name || 'Module'}</p>
+                      <p className="text-xs text-slate-500">
+                        Enabled {m.enabled_at ? new Date(m.enabled_at).toLocaleDateString() : '—'}
+                      </p>
                     </div>
-                    <span className="text-xs inline-block mt-1 px-2 py-1 bg-green-100 text-green-800 rounded">
-                      {m.status}
+                    <span className="text-sm font-semibold">
+                      GHS {(m.superadmin_modules?.monthly_cost || 0).toFixed(2)}/mo
                     </span>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Billing Tab */}
-      {activeTab === 'billing' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-6">
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <div className="text-gray-600 text-sm font-medium">Current Monthly Cost</div>
-              <div className="text-4xl font-bold text-gray-900 mt-2">GHS {calculatedCost.toFixed(2)}</div>
-              <p className="text-gray-600 text-sm mt-2">{modules.length} modules enabled</p>
-            </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <div className="text-gray-600 text-sm font-medium">Subscription Status</div>
-              <div className={`text-xl font-bold mt-2 capitalize ${
-                tenant.subscription_status === 'active' ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {tenant.subscription_status}
+                ))}
               </div>
-              <Button className="mt-4 w-full bg-blue-600 text-white hover:bg-blue-700">
-                View Billing History
-              </Button>
-            </div>
-          </div>
-        </div>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   )

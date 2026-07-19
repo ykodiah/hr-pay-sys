@@ -149,7 +149,11 @@ export default function SuperadminDashboard() {
             ) : (
               <div className="divide-y divide-border">
                 {recent.map((t) => (
-                  <div key={t.id} className="flex items-center justify-between px-5 py-3">
+                  <Link
+                    key={t.id}
+                    href={`/superadmin/tenants/${t.id}`}
+                    className="flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition-colors"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-semibold text-slate-600 text-xs">
                         {t.name.slice(0, 2).toUpperCase()}
@@ -165,7 +169,7 @@ export default function SuperadminDashboard() {
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${planBadge(t.plan)}`}>{t.plan}</span>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusBadge(t.status)}`}>{t.status}</span>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}
@@ -179,11 +183,11 @@ export default function SuperadminDashboard() {
           </CardHeader>
           <CardContent className="space-y-1.5">
             {[
-              { href: '/superadmin/tenants', label: 'Create new tenant', icon: Building2, color: 'text-emerald-600 bg-emerald-50' },
-              { href: '/superadmin/users', label: 'Add admin user', icon: Users, color: 'text-blue-600 bg-blue-50' },
+              { href: '/superadmin/tenants', label: 'Create / manage tenants', icon: Building2, color: 'text-emerald-600 bg-emerald-50' },
+              { href: '/superadmin/users', label: 'Add portal admin', icon: Users, color: 'text-blue-600 bg-blue-50' },
+              { href: '/superadmin/settings', label: 'Change password / settings', icon: Activity, color: 'text-slate-600 bg-slate-50' },
               { href: '/superadmin/feature-flags', label: 'Manage feature flags', icon: Zap, color: 'text-amber-600 bg-amber-50' },
               { href: '/superadmin/billing', label: 'View billing', icon: CreditCard, color: 'text-violet-600 bg-violet-50' },
-              { href: '/superadmin/audit', label: 'Audit trail', icon: Activity, color: 'text-slate-600 bg-slate-50' },
             ].map(({ href, label, icon: Icon, color }) => (
               <Link
                 key={href}

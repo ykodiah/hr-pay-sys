@@ -104,7 +104,8 @@ export default function SuperadminLoginPage() {
                 required
               />
               <p className="mt-2 text-xs text-slate-400">
-                Demo: Email preset • Enter password to proceed
+                Default password: <span className="text-slate-200 font-mono">Demo@12345</span>
+                {" "}· Change it under Settings after login
               </p>
             </div>
 

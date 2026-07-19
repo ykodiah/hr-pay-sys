@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Settings, Shield, Bell, Database, Globe } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Settings, Shield, Bell, Database, Globe, KeyRound, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -48,6 +48,24 @@ export default function SettingsPage() {
   const [draft, setDraft] = useState('')
   const [saved, setSaved] = useState<string | null>(null)
 
+  const [pw, setPw] = useState({ current: '', next: '', confirm: '' })
+  const [pwBusy, setPwBusy] = useState(false)
+  const [pwMsg, setPwMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [me, setMe] = useState<{ email?: string; firstName?: string; lastName?: string } | null>(null)
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const res = await fetch('/api/superadmin/auth/verify', { credentials: 'include' })
+        if (!res.ok) return
+        const data = await res.json()
+        setMe(data.user || data)
+      } catch {
+        // ignore
+      }
+    })()
+  }, [])
+
   const startEdit = (key: string) => { setEditing(key); setDraft(values[key] ?? '') }
 
   const commitEdit = (key: string) => {
@@ -57,12 +75,106 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(null), 2000)
   }
 
+  const changePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPwMsg(null)
+    if (pw.next !== pw.confirm) {
+      setPwMsg({ type: 'err', text: 'New password confirmation does not match.' })
+      return
+    }
+    try {
+      setPwBusy(true)
+      const res = await fetch('/api/superadmin/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          current_password: pw.current,
+          new_password: pw.next,
+          confirm_password: pw.confirm,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to change password')
+      setPwMsg({ type: 'ok', text: data.message || 'Password updated successfully.' })
+      setPw({ current: '', next: '', confirm: '' })
+    } catch (err) {
+      setPwMsg({ type: 'err', text: err instanceof Error ? err.message : 'Failed to change password' })
+    } finally {
+      setPwBusy(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
-        <p className="text-sm text-slate-500 mt-1">Manage platform configuration and preferences.</p>
+        <p className="text-sm text-slate-500 mt-1">Manage platform configuration, security, and preferences.</p>
       </div>
+
+      <Card className="border-emerald-200">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <KeyRound className="w-4 h-4 text-emerald-600" /> Change Superadmin Password
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Signed in as {me?.email || 'admin@akwaabahrpay.com'}. Default seed password was{' '}
+            <code className="font-mono">Demo@12345</code> — change it here after first login.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={changePassword} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Current password</label>
+              <Input
+                type="password"
+                value={pw.current}
+                onChange={(e) => setPw({ ...pw, current: e.target.value })}
+                required
+                autoComplete="current-password"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">New password</label>
+              <Input
+                type="password"
+                value={pw.next}
+                onChange={(e) => setPw({ ...pw, next: e.target.value })}
+                required
+                minLength={8}
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Confirm new password</label>
+              <Input
+                type="password"
+                value={pw.confirm}
+                onChange={(e) => setPw({ ...pw, confirm: e.target.value })}
+                required
+                minLength={8}
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="md:col-span-3 flex items-center gap-3">
+              <Button type="submit" size="sm" disabled={pwBusy}>
+                {pwBusy ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Updating…
+                  </>
+                ) : (
+                  'Update Password'
+                )}
+              </Button>
+              {pwMsg && (
+                <span className={`text-sm ${pwMsg.type === 'ok' ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {pwMsg.text}
+                </span>
+              )}
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
       {SETTINGS_SECTIONS.map(({ id, icon: Icon, label, items }) => (
         <Card key={id}>
@@ -103,7 +215,6 @@ export default function SettingsPage() {
         </Card>
       ))}
 
-      {/* Danger zone */}
       <Card className="border-red-200">
         <CardHeader className="pb-3">
           <CardTitle className="text-base text-red-600 flex items-center gap-2">

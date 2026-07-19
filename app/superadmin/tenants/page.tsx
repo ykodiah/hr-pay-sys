@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Building2, Plus, Search, X } from 'lucide-react'
+import Link from 'next/link'
+import { Building2, Plus, Search, X, Eye, Power } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,6 +14,9 @@ interface Tenant {
   status: string
   plan: string
   subscription_status: string
+  company_id?: string | null
+  admin_count?: number
+  employee_count?: number
   created_at: string
   updated_at: string
 }
@@ -34,7 +38,16 @@ export default function TenantsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState({ name: '', slug: '', description: '', plan: 'basic' })
+  const [form, setForm] = useState({
+    name: '',
+    slug: '',
+    description: '',
+    plan: 'basic',
+    admin_email: '',
+    admin_password: '',
+    admin_first_name: '',
+    admin_last_name: '',
+  })
   const [search, setSearch] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -45,7 +58,7 @@ export default function TenantsPage() {
   const fetchTenants = async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/superadmin/tenants')
+      const res = await fetch('/api/superadmin/tenants', { credentials: 'include' })
       if (!res.ok) throw new Error('Failed to fetch tenants')
       const data = await res.json()
       setTenants(data.tenants || [])
@@ -60,20 +73,67 @@ export default function TenantsPage() {
     e.preventDefault()
     try {
       setSubmitting(true); setError(''); setSuccess('')
+      const payload: Record<string, string> = {
+        name: form.name,
+        slug: form.slug,
+        description: form.description,
+        plan: form.plan,
+      }
+      if (form.admin_email && form.admin_password && form.admin_first_name && form.admin_last_name) {
+        payload.admin_email = form.admin_email
+        payload.admin_password = form.admin_password
+        payload.admin_first_name = form.admin_first_name
+        payload.admin_last_name = form.admin_last_name
+      }
       const res = await fetch('/api/superadmin/tenants', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        credentials: 'include',
+        body: JSON.stringify(payload),
       })
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed') }
-      setSuccess('Tenant created successfully.')
-      setForm({ name: '', slug: '', description: '', plan: 'basic' })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error || 'Failed')
+      setSuccess(
+        d.message ||
+          'Tenant created with an empty company account (no seed/demo data).',
+      )
+      setForm({
+        name: '',
+        slug: '',
+        description: '',
+        plan: 'basic',
+        admin_email: '',
+        admin_password: '',
+        admin_first_name: '',
+        admin_last_name: '',
+      })
       setShowCreate(false)
       fetchTenants()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create tenant')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const toggleStatus = async (tenant: Tenant) => {
+    try {
+      setError('')
+      const action = tenant.status === 'active' ? 'deactivate' : 'activate'
+      const res = await fetch(`/api/superadmin/tenants/${tenant.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        throw new Error(d.error || 'Failed')
+      }
+      setSuccess(action === 'deactivate' ? `${tenant.name} deactivated` : `${tenant.name} activated`)
+      fetchTenants()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update status')
     }
   }
 
@@ -171,6 +231,22 @@ export default function TenantsPage() {
                   <option value="enterprise">Enterprise</option>
                 </select>
               </div>
+              <div className="rounded-lg border border-dashed border-slate-200 p-3 space-y-3">
+                <p className="text-sm font-medium text-slate-700">Optional first admin</p>
+                <p className="text-xs text-slate-500">
+                  New tenants start empty — no employees, payroll, or demo data. Add an owner/admin to bind Auth access.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input placeholder="Admin first name" value={form.admin_first_name}
+                    onChange={(e) => setForm({ ...form, admin_first_name: e.target.value })} />
+                  <Input placeholder="Admin last name" value={form.admin_last_name}
+                    onChange={(e) => setForm({ ...form, admin_last_name: e.target.value })} />
+                  <Input type="email" placeholder="Admin email" value={form.admin_email}
+                    onChange={(e) => setForm({ ...form, admin_email: e.target.value })} />
+                  <Input type="password" placeholder="Admin password" value={form.admin_password}
+                    onChange={(e) => setForm({ ...form, admin_password: e.target.value })} />
+                </div>
+              </div>
               <div className="flex justify-end gap-3 pt-1">
                 <Button type="button" variant="outline" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
                 <Button type="submit" size="sm" disabled={submitting}>
@@ -207,8 +283,8 @@ export default function TenantsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-slate-50/60">
-                  {['Organisation', 'Slug', 'Plan', 'Status', 'Created'].map((h) => (
-                    <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                  {['Organisation', 'Slug', 'Plan', 'Status', 'Admins', 'Employees', 'Created', ''].map((h) => (
+                    <th key={h || 'actions'} className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -216,12 +292,12 @@ export default function TenantsPage() {
                 {filtered.map((t) => (
                   <tr key={t.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-2.5">
+                      <Link href={`/superadmin/tenants/${t.id}`} className="flex items-center gap-2.5 group">
                         <div className="w-7 h-7 rounded-md bg-slate-100 flex items-center justify-center text-xs font-semibold text-slate-600">
                           {t.name.slice(0, 2).toUpperCase()}
                         </div>
-                        <span className="font-medium text-slate-900">{t.name}</span>
-                      </div>
+                        <span className="font-medium text-slate-900 group-hover:text-emerald-700">{t.name}</span>
+                      </Link>
                     </td>
                     <td className="px-5 py-3.5 text-slate-500 font-mono text-xs">{t.slug}</td>
                     <td className="px-5 py-3.5">
@@ -230,8 +306,28 @@ export default function TenantsPage() {
                     <td className="px-5 py-3.5">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLE[t.status] || 'bg-slate-100 text-slate-500'}`}>{t.status}</span>
                     </td>
+                    <td className="px-5 py-3.5 text-slate-600">{t.admin_count ?? 0}</td>
+                    <td className="px-5 py-3.5 text-slate-600">{t.employee_count ?? 0}</td>
                     <td className="px-5 py-3.5 text-slate-500">
                       {new Date(t.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-1.5 justify-end">
+                        <Link href={`/superadmin/tenants/${t.id}`}>
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs">
+                            <Eye className="w-3.5 h-3.5 mr-1" /> View
+                          </Button>
+                        </Link>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => toggleStatus(t)}
+                          title={t.status === 'active' ? 'Deactivate' : 'Activate'}
+                        >
+                          <Power className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
