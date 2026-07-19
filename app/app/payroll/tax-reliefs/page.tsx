@@ -418,7 +418,16 @@ export default function PayrollTaxReliefsPage() {
           </Button>
           <Button
             variant="outline"
+            disabled={migrationRequired}
             onClick={() => {
+              if (migrationRequired) {
+                toast({
+                  title: "Migration required",
+                  description: "Run scripts/069_employee_tax_reliefs.sql in Supabase first.",
+                  variant: "destructive",
+                })
+                return
+              }
               if (!catalog.length) {
                 toast({
                   title: "No catalog reliefs yet",
@@ -434,7 +443,16 @@ export default function PayrollTaxReliefsPage() {
             Bulk assign
           </Button>
           <Button
+            disabled={migrationRequired}
             onClick={() => {
+              if (migrationRequired) {
+                toast({
+                  title: "Migration required",
+                  description: "Run scripts/069_employee_tax_reliefs.sql in Supabase first.",
+                  variant: "destructive",
+                })
+                return
+              }
               if (!catalog.length) {
                 toast({
                   title: "No catalog reliefs yet",

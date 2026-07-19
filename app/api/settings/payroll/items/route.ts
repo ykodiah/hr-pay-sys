@@ -303,7 +303,7 @@ function withRequiredReliefFields(row: Record<string, any>, companyId: string, n
     gra_code: code,
     relief_code: code,
     code,
-    is_active: true,
+    is_active: row.is_active !== false && row.isActive !== false,
     updated_at: now,
     last_updated: row.last_updated || now,
   }
@@ -410,10 +410,15 @@ async function upsertTaxReliefRow(
 ): Promise<{ ok: boolean; id?: string; error?: any }> {
   const full = withRequiredReliefFields(row, companyId, now)
 
+  const active = full.is_active !== false
+
   // Progressive column strip — never drop name/relief_name or code aliases
   const attempts = [
-    full,
-    (({ effective_date, last_updated, annual_amount, currency, category, description, ...r }) => r)(full),
+    { ...full, created_at: now },
+    (({ effective_date, last_updated, annual_amount, currency, category, description, ...r }) => r)({
+      ...full,
+      created_at: now,
+    }),
     {
       company_id: companyId,
       name: full.name,
@@ -422,8 +427,9 @@ async function upsertTaxReliefRow(
       gra_code: full.gra_code,
       relief_code: full.relief_code,
       code: full.code,
-      is_active: true,
+      is_active: active,
       updated_at: now,
+      created_at: now,
     },
     {
       company_id: companyId,
@@ -431,7 +437,7 @@ async function upsertTaxReliefRow(
       relief_name: full.relief_name,
       amount: full.amount,
       relief_code: full.relief_code,
-      is_active: true,
+      is_active: active,
       updated_at: now,
     },
     {
@@ -439,35 +445,36 @@ async function upsertTaxReliefRow(
       relief_name: full.relief_name,
       relief_code: full.relief_code,
       amount: full.amount,
-      is_active: true,
+      is_active: active,
       updated_at: now,
     },
   ]
 
   let lastError: any = null
-  for (let attempt of attempts) {
+  for (const attempt of attempts) {
     let payload = { ...attempt }
-    for (let retry = 0; retry < 6; retry++) {
+    for (let retry = 0; retry < 8; retry++) {
       if (existingId) {
-        const { error } = await service.from("tax_reliefs").update(payload).eq("id", existingId).eq("company_id", companyId)
+        const { created_at: _c, ...updatePayload } = payload
+        const { error } = await service
+          .from("tax_reliefs")
+          .update(updatePayload)
+          .eq("id", existingId)
+          .eq("company_id", companyId)
         if (!error) return { ok: true, id: existingId }
         lastError = error
         if (isMissingRelation(error)) return { ok: false, error }
         const patched =
-          applyNotNullHint(payload, error, full) ||
-          applyMissingColumnHint(payload, error) ||
-          applyValueTooLongHint(payload, error)
+          applyNotNullHint(updatePayload, error, full) ||
+          applyMissingColumnHint(updatePayload, error) ||
+          applyValueTooLongHint(updatePayload, error)
         if (patched) {
           payload = patched
           continue
         }
         break
       } else {
-        const { data, error } = await service
-          .from("tax_reliefs")
-          .insert({ ...payload, created_at: now })
-          .select("id")
-          .maybeSingle()
+        const { data, error } = await service.from("tax_reliefs").insert(payload).select("id").maybeSingle()
         if (!error) return { ok: true, id: data?.id }
         lastError = error
         if (isMissingRelation(error)) return { ok: false, error }
@@ -501,10 +508,28 @@ async function syncTaxReliefsTable(
     return { saved: 0 }
   }
 
-  const { data: existingRows, error: loadErr } = await service
-    .from("tax_reliefs")
-    .select("id, gra_code, relief_code, code, name, is_active")
-    .eq("company_id", companyId)
+  // Progressive select — legacy tables may lack some alias columns
+  const selectAttempts = [
+    "id, gra_code, relief_code, code, name, relief_name, is_active",
+    "id, relief_code, relief_name, is_active",
+    "id, gra_code, name, is_active",
+    "id, relief_code, is_active",
+    "id, is_active",
+    "*",
+  ]
+  let existingRows: any[] = []
+  let loadErr: any = null
+  for (const cols of selectAttempts) {
+    const { data, error } = await service.from("tax_reliefs").select(cols).eq("company_id", companyId)
+    if (!error) {
+      existingRows = data || []
+      loadErr = null
+      break
+    }
+    loadErr = error
+    if (isMissingRelation(error)) break
+    if (!isMissingColumn(error)) break
+  }
 
   if (loadErr) {
     if (isMissingRelation(loadErr)) {

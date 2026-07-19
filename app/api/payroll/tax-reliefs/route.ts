@@ -81,14 +81,7 @@ function toEngineItem(row: any, relief?: any) {
   }
 }
 
-/**
- * Settings → Payroll may persist reliefs only in company_settings.settings_data.tax_reliefs.
- * Materialize those into tax_reliefs so Assign / Bulk Assign get real UUID ids.
- */
-async function materializeCatalogFromSettings(service: any, companyId: string): Promise<any[]> {
-  const now = new Date().toISOString()
-  let backup: any[] = []
-
+async function loadTaxReliefsJsonBackup(service: any, companyId: string): Promise<any[]> {
   try {
     const { data: settings } = await service
       .from("company_settings")
@@ -96,118 +89,183 @@ async function materializeCatalogFromSettings(service: any, companyId: string): 
       .eq("company_id", companyId)
       .maybeSingle()
     if (Array.isArray(settings?.settings_data?.tax_reliefs)) {
-      backup = settings.settings_data.tax_reliefs
+      return settings.settings_data.tax_reliefs
     }
   } catch {
     // ignore
   }
 
-  if (!backup.length) {
-    try {
-      const { data: byId } = await service
-        .from("company_settings")
-        .select("settings_data")
-        .eq("id", companyId)
-        .maybeSingle()
-      if (Array.isArray(byId?.settings_data?.tax_reliefs)) {
-        backup = byId.settings_data.tax_reliefs
-      }
-    } catch {
-      // ignore
+  try {
+    const { data: byId } = await service
+      .from("company_settings")
+      .select("settings_data")
+      .eq("id", companyId)
+      .maybeSingle()
+    if (Array.isArray(byId?.settings_data?.tax_reliefs)) {
+      return byId.settings_data.tax_reliefs
     }
+  } catch {
+    // ignore
   }
 
-  if (!backup.length) {
-    try {
-      const { data: company } = await service
-        .from("companies")
-        .select("settings_data")
-        .eq("id", companyId)
-        .maybeSingle()
-      if (Array.isArray(company?.settings_data?.tax_reliefs)) {
-        backup = company.settings_data.tax_reliefs
-      }
-    } catch {
-      // ignore
+  try {
+    const { data: company } = await service
+      .from("companies")
+      .select("settings_data")
+      .eq("id", companyId)
+      .maybeSingle()
+    if (Array.isArray(company?.settings_data?.tax_reliefs)) {
+      return company.settings_data.tax_reliefs
     }
+  } catch {
+    // ignore
   }
 
-  const active = backup.filter((r) => r?.name && r.isActive !== false)
+  return []
+}
+
+function mergeCatalogWithBackup(catalogRows: any[], backup: any[]) {
+  if (!backup.length) return catalogRows
+  const byCode = new Map(
+    backup.map((b: any) => [
+      String(b.graCode || b.gra_code || b.relief_code || b.code || "")
+        .trim()
+        .toUpperCase(),
+      b,
+    ]),
+  )
+  return catalogRows.map((row) => {
+    const code = String(row.gra_code || row.relief_code || row.code || "")
+      .trim()
+      .toUpperCase()
+    const hit = byCode.get(code)
+    if (!hit) return row
+    return {
+      ...row,
+      name: hit.name || row.name || row.relief_name,
+      relief_name: hit.name || row.relief_name || row.name,
+      description: hit.description || row.description,
+      category: hit.category || row.category,
+      amount: Number(hit.amount ?? row.amount ?? 0),
+      annual_amount: Number(hit.amount ?? row.annual_amount ?? row.amount ?? 0),
+    }
+  })
+}
+
+/**
+ * Settings → Payroll may persist reliefs only in company_settings.settings_data.tax_reliefs.
+ * Materialize those into tax_reliefs so Assign / Bulk Assign get real UUID ids.
+ */
+async function materializeCatalogFromSettings(service: any, companyId: string): Promise<any[]> {
+  const now = new Date().toISOString()
+  const backup = await loadTaxReliefsJsonBackup(service, companyId)
+
+  const active = backup.filter((r) => (r?.name || r?.relief_name) && r.isActive !== false)
   if (!active.length) return []
 
-  const rows = active.map((r: any, index: number) => {
+  // Reactivate / update existing inactive rows by code before inserting
+  const { data: existing } = await service
+    .from("tax_reliefs")
+    .select("id, gra_code, relief_code, code, is_active")
+    .eq("company_id", companyId)
+
+  const byCode = new Map<string, any>()
+  for (const er of existing || []) {
+    const key = String(er.gra_code || er.relief_code || er.code || "")
+      .trim()
+      .toUpperCase()
+    if (key && !byCode.has(key)) byCode.set(key, er)
+  }
+
+  for (let index = 0; index < active.length; index++) {
+    const r = active[index]
     const amount = Number(r.amount ?? r.annualAmount ?? 0)
     const fullName =
       String(r.name || r.relief_name || r.reliefName || "Tax relief").trim() || "Tax relief"
-    // Legacy schemas often use VARCHAR(20) for name/code columns
     const reliefName = fullName.slice(0, 20)
     const raw = String(r.graCode || r.gra_code || r.reliefCode || r.relief_code || r.code || "").trim()
     const graCode = (raw || `CUSTOM-${index + 1}`).slice(0, 20)
-    return {
-      company_id: companyId,
-      name: reliefName,
-      relief_name: reliefName,
-      description: String(r.description || fullName),
-      amount,
-      annual_amount: amount,
-      currency: String(r.currency || "GHS").slice(0, 10),
-      category: String(r.category || "Personal").slice(0, 20),
-      gra_code: graCode,
-      relief_code: graCode,
-      code: graCode,
-      is_active: true,
-      updated_at: now,
-      created_at: now,
-    }
-  })
+    const codeKey = graCode.toUpperCase()
+    const match = byCode.get(codeKey)
 
-  // Insert best-effort — never strip relief_code / relief_name (legacy NOT NULL cols)
-  const attempts = [
-    rows,
-    rows.map(({ annual_amount, currency, category, description, code, ...r }) => r),
-    rows.map((r) => ({
-      company_id: companyId,
-      name: r.name,
-      relief_name: r.relief_name,
-      amount: r.amount,
-      gra_code: r.gra_code,
-      relief_code: r.relief_code,
-      code: r.code,
-      is_active: true,
-      updated_at: now,
-      created_at: now,
-    })),
-    rows.map((r) => ({
-      company_id: companyId,
-      relief_name: r.relief_name,
-      name: r.name,
-      amount: r.amount,
-      relief_code: r.relief_code,
-      is_active: true,
-      updated_at: now,
-      created_at: now,
-    })),
-  ]
+    const payloadVariants = [
+      {
+        company_id: companyId,
+        name: reliefName,
+        relief_name: reliefName,
+        description: reliefName,
+        amount,
+        annual_amount: amount,
+        currency: String(r.currency || "GHS").slice(0, 10),
+        category: String(r.category || "Personal").slice(0, 20),
+        gra_code: graCode,
+        relief_code: graCode,
+        code: graCode,
+        is_active: true,
+        updated_at: now,
+        created_at: now,
+      },
+      {
+        company_id: companyId,
+        name: reliefName,
+        relief_name: reliefName,
+        amount,
+        relief_code: graCode,
+        gra_code: graCode,
+        is_active: true,
+        updated_at: now,
+      },
+      {
+        company_id: companyId,
+        relief_name: reliefName,
+        relief_code: graCode,
+        amount,
+        is_active: true,
+        updated_at: now,
+      },
+    ]
 
-  for (const payload of attempts) {
-    const { error } = await service.from("tax_reliefs").insert(payload)
-    if (!error) break
-    if (isMissingRelation(error)) return []
-    // Truncate strings if a VARCHAR(N) limit was hit
-    const tooLong = String(error?.message || "").match(/character varying\((\d+)\)/i)
-    if (tooLong) {
-      const maxLen = Number(tooLong[1])
-      const trimmed = payload.map((row: any) => {
-        const next: Record<string, any> = { ...row }
-        for (const [k, v] of Object.entries(next)) {
-          if (typeof v === "string" && v.length > maxLen && k !== "company_id" && !k.endsWith("_at")) {
-            next[k] = v.slice(0, maxLen)
+    let done = false
+    for (const payload of payloadVariants) {
+      if (match?.id) {
+        const { created_at: _c, ...updatePayload } = payload
+        const { error } = await service
+          .from("tax_reliefs")
+          .update(updatePayload)
+          .eq("id", match.id)
+          .eq("company_id", companyId)
+        if (!error) {
+          done = true
+          break
+        }
+        if (isMissingRelation(error)) return []
+      } else {
+        const { error } = await service.from("tax_reliefs").insert(payload)
+        if (!error) {
+          done = true
+          break
+        }
+        if (isMissingRelation(error)) return []
+        const tooLong = String(error?.message || "").match(/character varying\((\d+)\)/i)
+        if (tooLong) {
+          const maxLen = Number(tooLong[1])
+          const trimmed: Record<string, any> = {}
+          for (const [k, v] of Object.entries(payload)) {
+            trimmed[k] =
+              typeof v === "string" && v.length > maxLen && k !== "company_id" && !k.endsWith("_at")
+                ? v.slice(0, maxLen)
+                : v
+          }
+          const { error: retryErr } = await service.from("tax_reliefs").insert(trimmed)
+          if (!retryErr) {
+            done = true
+            break
           }
         }
-        return next
-      })
-      const { error: retryErr } = await service.from("tax_reliefs").insert(trimmed)
-      if (!retryErr) break
+      }
+    }
+    if (!done && !match) {
+      // continue trying remaining reliefs
     }
   }
 
@@ -216,7 +274,6 @@ async function materializeCatalogFromSettings(service: any, companyId: string): 
     .select("*")
     .eq("company_id", companyId)
     .eq("is_active", true)
-    .order("name")
 
   return refreshed || []
 }
@@ -236,23 +293,41 @@ export async function GET(req: NextRequest) {
     const employeeId = searchParams.get("employee_id")
 
     // Catalog — table first; if empty, materialize from Settings JSON backup so Assign works
-    let { data: catalogRows, error: catalogErr } = await service
-      .from("tax_reliefs")
-      .select("*")
-      .eq("company_id", companyId)
-      .eq("is_active", true)
-      .order("name")
+    let catalogRows: any[] = []
+    {
+      let { data, error: catalogErr } = await service
+        .from("tax_reliefs")
+        .select("*")
+        .eq("company_id", companyId)
+        .eq("is_active", true)
+        .order("name")
 
-    if (catalogErr && !isMissingRelation(catalogErr)) throw catalogErr
+      // Legacy tables may lack `name` — retry without order
+      if (catalogErr && !isMissingRelation(catalogErr)) {
+        const retry = await service
+          .from("tax_reliefs")
+          .select("*")
+          .eq("company_id", companyId)
+          .eq("is_active", true)
+        if (retry.error && !isMissingRelation(retry.error)) throw retry.error
+        data = retry.data
+        catalogErr = retry.error
+      }
 
-    if (!(catalogRows || []).length) {
+      if (catalogErr && !isMissingRelation(catalogErr)) throw catalogErr
+      catalogRows = data || []
+    }
+
+    if (!catalogRows.length) {
       const materialized = await materializeCatalogFromSettings(service, companyId)
       if (materialized.length) {
         catalogRows = materialized
       }
     }
 
-    const catalog = (catalogRows || []).map(mapCatalogRow)
+    const backup = await loadTaxReliefsJsonBackup(service, companyId)
+    const mergedRows = mergeCatalogWithBackup(catalogRows || [], backup)
+    const catalog = mergedRows.map(mapCatalogRow)
 
     // Assignments for year
     let assignQuery = service
@@ -361,12 +436,13 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      // Isolation: reliefs and employees must belong to this company
+      // Isolation: reliefs and employees must belong to this company (active catalog only)
       const [{ data: reliefs }, { data: employees }] = await Promise.all([
         service
           .from("tax_reliefs")
           .select("id")
           .eq("company_id", companyId)
+          .eq("is_active", true)
           .in("id", taxReliefIds),
         service
           .from("employees")
@@ -378,7 +454,13 @@ export async function POST(req: NextRequest) {
       const validReliefIds = new Set((reliefs || []).map((r) => r.id))
       const validEmployees = employees || []
       if (!validReliefIds.size) {
-        return NextResponse.json({ error: "No valid tax reliefs for this company" }, { status: 400 })
+        return NextResponse.json(
+          {
+            error:
+              "No valid active tax reliefs for this company. Save the catalog in Settings → Payroll first.",
+          },
+          { status: 400 },
+        )
       }
       if (!validEmployees.length) {
         return NextResponse.json({ error: "No valid employees for this company" }, { status: 400 })
@@ -403,14 +485,71 @@ export async function POST(req: NextRequest) {
             notes: body.notes || null,
             assigned_by: userId && String(userId).length > 20 ? userId : null,
             updated_at: now,
+            created_at: now,
           })
         }
       }
 
-      const { data: upserted, error } = await service
+      let upserted: any[] | null = null
+      let error: any = null
+      ;({ data: upserted, error } = await service
         .from("employee_tax_reliefs")
         .upsert(rows, { onConflict: "company_id,employee_id,tax_relief_id,tax_year" })
-        .select("id")
+        .select("id"))
+
+      // Fallback when unique constraint is missing: update-then-insert per row
+      if (error && /no unique|on conflict|conflict target/i.test(String(error.message || ""))) {
+        let assigned = 0
+        let fallbackErr: any = null
+        for (const row of rows) {
+          const { data: existing } = await service
+            .from("employee_tax_reliefs")
+            .select("id")
+            .eq("company_id", companyId)
+            .eq("employee_id", row.employee_id)
+            .eq("tax_relief_id", row.tax_relief_id)
+            .eq("tax_year", row.tax_year)
+            .maybeSingle()
+          if (existing?.id) {
+            const { created_at: _c, ...updateRow } = row
+            const { error: upErr } = await service
+              .from("employee_tax_reliefs")
+              .update(updateRow)
+              .eq("id", existing.id)
+              .eq("company_id", companyId)
+            if (upErr) {
+              fallbackErr = upErr
+              break
+            }
+            assigned += 1
+          } else {
+            const { error: inErr } = await service.from("employee_tax_reliefs").insert(row)
+            if (inErr) {
+              fallbackErr = inErr
+              break
+            }
+            assigned += 1
+          }
+        }
+        if (fallbackErr) {
+          if (isMissingRelation(fallbackErr)) {
+            return NextResponse.json(
+              {
+                error:
+                  "employee_tax_reliefs table is missing. Run scripts/069_employee_tax_reliefs.sql in Supabase.",
+              },
+              { status: 503 },
+            )
+          }
+          throw fallbackErr
+        }
+        return NextResponse.json({
+          success: true,
+          assigned,
+          tax_year: taxYear,
+          company_id: companyId,
+        })
+      }
 
       if (error) {
         if (isMissingRelation(error)) {
