@@ -64,6 +64,17 @@ const isDemoMode = () => {
   return false
 }
 
+/** Clear leftover demo cookies/local flags so real tenants do not resolve to the wrong company. */
+const clearClientDemoSession = () => {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.removeItem("demo_mode")
+    document.cookie = "demo-session=; Max-Age=0; path=/"
+  } catch {
+    // ignore
+  }
+}
+
 const mockEmployees = [
   {
     id: "1",
@@ -498,10 +509,17 @@ export default function EmployeesPage() {
 
   const loadSubsidiaries = async (cid?: string) => {
     try {
+      // Never load subsidiaries without a company scope — open RLS would leak other tenants.
+      if (!cid) {
+        setSubsidiaries(isDemoMode() ? mockSubsidiaries : [])
+        return
+      }
       const supabase = createClient()
-      let query = supabase.from("subsidiaries").select("*").eq("status", "active")
-      if (cid) query = query.eq("company_id", cid)
-      const { data, error } = await query
+      const { data, error } = await supabase
+        .from("subsidiaries")
+        .select("*")
+        .eq("status", "active")
+        .eq("company_id", cid)
 
       if (error) {
         console.error("Error loading subsidiaries:", error)
@@ -533,6 +551,7 @@ export default function EmployeesPage() {
 
   useEffect(() => {
     void (async () => {
+      clearClientDemoSession()
       const cid = await loadCompanyData()
       await Promise.all([loadEmployees(cid), loadSubsidiaries(cid)])
     })()
@@ -671,25 +690,10 @@ export default function EmployeesPage() {
         return meta.company_id as string
       }
 
-      // Fallback: companies + company_settings
-      const supabase = createClient()
-      const { data, error } = await supabase.from("companies").select("*").limit(1).maybeSingle()
-      if (error) console.error("[v0] Error loading company data:", error)
-      if (data) {
-        const { data: settings } = await supabase
-          .from("company_settings")
-          .select("settings_data")
-          .eq("company_id", data.id)
-          .maybeSingle()
-        const org = extractOrgOptions(data, settings?.settings_data)
-        setCompanySettings({ ...data, ...org })
-        setCompanyId(data.id)
-        setDivisions(org.divisions)
-        setDepartments(org.departments)
-        setLocations(org.locations)
-        return data.id as string
-      }
-
+      // Fail closed: do not pick an arbitrary first company (cross-tenant leak).
+      console.warn("[v0] Unable to resolve company for employees page", meta)
+      setCompanyId("")
+      setSubsidiaries([])
       setDivisions(["Head Office", "Regional Office"])
       setDepartments(["Technology", "Human Resources", "Finance", "Marketing", "Sales", "Operations"])
       setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])

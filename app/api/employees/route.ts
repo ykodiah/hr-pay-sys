@@ -26,7 +26,11 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(Number(searchParams.get("limit") ?? 500), 2000)
 
     if (!companyId) {
-      const resolved = await resolveCompanyId(client, user.isDemo ? null : user.id)
+      const resolved = await resolveCompanyId(
+        client,
+        user.isDemo ? null : user.id,
+        user.isDemo ? null : user,
+      )
       companyId = resolved?.companyId ?? null
     }
 
@@ -124,11 +128,33 @@ export async function POST(req: NextRequest) {
 
     let companyId = body.company_id as string | undefined
     if (!companyId) {
-      const resolved = await resolveCompanyId(client, user.isDemo ? null : user.id)
+      const resolved = await resolveCompanyId(
+        client,
+        user.isDemo ? null : user.id,
+        user.isDemo ? null : user,
+      )
       companyId = resolved?.companyId
     }
     if (!companyId) {
       return NextResponse.json({ error: "company_id is required" }, { status: 400 })
+    }
+
+    // Prevent attaching another tenant's subsidiary to this company
+    if (body.subsidiary_id) {
+      const { data: subsidiary, error: subErr } = await client
+        .from("subsidiaries")
+        .select("id, company_id")
+        .eq("id", body.subsidiary_id)
+        .maybeSingle()
+      if (subErr) {
+        return NextResponse.json({ error: subErr.message }, { status: 500 })
+      }
+      if (!subsidiary || subsidiary.company_id !== companyId) {
+        return NextResponse.json(
+          { error: "subsidiary_id does not belong to this company" },
+          { status: 400 },
+        )
+      }
     }
 
     if (!body.first_name || !body.last_name) {

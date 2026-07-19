@@ -33,8 +33,18 @@ export async function GET(req: NextRequest) {
 
     const client = await createClient()
     let companyId = new URL(req.url).searchParams.get("company_id")
+    const resolved = await resolveCompanyId(
+      client,
+      user.isDemo ? null : user.id,
+      user.isDemo ? null : user,
+    )
     if (!companyId) {
-      companyId = (await resolveCompanyId(client, user.isDemo ? null : user.id))?.companyId ?? null
+      companyId = resolved?.companyId ?? null
+    } else if (resolved?.companyId && companyId !== resolved.companyId) {
+      return NextResponse.json(
+        { error: "company_id does not belong to the authenticated user" },
+        { status: 403 },
+      )
     }
     if (!companyId) return NextResponse.json({ error: "company_id required" }, { status: 400 })
 
