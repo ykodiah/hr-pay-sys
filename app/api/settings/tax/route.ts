@@ -6,7 +6,13 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { GRA_MONTHLY_PAYE_BANDS, GRA_2025_SSNIT, GRA_2025_TIER2, GRA_2025_TIER3 } from "@/lib/ghana-tax/engine"
+import {
+  GRA_MONTHLY_PAYE_BANDS,
+  GRA_2025_SSNIT,
+  GRA_2025_TIER2,
+  GRA_2025_TIER3,
+  normalizePayeBands,
+} from "@/lib/ghana-tax/engine"
 import { jsonError, resolveTenantContext } from "@/lib/settings/resolve-tenant"
 
 export async function GET(req: NextRequest) {
@@ -49,7 +55,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const payeBands =
+    const rawBands =
       !bandError && bandRows && bandRows.length > 0
         ? bandRows.map((r: any) => ({
             band_order: r.band_order,
@@ -60,11 +66,19 @@ export async function GET(req: NextRequest) {
           }))
         : GRA_MONTHLY_PAYE_BANDS
 
+    const { bands: payeBands, isMonthly } = normalizePayeBands(rawBands)
+
+    // Repair SSNIT 0.5% typo (legacy Tier-1 split) → Act 766 employee 5.5%
+    if (Number(ssnit.employee_rate) > 0 && Number(ssnit.employee_rate) < 1) {
+      ssnit = { ...ssnit, employee_rate: 5.5 }
+    }
+
     return NextResponse.json({
       ssnit,
       tier2,
       tier3,
       paye_bands: payeBands,
+      paye_bands_are_monthly: isMonthly,
       tax_year: taxYear,
       company_id: companyId,
     })
@@ -163,7 +177,18 @@ export async function POST(req: NextRequest) {
         .eq("company_id", companyId)
         .eq("tax_year", year)
 
-      const bandRows = paye_bands.map((b, i) => ({
+      // Normalize so cumulative ceilings from the Settings UI are stored as GRA widths.
+      const { bands: normalizedBands } = normalizePayeBands(
+        paye_bands.map((b, i) => ({
+          band_order: b.band_order ?? i + 1,
+          rate: Number(b.rate),
+          threshold_amount: Number(b.threshold_amount),
+          is_remaining_amount: Boolean(b.is_remaining_amount),
+          description: b.description ?? `${b.rate}% band`,
+        })),
+      )
+
+      const bandRows = normalizedBands.map((b, i) => ({
         company_id: companyId,
         band_order: b.band_order ?? i + 1,
         rate: b.rate,

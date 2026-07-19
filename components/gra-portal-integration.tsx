@@ -7,111 +7,49 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
-  ExternalLink, 
   RefreshCw, 
   CheckCircle, 
-  AlertCircle, 
   Clock, 
   Download,
-  Upload,
-  Settings,
   Info,
   Shield,
   Globe,
   Database,
-  Activity
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { GRATaxRelief, GRASyncStatus } from '@/lib/gra-api';
 
 interface GRAPortalIntegrationProps {
   onReliefsUpdate?: (reliefs: GRATaxRelief[]) => void;
+  companyId?: string;
+  autoSyncOnMount?: boolean;
 }
 
-export default function GRAPortalIntegration({ onReliefsUpdate }: GRAPortalIntegrationProps) {
+export default function GRAPortalIntegration({
+  onReliefsUpdate,
+  autoSyncOnMount = true,
+}: GRAPortalIntegrationProps) {
   const { toast } = useToast();
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<GRASyncStatus | null>(null);
   const [reliefs, setReliefs] = useState<GRATaxRelief[]>([]);
-  const [apiKey, setApiKey] = useState('');
-  const [showApiKey, setShowApiKey] = useState(false);
 
-  useEffect(() => {
-    // Load saved API key from localStorage
-    const savedApiKey = localStorage.getItem('gra_api_key');
-    if (savedApiKey) {
-      setApiKey(savedApiKey);
-    }
-  }, []);
-
-  const handleTestConnection = async () => {
-    if (!apiKey) {
-      toast({
-        title: "API Key Required",
-        description: "Please enter your GRA API key to test the connection.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/gra/sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          apiKey,
-          action: 'test_connection'
-        }),
-      });
-
-      const result = await response.json();
-      setIsConnected(result.success);
-      
-      if (result.success) {
-        localStorage.setItem('gra_api_key', apiKey);
-        toast({
-          title: "Connection Successful",
-          description: "Successfully connected to GRA API.",
-        });
-      } else {
-        toast({
-          title: "Connection Failed",
-          description: result.message || "Failed to connect to GRA API.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error('Connection test failed:', error);
-      toast({
-        title: "Connection Error",
-        description: "An error occurred while testing the connection.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleSyncReliefs = async () => {
+  const handleSyncReliefs = async (silent = false) => {
     setIsSyncing(true);
     
     try {
       const response = await fetch('/api/gra/sync', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          apiKey,
-          action: 'get_comprehensive_reliefs'
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'auto_sync' }),
       });
 
       const result = await response.json();
       
       if (result.success) {
-        setReliefs(result.data.taxReliefs);
+        setReliefs(result.data.taxReliefs || []);
+        setIsConnected(true);
         setSyncStatus({
           isConnected: true,
           lastSync: result.lastSync,
@@ -122,14 +60,16 @@ export default function GRAPortalIntegration({ onReliefsUpdate }: GRAPortalInteg
         });
         
         if (onReliefsUpdate) {
-          onReliefsUpdate(result.data.taxReliefs);
+          onReliefsUpdate(result.data.taxReliefs || []);
         }
         
-        toast({
-          title: "Sync Successful",
-          description: `Successfully synced ${result.totalReliefs} tax reliefs from GRA portal.`,
-        });
-      } else {
+        if (!silent) {
+          toast({
+            title: "GRA catalog synced",
+            description: `Loaded ${result.totalReliefs} official personal tax reliefs from the GRA catalog.`,
+          });
+        }
+      } else if (!silent) {
         toast({
           title: "Sync Failed",
           description: result.error || "Failed to sync tax reliefs.",
@@ -138,15 +78,24 @@ export default function GRAPortalIntegration({ onReliefsUpdate }: GRAPortalInteg
       }
     } catch (error) {
       console.error('Sync failed:', error);
-      toast({
-        title: "Sync Error",
-        description: "An error occurred while syncing tax reliefs.",
-        variant: "destructive",
-      });
+      if (!silent) {
+        toast({
+          title: "Sync Error",
+          description: "An error occurred while syncing tax reliefs.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsSyncing(false);
     }
   };
+
+  useEffect(() => {
+    if (autoSyncOnMount) {
+      void handleSyncReliefs(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSyncOnMount]);
 
   const handleExportReliefs = () => {
     const csvContent = [
@@ -181,7 +130,6 @@ export default function GRAPortalIntegration({ onReliefsUpdate }: GRAPortalInteg
 
   return (
     <div className="space-y-6">
-      {/* Connection Status */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
@@ -189,56 +137,32 @@ export default function GRAPortalIntegration({ onReliefsUpdate }: GRAPortalInteg
             <span>GRA Portal Integration</span>
           </CardTitle>
           <CardDescription>
-            Connect to Ghana Revenue Authority portal for real-time tax relief synchronization
+            Auto-synced from the official GRA personal tax relief catalog. No API key required.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {/* API Key Configuration */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">GRA API Key</label>
-              <div className="flex space-x-2">
-                <input
-                  type={showApiKey ? "text" : "password"}
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="Enter your GRA API key"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                >
-                  {showApiKey ? 'Hide' : 'Show'}
-                </Button>
-                <Button
-                  onClick={handleTestConnection}
-                  disabled={!apiKey}
-                >
-                  <Activity className="w-4 h-4 mr-2" />
-                  Test Connection
-                </Button>
-              </div>
-              <p className="text-xs text-gray-500">
-                Get your API key from the GRA developer portal at{' '}
-                <a 
-                  href="https://developer.gra.gov.gh" 
-                  target="_blank" 
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Akwaaba keeps the 7 active GRA personal tax reliefs in sync from{' '}
+                <a
+                  href="https://gra.gov.gh/domestic-tax/personal-tax-relief/"
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-600 hover:underline"
                 >
-                  developer.gra.gov.gh
+                  gra.gov.gh/domestic-tax/personal-tax-relief
                 </a>
-              </p>
-            </div>
+                . Click Sync to refresh, then Save All on the Tax Reliefs card to persist for your company.
+              </AlertDescription>
+            </Alert>
 
-            {/* Connection Status */}
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
                 <span className="text-sm font-medium">
-                  {isConnected ? 'Connected to GRA' : 'Not Connected'}
+                  {isConnected ? 'Official GRA catalog ready' : 'Catalog unavailable'}
                 </span>
               </div>
               {syncStatus?.lastSync && (
@@ -249,11 +173,10 @@ export default function GRAPortalIntegration({ onReliefsUpdate }: GRAPortalInteg
               )}
             </div>
 
-            {/* Sync Actions */}
             <div className="flex space-x-2">
               <Button
-                onClick={handleSyncReliefs}
-                disabled={!isConnected || isSyncing}
+                onClick={() => handleSyncReliefs(false)}
+                disabled={isSyncing}
                 className="flex-1"
               >
                 {isSyncing ? (
@@ -264,10 +187,7 @@ export default function GRAPortalIntegration({ onReliefsUpdate }: GRAPortalInteg
                 Sync Tax Reliefs
               </Button>
               {reliefs.length > 0 && (
-                <Button
-                  variant="outline"
-                  onClick={handleExportReliefs}
-                >
+                <Button variant="outline" onClick={handleExportReliefs}>
                   <Download className="w-4 h-4 mr-2" />
                   Export CSV
                 </Button>
@@ -277,7 +197,6 @@ export default function GRAPortalIntegration({ onReliefsUpdate }: GRAPortalInteg
         </CardContent>
       </Card>
 
-      {/* Sync Results */}
       {reliefs.length > 0 && (
         <Card>
           <CardHeader>
@@ -286,7 +205,7 @@ export default function GRAPortalIntegration({ onReliefsUpdate }: GRAPortalInteg
               <span>Synced Tax Reliefs</span>
             </CardTitle>
             <CardDescription>
-              {reliefs.length} tax reliefs successfully synced from GRA portal
+              {reliefs.length} tax reliefs loaded from the official GRA catalog
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -316,12 +235,12 @@ export default function GRAPortalIntegration({ onReliefsUpdate }: GRAPortalInteg
                       {reliefs.filter(r => r.isActive).length}
                     </p>
                   </div>
-                  <div className="bg-purple-50 p-4 rounded-lg">
+                  <div className="bg-slate-50 p-4 rounded-lg">
                     <div className="flex items-center space-x-2">
-                      <Shield className="w-5 h-5 text-purple-600" />
+                      <Shield className="w-5 h-5 text-slate-600" />
                       <span className="font-medium">Categories</span>
                     </div>
-                    <p className="text-2xl font-bold text-purple-600">
+                    <p className="text-2xl font-bold text-slate-700">
                       {Object.keys(reliefCategories).length}
                     </p>
                   </div>
@@ -342,7 +261,7 @@ export default function GRAPortalIntegration({ onReliefsUpdate }: GRAPortalInteg
               <TabsContent value="details" className="space-y-4">
                 <div className="space-y-3">
                   {reliefs.map((relief) => (
-                    <div key={relief.id} className="border rounded-lg p-4">
+                    <div key={relief.id || relief.graCode} className="border rounded-lg p-4">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center space-x-2 mb-2">
@@ -362,19 +281,6 @@ export default function GRAPortalIntegration({ onReliefsUpdate }: GRAPortalInteg
                           </div>
                         </div>
                       </div>
-                      {relief.conditions && relief.conditions.length > 0 && (
-                        <div className="mt-3 pt-3 border-t">
-                          <h4 className="text-sm font-medium text-gray-700 mb-2">Conditions:</h4>
-                          <ul className="text-sm text-gray-600 space-y-1">
-                            {relief.conditions.map((condition, idx) => (
-                              <li key={idx} className="flex items-start space-x-2">
-                                <span className="text-gray-400">•</span>
-                                <span>{condition}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -384,37 +290,9 @@ export default function GRAPortalIntegration({ onReliefsUpdate }: GRAPortalInteg
                 <Alert>
                   <Info className="h-4 w-4" />
                   <AlertDescription>
-                    All tax reliefs have been synced from the official GRA portal and are up-to-date with current regulations.
+                    Catalog matches the published GRA personal tax relief schedule. Save All on the Tax Reliefs card to store them for this company.
                   </AlertDescription>
                 </Alert>
-                
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                      <span className="font-medium">Data Source Verification</span>
-                    </div>
-                    <Badge className="bg-green-100 text-green-800">Verified</Badge>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                      <span className="font-medium">Regulatory Compliance</span>
-                    </div>
-                    <Badge className="bg-green-100 text-green-800">Compliant</Badge>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                      <span className="font-medium">Last Updated</span>
-                    </div>
-                    <Badge className="bg-green-100 text-green-800">
-                      {syncStatus?.lastSync ? new Date(syncStatus.lastSync).toLocaleDateString() : 'N/A'}
-                    </Badge>
-                  </div>
-                </div>
               </TabsContent>
             </Tabs>
           </CardContent>

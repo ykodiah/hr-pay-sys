@@ -66,13 +66,146 @@ async function loadCompanyBundle(service: any, companyId: string) {
   if (error) throw error
   if (!company) return null
 
-  const { data: settings } = await service
-    .from("company_settings")
-    .select("settings_data, fiscal_year_start, default_currency, timezone, language, company_id")
-    .eq("company_id", companyId)
-    .maybeSingle()
+  let settings: any = null
+  // Prefer company_id lookup (canonical). Fall back for legacy schemas.
+  {
+    const { data, error: settingsError } = await service
+      .from("company_settings")
+      .select("*")
+      .eq("company_id", companyId)
+      .maybeSingle()
+    if (!settingsError) {
+      settings = data
+    } else {
+      // Legacy: company_settings.id == companies.id, or settings_data embedded on companies
+      const { data: byId } = await service.from("company_settings").select("*").eq("id", companyId).maybeSingle()
+      settings = byId || null
+      if (!settings && company.settings_data) {
+        settings = { settings_data: company.settings_data, company_id: companyId }
+      }
+    }
+  }
 
   return { company, settings: settings || null, response: buildCompanyResponse(company, settings || null) }
+}
+
+/** Persist settings_data — resilient to missing company_id column until 073 is applied. */
+async function persistCompanySettingsRow(
+  service: any,
+  companyId: string,
+  settingsData: Record<string, unknown>,
+  extras: Record<string, unknown>,
+  now: string,
+): Promise<{ saved: boolean; warning?: string }> {
+  const canonical = {
+    company_id: companyId,
+    settings_data: settingsData,
+    ...extras,
+    updated_at: now,
+  }
+
+  // 1) Upsert on company_id
+  {
+    const { error } = await service.from("company_settings").upsert(canonical, { onConflict: "company_id" })
+    if (!error) return { saved: true }
+    if (!/company_id|schema cache|PGRST204/i.test(String(error.message || ""))) {
+      // try update/insert by company_id anyway
+      const { error: updErr } = await service
+        .from("company_settings")
+        .update({ settings_data: settingsData, ...extras, updated_at: now })
+        .eq("company_id", companyId)
+      if (!updErr) return { saved: true }
+    }
+  }
+
+  // 2) Legacy: row where id = companyId
+  {
+    const { data: existing } = await service.from("company_settings").select("id").eq("id", companyId).maybeSingle()
+    if (existing?.id) {
+      const { error } = await service
+        .from("company_settings")
+        .update({
+          settings_data: settingsData,
+          name: settingsData.name,
+          tax_id: settingsData.tax_id,
+          ssnit_number: settingsData.ssnit_number,
+          industry: settingsData.industry,
+          address: settingsData.address,
+          phone: settingsData.phone_number,
+          email: settingsData.email_address,
+          logo: settingsData.logo_url,
+          divisions: settingsData.divisions,
+          departments: settingsData.departments,
+          locations: settingsData.locations,
+          updated_at: now,
+        })
+        .eq("id", companyId)
+      if (!error) return { saved: true, warning: "Saved via legacy company_settings.id mapping. Run scripts/073_company_settings_and_payroll_hardening.sql." }
+    } else {
+      const { error } = await service.from("company_settings").insert({
+        id: companyId,
+        name: settingsData.name || "Company",
+        tax_id: settingsData.tax_id || "",
+        ssnit_number: settingsData.ssnit_number || "",
+        industry: settingsData.industry || null,
+        address: settingsData.address || null,
+        phone: settingsData.phone_number || null,
+        email: settingsData.email_address || null,
+        logo: settingsData.logo_url || null,
+        divisions: settingsData.divisions || [],
+        departments: settingsData.departments || [],
+        locations: settingsData.locations || [],
+        settings_data: settingsData,
+        company_id: companyId,
+        created_at: now,
+        updated_at: now,
+      })
+      if (!error) return { saved: true }
+      // Retry without company_id / settings_data for very old schemas
+      const { error: legacyErr } = await service.from("company_settings").insert({
+        id: companyId,
+        name: settingsData.name || "Company",
+        tax_id: settingsData.tax_id || "PENDING",
+        ssnit_number: settingsData.ssnit_number || "PENDING",
+        industry: settingsData.industry || null,
+        address: settingsData.address || null,
+        phone: settingsData.phone_number || null,
+        email: settingsData.email_address || null,
+        logo: settingsData.logo_url || null,
+        divisions: settingsData.divisions || [],
+        departments: settingsData.departments || [],
+        locations: settingsData.locations || [],
+        created_at: now,
+        updated_at: now,
+      })
+      if (!legacyErr) {
+        return {
+          saved: true,
+          warning: "Saved company profile. Run scripts/073_company_settings_and_payroll_hardening.sql to enable full settings_data.",
+        }
+      }
+    }
+  }
+
+  // 3) Last resort: embed settings_data on companies row
+  {
+    const { error } = await service
+      .from("companies")
+      .update({ settings_data: settingsData, updated_at: now })
+      .eq("id", companyId)
+    if (!error) {
+      return {
+        saved: true,
+        warning: "Saved to companies.settings_data. Run scripts/073_company_settings_and_payroll_hardening.sql for company_settings.company_id.",
+      }
+    }
+  }
+
+  return {
+    saved: false,
+    warning:
+      "company_settings: could not find the 'company_id' column. Run scripts/073_company_settings_and_payroll_hardening.sql in Supabase, then save again.",
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -238,53 +371,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2) Canonical settings snapshot
+    // 2) Settings snapshot (resilient to legacy company_settings without company_id)
     {
-      const { error: upsertError } = await service.from("company_settings").upsert(
+      const result = await persistCompanySettingsRow(
+        service,
+        companyId,
+        settingsData,
         {
-          company_id: companyId,
-          settings_data: settingsData,
           fiscal_year_start: body.fiscal_year_start,
           default_currency: body.default_currency,
           timezone: body.timezone,
           language: body.language,
-          updated_at: now,
         },
-        { onConflict: "company_id" },
+        now,
       )
-
-      if (!upsertError) {
-        settingsSaved = true
-      } else {
-        const { error: updateError } = await service
-          .from("company_settings")
-          .update({
-            settings_data: settingsData,
-            fiscal_year_start: body.fiscal_year_start,
-            default_currency: body.default_currency,
-            timezone: body.timezone,
-            language: body.language,
-            updated_at: now,
-          })
-          .eq("company_id", companyId)
-
-        if (!updateError) {
-          settingsSaved = true
-        } else {
-          const { error: insertError } = await service.from("company_settings").insert({
-            company_id: companyId,
-            settings_data: settingsData,
-            fiscal_year_start: body.fiscal_year_start,
-            default_currency: body.default_currency,
-            timezone: body.timezone,
-            language: body.language,
-            created_at: now,
-            updated_at: now,
-          })
-          if (insertError) warnings.push(`company_settings: ${insertError.message}`)
-          else settingsSaved = true
-        }
-      }
+      settingsSaved = result.saved
+      if (result.warning) warnings.push(result.warning)
     }
 
     if (!companiesSaved && !settingsSaved) {

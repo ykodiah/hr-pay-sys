@@ -9,7 +9,12 @@ import { useToast } from "@/hooks/use-toast"
 import TaxReliefManager from "@/components/tax-relief-manager"
 import GhanaTaxSettings from "@/components/ghana-tax-settings"
 import { createClient } from "@/lib/supabase/client"
-import { calculateMonthlyPaye, round2 as roundMoney } from "@/lib/ghana-tax/engine"
+import {
+  calculateMonthlyPaye,
+  normalizePayeBands,
+  GRA_MONTHLY_PAYE_BANDS,
+  round2 as roundMoney,
+} from "@/lib/ghana-tax/engine"
 import {
   Building2,
   Users,
@@ -598,7 +603,7 @@ export default function SettingsPage() {
 
   // Act 766: Tier 1 (SSNIT) 0.5% ee / 13% er — Tier 2 is separate (5% ee / 0% er)
   const [ssnitRates, setSsnitRates] = useState({
-    employee: 0.5,
+    employee: 5.5,
     employer: 13,
     total: 13.5,
   })
@@ -659,10 +664,10 @@ export default function SettingsPage() {
         { rate: 35, from: 50416.67, to: Number.POSITIVE_INFINITY, cumulativeTax: 13728.67 },
       ],
       socialSecurity: {
-        // Act 766 Tier 1 (SSNIT) portion — employee total pension is 5.5% with Tier 2
-        employee: 0.5,
+        // Act 766 Tier 1 (SSNIT): employee 5.5%, employer 13%
+        employee: 5.5,
         employer: 13.0,
-        total: 13.5,
+        total: 18.5,
         cap: 2000000, // Annual cap in GHS
       },
       tier2: {
@@ -1097,9 +1102,25 @@ export default function SettingsPage() {
     const config = getCurrencyConfig(currency)
     if (!config) return 0
 
-    // Ghana PAYE: use the shared GRA monthly engine so Settings matches Payroll
+    // Ghana PAYE: use configured bands (normalized to GRA widths) so the live
+    // calculator matches payroll after save/load.
     if (currency === "ghs") {
-      return roundMoney(calculateMonthlyPaye(Math.max(0, income)).monthlyTax)
+      const uiBands = (payeTaxBands?.length ? payeTaxBands : config.taxBands) || []
+      const asEngineBands = uiBands.map((b: any, i: number) => {
+        const from = Number(b.from || 0)
+        const to =
+          b.to == null || !Number.isFinite(b.to) ? Number.POSITIVE_INFINITY : Number(b.to)
+        const width = Number.isFinite(to) ? Math.max(0, to - from) : 0
+        return {
+          band_order: i + 1,
+          rate: Number(b.rate || 0),
+          threshold_amount: Number.isFinite(to) ? width : 0,
+          is_remaining_amount: !Number.isFinite(to),
+          description: `${b.rate}%`,
+        }
+      })
+      const { bands } = normalizePayeBands(asEngineBands.length ? asEngineBands : GRA_MONTHLY_PAYE_BANDS)
+      return roundMoney(calculateMonthlyPaye(Math.max(0, income), bands).monthlyTax)
     }
 
     let tax = 0
@@ -1193,13 +1214,18 @@ export default function SettingsPage() {
       // Persist using the synced values (avoid stale React state)
       const companyId = await resolveHrCompanyId()
       const taxYear = new Date().getFullYear()
-      const payeBands = nextBands.map((b: any, i: number) => ({
-        band_order: i + 1,
-        rate: Number(b.rate || 0),
-        threshold_amount: b.to === Number.POSITIVE_INFINITY ? 999999999 : Number(b.to || 0),
-        is_remaining_amount: b.to === Number.POSITIVE_INFINITY,
-        description: `${b.rate}% band`,
-      }))
+      const payeBands = nextBands.map((b: any, i: number) => {
+        const from = Number(b.from || 0)
+        const isRemaining = b.to === Number.POSITIVE_INFINITY || b.to == null || !Number.isFinite(b.to)
+        const to = isRemaining ? from : Number(b.to || 0)
+        return {
+          band_order: i + 1,
+          rate: Number(b.rate || 0),
+          threshold_amount: isRemaining ? 0 : Math.max(0, to - from),
+          is_remaining_amount: isRemaining,
+          description: `${b.rate}% band`,
+        }
+      })
       await settingsFetch("/api/settings/tax", {
         method: "POST",
         body: JSON.stringify({
@@ -1861,17 +1887,38 @@ export default function SettingsPage() {
   }
 
   const mapDbBandsToUi = (bands: any[]) => {
-    const sorted = [...(bands || [])].sort((a, b) => Number(a.band_order || 0) - Number(b.band_order || 0))
+    // DB stores GRA width thresholds; rebuild cumulative from/to for the UI table.
+    const { bands: normalized } = normalizePayeBands(
+      (bands || []).map((band: any, i: number) => ({
+        band_order: Number(band.band_order || i + 1),
+        rate: Number(band.rate || 0),
+        threshold_amount: Number(band.threshold_amount || 0),
+        is_remaining_amount: Boolean(band.is_remaining_amount),
+        description: band.description || "",
+      })),
+    )
     let previousTo = 0
-    return sorted.map((band) => {
-      const to = band.is_remaining_amount ? Number.POSITIVE_INFINITY : Number(band.threshold_amount || 0)
+    let runningTax = 0
+    return normalized.map((band) => {
       const from = previousTo
-      previousTo = Number.isFinite(to) ? to : previousTo
+      if (band.is_remaining_amount) {
+        return {
+          rate: Number(band.rate || 0),
+          from,
+          to: Number.POSITIVE_INFINITY,
+          cumulativeTax: roundMoney(runningTax),
+        }
+      }
+      const width = Number(band.threshold_amount || 0)
+      const to = previousTo + width
+      // cumulative tax at top of this band (for display)
+      runningTax += (width * Number(band.rate || 0)) / 100
+      previousTo = to
       return {
         rate: Number(band.rate || 0),
         from,
         to,
-        cumulativeTax: 0,
+        cumulativeTax: roundMoney(runningTax - (width * Number(band.rate || 0)) / 100),
       }
     })
   }
@@ -1913,10 +1960,13 @@ export default function SettingsPage() {
       if (taxRes.ok) {
         const tax = await taxRes.json()
         if (tax.ssnit) {
+          let emp = Number(tax.ssnit.employee_rate)
+          if (emp > 0 && emp < 1) emp = 5.5
+          const er = Number(tax.ssnit.employer_rate)
           setSsnitRates({
-            employee: tax.ssnit.employee_rate,
-            employer: tax.ssnit.employer_rate,
-            total: tax.ssnit.employee_rate + tax.ssnit.employer_rate,
+            employee: emp,
+            employer: er,
+            total: emp + er,
           })
         }
         if (tax.tier2) {
@@ -4258,15 +4308,20 @@ Format the response in a professional, actionable manner for HR decision-makers.
       const companyId = await resolveHrCompanyId()
       const taxYear = new Date().getFullYear()
 
-      const payeBands = payeTaxBands.map((b: any, i: number) => ({
-        band_order: i + 1,
-        rate: Number(b.rate || 0),
-        threshold_amount: b.to === Number.POSITIVE_INFINITY ? 999999999 : Number(b.to || 0),
-        is_remaining_amount: b.to === Number.POSITIVE_INFINITY,
-        description: `${b.rate}% — ${Number(b.from || 0).toLocaleString()} to ${
-          b.to === Number.POSITIVE_INFINITY ? "∞" : Number(b.to || 0).toLocaleString()
-        }`,
-      }))
+      // Persist GRA width thresholds (to − from), not absolute ceilings.
+      const payeBands = payeTaxBands.map((b: any, i: number) => {
+        const from = Number(b.from || 0)
+        const isRemaining = b.to === Number.POSITIVE_INFINITY || b.to == null || !Number.isFinite(b.to)
+        const to = isRemaining ? from : Number(b.to || 0)
+        const width = isRemaining ? 0 : Math.max(0, to - from)
+        return {
+          band_order: i + 1,
+          rate: Number(b.rate || 0),
+          threshold_amount: width,
+          is_remaining_amount: isRemaining,
+          description: `${b.rate}% — ${from.toLocaleString()} to ${isRemaining ? "∞" : to.toLocaleString()}`,
+        }
+      })
 
       const data = await settingsFetch("/api/settings/tax", {
         method: "POST",
@@ -4400,7 +4455,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
           graCode: r.graCode || r.gra_code || "",
         }),
       )
-      await settingsFetch("/api/settings/payroll/items", {
+      const saveResult = await settingsFetch("/api/settings/payroll/items", {
         method: "POST",
         body: JSON.stringify({
           action: "save_tax_reliefs",
@@ -4408,14 +4463,19 @@ Format the response in a professional, actionable manner for HR decision-makers.
           taxReliefs: payload,
         }),
       })
+      // Keep the in-memory catalog (payload) so a reload glitch never blanks the UI.
+      setTaxReliefs(payload as any)
       await loadPayrollData(companyId, { silent: true }).catch(() => null)
 
       toast({
         title: "Tax Reliefs Saved",
-        description: "Tax reliefs have been saved successfully.",
+        description: saveResult?.warning
+          ? `Saved successfully. Note: ${saveResult.warning}`
+          : "Tax reliefs have been saved successfully.",
       })
     } catch (error) {
       console.error("[v0] Error saving tax reliefs:", error)
+      // Do not clear taxReliefs on failure — synced rows stay visible for retry.
       toast({
         title: "Save Failed",
         description: settingsErrorMessage(error, "Failed to save tax reliefs. Please try again."),

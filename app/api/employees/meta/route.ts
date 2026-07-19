@@ -9,23 +9,6 @@ import { requireApiUser } from "@/lib/auth/api-user"
 import { resolveCompanyId } from "@/lib/employees/resolve-company"
 import { extractOrgOptions } from "@/lib/employees/form-mapper"
 
-const DEFAULT_ALLOWANCES = [
-  { code: "TRANS", description: "Transport Allowance", taxable: true, recurring: true, amount: 0, percentage: 0 },
-  { code: "HOUSE", description: "Housing Allowance", taxable: true, recurring: true, amount: 0, percentage: 0 },
-  { code: "MED", description: "Medical Allowance", taxable: false, recurring: true, amount: 0, percentage: 0 },
-  { code: "MEAL", description: "Meal Allowance", taxable: false, recurring: true, amount: 0, percentage: 0 },
-  { code: "UNIFORM", description: "Uniform Allowance", taxable: false, recurring: true, amount: 0, percentage: 0 },
-  { code: "COMM", description: "Communication Allowance", taxable: false, recurring: true, amount: 0, percentage: 0 },
-]
-
-const DEFAULT_DEDUCTIONS = [
-  { code: "TAX", description: "Tax Deduction", taxable: false, recurring: true, amount: 0, percentage: 0 },
-  { code: "SSNIT", description: "SSNIT Deduction", taxable: false, recurring: true, amount: 0, percentage: 5.5 },
-  { code: "TIER3", description: "Tier 3 Contribution", taxable: false, recurring: true, amount: 0, percentage: 5 },
-  { code: "LOAN", description: "Loan Deduction", taxable: false, recurring: true, amount: 0, percentage: 0 },
-  { code: "ADVANCE", description: "Advance Deduction", taxable: false, recurring: true, amount: 0, percentage: 0 },
-]
-
 export async function GET(req: NextRequest) {
   try {
     const user = await requireApiUser()
@@ -99,44 +82,21 @@ export async function GET(req: NextRequest) {
       )
     })
 
-    let { data: allowances } = await client
+    // Catalog is tenant-owned — never auto-seed predefined allowances/deductions.
+    // Configure them in Settings → Payroll.
+    const { data: allowances } = await client
       .from("payroll_allowances")
       .select("id, code, description, taxable, recurring, amount, percentage, type, is_active")
       .eq("company_id", companyId)
       .eq("is_active", true)
       .order("code")
 
-    let { data: deductions } = await client
+    const { data: deductions } = await client
       .from("payroll_deductions")
       .select("id, code, description, taxable, recurring, amount, percentage, type, is_active")
       .eq("company_id", companyId)
       .eq("is_active", true)
       .order("code")
-
-    // Seed defaults when company has no payroll catalog yet
-    if (!allowances?.length) {
-      const seed = DEFAULT_ALLOWANCES.map((a) => ({ ...a, company_id: companyId, type: "FIXED", is_active: true }))
-      await client.from("payroll_allowances").upsert(seed, { onConflict: "company_id,code" })
-      const again = await client
-        .from("payroll_allowances")
-        .select("id, code, description, taxable, recurring, amount, percentage, type, is_active")
-        .eq("company_id", companyId)
-        .eq("is_active", true)
-        .order("code")
-      allowances = again.data
-    }
-
-    if (!deductions?.length) {
-      const seed = DEFAULT_DEDUCTIONS.map((d) => ({ ...d, company_id: companyId, type: "FIXED", is_active: true }))
-      await client.from("payroll_deductions").upsert(seed, { onConflict: "company_id,code" })
-      const again = await client
-        .from("payroll_deductions")
-        .select("id, code, description, taxable, recurring, amount, percentage, type, is_active")
-        .eq("company_id", companyId)
-        .eq("is_active", true)
-        .order("code")
-      deductions = again.data
-    }
 
     return NextResponse.json({
       success: true,

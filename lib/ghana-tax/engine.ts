@@ -235,6 +235,59 @@ export function applyPayeBands(
   return { totalTax: round2(totalTax), breakdown }
 }
 
+/**
+ * Detect bands stored as cumulative absolute ceilings (from/to UI style)
+ * instead of GRA width thresholds. Width format has a smaller second band
+ * (e.g. 110 after 490); cumulative has strictly increasing ceilings
+ * (490 → 600 → 730 …).
+ */
+function looksLikeCumulativeAbsoluteCeilings(sorted: PAYEBand[]): boolean {
+  const finite = sorted.filter((b) => !b.is_remaining_amount)
+  if (finite.length < 2) return false
+  for (let i = 1; i < finite.length; i++) {
+    if (Number(finite[i].threshold_amount) <= Number(finite[i - 1].threshold_amount)) {
+      return false
+    }
+  }
+  // Also treat huge sentinel ceilings from the settings UI as cumulative.
+  return (
+    Number(finite[1].threshold_amount) > Number(finite[0].threshold_amount) &&
+    Number(finite[0].threshold_amount) > 0
+  )
+}
+
+function convertCumulativeCeilingsToWidths(sorted: PAYEBand[]): PAYEBand[] {
+  let previousCeiling = 0
+  return sorted.map((band, index) => {
+    if (band.is_remaining_amount) {
+      return {
+        ...band,
+        band_order: band.band_order || index + 1,
+        threshold_amount: 0,
+        is_remaining_amount: true,
+      }
+    }
+    const ceiling = Number(band.threshold_amount || 0)
+    // Sentinel "∞" saves from the settings UI
+    if (ceiling >= 99999999) {
+      return {
+        ...band,
+        band_order: band.band_order || index + 1,
+        threshold_amount: 0,
+        is_remaining_amount: true,
+      }
+    }
+    const width = Math.round(Math.max(0, ceiling - previousCeiling) * 100) / 100
+    previousCeiling = ceiling
+    return {
+      ...band,
+      band_order: band.band_order || index + 1,
+      threshold_amount: width,
+      is_remaining_amount: false,
+    }
+  })
+}
+
 export function normalizePayeBands(bands: PAYEBand[] | null | undefined): {
   bands: PAYEBand[]
   isMonthly: boolean
@@ -243,14 +296,20 @@ export function normalizePayeBands(bands: PAYEBand[] | null | undefined): {
     return { bands: GRA_MONTHLY_PAYE_BANDS, isMonthly: true }
   }
 
-  const sorted = [...bands].sort((a, b) => a.band_order - b.band_order)
+  let sorted = [...bands].sort((a, b) => a.band_order - b.band_order)
   const first = sorted.find((b) => !b.is_remaining_amount)
 
   if (first && OBSOLETE_FIRST_BAND_THRESHOLDS.has(Number(first.threshold_amount))) {
     return { bands: GRA_MONTHLY_PAYE_BANDS, isMonthly: true }
   }
 
-  const isMonthly = first != null && Number(first.threshold_amount) <= 1000
+  // Repair cumulative absolute ceilings accidentally saved as threshold_amount.
+  if (looksLikeCumulativeAbsoluteCeilings(sorted)) {
+    sorted = convertCumulativeCeilingsToWidths(sorted)
+  }
+
+  const repairedFirst = sorted.find((b) => !b.is_remaining_amount)
+  const isMonthly = repairedFirst != null && Number(repairedFirst.threshold_amount) <= 1000
   return { bands: sorted, isMonthly }
 }
 

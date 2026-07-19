@@ -29,6 +29,7 @@ import {
   GRA_MONTHLY_PAYE_BANDS,
   GRA_2025_SSNIT,
   GRA_2025_TIER2,
+  normalizePayeBands,
   type TaxRates,
   type EmployeePayInput,
   type TaxCalculationResult,
@@ -300,19 +301,32 @@ function LiveCalculator({ bands, rates }: { bands: TaxBandRow[]; rates: TaxRateR
   const [result, setResult] = useState<TaxCalculationResult | null>(null)
 
   const runCalculation = useCallback(() => {
-    const taxRates: TaxRates = {
-      paye_bands: bands.map((b) => ({
+    const { bands: normalizedBands, isMonthly } = normalizePayeBands(
+      bands.map((b) => ({
         band_order: b.band_order,
         rate: b.rate,
         threshold_amount: b.threshold_amount,
         is_remaining_amount: b.is_remaining_amount,
         description: b.description,
       })),
-      ssnit: rates.find((r) => r.rate_type === "ssnit")
-        ? { employee_rate: rates.find((r) => r.rate_type === "ssnit")!.employee_rate, employer_rate: rates.find((r) => r.rate_type === "ssnit")!.employer_rate }
-        : GRA_2025_SSNIT,
+    )
+    const ssnitRow = rates.find((r) => r.rate_type === "ssnit")
+    let ssnit = ssnitRow
+      ? { employee_rate: ssnitRow.employee_rate, employer_rate: ssnitRow.employer_rate }
+      : GRA_2025_SSNIT
+    // Repair legacy 0.5% Tier-1 split typo → Act 766 5.5%
+    if (ssnit.employee_rate > 0 && ssnit.employee_rate < 1) {
+      ssnit = { ...ssnit, employee_rate: 5.5 }
+    }
+    const taxRates: TaxRates = {
+      paye_bands: normalizedBands,
+      paye_bands_are_monthly: isMonthly,
+      ssnit,
       tier2: rates.find((r) => r.rate_type === "tier2")
-        ? { employee_rate: rates.find((r) => r.rate_type === "tier2")!.employee_rate, employer_rate: rates.find((r) => r.rate_type === "tier2")!.employer_rate }
+        ? {
+            employee_rate: rates.find((r) => r.rate_type === "tier2")!.employee_rate,
+            employer_rate: rates.find((r) => r.rate_type === "tier2")!.employer_rate,
+          }
         : GRA_2025_TIER2,
       tier3: { employee_rate: 0, employer_rate: 0 },
     }
@@ -455,16 +469,25 @@ export default function GhanaTaxSettings({ companyId, taxYear }: Props) {
         if (res.ok) {
           const data = await res.json()
 
-          // PAYE bands
+          // PAYE bands — normalize so cumulative ceilings never poison the calculator
           if (data.paye_bands && data.paye_bands.length > 0) {
-            setBands(
+            const { bands: normalized } = normalizePayeBands(
               data.paye_bands.map((b: any, i: number) => ({
                 band_order: b.band_order ?? i + 1,
                 rate: Number(b.rate),
                 threshold_amount: Number(b.threshold_amount),
                 is_remaining_amount: b.is_remaining_amount ?? false,
                 description: b.description ?? "",
-              }))
+              })),
+            )
+            setBands(
+              normalized.map((b) => ({
+                band_order: b.band_order,
+                rate: b.rate,
+                threshold_amount: b.threshold_amount,
+                is_remaining_amount: b.is_remaining_amount,
+                description: b.description,
+              })),
             )
           } else {
             setBands(
@@ -479,10 +502,12 @@ export default function GhanaTaxSettings({ companyId, taxYear }: Props) {
           }
 
           // SSNIT / Tier rates
+          let ssnitEmployee = Number(data.ssnit?.employee_rate ?? 5.5)
+          if (ssnitEmployee > 0 && ssnitEmployee < 1) ssnitEmployee = 5.5
           const rates: TaxRateRow[] = [
             {
               rate_type: "ssnit",
-              employee_rate: data.ssnit?.employee_rate ?? 5.5,
+              employee_rate: ssnitEmployee,
               employer_rate: data.ssnit?.employer_rate ?? 13,
             },
             {
