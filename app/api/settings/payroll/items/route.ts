@@ -188,34 +188,40 @@ export async function POST(req: NextRequest) {
       await service.from("tax_reliefs").update({ is_active: false, updated_at: now }).eq("company_id", companyId)
 
       if (reliefs.length) {
-        const rows = reliefs.map((r: any) => ({
-          id: typeof r.id === "string" && r.id.includes("-") ? r.id : undefined,
-          company_id: companyId,
-          name: r.name,
-          description: r.description || "",
-          amount: Number(r.amount || 0),
-          annual_amount: Number(r.amount || 0),
-          currency: r.currency || "GHS",
-          category: r.category || "Personal",
-          gra_code: r.graCode || r.gra_code || null,
-          relief_code: r.graCode || r.relief_code || null,
-          is_active: r.isActive !== false,
-          effective_date: r.effectiveDate || null,
-          last_updated: now,
-          updated_at: now,
-        }))
+        const isUuid = (v: unknown) =>
+          typeof v === "string" &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v)
 
-        // Upsert by id when present; otherwise insert
-        const withIds = rows.filter((r) => r.id)
-        const withoutIds = rows.filter((r) => !r.id).map(({ id, ...rest }) => rest)
+        // Always insert fresh rows after soft-deactivate. GRA sync uses numeric ids that
+        // are not valid UUIDs — never pass those into upsert.
+        const rows = reliefs
+          .filter((r: any) => r?.name)
+          .map((r: any) => {
+            const amount = Number(r.amount ?? r.annualAmount ?? 0)
+            const base: Record<string, any> = {
+              company_id: companyId,
+              name: String(r.name),
+              description: r.description || "",
+              amount,
+              annual_amount: amount,
+              currency: r.currency || "GHS",
+              category: r.category || "Personal",
+              gra_code: r.graCode || r.gra_code || r.code || null,
+              relief_code: r.graCode || r.relief_code || r.code || null,
+              is_active: r.isActive !== false,
+              effective_date: r.effectiveDate || r.effective_date || null,
+              last_updated: now,
+              updated_at: now,
+            }
+            if (isUuid(r.id)) base.id = r.id
+            return base
+          })
 
-        if (withIds.length) {
-          const { error } = await service.from("tax_reliefs").upsert(withIds)
-          if (error) throw error
-        }
-        if (withoutIds.length) {
-          const { error } = await service.from("tax_reliefs").insert(withoutIds)
-          if (error) throw error
+        if (rows.length) {
+          // Prefer insert without client ids so GRA numeric ids never corrupt UUID PK.
+          const plain = rows.map(({ id: _id, ...rest }) => rest)
+          const { error: insertErr } = await service.from("tax_reliefs").insert(plain)
+          if (insertErr) throw insertErr
         }
       }
 

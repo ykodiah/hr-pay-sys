@@ -73,7 +73,7 @@ async function resolveUserCompanyId(
     // ignore
   }
 
-  // Fallback: match by corporate/personal email
+  // Fallback: match by corporate/personal email on employees
   if (user.email) {
     try {
       const { data: byEmail } = await service
@@ -86,14 +86,30 @@ async function resolveUserCompanyId(
     } catch {
       // ignore
     }
+
+    // Company contact email (common for tenant admins who are not employees)
+    try {
+      const { data: byCompanyEmail } = await service
+        .from("companies")
+        .select("id")
+        .or(`email_address.eq.${user.email},email.eq.${user.email}`)
+        .limit(1)
+        .maybeSingle()
+      if (byCompanyEmail?.id) return byCompanyEmail.id
+    } catch {
+      // ignore
+    }
   }
 
-  // RPC may be JWT-based (good) or hardcoded (bad) — only accept if it looks like a UUID
-  // and the company actually exists. Do not trust hardcoded demo UUIDs blindly if
-  // the company row is missing.
+  // JWT-based RPC only — accept when the company row exists.
+  // Skip known hardcoded placeholder UUID from old migrations.
   try {
     const { data: rpcId } = await service.rpc("get_current_user_company_id")
-    if (typeof rpcId === "string" && isUuid(rpcId)) {
+    if (
+      typeof rpcId === "string" &&
+      isUuid(rpcId) &&
+      rpcId !== "550e8400-e29b-41d4-a716-446655440000"
+    ) {
       const { data: company } = await service
         .from("companies")
         .select("id")
@@ -168,23 +184,22 @@ export async function resolveTenantContext(
   const homeCompanyId = await resolveUserCompanyId(service, user)
 
   if (requestedId) {
-    // Client-supplied company_id must match the caller's home company.
-    // (Multi-company access can be expanded later via an explicit membership table.)
+    if (!isUuid(requestedId)) {
+      return badRequest("Invalid company_id", 400)
+    }
+    const { data: company } = await service
+      .from("companies")
+      .select("id")
+      .eq("id", requestedId)
+      .maybeSingle()
+    if (!company?.id) {
+      return badRequest("Unknown company_id", 404)
+    }
+    // Client-supplied company_id must match home company when one is known.
+    // If home is unknown (admin not linked yet), allow the existing company id
+    // so Settings can load/save after Company tab establishes the tenant.
     if (homeCompanyId && requestedId !== homeCompanyId) {
       return forbidden("company_id does not belong to the authenticated user")
-    }
-    if (!homeCompanyId) {
-      // No home company yet (brand-new tenant admin): allow only if the company exists
-      // and has no employees / is being bootstrapped by this user. Still require the
-      // company row to exist — never invent one via LIMIT 1.
-      const { data: company } = await service
-        .from("companies")
-        .select("id")
-        .eq("id", requestedId)
-        .maybeSingle()
-      if (!company?.id) {
-        return badRequest("Unknown company_id", 404)
-      }
     }
     return { companyId: requestedId, userId, demo, service }
   }
@@ -195,7 +210,7 @@ export async function resolveTenantContext(
 
   // Fail closed — do NOT fall back to newest/oldest company.
   return badRequest(
-    "Unable to resolve company for this user. Set company_id on the user profile or pass a valid company_id.",
+    "Unable to resolve company for this user. Open Company settings and save your company, or set company_id on the user profile.",
     400,
   )
 }

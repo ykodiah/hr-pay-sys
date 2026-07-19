@@ -393,9 +393,20 @@ async function settingsFetch(url: string, init?: RequestInit) {
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
-    throw new Error(data.error || data.message || `Request failed (${res.status})`)
+    const detail =
+      (typeof data.error === "string" && data.error) ||
+      (typeof data.message === "string" && data.message) ||
+      (Array.isArray(data.errors) && data.errors.filter(Boolean).join("; ")) ||
+      `Request failed (${res.status})`
+    throw new Error(detail)
   }
   return data
+}
+
+function settingsErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message?.trim()) return error.message.trim()
+  if (typeof error === "string" && error.trim()) return error.trim()
+  return fallback
 }
 
 const ensureStringArray = (value: unknown): string[] => {
@@ -1470,7 +1481,14 @@ export default function SettingsPage() {
 
     try {
       const { data, error } = await supabase.rpc("get_current_user_company_id")
-      if (!error && typeof data === "string" && data.trim().length > 0) {
+      const HARDCODED_PLACEHOLDER = "550e8400-e29b-41d4-a716-446655440000"
+      if (
+        !error &&
+        typeof data === "string" &&
+        data.trim().length > 0 &&
+        data !== HARDCODED_PLACEHOLDER &&
+        !data.startsWith("demo-")
+      ) {
         return data
       }
       if (error) {
@@ -1505,8 +1523,8 @@ export default function SettingsPage() {
       console.error("[v0] Error loading company data:", error)
       if (!isDemoMode()) {
         toast({
-          title: "Error",
-          description: error instanceof Error ? error.message : "Failed to load company data",
+          title: "Company settings error",
+          description: settingsErrorMessage(error, "Failed to load company data"),
           variant: "destructive",
         })
       }
@@ -1623,7 +1641,7 @@ export default function SettingsPage() {
     }
   }
 
-  const loadSubsidiaries = async (companyId?: string) => {
+  const loadSubsidiaries = async (companyId?: string, opts?: { silent?: boolean }) => {
     console.log("[v0] Loading subsidiaries...")
 
     try {
@@ -1631,13 +1649,13 @@ export default function SettingsPage() {
       if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
         targetCompanyId = (await loadCompanyData()) || targetCompanyId
       }
-      const qs =
-        targetCompanyId && !String(targetCompanyId).startsWith("demo-")
-          ? `?company_id=${encodeURIComponent(targetCompanyId)}`
-          : ""
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        throw new Error("No company id available. Save Company settings first.")
+      }
+      const qs = `?company_id=${encodeURIComponent(targetCompanyId)}`
       const [listPayload, prefsPayload] = await Promise.all([
         settingsFetch(`/api/settings/subsidiaries${qs}`),
-        settingsFetch(`/api/settings/subsidiaries${qs}${qs ? "&" : "?"}action=sync_preferences`).catch(() => null),
+        settingsFetch(`/api/settings/subsidiaries${qs}&action=sync_preferences`).catch(() => null),
       ])
       setSubsidiaries(listPayload.subsidiaries || [])
       clearClientDemoSession()
@@ -1652,41 +1670,46 @@ export default function SettingsPage() {
       console.log("[v0] Loaded subsidiaries:", (listPayload.subsidiaries || []).length)
     } catch (error) {
       console.error("Subsidiaries loading error:", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to load subsidiaries",
-        variant: "destructive",
-      })
+      if (!opts?.silent) {
+        toast({
+          title: "Multi-Company error",
+          description: settingsErrorMessage(error, "Failed to load subsidiaries"),
+          variant: "destructive",
+        })
+      }
+      throw error
     }
   }
 
-  const loadRoles = async (companyId?: string) => {
+  const loadRoles = async (companyId?: string, opts?: { silent?: boolean }) => {
     console.log("[v0] Loading roles...")
-    // Always read from the service-role API (same pattern as HR / Payroll / Notifications).
     try {
       let targetCompanyId = companyId || companyData.id
       if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
         targetCompanyId = (await loadCompanyData()) || targetCompanyId
       }
-      const qs =
-        targetCompanyId && !String(targetCompanyId).startsWith("demo-")
-          ? `?company_id=${encodeURIComponent(targetCompanyId)}`
-          : ""
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        throw new Error("No company id available. Save Company settings first.")
+      }
+      const qs = `?company_id=${encodeURIComponent(targetCompanyId)}`
       const { roles: roleRows } = await settingsFetch(`/api/settings/roles${qs}`)
       clearClientDemoSession()
       setRoles(Array.isArray(roleRows) ? roleRows : [])
     } catch (error) {
       console.error("Error loading roles:", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to load roles",
-        variant: "destructive",
-      })
+      if (!opts?.silent) {
+        toast({
+          title: "Roles error",
+          description: settingsErrorMessage(error, "Failed to load roles"),
+          variant: "destructive",
+        })
+      }
+      throw error
     }
   }
 
   // Added for Access Control and Security
-  const loadAccessAndSecurityData = async (companyId?: string) => {
+  const loadAccessAndSecurityData = async (companyId?: string, opts?: { silent?: boolean }) => {
     console.log("[v0] Loading access and security data...")
 
     let targetCompanyId = companyId || companyData.id
@@ -1695,8 +1718,15 @@ export default function SettingsPage() {
     }
 
     if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
-      console.warn("[v0] Unable to load access/security data without a company id")
-      return
+      const err = new Error("No company id available. Save Company settings first.")
+      if (!opts?.silent) {
+        toast({
+          title: "Access / Security error",
+          description: err.message,
+          variant: "destructive",
+        })
+      }
+      throw err
     }
 
     try {
@@ -1720,11 +1750,14 @@ export default function SettingsPage() {
       console.log("[v0] Access and security data loaded from database.")
     } catch (error) {
       console.error("[v0] Failed to load access and security data", error)
-      toast({
-        title: "Error",
-        description: "Unable to load access and security insights.",
-        variant: "destructive",
-      })
+      if (!opts?.silent) {
+        toast({
+          title: "Access / Security error",
+          description: settingsErrorMessage(error, "Unable to load access and security settings."),
+          variant: "destructive",
+        })
+      }
+      throw error
     }
   }
 
@@ -1739,19 +1772,17 @@ export default function SettingsPage() {
     return targetCompanyId
   }
 
-  const loadHrData = async (companyId?: string) => {
-    // Always hit the service-role API first (same pattern as Company).
-    // A stale demo-session cookie must not keep mock HR policies/docs on screen.
+  const loadHrData = async (companyId?: string, opts?: { silent?: boolean }) => {
     try {
       let targetCompanyId = companyId || companyData.id
       if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
         targetCompanyId = (await loadCompanyData()) || targetCompanyId
       }
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        throw new Error("No company id available. Save Company settings first.")
+      }
 
-      const qs =
-        targetCompanyId && !String(targetCompanyId).startsWith("demo-")
-          ? `?company_id=${encodeURIComponent(targetCompanyId)}`
-          : ""
+      const qs = `?company_id=${encodeURIComponent(targetCompanyId)}`
       const payload = await settingsFetch(`/api/settings/hr${qs}`)
       clearClientDemoSession()
 
@@ -1762,11 +1793,14 @@ export default function SettingsPage() {
       setUnstructuredGrades(Array.isArray(payload.unstructuredGrades) ? payload.unstructuredGrades : [])
     } catch (error) {
       console.error("[v0] Failed to load HR configuration/documents", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Unable to load HR configuration.",
-        variant: "destructive",
-      })
+      if (!opts?.silent) {
+        toast({
+          title: "HR settings error",
+          description: settingsErrorMessage(error, "Unable to load HR configuration."),
+          variant: "destructive",
+        })
+      }
+      throw error
     }
   }
 
@@ -1852,16 +1886,14 @@ export default function SettingsPage() {
     }
   }
 
-  const loadPayrollData = async (companyId?: string) => {
-    // Always hit service-role APIs first (same pattern as Company / HR).
+  const loadPayrollData = async (companyId?: string, opts?: { silent?: boolean }) => {
     try {
       let targetCompanyId = companyId || companyData.id
       if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
         targetCompanyId = (await loadCompanyData()) || targetCompanyId
       }
       if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
-        console.warn("[v0] Unable to load payroll data without a company id")
-        return
+        throw new Error("No company id available. Save Company settings first.")
       }
 
       await loadPayrollSettings(targetCompanyId)
@@ -1918,26 +1950,28 @@ export default function SettingsPage() {
       )
     } catch (error) {
       console.error("[v0] Failed to load payroll configuration", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Unable to load payroll settings.",
-        variant: "destructive",
-      })
+      if (!opts?.silent) {
+        toast({
+          title: "Payroll settings error",
+          description: settingsErrorMessage(error, "Unable to load payroll settings."),
+          variant: "destructive",
+        })
+      }
+      throw error
     }
   }
 
-  const loadNotificationSettings = async (companyId?: string) => {
-    // Always hit the service-role API first (same pattern as Company / HR / Payroll).
+  const loadNotificationSettings = async (companyId?: string, opts?: { silent?: boolean }) => {
     try {
       let targetCompanyId = companyId || companyData.id
       if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
         targetCompanyId = (await loadCompanyData()) || targetCompanyId
       }
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        throw new Error("No company id available. Save Company settings first.")
+      }
 
-      const qs =
-        targetCompanyId && !String(targetCompanyId).startsWith("demo-")
-          ? `?company_id=${encodeURIComponent(targetCompanyId)}`
-          : ""
+      const qs = `?company_id=${encodeURIComponent(targetCompanyId)}`
       const payload = await settingsFetch(`/api/settings/notifications${qs}`)
       clearClientDemoSession()
 
@@ -1950,11 +1984,14 @@ export default function SettingsPage() {
       }
     } catch (error) {
       console.error("[v0] Failed to load notification settings", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Unable to load notification preferences.",
-        variant: "destructive",
-      })
+      if (!opts?.silent) {
+        toast({
+          title: "Notifications error",
+          description: settingsErrorMessage(error, "Unable to load notification preferences."),
+          variant: "destructive",
+        })
+      }
+      throw error
     }
   }
 
@@ -1965,12 +2002,12 @@ export default function SettingsPage() {
         await Promise.all([
           loadCompanyData(),
           loadEmployees(),
-          loadSubsidiaries(),
-          loadRoles(),
-          loadHrData(),
-          loadPayrollData(),
-          loadNotificationSettings(),
-          loadAccessAndSecurityData(),
+          loadSubsidiaries(undefined, { silent: true }).catch(() => null),
+          loadRoles(undefined, { silent: true }).catch(() => null),
+          loadHrData(undefined, { silent: true }).catch(() => null),
+          loadPayrollData(undefined, { silent: true }).catch(() => null),
+          loadNotificationSettings(undefined, { silent: true }).catch(() => null),
+          loadAccessAndSecurityData(undefined, { silent: true }).catch(() => null),
         ])
         console.log("[v0] All settings data loaded successfully in demo mode")
         return
@@ -1978,24 +2015,49 @@ export default function SettingsPage() {
 
       const companyId = await loadCompanyData()
 
-      if (!companyId) {
-        console.warn("[v0] No company id available after loading company data")
+      if (!companyId || String(companyId).startsWith("demo-")) {
+        toast({
+          title: "Company required",
+          description:
+            "Could not resolve your company. Open the Company tab, save your company details, then reload Settings.",
+          variant: "destructive",
+        })
         return
       }
 
-      await Promise.all([
+      const results = await Promise.allSettled([
         loadEmployees(companyId),
-        loadSubsidiaries(companyId),
-        loadRoles(companyId),
-        loadHrData(companyId),
-        loadPayrollData(companyId),
-        loadNotificationSettings(companyId),
-        loadAccessAndSecurityData(companyId),
+        loadSubsidiaries(companyId, { silent: true }),
+        loadRoles(companyId, { silent: true }),
+        loadHrData(companyId, { silent: true }),
+        loadPayrollData(companyId, { silent: true }),
+        loadNotificationSettings(companyId, { silent: true }),
+        loadAccessAndSecurityData(companyId, { silent: true }),
       ])
+
+      const failed = results
+        .map((r, i) => ({ r, label: ["Employees", "Multi-Company", "Roles", "HR", "Payroll", "Notifications", "Access/Security"][i] }))
+        .filter(({ r }) => r.status === "rejected") as Array<{ r: PromiseRejectedResult; label: string }>
+
+      if (failed.length) {
+        const details = failed
+          .map(({ r, label }) => `${label}: ${settingsErrorMessage(r.reason, "failed")}`)
+          .join(" · ")
+        toast({
+          title: `Settings load issues (${failed.length})`,
+          description: details.slice(0, 400),
+          variant: "destructive",
+        })
+      }
 
       console.log("[v0] All settings data loaded successfully")
     } catch (error) {
       console.error("[v0] Error loading settings data:", error)
+      toast({
+        title: "Settings error",
+        description: settingsErrorMessage(error, "Failed to load settings"),
+        variant: "destructive",
+      })
     }
   }
 
@@ -4294,7 +4356,16 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
     try {
       const companyId = await resolveHrCompanyId()
-      const payload = Array.isArray(reliefsOverride) ? reliefsOverride : taxReliefs
+      const payload = (Array.isArray(reliefsOverride) ? reliefsOverride : taxReliefs).map(
+        (r: any) => ({
+          ...r,
+          // Drop GRA/local numeric ids — API inserts fresh UUID rows
+          id: typeof r.id === "string" && r.id.includes("-") ? r.id : undefined,
+          name: r.name || "Untitled relief",
+          amount: Number(r.amount || 0),
+          graCode: r.graCode || r.gra_code || "",
+        }),
+      )
       await settingsFetch("/api/settings/payroll/items", {
         method: "POST",
         body: JSON.stringify({
@@ -4303,7 +4374,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
           taxReliefs: payload,
         }),
       })
-      await loadPayrollData(companyId)
+      await loadPayrollData(companyId, { silent: true }).catch(() => null)
 
       toast({
         title: "Tax Reliefs Saved",
@@ -5447,12 +5518,14 @@ Format the response in a professional, actionable manner for HR decision-makers.
         value={activeSettingsTab}
         onValueChange={(value) => {
           setActiveSettingsTab(value)
-          if (value === "subsidiaries") void loadSubsidiaries()
-          if (value === "payroll") void loadPayrollData()
-          if (value === "notifications") void loadNotificationSettings()
-          if (value === "roles") void loadRoles()
-          if (value === "access") void loadAccessAndSecurityData()
-          if (value === "security") void loadAccessAndSecurityData()
+          const cid = companyData.id && !String(companyData.id).startsWith("demo-") ? companyData.id : undefined
+          if (value === "subsidiaries") void loadSubsidiaries(cid)
+          if (value === "hr") void loadHrData(cid)
+          if (value === "payroll") void loadPayrollData(cid)
+          if (value === "notifications") void loadNotificationSettings(cid)
+          if (value === "roles") void loadRoles(cid)
+          if (value === "access") void loadAccessAndSecurityData(cid)
+          if (value === "security") void loadAccessAndSecurityData(cid)
         }}
         className="space-y-6"
       >

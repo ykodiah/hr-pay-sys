@@ -107,19 +107,40 @@ export default function TaxReliefManager({
 
       // Get comprehensive tax reliefs (simulated GRA data)
       const comprehensiveReliefs = await graApiService.getComprehensiveTaxReliefs();
-      
-      setReliefs(comprehensiveReliefs);
+      // Strip non-UUID ids so DB save always inserts clean catalog rows
+      const normalized = (comprehensiveReliefs || []).map((r: any, index: number) => ({
+        ...r,
+        id: undefined,
+        name: r.name || `GRA Relief ${index + 1}`,
+        description: r.description || "",
+        amount: Number(r.amount || 0),
+        currency: r.currency || "GHS",
+        category: r.category || "Personal",
+        graCode: r.graCode || r.code || "",
+        isActive: r.isActive !== false,
+        effectiveDate: r.effectiveDate || new Date().toISOString().slice(0, 10),
+      }))
+
+      setReliefs(normalized as any);
       setSyncStatus(graApiService.getSyncStatus());
-      
-      toast({
-        title: "Tax Reliefs Synced",
-        description: `Successfully synced ${comprehensiveReliefs.length} tax reliefs from GRA portal.`,
-      });
+
+      if (onSaveReliefs) {
+        await onSaveReliefs(normalized);
+        toast({
+          title: "Tax Reliefs Synced & Saved",
+          description: `Synced ${normalized.length} GRA reliefs and saved them to your company catalog.`,
+        });
+      } else {
+        toast({
+          title: "Tax Reliefs Synced",
+          description: `Synced ${normalized.length} reliefs. Click Save All to persist them.`,
+        });
+      }
     } catch (error) {
       console.error('Error syncing tax reliefs:', error);
       toast({
         title: "Sync Failed",
-        description: "Failed to sync tax reliefs. Please check your connection and try again.",
+        description: error instanceof Error ? error.message : "Failed to sync tax reliefs. Please try again.",
         variant: "destructive",
       });
     } finally {
