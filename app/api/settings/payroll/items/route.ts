@@ -83,12 +83,30 @@ async function purgeAccidentalSeedCatalog(
   return { allowances, deductions }
 }
 
+function resolveReliefCode(r: any, index: number) {
+  const raw = String(
+    r.graCode ||
+      r.gra_code ||
+      r.reliefCode ||
+      r.relief_code ||
+      r.code ||
+      "",
+  ).trim()
+  if (raw) return raw.slice(0, 50)
+  const fromName = String(r.name || "relief")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40)
+  return (fromName || "CUSTOM") + `-${index + 1}`
+}
+
 function normalizeReliefPayload(reliefs: any[], companyId: string, now: string) {
   return reliefs
     .filter((r: any) => r?.name)
     .map((r: any, index: number) => {
       const amount = Number(r.amount ?? r.annualAmount ?? 0)
-      const graCode = String(r.graCode || r.gra_code || r.code || `CUSTOM-${index + 1}`).trim()
+      const graCode = resolveReliefCode(r, index)
       const effective = r.effectiveDate || r.effective_date || null
       return {
         company_id: companyId,
@@ -199,8 +217,7 @@ async function persistTaxReliefsJsonBackup(
       if (!error) {
         return {
           saved: true,
-          warning:
-            "Saved tax reliefs to companies.settings_data. Run scripts/074_tenant_isolation_and_tax_reliefs.sql for full tax_reliefs table support.",
+          warning: "Saved tax reliefs to companies.settings_data backup.",
         }
       }
     }
@@ -249,6 +266,101 @@ async function loadTaxReliefsJsonBackup(service: any, companyId: string): Promis
   return []
 }
 
+function withRequiredReliefCodes(row: Record<string, any>, companyId: string, now: string) {
+  const code = String(row.relief_code || row.gra_code || row.code || "CUSTOM").trim() || "CUSTOM"
+  const out: Record<string, any> = {
+    company_id: companyId,
+    name: String(row.name || "Tax relief").slice(0, 150),
+    amount: Number(row.amount ?? row.annual_amount ?? 0),
+    gra_code: code,
+    relief_code: code,
+    code,
+    is_active: true,
+    updated_at: now,
+  }
+  if (row.description != null && row.description !== "") out.description = String(row.description)
+  if (row.annual_amount != null) out.annual_amount = Number(row.annual_amount)
+  else out.annual_amount = out.amount
+  if (row.currency) out.currency = String(row.currency)
+  if (row.category) out.category = String(row.category)
+  if (row.effective_date) out.effective_date = row.effective_date
+  if (row.last_updated) out.last_updated = row.last_updated
+  else out.last_updated = now
+  return out
+}
+
+async function upsertTaxReliefRow(
+  service: any,
+  companyId: string,
+  row: Record<string, any>,
+  existingId: string | undefined,
+  now: string,
+): Promise<{ ok: boolean; id?: string; error?: any }> {
+  const full = withRequiredReliefCodes(row, companyId, now)
+
+  // Progressive column strip — never drop relief_code / gra_code / code
+  const attempts = [
+    full,
+    (({ effective_date, last_updated, annual_amount, currency, category, description, ...r }) => r)(full),
+    {
+      company_id: companyId,
+      name: full.name,
+      amount: full.amount,
+      gra_code: full.gra_code,
+      relief_code: full.relief_code,
+      code: full.code,
+      is_active: true,
+      updated_at: now,
+    },
+    {
+      company_id: companyId,
+      name: full.name,
+      amount: full.amount,
+      relief_code: full.relief_code,
+      is_active: true,
+      updated_at: now,
+    },
+  ]
+
+  let lastError: any = null
+  for (const payload of attempts) {
+    if (existingId) {
+      const { error } = await service.from("tax_reliefs").update(payload).eq("id", existingId).eq("company_id", companyId)
+      if (!error) return { ok: true, id: existingId }
+      lastError = error
+      if (isMissingRelation(error)) return { ok: false, error }
+    } else {
+      const { data, error } = await service
+        .from("tax_reliefs")
+        .insert({ ...payload, created_at: now })
+        .select("id")
+        .maybeSingle()
+      if (!error) return { ok: true, id: data?.id }
+      lastError = error
+      if (isMissingRelation(error)) return { ok: false, error }
+    }
+  }
+
+  // Final attempt with absolute minimum NOT NULL fields
+  const minimal = {
+    company_id: companyId,
+    name: full.name,
+    relief_code: full.relief_code,
+    is_active: true,
+    updated_at: now,
+  }
+  if (existingId) {
+    const { error } = await service.from("tax_reliefs").update(minimal).eq("id", existingId).eq("company_id", companyId)
+    return error ? { ok: false, error } : { ok: true, id: existingId }
+  }
+  const { data, error } = await service
+    .from("tax_reliefs")
+    .insert({ ...minimal, created_at: now })
+    .select("id")
+    .maybeSingle()
+  return error ? { ok: false, error: error || lastError } : { ok: true, id: data?.id }
+}
+
 async function syncTaxReliefsTable(
   service: any,
   companyId: string,
@@ -263,66 +375,86 @@ async function syncTaxReliefsTable(
     return { saved: 0 }
   }
 
-  // Soft-deactivate current actives for this company first
-  const { error: deactErr } = await service
+  const { data: existingRows, error: loadErr } = await service
     .from("tax_reliefs")
-    .update({ is_active: false, updated_at: now })
+    .select("id, gra_code, relief_code, code, name, is_active")
     .eq("company_id", companyId)
-    .eq("is_active", true)
-  if (deactErr && !isMissingRelation(deactErr) && !isMissingColumn(deactErr)) {
-    console.warn("[tax_reliefs] deactivate warning:", deactErr.message)
-  }
 
-  const payloads = [
-    // Full
-    rows,
-    // Without optional dates / codes
-    rows.map(({ effective_date, last_updated, relief_code, code, annual_amount, currency, category, description, ...r }) => ({
-      ...r,
-      amount: r.amount ?? 0,
-    })),
-    // Minimal
-    rows.map((r) => ({
-      company_id: companyId,
-      name: r.name,
-      amount: r.amount ?? 0,
-      gra_code: r.gra_code,
-      is_active: true,
-      updated_at: now,
-    })),
-  ]
-
-  let lastError: any = null
-  for (const payload of payloads) {
-    // Strip undefined keys (PostgREST can reject null dates depending on schema)
-    const cleaned = payload.map((row) => {
-      const out: Record<string, any> = {}
-      for (const [k, v] of Object.entries(row)) {
-        if (v !== undefined && v !== null) out[k] = v
-      }
-      out.is_active = true
-      out.company_id = companyId
-      return out
-    })
-
-    const { error } = await service.from("tax_reliefs").insert(cleaned)
-    if (!error) return { saved: cleaned.length }
-    lastError = error
-    if (isMissingRelation(error)) {
+  if (loadErr) {
+    if (isMissingRelation(loadErr)) {
       return {
         saved: 0,
-        warning:
-          "tax_reliefs table missing — catalog saved to company settings. Run scripts/069 and 074.",
+        warning: "tax_reliefs table missing — catalog saved to company settings. Run scripts/069 and 074.",
+      }
+    }
+    return {
+      saved: 0,
+      warning: `Table sync skipped: ${loadErr.message}. Catalog kept in company settings.`,
+    }
+  }
+
+  const byCode = new Map<string, any>()
+  for (const er of existingRows || []) {
+    const key = String(er.gra_code || er.relief_code || er.code || "")
+      .trim()
+      .toUpperCase()
+    if (key && !byCode.has(key)) byCode.set(key, er)
+  }
+
+  const keepIds = new Set<string>()
+  let saved = 0
+  let lastError: any = null
+
+  for (const row of rows) {
+    const code = String(row.relief_code || row.gra_code || row.code || "")
+      .trim()
+      .toUpperCase()
+    const match = code ? byCode.get(code) : null
+    const result = await upsertTaxReliefRow(service, companyId, row, match?.id, now)
+    if (result.ok) {
+      saved += 1
+      if (result.id) keepIds.add(result.id)
+      else if (match?.id) keepIds.add(match.id)
+    } else {
+      lastError = result.error
+      if (isMissingRelation(result.error)) {
+        return {
+          saved: 0,
+          warning: "tax_reliefs table missing — catalog saved to company settings. Run scripts/069 and 074.",
+        }
       }
     }
   }
 
-  return {
-    saved: 0,
-    warning: lastError?.message
-      ? `Table sync skipped: ${lastError.message}. Catalog kept in company settings.`
-      : "Table sync skipped. Catalog kept in company settings.",
+  // Soft-deactivate catalog rows not in this save
+  if (saved > 0 && (existingRows || []).length) {
+    const staleIds = (existingRows || [])
+      .filter((er: any) => er.is_active !== false && er.id && !keepIds.has(er.id))
+      .map((er: any) => er.id)
+    if (staleIds.length) {
+      await service
+        .from("tax_reliefs")
+        .update({ is_active: false, updated_at: now })
+        .eq("company_id", companyId)
+        .in("id", staleIds)
+    }
   }
+
+  if (saved === 0 && lastError) {
+    return {
+      saved: 0,
+      warning: `Table sync skipped: ${lastError.message}. Catalog kept in company settings.`,
+    }
+  }
+
+  if (saved < rows.length && lastError) {
+    return {
+      saved,
+      warning: `Synced ${saved}/${rows.length} reliefs to tax_reliefs. Last error: ${lastError.message}`,
+    }
+  }
+
+  return { saved }
 }
 
 export async function GET(req: NextRequest) {
@@ -491,14 +623,20 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      // 2) Best-effort sync into tax_reliefs table (payroll assignment module)
+      // 2) Sync into tax_reliefs table (required for payroll Assign / Bulk Assign)
       const tableSync = await syncTaxReliefsTable(service, companyId, rows, now)
+
+      // Only surface warnings when table sync fails or partially fails.
+      // JSON backup path is silent when the catalog table sync succeeded.
+      const warning =
+        tableSync.warning ||
+        (tableSync.saved === 0 && backup.warning ? backup.warning : undefined)
 
       return NextResponse.json({
         success: true,
         saved: uiReliefs.length,
         table_saved: tableSync.saved,
-        warning: [backup.warning, tableSync.warning].filter(Boolean).join(" ") || undefined,
+        warning,
         taxReliefs: uiReliefs,
       })
     }

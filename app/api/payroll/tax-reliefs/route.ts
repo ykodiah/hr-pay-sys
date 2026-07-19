@@ -137,7 +137,14 @@ async function materializeCatalogFromSettings(service: any, companyId: string): 
 
   const rows = active.map((r: any, index: number) => {
     const amount = Number(r.amount ?? r.annualAmount ?? 0)
-    const graCode = String(r.graCode || r.gra_code || r.code || `CUSTOM-${index + 1}`).trim()
+    const raw = String(r.graCode || r.gra_code || r.reliefCode || r.relief_code || r.code || "").trim()
+    const graCode =
+      raw ||
+      `${String(r.name || "relief")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 40) || "CUSTOM"}-${index + 1}`
     return {
       company_id: companyId,
       name: String(r.name).slice(0, 150),
@@ -148,23 +155,36 @@ async function materializeCatalogFromSettings(service: any, companyId: string): 
       category: r.category || "Personal",
       gra_code: graCode,
       relief_code: graCode,
+      code: graCode,
       is_active: true,
       updated_at: now,
       created_at: now,
     }
   })
 
-  // Insert best-effort (ignore schema-cache column misses with progressive strip)
+  // Insert best-effort — never strip relief_code (legacy schemas enforce NOT NULL)
   const attempts = [
     rows,
-    rows.map(({ relief_code, annual_amount, currency, category, description, ...r }) => r),
+    rows.map(({ annual_amount, currency, category, description, code, ...r }) => r),
     rows.map((r) => ({
       company_id: companyId,
       name: r.name,
       amount: r.amount,
       gra_code: r.gra_code,
+      relief_code: r.relief_code,
+      code: r.code,
       is_active: true,
       updated_at: now,
+      created_at: now,
+    })),
+    rows.map((r) => ({
+      company_id: companyId,
+      name: r.name,
+      amount: r.amount,
+      relief_code: r.relief_code,
+      is_active: true,
+      updated_at: now,
+      created_at: now,
     })),
   ]
 

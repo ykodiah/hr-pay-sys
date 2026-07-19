@@ -4464,11 +4464,15 @@ Format the response in a professional, actionable manner for HR decision-makers.
       setTaxReliefs(savedList as any)
       await loadPayrollData(companyId, { silent: true }).catch(() => null)
 
+      const tableSaved = Number(saveResult?.table_saved || 0)
       toast({
         title: "Tax Reliefs Saved",
-        description: saveResult?.warning
-          ? `Saved ${savedList.length} reliefs. Note: ${saveResult.warning}`
-          : `${savedList.length} tax reliefs saved successfully.`,
+        description:
+          tableSaved > 0 && !saveResult?.warning
+            ? `${savedList.length} tax reliefs saved and ready to assign in Payroll.`
+            : saveResult?.warning
+              ? `Saved ${savedList.length} reliefs. Note: ${saveResult.warning}`
+              : `${savedList.length} tax reliefs saved successfully.`,
       })
     } catch (error) {
       console.error("[v0] Error saving tax reliefs:", error)
