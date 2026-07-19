@@ -81,6 +81,109 @@ function toEngineItem(row: any, relief?: any) {
   }
 }
 
+/**
+ * Settings → Payroll may persist reliefs only in company_settings.settings_data.tax_reliefs.
+ * Materialize those into tax_reliefs so Assign / Bulk Assign get real UUID ids.
+ */
+async function materializeCatalogFromSettings(service: any, companyId: string): Promise<any[]> {
+  const now = new Date().toISOString()
+  let backup: any[] = []
+
+  try {
+    const { data: settings } = await service
+      .from("company_settings")
+      .select("settings_data")
+      .eq("company_id", companyId)
+      .maybeSingle()
+    if (Array.isArray(settings?.settings_data?.tax_reliefs)) {
+      backup = settings.settings_data.tax_reliefs
+    }
+  } catch {
+    // ignore
+  }
+
+  if (!backup.length) {
+    try {
+      const { data: byId } = await service
+        .from("company_settings")
+        .select("settings_data")
+        .eq("id", companyId)
+        .maybeSingle()
+      if (Array.isArray(byId?.settings_data?.tax_reliefs)) {
+        backup = byId.settings_data.tax_reliefs
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!backup.length) {
+    try {
+      const { data: company } = await service
+        .from("companies")
+        .select("settings_data")
+        .eq("id", companyId)
+        .maybeSingle()
+      if (Array.isArray(company?.settings_data?.tax_reliefs)) {
+        backup = company.settings_data.tax_reliefs
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const active = backup.filter((r) => r?.name && r.isActive !== false)
+  if (!active.length) return []
+
+  const rows = active.map((r: any, index: number) => {
+    const amount = Number(r.amount ?? r.annualAmount ?? 0)
+    const graCode = String(r.graCode || r.gra_code || r.code || `CUSTOM-${index + 1}`).trim()
+    return {
+      company_id: companyId,
+      name: String(r.name).slice(0, 150),
+      description: r.description || "",
+      amount,
+      annual_amount: amount,
+      currency: r.currency || "GHS",
+      category: r.category || "Personal",
+      gra_code: graCode,
+      relief_code: graCode,
+      is_active: true,
+      updated_at: now,
+      created_at: now,
+    }
+  })
+
+  // Insert best-effort (ignore schema-cache column misses with progressive strip)
+  const attempts = [
+    rows,
+    rows.map(({ relief_code, annual_amount, currency, category, description, ...r }) => r),
+    rows.map((r) => ({
+      company_id: companyId,
+      name: r.name,
+      amount: r.amount,
+      gra_code: r.gra_code,
+      is_active: true,
+      updated_at: now,
+    })),
+  ]
+
+  for (const payload of attempts) {
+    const { error } = await service.from("tax_reliefs").insert(payload)
+    if (!error) break
+    if (isMissingRelation(error)) return []
+  }
+
+  const { data: refreshed } = await service
+    .from("tax_reliefs")
+    .select("*")
+    .eq("company_id", companyId)
+    .eq("is_active", true)
+    .order("name")
+
+  return refreshed || []
+}
+
 export async function GET(req: NextRequest) {
   try {
     const ctx = await resolveTenantContext(req)
@@ -95,8 +198,8 @@ export async function GET(req: NextRequest) {
     const mode = searchParams.get("mode") || "page"
     const employeeId = searchParams.get("employee_id")
 
-    // Catalog
-    const { data: catalogRows, error: catalogErr } = await service
+    // Catalog — table first; if empty, materialize from Settings JSON backup so Assign works
+    let { data: catalogRows, error: catalogErr } = await service
       .from("tax_reliefs")
       .select("*")
       .eq("company_id", companyId)
@@ -104,6 +207,14 @@ export async function GET(req: NextRequest) {
       .order("name")
 
     if (catalogErr && !isMissingRelation(catalogErr)) throw catalogErr
+
+    if (!(catalogRows || []).length) {
+      const materialized = await materializeCatalogFromSettings(service, companyId)
+      if (materialized.length) {
+        catalogRows = materialized
+      }
+    }
+
     const catalog = (catalogRows || []).map(mapCatalogRow)
 
     // Assignments for year

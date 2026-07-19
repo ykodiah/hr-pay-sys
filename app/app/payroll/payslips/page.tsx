@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
+import { resolveClientCompanyId } from "@/lib/tenant/resolve-company-client"
 import {
   Search,
   Download,
@@ -373,6 +374,7 @@ function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | n
 
 export default function PayslipsPage() {
   const supabase = createClient()
+  const [companyId, setCompanyId] = useState("")
   const { toast } = useToast()
 
   // Global state
@@ -441,48 +443,98 @@ export default function PayslipsPage() {
 
   const loadAll = async () => {
     setLoadingRuns(true)
-    const [runsRes, empsRes, subsRes] = await Promise.all([
-      supabase.from("payroll_runs").select("id, pay_period_start, pay_period_end, status").order("pay_period_start", { ascending: false }).limit(48),
-      supabase.from("employees").select("id, first_name, last_name, employee_id, department, division, location, subsidiary_id").in("status", ["active", "Active"]).order("first_name"),
-      supabase.from("subsidiaries").select("id, name").eq("status", "active"),
-    ])
+    try {
+      const cid = companyId || (await resolveClientCompanyId())
+      setCompanyId(cid)
 
-    const runs = (runsRes.data ?? []) as PayrollRun[]
-    setPayrollRuns(runs)
+      const [runsApi, empsApi, subsRes] = await Promise.all([
+        fetch(`/api/payroll/runs?company_id=${encodeURIComponent(cid)}&limit=48`, {
+          cache: "no-store",
+          credentials: "include",
+        }),
+        fetch(`/api/employees?company_id=${encodeURIComponent(cid)}&status=active&limit=2000`, {
+          cache: "no-store",
+          credentials: "include",
+        }),
+        supabase.from("subsidiaries").select("id, name").eq("company_id", cid).eq("status", "active"),
+      ])
 
-    const emps = (empsRes.data ?? []) as Employee[]
-    setEmployees(emps)
-    setFilteredEmps(emps)
+      const runsJson = await runsApi.json().catch(() => ({}))
+      const empsJson = await empsApi.json().catch(() => ({}))
 
-    const depts = [...new Set(emps.map(e => e.department).filter(Boolean))].sort() as string[]
-    const divs  = [...new Set(emps.map(e => e.division).filter(Boolean))].sort() as string[]
-    const locs  = [...new Set(emps.map(e => e.location).filter(Boolean))].sort() as string[]
-    setDepartments(depts)
-    setDivisions(divs)
-    setLocations(locs)
-    setSubsidiaries((subsRes.data ?? []) as { id: string; name: string }[])
-    setLoadingRuns(false)
+      const runs = (runsJson.runs ?? runsJson.data ?? []) as PayrollRun[]
+      setPayrollRuns(runs)
 
-    // Set default periods once runs load
-    if (runs.length > 0) {
-      const firstPeriod = periodFromDate(runs[0].pay_period_start)
-      setSelectedPeriod(prev => prev || firstPeriod)
-      setBulkPeriod(prev => prev || firstPeriod)
-      setCustomPeriodFrom(prev => prev || firstPeriod)
+      const emps = (empsJson.employees ?? empsJson.data ?? []) as Employee[]
+      setEmployees(emps)
+      setFilteredEmps(emps)
+
+      const depts = [...new Set(emps.map((e) => e.department).filter(Boolean))].sort() as string[]
+      const divs = [...new Set(emps.map((e) => e.division).filter(Boolean))].sort() as string[]
+      const locs = [...new Set(emps.map((e) => e.location).filter(Boolean))].sort() as string[]
+      setDepartments(depts)
+      setDivisions(divs)
+      setLocations(locs)
+      setSubsidiaries((subsRes.data ?? []) as { id: string; name: string }[])
+
+      if (runs.length > 0) {
+        const firstPeriod = periodFromDate(runs[0].pay_period_start)
+        setSelectedPeriod((prev) => prev || firstPeriod)
+        setBulkPeriod((prev) => prev || firstPeriod)
+        setCustomPeriodFrom((prev) => prev || firstPeriod)
+      }
+
+      void loadStats(cid)
+    } catch (err) {
+      toast({
+        title: "Could not load payslips",
+        description: err instanceof Error ? err.message : "Tenant resolve failed",
+        variant: "destructive",
+      })
+      setPayrollRuns([])
+      setEmployees([])
+      setFilteredEmps([])
+    } finally {
+      setLoadingRuns(false)
     }
-
-    void loadStats()
   }
 
-  const loadStats = async () => {
+  const loadStats = async (cid?: string) => {
+    const company = cid || companyId
+    if (!company) return
+    // Scope stats via tenant runs → payslips for those runs only
+    const runsRes = await fetch(`/api/payroll/runs?company_id=${encodeURIComponent(company)}&limit=100`, {
+      cache: "no-store",
+      credentials: "include",
+    })
+    const runsJson = await runsRes.json().catch(() => ({}))
+    const runIds = ((runsJson.runs ?? runsJson.data ?? []) as any[]).map((r) => r.id).filter(Boolean)
+    if (!runIds.length) {
+      setStats({ totalIssued: 0, totalDraft: 0, latestPeriod: "" })
+      return
+    }
     const [issuedRes, draftRes, periodRes] = await Promise.all([
-      supabase.from("payslips").select("id", { count: "exact", head: true }).eq("status", "issued"),
-      supabase.from("payslips").select("id", { count: "exact", head: true }).eq("status", "draft"),
-      supabase.from("payslips").select("pay_period").order("pay_period", { ascending: false }).limit(1).maybeSingle(),
+      supabase
+        .from("payslips")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "issued")
+        .in("payroll_run_id", runIds),
+      supabase
+        .from("payslips")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "draft")
+        .in("payroll_run_id", runIds),
+      supabase
+        .from("payslips")
+        .select("pay_period")
+        .in("payroll_run_id", runIds)
+        .order("pay_period", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ])
     setStats({
       totalIssued: issuedRes.count ?? 0,
-      totalDraft:  draftRes.count ?? 0,
+      totalDraft: draftRes.count ?? 0,
       latestPeriod: (periodRes.data as any)?.pay_period ?? "",
     })
   }
@@ -504,14 +556,41 @@ export default function PayslipsPage() {
   // ── Load individual payslip ──
   const loadIndividualSlip = useCallback(async (empId: string, period: string) => {
     if (!empId || !period) return
+    const cid = companyId || (await resolveClientCompanyId().catch(() => ""))
+    if (cid && !companyId) setCompanyId(cid)
     setLoadingSlip(true)
     setIndivSlip(null)
     setActiveLoan(null)
     try {
+      let slipQ = supabase
+        .from("payslips")
+        .select("*")
+        .eq("employee_id", empId)
+        .eq("pay_period", period)
+        .order("created_at", { ascending: false })
+        .limit(1)
+      let loanQ = supabase
+        .from("employee_loans")
+        .select("*")
+        .eq("employee_id", empId)
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(1)
+      let recentQ = supabase
+        .from("payslips")
+        .select("*")
+        .eq("employee_id", empId)
+        .order("pay_period", { ascending: false })
+        .limit(8)
+      if (cid) {
+        slipQ = slipQ.eq("company_id", cid)
+        loanQ = loanQ.eq("company_id", cid)
+        recentQ = recentQ.eq("company_id", cid)
+      }
       const [slipRes, loanRes, recentRes] = await Promise.all([
-        supabase.from("payslips").select("*").eq("employee_id", empId).eq("pay_period", period).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-        supabase.from("employee_loans").select("*").eq("employee_id", empId).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle(),
-        supabase.from("payslips").select("*").eq("employee_id", empId).order("pay_period", { ascending: false }).limit(8),
+        slipQ.maybeSingle(),
+        loanQ.maybeSingle(),
+        recentQ,
       ])
 
       if (slipRes.data) setIndivSlip(slipRes.data as PayslipRow)
@@ -550,6 +629,12 @@ export default function PayslipsPage() {
   // ── Load bulk payslips ──
   const loadBulkSlips = useCallback(async () => {
     if (!bulkPeriod) return
+    const cid = companyId || (await resolveClientCompanyId().catch(() => ""))
+    if (cid && !companyId) setCompanyId(cid)
+    if (!cid) {
+      toast({ title: "Company required", description: "Unable to resolve your company.", variant: "destructive" })
+      return
+    }
     setLoadingBulk(true)
     setBulkSlips([])
     setBulkSelected(new Set())
@@ -557,6 +642,7 @@ export default function PayslipsPage() {
       let query = supabase
         .from("payslips")
         .select("*")
+        .eq("company_id", cid)
         .eq("pay_period", bulkPeriod)
         .order("snapshot_employee_name", { ascending: true })
 
@@ -573,19 +659,23 @@ export default function PayslipsPage() {
 
       let slips = (data ?? []) as PayslipRow[]
 
-      // Subsidiary / company filter — client-side
+      // Subsidiary / company filter — client-side, still tenant-scoped
       if (bulkFilterType === "subsidiary" && bulkFilterValue !== "all") {
         const { data: empIds } = await supabase
           .from("employees")
           .select("id")
+          .eq("company_id", cid)
           .eq("subsidiary_id", bulkFilterValue)
         const ids = new Set((empIds ?? []).map((e: any) => e.id))
-        slips = slips.filter(s => ids.has(s.employee_id))
+        slips = slips.filter((s) => ids.has(s.employee_id))
       } else if (bulkFilterType === "company") {
-        // parent company employees only — those without a subsidiary
-        const { data: empIds } = await supabase.from("employees").select("id").is("subsidiary_id", null)
+        const { data: empIds } = await supabase
+          .from("employees")
+          .select("id")
+          .eq("company_id", cid)
+          .is("subsidiary_id", null)
         const ids = new Set((empIds ?? []).map((e: any) => e.id))
-        slips = slips.filter(s => ids.has(s.employee_id))
+        slips = slips.filter((s) => ids.has(s.employee_id))
       }
 
       setBulkSlips(slips)
@@ -595,7 +685,7 @@ export default function PayslipsPage() {
     } finally {
       setLoadingBulk(false)
     }
-  }, [bulkPeriod, bulkFilterType, bulkFilterValue, supabase, toast])
+  }, [bulkPeriod, bulkFilterType, bulkFilterValue, companyId, supabase, toast])
 
   useEffect(() => {
     if (activeTab === "bulk" && bulkPeriod) void loadBulkSlips()
@@ -619,12 +709,19 @@ export default function PayslipsPage() {
       toast({ title: "Select a start period", variant: "destructive" })
       return
     }
+    const cid = companyId || (await resolveClientCompanyId().catch(() => ""))
+    if (cid && !companyId) setCompanyId(cid)
+    if (!cid) {
+      toast({ title: "Company required", description: "Unable to resolve your company.", variant: "destructive" })
+      return
+    }
     setLoadingCustom(true)
     setCustomLoaded(false)
     try {
       let query = supabase
         .from("payslips")
         .select("*")
+        .eq("company_id", cid)
         .gte("pay_period", customPeriodFrom)
         .order("snapshot_employee_name", { ascending: true })
 

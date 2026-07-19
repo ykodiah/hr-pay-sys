@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { toast } from "@/hooks/use-toast"
-import { createClient } from "@/lib/supabase/client"
+import { resolveClientCompanyId } from "@/lib/tenant/resolve-company-client"
 import {
   calculateGhanaTax,
   DEFAULT_TAX_RATES,
@@ -97,10 +97,9 @@ export default function PayInputsPage() {
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null)
 
   const resolveCompany = useCallback(async () => {
-    const supabase = createClient()
-    const { data } = await supabase.from("companies").select("id").limit(1).maybeSingle()
-    if (data?.id) setCompanyId(data.id)
-    return data?.id ?? ""
+    const id = await resolveClientCompanyId()
+    setCompanyId(id)
+    return id
   }, [])
 
   const loadRows = useCallback(async (cid: string, period: string) => {

@@ -6,16 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
-import { createClient } from "@/lib/supabase/client"
+import { resolveClientCompanyId } from "@/lib/tenant/resolve-company-client"
 import { TrendingUp, Users, DollarSign, Calculator, Download, RefreshCw } from "lucide-react"
 import type { ReportType } from "@/lib/services/reports/types"
-
-const basicMetrics = {
-  totalPayroll: 325000,
-  netPay: 224000,
-  employees: 54,
-  avgSalary: 6019,
-}
 
 const simpleReports: {
   id: number
@@ -68,23 +61,66 @@ export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState("overview")
   const [companyId, setCompanyId] = useState("")
   const [downloadingId, setDownloadingId] = useState<number | null>(null)
+  const [basicMetrics, setBasicMetrics] = useState({
+    totalPayroll: 0,
+    netPay: 0,
+    employees: 0,
+    avgSalary: 0,
+  })
+  const [loadingMetrics, setLoadingMetrics] = useState(true)
+
+  const loadMetrics = async (cid: string) => {
+    setLoadingMetrics(true)
+    try {
+      const res = await fetch("/api/dashboard/summary", { credentials: "include", cache: "no-store" })
+      const dash = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(dash.error || "Failed to load analytics")
+      const employees = Number(dash.totalEmployees || 0)
+      const netPay = Number(dash.monthlyPayroll || 0)
+      setBasicMetrics({
+        totalPayroll: netPay,
+        netPay,
+        employees,
+        avgSalary: employees > 0 ? Math.round(netPay / employees) : 0,
+      })
+      if (dash.company_id && dash.company_id !== cid) {
+        setCompanyId(dash.company_id)
+      }
+    } catch (err) {
+      toast({
+        title: "Analytics load failed",
+        description: err instanceof Error ? err.message : "Could not load tenant metrics",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingMetrics(false)
+    }
+  }
 
   useEffect(() => {
-    const supabase = createClient()
-    void supabase
-      .from("companies")
-      .select("id")
-      .limit(1)
-      .then(({ data }) => {
-        if (data?.[0]?.id) setCompanyId(data[0].id)
+    void resolveClientCompanyId()
+      .then(async (id) => {
+        setCompanyId(id)
+        await loadMetrics(id)
+      })
+      .catch((err) => {
+        setLoadingMetrics(false)
+        toast({
+          title: "Company required",
+          description: err instanceof Error ? err.message : "Unable to resolve company",
+          variant: "destructive",
+        })
       })
   }, [])
 
   const handleRefreshData = () => {
-    toast({
-      title: "Data Refreshed",
-      description: "Analytics data has been updated.",
-    })
+    if (!companyId) return
+    void loadMetrics(companyId).then(() =>
+      toast({
+        title: "Data Refreshed",
+        description: "Analytics data has been updated for your company.",
+      }),
+    )
   }
 
   const handleDownloadReport = async (reportId: number, reportType: ReportType) => {

@@ -6,29 +6,30 @@
  * period overrides from `payroll_pay_inputs`, and loan defaults from `employee_loans`.
  */
 
-import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { NextRequest, NextResponse } from "next/server"
+import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
 import { sumCompLines } from "@/lib/payroll/employee-comp-extras"
 
 const ACTIVE_STATUSES = ["Active", "active", "ACTIVE"]
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const ctx = await resolveTenantContext(request)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId, service: supabase } = ctx
+
     const { searchParams } = new URL(request.url)
-    const companyId = searchParams.get("company_id")
     const payPeriod = searchParams.get("pay_period")
 
-    if (!companyId || !payPeriod) {
-      return NextResponse.json({ error: "company_id and pay_period are required" }, { status: 400 })
+    if (!payPeriod) {
+      return NextResponse.json({ error: "pay_period is required" }, { status: 400 })
     }
 
-    // Parallel fetch from respective tables for fast sync
-    const [employeesRes, inputsRes, loansRes, allowRes, dedRes] = await Promise.all([
-      supabase
-        .from("employees")
-        .select(
-          `id, first_name, last_name, employee_id, department, position, status, subsidiary_id, date_of_joining,
+    // Load employees first so allowance/deduction queries stay tenant-scoped
+    const employeesRes = await supabase
+      .from("employees")
+      .select(
+        `id, first_name, last_name, employee_id, department, position, status, subsidiary_id, date_of_joining,
            financial:employee_financial(
              monthly_salary, transport_allowance, housing_allowance, medical_allowance,
              meal_allowance, communication_allowance, uniform_allowance, other_allowances,
@@ -36,10 +37,36 @@ export async function GET(request: Request) {
              provident_fund_enrolled, provident_fund_rate,
              bank_name, bank_account_number, ssnit_number
            )`,
-        )
+      )
+      .eq("company_id", companyId)
+      .in("status", ACTIVE_STATUSES)
+      .order("first_name")
+
+    let employees: any[] = employeesRes.data ?? []
+    if (employeesRes.error) {
+      const fallback = await supabase
+        .from("employees")
+        .select("id, first_name, last_name, employee_id, department, position, status, subsidiary_id, date_of_joining")
         .eq("company_id", companyId)
         .in("status", ACTIVE_STATUSES)
-        .order("first_name"),
+        .order("first_name")
+      if (fallback.error) {
+        return NextResponse.json({ error: fallback.error.message }, { status: 500 })
+      }
+      const empIdsFb = (fallback.data ?? []).map((e) => e.id)
+      const { data: financials } = empIdsFb.length
+        ? await supabase.from("employee_financial").select("*").in("employee_id", empIdsFb)
+        : { data: [] as any[] }
+      const finByEmp = new Map((financials ?? []).map((f: any) => [f.employee_id, f]))
+      employees = (fallback.data ?? []).map((e) => ({
+        ...e,
+        financial: finByEmp.get(e.id) ?? null,
+      }))
+    }
+
+    const empIds = employees.map((e) => e.id)
+
+    const [inputsRes, loansRes, allowRes, dedRes] = await Promise.all([
       supabase
         .from("payroll_pay_inputs")
         .select("*")
@@ -50,42 +77,21 @@ export async function GET(request: Request) {
         .select("employee_id, monthly_payment, remaining_balance, status, auto_deduct")
         .eq("company_id", companyId)
         .in("status", ["active", "approved"]),
-      supabase
-        .from("employee_allowances")
-        .select("employee_id, amount, percentage, calculation_type, effective_date, end_date, is_active")
-        .eq("is_active", true),
-      supabase
-        .from("employee_deductions")
-        .select("employee_id, amount, percentage, calculation_type, effective_date, end_date, is_active")
-        .eq("is_active", true),
+      empIds.length
+        ? supabase
+            .from("employee_allowances")
+            .select("employee_id, amount, percentage, calculation_type, effective_date, end_date, is_active")
+            .eq("is_active", true)
+            .in("employee_id", empIds)
+        : Promise.resolve({ data: [] as any[], error: null }),
+      empIds.length
+        ? supabase
+            .from("employee_deductions")
+            .select("employee_id, amount, percentage, calculation_type, effective_date, end_date, is_active")
+            .eq("is_active", true)
+            .in("employee_id", empIds)
+        : Promise.resolve({ data: [] as any[], error: null }),
     ])
-
-    let employees: any[] = employeesRes.data ?? []
-
-    if (employeesRes.error) {
-      // Fallback without relational embed if join shape differs
-      const fallback = await supabase
-        .from("employees")
-        .select("id, first_name, last_name, employee_id, department, position, status, subsidiary_id, date_of_joining")
-        .eq("company_id", companyId)
-        .in("status", ACTIVE_STATUSES)
-        .order("first_name")
-
-      if (fallback.error) {
-        return NextResponse.json({ error: fallback.error.message }, { status: 500 })
-      }
-
-      const empIds = (fallback.data ?? []).map((e) => e.id)
-      const { data: financials } = empIds.length
-        ? await supabase.from("employee_financial").select("*").in("employee_id", empIds)
-        : { data: [] as any[] }
-
-      const finByEmp = new Map((financials ?? []).map((f: any) => [f.employee_id, f]))
-      employees = (fallback.data ?? []).map((e) => ({
-        ...e,
-        financial: finByEmp.get(e.id) ?? null,
-      }))
-    }
 
     const warnings: string[] = []
     if (inputsRes.error) warnings.push(`pay_inputs: ${inputsRes.error.message}`)
@@ -236,21 +242,23 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
     const body = await request.json()
-    const { company_id, pay_period, pay_period_start, pay_period_end, rows } = body as {
-      company_id: string
+    const ctx = await resolveTenantContext(request, body.company_id)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId: company_id, service: supabase } = ctx
+
+    const { pay_period, pay_period_start, pay_period_end, rows } = body as {
       pay_period: string
       pay_period_start?: string
       pay_period_end?: string
       rows: Array<Record<string, unknown>>
     }
 
-    if (!company_id || !pay_period || !Array.isArray(rows)) {
+    if (!pay_period || !Array.isArray(rows)) {
       return NextResponse.json(
-        { error: "company_id, pay_period, and rows are required" },
+        { error: "pay_period and rows are required" },
         { status: 400 },
       )
     }

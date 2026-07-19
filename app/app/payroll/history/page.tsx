@@ -120,9 +120,15 @@ export default function PayrollHistoryPage() {
     setIsLoading(true)
 
     try {
+      const { resolveClientCompanyId } = await import("@/lib/tenant/resolve-company-client")
+      const companyId = await resolveClientCompanyId()
+
       const [{ data: subsidiariesData }, runsRes] = await Promise.all([
-        supabase.from("subsidiaries").select("id, name").eq("status", "active"),
-        fetch("/api/payroll/runs?limit=200", { cache: "no-store" }),
+        supabase.from("subsidiaries").select("id, name").eq("company_id", companyId).eq("status", "active"),
+        fetch(`/api/payroll/runs?company_id=${encodeURIComponent(companyId)}&limit=200`, {
+          cache: "no-store",
+          credentials: "include",
+        }),
       ])
 
       if (subsidiariesData) {

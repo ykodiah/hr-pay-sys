@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,8 @@ import EmployeeAnalyticsDashboard from "@/components/ml/employee-analytics-dashb
 import LearningRecommendationsPanel from "@/components/ml/learning-recommendations-panel"
 import MLPerformanceReview from "@/components/ml/ml-performance-review"
 import SkillGapAnalysis from "@/components/ml/skill-gap-analysis"
+import { resolveClientCompanyId } from "@/lib/tenant/resolve-company-client"
+import { toast } from "@/hooks/use-toast"
 import {
   Brain,
   TrendingUp,
@@ -23,6 +25,34 @@ import {
 export default function MLAnalyticsPage() {
   const [selectedTab, setSelectedTab] = useState("overview")
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null)
+  const [companyId, setCompanyId] = useState("")
+  const [employees, setEmployees] = useState<{ id: string; name: string }[]>([])
+
+  useEffect(() => {
+    void resolveClientCompanyId()
+      .then(async (cid) => {
+        setCompanyId(cid)
+        const res = await fetch(
+          `/api/employees?company_id=${encodeURIComponent(cid)}&status=active&options=true&limit=200`,
+          { credentials: "include", cache: "no-store" },
+        )
+        const json = await res.json().catch(() => ({}))
+        if (res.ok) {
+          const list = (json.employees || json.data || []).map((e: any) => ({
+            id: e.id,
+            name: e.name || e.full_name || `${e.first_name || ""} ${e.last_name || ""}`.trim(),
+          }))
+          setEmployees(list)
+        }
+      })
+      .catch((err) => {
+        toast({
+          title: "Company required",
+          description: err instanceof Error ? err.message : "Unable to resolve company",
+          variant: "destructive",
+        })
+      })
+  }, [])
 
   const mlFeatures = [
     {
@@ -142,7 +172,7 @@ export default function MLAnalyticsPage() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
-          <EmployeeAnalyticsDashboard />
+          <EmployeeAnalyticsDashboard companyId={companyId || undefined} />
         </TabsContent>
 
         <TabsContent value="retention" className="space-y-4">
@@ -151,7 +181,7 @@ export default function MLAnalyticsPage() {
               <CardTitle>Retention Risk Analysis</CardTitle>
             </CardHeader>
             <CardContent>
-              <EmployeeAnalyticsDashboard />
+              <EmployeeAnalyticsDashboard companyId={companyId || undefined} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -162,17 +192,17 @@ export default function MLAnalyticsPage() {
               <CardTitle>Performance Analytics</CardTitle>
             </CardHeader>
             <CardContent>
-              <EmployeeAnalyticsDashboard />
+              <EmployeeAnalyticsDashboard companyId={companyId || undefined} />
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="learning" className="space-y-4">
-          <LearningRecommendationsPanel />
+          <LearningRecommendationsPanel companyId={companyId || undefined} />
         </TabsContent>
 
         <TabsContent value="skills" className="space-y-4">
-          <SkillGapAnalysis />
+          <SkillGapAnalysis companyId={companyId || undefined} />
         </TabsContent>
 
         <TabsContent value="reviews" className="space-y-4">
@@ -194,12 +224,25 @@ export default function MLAnalyticsPage() {
                   <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">Select an Employee</h3>
                   <p className="text-gray-600 mb-4">Choose an employee to start an ML-enhanced performance review</p>
-                  <Button 
-                    onClick={() => setSelectedEmployee("sample-employee-id")}
-                    className="bg-emerald-600 hover:bg-emerald-700"
-                  >
-                    Start Review
-                  </Button>
+                  <div className="space-y-3 max-w-sm mx-auto">
+                    <select
+                      className="w-full border rounded-md h-10 px-3 text-sm"
+                      value={selectedEmployee || ""}
+                      onChange={(e) => setSelectedEmployee(e.target.value || null)}
+                    >
+                      <option value="">Select employee…</option>
+                      {employees.map((e) => (
+                        <option key={e.id} value={e.id}>{e.name}</option>
+                      ))}
+                    </select>
+                    <Button
+                      disabled={!selectedEmployee}
+                      onClick={() => selectedEmployee && setSelectedEmployee(selectedEmployee)}
+                      className="bg-emerald-600 hover:bg-emerald-700"
+                    >
+                      Start Review
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>

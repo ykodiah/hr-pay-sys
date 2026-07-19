@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react"
 import useSWR, { mutate } from "swr"
-import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { resolveClientCompanyId } from "@/lib/tenant/resolve-company-client"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -34,20 +34,26 @@ export default function ApprovalsPage() {
   const [rejectReason, setRejectReason] = useState("")
 
   useEffect(() => {
-    const supabase = createClient()
-    void supabase.from("companies").select("id").limit(1).maybeSingle().then(({ data }) => {
-      if (data?.id) setCompanyId(data.id)
-    })
+    void resolveClientCompanyId()
+      .then((id) => setCompanyId(id))
+      .catch(() => setCompanyId(""))
   }, [])
 
   const payrollKey = companyId
-    ? `/api/payroll/runs?company_id=${companyId}&status=pending`
-    : "/api/payroll/runs?status=pending"
+    ? `/api/payroll/runs?company_id=${encodeURIComponent(companyId)}&status=pending`
+    : null
+  const leaveKey = companyId
+    ? `/api/leave?company_id=${encodeURIComponent(companyId)}&status=pending`
+    : null
+  const overtimeKey = companyId
+    ? `/api/overtime?company_id=${encodeURIComponent(companyId)}&status=pending`
+    : null
+
   const { data: payrollData, isLoading: payrollLoading } = useSWR(payrollKey, fetcher, {
     refreshInterval: 15000,
   })
-  const { data: leaveData,   isLoading: leaveLoading   } = useSWR("/api/leave?status=pending", fetcher)
-  const { data: overtimeData,isLoading: otLoading      } = useSWR("/api/overtime?status=pending", fetcher)
+  const { data: leaveData, isLoading: leaveLoading } = useSWR(leaveKey, fetcher)
+  const { data: overtimeData, isLoading: otLoading } = useSWR(overtimeKey, fetcher)
 
   const payrollRuns:   any[] = payrollData?.runs     ?? payrollData?.data   ?? []
   const leaveRequests: any[] = leaveData?.requests   ?? leaveData?.data     ?? []
@@ -63,7 +69,7 @@ export default function ApprovalsPage() {
       const res = await fetch("/api/payroll/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ payroll_run_id: id, action: "approve" }),
+        body: JSON.stringify({ payroll_run_id: id, action: "approve", company_id: companyId }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Failed")
@@ -128,6 +134,7 @@ export default function ApprovalsPage() {
             action: "reject",
             rejection_reason: rejectReason,
             notes: rejectReason,
+            company_id: companyId,
           }),
         })
       } else if (rejectDialog.type === "leave") {
@@ -147,9 +154,9 @@ export default function ApprovalsPage() {
       if (!res.ok) throw new Error(json.error || "Failed")
       toast({ title: "Rejected", description: `${rejectDialog.label} has been rejected.` })
       setRejectDialog(null); setRejectReason("")
-      mutate(payrollKey)
-      mutate("/api/leave?status=pending")
-      mutate("/api/overtime?status=pending")
+      if (payrollKey) mutate(payrollKey)
+      if (leaveKey) mutate(leaveKey)
+      if (overtimeKey) mutate(overtimeKey)
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" })
     } finally { setActioning(null) }

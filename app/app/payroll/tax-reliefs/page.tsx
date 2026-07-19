@@ -416,11 +416,36 @@ export default function PayrollTaxReliefsPage() {
               Open Process Payroll
             </Link>
           </Button>
-          <Button variant="outline" onClick={() => setShowBulk(true)} disabled={!catalog.length}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (!catalog.length) {
+                toast({
+                  title: "No catalog reliefs yet",
+                  description: "Sync/save reliefs in Settings → Payroll, then click Refresh here.",
+                  variant: "destructive",
+                })
+                return
+              }
+              setShowBulk(true)
+            }}
+          >
             <Users className="w-4 h-4 mr-2" />
             Bulk assign
           </Button>
-          <Button onClick={() => setShowAssign(true)} disabled={!catalog.length}>
+          <Button
+            onClick={() => {
+              if (!catalog.length) {
+                toast({
+                  title: "No catalog reliefs yet",
+                  description: "Sync/save reliefs in Settings → Payroll, then click Refresh here.",
+                  variant: "destructive",
+                })
+                return
+              }
+              setShowAssign(true)
+            }}
+          >
             <Plus className="w-4 h-4 mr-2" />
             Assign relief
           </Button>
