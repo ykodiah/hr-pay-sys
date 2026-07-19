@@ -1,22 +1,17 @@
--- Employee tax relief assignments (per tax year) + document vault link.
--- Safe to re-run. Tolerates schema drift (missing amount / company_id / etc).
+-- =============================================================================
+-- 069: Employee tax reliefs (per tax year) + vault link
+-- Safe / idempotent. Never assumes company_id (or other columns) already exist.
+-- Re-run this entire script after a failed attempt.
+-- =============================================================================
+
+-- Helper pattern: create bare tables first, then ADD COLUMN IF NOT EXISTS for
+-- every column, then create indexes only after confirming columns exist.
 
 -- ---------------------------------------------------------------------------
--- Harden company tax relief catalog
+-- 1) tax_reliefs catalog
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.tax_reliefs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
-  name VARCHAR(150) NOT NULL DEFAULT 'Tax relief',
-  description TEXT,
-  amount DECIMAL(15,2) DEFAULT 0,
-  currency VARCHAR(10) DEFAULT 'GHS',
-  category VARCHAR(50) DEFAULT 'Personal',
-  is_active BOOLEAN DEFAULT true,
-  effective_date DATE,
-  last_updated TIMESTAMPTZ DEFAULT NOW(),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid()
 );
 
 ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS company_id UUID;
@@ -35,22 +30,45 @@ ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS gra_code VARCHAR(50);
 ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS relief_code VARCHAR(50);
 ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS code VARCHAR(50);
 
--- Sync amount / annual_amount when both exist
 DO $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'tax_reliefs' AND column_name = 'name'
+  ) THEN
+    EXECUTE $u$UPDATE public.tax_reliefs
+      SET name = COALESCE(NULLIF(name, ''), 'Tax relief')
+      WHERE name IS NULL OR name = ''$u$;
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'tax_reliefs' AND column_name = 'amount'
-  ) AND EXISTS (
+  ) THEN
+    EXECUTE 'UPDATE public.tax_reliefs SET amount = COALESCE(amount, 0) WHERE amount IS NULL';
+  END IF;
+  IF EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'tax_reliefs' AND column_name = 'annual_amount'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'tax_reliefs' AND column_name = 'amount'
   ) THEN
     EXECUTE 'UPDATE public.tax_reliefs
       SET annual_amount = COALESCE(annual_amount, amount, 0)
       WHERE annual_amount IS NULL';
+  ELSIF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'tax_reliefs' AND column_name = 'annual_amount'
+  ) THEN
     EXECUTE 'UPDATE public.tax_reliefs
-      SET amount = COALESCE(amount, annual_amount, 0)
-      WHERE amount IS NULL';
+      SET annual_amount = COALESCE(annual_amount, 0)
+      WHERE annual_amount IS NULL';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'tax_reliefs' AND column_name = 'is_active'
+  ) THEN
+    EXECUTE 'UPDATE public.tax_reliefs SET is_active = COALESCE(is_active, true) WHERE is_active IS NULL';
   END IF;
 END $$;
 
@@ -69,31 +87,28 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
--- Document vault: ensure company_id / category exist before indexing
+-- 2) document_vault
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.document_vault (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id UUID,
-  employee_name TEXT,
-  document_type TEXT,
-  file_name TEXT,
-  file_size BIGINT DEFAULT 0,
-  file_type TEXT,
-  file_url TEXT,
-  upload_date TIMESTAMPTZ DEFAULT now(),
-  uploaded_by UUID,
-  status TEXT DEFAULT 'pending',
-  notes TEXT,
-  source TEXT DEFAULT 'employee-onboarding',
-  category TEXT DEFAULT 'employee-document',
-  company_id UUID,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid()
 );
 
-ALTER TABLE public.document_vault ADD COLUMN IF NOT EXISTS company_id UUID;
-ALTER TABLE public.document_vault ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'employee-document';
+ALTER TABLE public.document_vault ADD COLUMN IF NOT EXISTS employee_id UUID;
+ALTER TABLE public.document_vault ADD COLUMN IF NOT EXISTS employee_name TEXT;
+ALTER TABLE public.document_vault ADD COLUMN IF NOT EXISTS document_type TEXT;
+ALTER TABLE public.document_vault ADD COLUMN IF NOT EXISTS file_name TEXT;
+ALTER TABLE public.document_vault ADD COLUMN IF NOT EXISTS file_size BIGINT DEFAULT 0;
+ALTER TABLE public.document_vault ADD COLUMN IF NOT EXISTS file_type TEXT;
+ALTER TABLE public.document_vault ADD COLUMN IF NOT EXISTS file_url TEXT;
+ALTER TABLE public.document_vault ADD COLUMN IF NOT EXISTS upload_date TIMESTAMPTZ DEFAULT now();
+ALTER TABLE public.document_vault ADD COLUMN IF NOT EXISTS uploaded_by UUID;
+ALTER TABLE public.document_vault ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending';
+ALTER TABLE public.document_vault ADD COLUMN IF NOT EXISTS notes TEXT;
 ALTER TABLE public.document_vault ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'employee-onboarding';
+ALTER TABLE public.document_vault ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'employee-document';
+ALTER TABLE public.document_vault ADD COLUMN IF NOT EXISTS company_id UUID;
+ALTER TABLE public.document_vault ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();
+ALTER TABLE public.document_vault ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
 
 DO $$
 BEGIN
@@ -110,45 +125,167 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
--- Per-employee, per-tax-year assignments
+-- 3) employee_tax_reliefs (may already exist from Phase 1 without company_id)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.employee_tax_reliefs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
-  employee_id UUID NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
-  tax_relief_id UUID NOT NULL REFERENCES public.tax_reliefs(id) ON DELETE CASCADE,
-  tax_year INTEGER NOT NULL,
-  override_amount DECIMAL(15,2),
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  document_url TEXT,
-  document_name TEXT,
-  document_file_type VARCHAR(100),
-  document_size BIGINT DEFAULT 0,
-  vault_document_id UUID,
-  notes TEXT,
-  assigned_by UUID,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (company_id, employee_id, tax_relief_id, tax_year)
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid()
 );
 
-CREATE INDEX IF NOT EXISTS idx_employee_tax_reliefs_company_year
-  ON public.employee_tax_reliefs (company_id, tax_year, is_active);
+ALTER TABLE public.employee_tax_reliefs ADD COLUMN IF NOT EXISTS company_id UUID;
+ALTER TABLE public.employee_tax_reliefs ADD COLUMN IF NOT EXISTS employee_id UUID;
+ALTER TABLE public.employee_tax_reliefs ADD COLUMN IF NOT EXISTS tax_relief_id UUID;
+ALTER TABLE public.employee_tax_reliefs ADD COLUMN IF NOT EXISTS tax_year INTEGER;
+ALTER TABLE public.employee_tax_reliefs ADD COLUMN IF NOT EXISTS override_amount DECIMAL(15,2);
+ALTER TABLE public.employee_tax_reliefs ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+ALTER TABLE public.employee_tax_reliefs ADD COLUMN IF NOT EXISTS document_url TEXT;
+ALTER TABLE public.employee_tax_reliefs ADD COLUMN IF NOT EXISTS document_name TEXT;
+ALTER TABLE public.employee_tax_reliefs ADD COLUMN IF NOT EXISTS document_file_type VARCHAR(100);
+ALTER TABLE public.employee_tax_reliefs ADD COLUMN IF NOT EXISTS document_size BIGINT DEFAULT 0;
+ALTER TABLE public.employee_tax_reliefs ADD COLUMN IF NOT EXISTS vault_document_id UUID;
+ALTER TABLE public.employee_tax_reliefs ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE public.employee_tax_reliefs ADD COLUMN IF NOT EXISTS assigned_by UUID;
+ALTER TABLE public.employee_tax_reliefs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.employee_tax_reliefs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
-CREATE INDEX IF NOT EXISTS idx_employee_tax_reliefs_employee_year
-  ON public.employee_tax_reliefs (employee_id, tax_year, is_active);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_tax_reliefs' AND column_name = 'is_active'
+  ) THEN
+    EXECUTE 'UPDATE public.employee_tax_reliefs
+      SET is_active = COALESCE(is_active, true) WHERE is_active IS NULL';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_tax_reliefs' AND column_name = 'tax_year'
+  ) THEN
+    EXECUTE 'UPDATE public.employee_tax_reliefs
+      SET tax_year = COALESCE(tax_year, EXTRACT(YEAR FROM NOW())::INTEGER)
+      WHERE tax_year IS NULL';
+  END IF;
+END $$;
 
-CREATE INDEX IF NOT EXISTS idx_employee_tax_reliefs_vault
-  ON public.employee_tax_reliefs (vault_document_id);
+-- Backfill company_id from the employee row when missing
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_tax_reliefs' AND column_name = 'company_id'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_tax_reliefs' AND column_name = 'employee_id'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employees' AND column_name = 'company_id'
+  ) THEN
+    EXECUTE '
+      UPDATE public.employee_tax_reliefs etr
+      SET company_id = e.company_id
+      FROM public.employees e
+      WHERE etr.employee_id = e.id
+        AND etr.company_id IS NULL
+        AND e.company_id IS NOT NULL
+    ';
+  END IF;
+END $$;
+
+-- Unique assignment key (only when all columns exist and no null company/employee/relief/year)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_tax_reliefs' AND column_name = 'company_id'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_tax_reliefs' AND column_name = 'employee_id'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_tax_reliefs' AND column_name = 'tax_relief_id'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_tax_reliefs' AND column_name = 'tax_year'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'employee_tax_reliefs_company_employee_relief_year_key'
+  ) THEN
+    -- Drop orphan null-key rows that would block a unique index (safe: incomplete rows)
+    EXECUTE '
+      DELETE FROM public.employee_tax_reliefs
+      WHERE company_id IS NULL
+         OR employee_id IS NULL
+         OR tax_relief_id IS NULL
+         OR tax_year IS NULL
+    ';
+    BEGIN
+      EXECUTE '
+        ALTER TABLE public.employee_tax_reliefs
+        ADD CONSTRAINT employee_tax_reliefs_company_employee_relief_year_key
+        UNIQUE (company_id, employee_id, tax_relief_id, tax_year)
+      ';
+    EXCEPTION WHEN others THEN
+      RAISE NOTICE 'Unique constraint skipped: %', SQLERRM;
+    END;
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_tax_reliefs' AND column_name = 'company_id'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_tax_reliefs' AND column_name = 'tax_year'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_tax_reliefs' AND column_name = 'is_active'
+  ) THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_employee_tax_reliefs_company_year
+      ON public.employee_tax_reliefs (company_id, tax_year, is_active)';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_tax_reliefs' AND column_name = 'employee_id'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_tax_reliefs' AND column_name = 'tax_year'
+  ) THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_employee_tax_reliefs_employee_year
+      ON public.employee_tax_reliefs (employee_id, tax_year, is_active)';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'employee_tax_reliefs' AND column_name = 'vault_document_id'
+  ) THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_employee_tax_reliefs_vault
+      ON public.employee_tax_reliefs (vault_document_id)';
+  END IF;
+END $$;
 
 -- ---------------------------------------------------------------------------
--- payroll_items / payslips monthly relief total
+-- 4) payroll_items / payslips monthly relief total
 -- ---------------------------------------------------------------------------
-ALTER TABLE IF EXISTS public.payroll_items
-  ADD COLUMN IF NOT EXISTS tax_relief_total DECIMAL(15,2) DEFAULT 0;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'payroll_items'
+  ) THEN
+    EXECUTE 'ALTER TABLE public.payroll_items
+      ADD COLUMN IF NOT EXISTS tax_relief_total DECIMAL(15,2) DEFAULT 0';
+  END IF;
 
-ALTER TABLE IF EXISTS public.payslips
-  ADD COLUMN IF NOT EXISTS tax_relief_total DECIMAL(15,2) DEFAULT 0;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'payslips'
+  ) THEN
+    EXECUTE 'ALTER TABLE public.payslips
+      ADD COLUMN IF NOT EXISTS tax_relief_total DECIMAL(15,2) DEFAULT 0';
+  END IF;
+END $$;
 
 COMMENT ON TABLE public.employee_tax_reliefs IS
   'Employee tax relief assignments scoped by company_id and tax_year. No auto-rollover across years.';
