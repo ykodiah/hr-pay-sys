@@ -5,20 +5,23 @@ import Link from 'next/link'
 
 export default function SuperadminLoginPage() {
   const [email, setEmail] = useState('admin@akwaabahrpay.com')
-  const [password, setPassword] = useState('')
+  const [password, setPassword] = useState('Demo@12345')
   const [loading, setLoading] = useState(false)
+  const [repairing, setRepairing] = useState(false)
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setInfo('')
 
     try {
       const response = await fetch('/api/superadmin/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       })
 
       const data = await response.json()
@@ -35,6 +38,39 @@ export default function SuperadminLoginPage() {
     } catch (err: any) {
       setError(err.message || 'An error occurred')
       setLoading(false)
+    }
+  }
+
+  const repairSeedAccount = async () => {
+    setRepairing(true)
+    setError('')
+    setInfo('')
+    try {
+      // Works when no admins exist yet; otherwise needs SUPERADMIN_BOOTSTRAP_SECRET.
+      const res = await fetch('/api/superadmin/auth/bootstrap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'admin@akwaabahrpay.com',
+          password: 'Demo@12345',
+          reset_password: true,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(
+          data.error ||
+            'Could not repair seed account. Run scripts/071_ensure_superadmin_seed.sql in Supabase, then try again.',
+        )
+        return
+      }
+      setEmail('admin@akwaabahrpay.com')
+      setPassword('Demo@12345')
+      setInfo(`${data.message}. You can sign in now with Demo@12345.`)
+    } catch (err: any) {
+      setError(err.message || 'Repair failed')
+    } finally {
+      setRepairing(false)
     }
   }
 

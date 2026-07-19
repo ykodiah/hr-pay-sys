@@ -73,22 +73,67 @@ export async function loginSuperadmin(
   email: string,
   password: string
 ): Promise<{ user: SuperadminUser; token: string } | { error: string }> {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  if (!url || !serviceKey) {
+    return {
+      error:
+        'Superadmin database is not configured (missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY).',
+    }
+  }
+
+  const supabase = createClient(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+
+  const normalizedEmail = String(email || '').trim().toLowerCase()
+  const plainPassword = String(password || '')
 
   try {
-    // Fetch superadmin user
-    const { data: user, error } = await supabase
+    // Auto-seed default admin when missing so first login always works.
+    const { ensureSeedSuperadmin, SEED_SUPERADMIN_EMAIL, SEED_SUPERADMIN_PASSWORD } = await import(
+      '@/lib/superadmin/ensure-seed'
+    )
+    const seed = await ensureSeedSuperadmin(supabase)
+
+    if (seed.error && /table is missing/i.test(seed.error)) {
+      return { error: seed.error }
+    }
+
+    // Fetch superadmin user (case-insensitive)
+    let { data: user, error } = await supabase
       .from('superadmin_users')
       .select('*')
-      .eq('email', email)
-      .single()
+      .ilike('email', normalizedEmail)
+      .maybeSingle()
+
+    // If still missing and credentials match seed defaults, create then retry.
+    if ((!user || error) &&
+      normalizedEmail === SEED_SUPERADMIN_EMAIL &&
+      plainPassword === SEED_SUPERADMIN_PASSWORD
+    ) {
+      const created = await ensureSeedSuperadmin(supabase, {
+        resetPassword: true,
+        email: SEED_SUPERADMIN_EMAIL,
+        password: SEED_SUPERADMIN_PASSWORD,
+      })
+      if (created.error) {
+        return { error: created.error }
+      }
+      const retry = await supabase
+        .from('superadmin_users')
+        .select('*')
+        .ilike('email', normalizedEmail)
+        .maybeSingle()
+      user = retry.data
+      error = retry.error
+    }
 
     if (error || !user) {
-      return { error: 'Invalid email or password' }
+      return {
+        error:
+          'Invalid email or password. Default seed: admin@akwaabahrpay.com / Demo@12345 (auto-created on first successful login).',
+      }
     }
 
     if (user.status !== 'active') {
@@ -96,7 +141,32 @@ export async function loginSuperadmin(
     }
 
     // Verify password
-    const passwordMatch = await verifyPassword(password, user.password_hash)
+    let passwordMatch = await verifyPassword(plainPassword, user.password_hash)
+
+    // Recover seed account when hash in DB is stale/wrong but user enters the known seed password.
+    if (
+      !passwordMatch &&
+      normalizedEmail === SEED_SUPERADMIN_EMAIL &&
+      plainPassword === SEED_SUPERADMIN_PASSWORD
+    ) {
+      const recovered = await ensureSeedSuperadmin(supabase, {
+        resetPassword: true,
+        email: SEED_SUPERADMIN_EMAIL,
+        password: SEED_SUPERADMIN_PASSWORD,
+      })
+      if (!recovered.error) {
+        const { data: refreshed } = await supabase
+          .from('superadmin_users')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle()
+        if (refreshed) {
+          user = refreshed
+          passwordMatch = await verifyPassword(plainPassword, user.password_hash)
+        }
+      }
+    }
+
     if (!passwordMatch) {
       return { error: 'Invalid email or password' }
     }
@@ -123,8 +193,9 @@ export async function loginSuperadmin(
     const token = generateToken(responseUser)
 
     return { user: responseUser, token }
-  } catch (err) {
-    return { error: 'Login failed' }
+  } catch (err: any) {
+    console.error('[v0] Superadmin login failed:', err)
+    return { error: err?.message || 'Login failed' }
   }
 }
 
