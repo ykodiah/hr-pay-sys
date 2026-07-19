@@ -1,5 +1,6 @@
 -- Employee tax relief assignments (per tax year) + document vault link.
 -- Safe to re-run. Always scope by company_id for tenant isolation.
+-- Compatible with older tax_reliefs schemas that may lack amount / annual_amount.
 
 -- ---------------------------------------------------------------------------
 -- Harden company tax relief catalog
@@ -19,16 +20,48 @@ CREATE TABLE IF NOT EXISTS public.tax_reliefs (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE public.tax_reliefs
-  ADD COLUMN IF NOT EXISTS gra_code VARCHAR(50),
-  ADD COLUMN IF NOT EXISTS relief_code VARCHAR(50),
-  ADD COLUMN IF NOT EXISTS annual_amount DECIMAL(15,2),
-  ADD COLUMN IF NOT EXISTS code VARCHAR(50);
+-- Add missing columns one-by-one (IF NOT EXISTS) for schema drift
+ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS amount DECIMAL(15,2) DEFAULT 0;
+ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS annual_amount DECIMAL(15,2);
+ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'GHS';
+ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'Personal';
+ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS effective_date DATE;
+ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS last_updated TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS gra_code VARCHAR(50);
+ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS relief_code VARCHAR(50);
+ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS code VARCHAR(50);
+ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE public.tax_reliefs ADD COLUMN IF NOT EXISTS name VARCHAR(150);
 
--- Keep annual_amount in sync with amount when null
-UPDATE public.tax_reliefs
-SET annual_amount = COALESCE(annual_amount, amount, 0)
-WHERE annual_amount IS NULL;
+-- Sync annual_amount <-> amount without assuming either existed before this script
+DO $$
+BEGIN
+  -- Fill annual_amount from amount when amount exists
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'tax_reliefs' AND column_name = 'amount'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'tax_reliefs' AND column_name = 'annual_amount'
+  ) THEN
+    EXECUTE 'UPDATE public.tax_reliefs
+      SET annual_amount = COALESCE(annual_amount, amount, 0)
+      WHERE annual_amount IS NULL';
+    EXECUTE 'UPDATE public.tax_reliefs
+      SET amount = COALESCE(amount, annual_amount, 0)
+      WHERE amount IS NULL';
+  ELSIF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'tax_reliefs' AND column_name = 'annual_amount'
+  ) THEN
+    EXECUTE 'UPDATE public.tax_reliefs
+      SET annual_amount = COALESCE(annual_amount, 0)
+      WHERE annual_amount IS NULL';
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_tax_reliefs_company_active
   ON public.tax_reliefs (company_id, is_active);
