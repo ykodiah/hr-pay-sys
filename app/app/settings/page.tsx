@@ -1342,14 +1342,18 @@ export default function SettingsPage() {
 
   // Logo upload function
   const applyCompanyPayload = (data: any) => {
-    if (!data?.id) return null
+    // Allow empty id during first-time company bootstrap (needs_bootstrap).
+    if (!data || (data.id === undefined && data.name === undefined && !data.email_address)) {
+      return null
+    }
     const nextDivisions = ensureStringArray(data.divisions)
     const nextDepartments = ensureStringArray(data.departments)
     const nextLocations = ensureStringArray(data.locations)
-    const resolvedLogoUrl = isPlaceholderLogo(data.logo_url) ? "" : String(data.logo_url)
+    const resolvedLogoUrl = isPlaceholderLogo(data.logo_url) ? "" : String(data.logo_url || "")
+    const id = typeof data.id === "string" ? data.id : ""
 
     setCompanyData({
-      id: data.id,
+      id,
       name: data.name || "",
       email_address: data.email_address || "",
       tax_id: data.tax_id || "",
@@ -1368,12 +1372,14 @@ export default function SettingsPage() {
     setLocations(nextLocations)
     setCompanyLogoPreview(resolvedLogoUrl)
     setLogoPreview(resolvedLogoUrl)
-    return data.id as string
+    return id || null
   }
 
   const persistCompanySettings = async (overrides: Record<string, unknown> = {}) => {
-    const companyId = (overrides.company_id as string) || companyData.id
-    if (!companyId) throw new Error("No company identifier available")
+    // Allow empty company_id — API creates the company and binds the user on first save.
+    const companyId = ((overrides.company_id as string) || companyData.id || "").trim()
+    const usableCompanyId =
+      companyId && !companyId.startsWith("demo-") ? companyId : undefined
 
     const logoCandidate =
       (overrides.logo_url as string | null | undefined) ??
@@ -1381,7 +1387,7 @@ export default function SettingsPage() {
       (isPlaceholderLogo(companyData.logo_url) ? null : companyData.logo_url)
 
     const payload = {
-      company_id: companyId,
+      ...(usableCompanyId ? { company_id: usableCompanyId } : {}),
       name: companyData.name,
       industry: companyData.industry,
       tax_id: companyData.tax_id,
@@ -1395,6 +1401,9 @@ export default function SettingsPage() {
       logo_url: logoCandidate,
       ...overrides,
     }
+    if (!usableCompanyId) {
+      delete (payload as any).company_id
+    }
 
     const result = await settingsFetch("/api/settings/company", {
       method: "POST",
@@ -1404,6 +1413,14 @@ export default function SettingsPage() {
     if (result.company) {
       applyCompanyPayload(result.company)
       clearClientDemoSession()
+      try {
+        const savedId = result.company.id || result.company_id
+        if (savedId && typeof window !== "undefined") {
+          window.localStorage.setItem("hrpay.company_id", String(savedId))
+        }
+      } catch {
+        // ignore storage errors
+      }
     }
     return result
   }
@@ -1480,16 +1497,20 @@ export default function SettingsPage() {
     }
 
     try {
+      if (typeof window !== "undefined") {
+        const cached = window.localStorage.getItem("hrpay.company_id")?.trim()
+        if (cached && !cached.startsWith("demo-")) return cached
+      }
+    } catch {
+      // ignore
+    }
+
+    try {
       const { data, error } = await supabase.rpc("get_current_user_company_id")
-      const HARDCODED_PLACEHOLDER = "550e8400-e29b-41d4-a716-446655440000"
-      if (
-        !error &&
-        typeof data === "string" &&
-        data.trim().length > 0 &&
-        data !== HARDCODED_PLACEHOLDER &&
-        !data.startsWith("demo-")
-      ) {
-        return data
+      // Accept any non-demo UUID — including seed UUID if that company row exists
+      // (server-side resolveTenantContext verifies existence before using it).
+      if (!error && typeof data === "string" && data.trim().length > 0 && !data.startsWith("demo-")) {
+        return data.trim()
       }
       if (error) {
         console.warn("[v0] get_current_user_company_id RPC failed", error)
@@ -1517,7 +1538,25 @@ export default function SettingsPage() {
       const payload = await settingsFetch(`/api/settings/company${qs}`)
       if (payload.company?.id) {
         clearClientDemoSession()
+        try {
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem("hrpay.company_id", String(payload.company.id))
+          }
+        } catch {
+          // ignore
+        }
         return applyCompanyPayload(payload.company)
+      }
+
+      // Bootstrap: company API returned empty shell — keep form usable for first save.
+      if (payload.needs_bootstrap || payload.company) {
+        if (payload.company) {
+          applyCompanyPayload({
+            ...payload.company,
+            id: payload.company.id || "",
+          })
+        }
+        return null
       }
     } catch (error) {
       console.error("[v0] Error loading company data:", error)
@@ -1766,8 +1805,22 @@ export default function SettingsPage() {
     if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
       targetCompanyId = (await loadCompanyData()) || targetCompanyId
     }
+    // Last resort: let the server resolve tenant (no client company_id query param).
     if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
-      throw new Error("No company identifier available")
+      try {
+        const payload = await settingsFetch("/api/settings/company")
+        if (payload.company?.id) {
+          applyCompanyPayload(payload.company)
+          targetCompanyId = payload.company.id
+        }
+      } catch {
+        // fall through
+      }
+    }
+    if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+      throw new Error(
+        "No company identifier available. Open the Company tab and click Save Company Settings first.",
+      )
     }
     return targetCompanyId
   }
@@ -4280,69 +4333,41 @@ Format the response in a professional, actionable manner for HR decision-makers.
     console.log("[v0] Syncing tax reliefs from GRA...")
 
     try {
-      // Simulate API call to GRA
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // Simulate updated data from GRA
-      const graReliefs = [
-        {
-          id: 1,
-          name: "Personal Relief",
-          description: "Basic personal tax relief",
-          amount: 402,
-          currency: "GHS",
-          isActive: true,
-          category: "Personal",
-          effectiveDate: "2024-01-01",
-          lastUpdated: new Date().toISOString()
-        },
-        {
-          id: 2,
-          name: "Child Relief",
-          description: "Tax relief for dependent children",
-          amount: 150,
-          currency: "GHS",
-          isActive: true,
-          category: "Family",
-          effectiveDate: "2024-01-01",
-          lastUpdated: new Date().toISOString()
-        },
-        {
-          id: 3,
-          name: "Old Age Relief",
-          description: "Tax relief for elderly citizens",
-          amount: 200,
-          currency: "GHS",
-          isActive: true,
-          category: "Age",
-          effectiveDate: "2024-01-01",
-          lastUpdated: new Date().toISOString()
-        },
-        {
-          id: 4,
-          name: "Disability Relief",
-          description: "Tax relief for persons with disabilities",
-          amount: 100,
-          currency: "GHS",
-          isActive: true,
-          category: "Disability",
-          effectiveDate: "2024-01-01",
-          lastUpdated: new Date().toISOString()
-        }
-      ]
+      // Official GRA figures: https://gra.gov.gh/domestic-tax/personal-tax-relief/
+      const { graApiService } = await import("@/lib/gra-api")
+      const comprehensive = await graApiService.getComprehensiveTaxReliefs()
+      const graReliefs = comprehensive.map((r) => ({
+        // Drop non-UUID ids so save inserts fresh rows
+        name: r.name,
+        description: r.description,
+        amount: Number(r.amount || 0),
+        currency: r.currency || "GHS",
+        isActive: r.isActive !== false,
+        category: r.category,
+        effectiveDate: r.effectiveDate,
+        lastUpdated: r.lastUpdated || new Date().toISOString(),
+        graCode: r.graCode,
+        maxAmount: r.maxAmount,
+        conditions: r.conditions,
+        eligibilityCriteria: r.eligibilityCriteria,
+        requiredDocuments: r.requiredDocuments,
+      }))
 
       setTaxReliefs(graReliefs)
       setReliefsLastSync(new Date().toISOString())
 
+      // Persist to tenant catalog so Payroll Tax Reliefs uses the same figures
+      await handleSaveReliefs(graReliefs)
+
       toast({
         title: "Tax Reliefs Synced",
-        description: "Successfully synced tax reliefs from GRA. 4 reliefs updated.",
+        description: `Synced ${graReliefs.length} official GRA personal tax reliefs and saved to company settings.`,
       })
     } catch (error) {
       console.error("[v0] Error syncing tax reliefs:", error)
       toast({
         title: "Sync Failed",
-        description: "Failed to sync tax reliefs from GRA. Please try again.",
+        description: settingsErrorMessage(error, "Failed to sync tax reliefs from GRA. Please try again."),
         variant: "destructive",
       })
     } finally {

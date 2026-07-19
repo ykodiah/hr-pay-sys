@@ -46,7 +46,15 @@ export async function GET(req: NextRequest) {
         { status: 403 },
       )
     }
-    if (!companyId) return NextResponse.json({ error: "company_id required" }, { status: 400 })
+    if (!companyId) {
+      return NextResponse.json(
+        {
+          error:
+            "Unable to resolve company for this user. Open Company settings and save your company, or set company_id on the user profile.",
+        },
+        { status: 400 },
+      )
+    }
 
     const [{ data: company }, { data: settings }, { data: subsidiaries }] = await Promise.all([
       client.from("companies").select("*").eq("id", companyId).maybeSingle(),

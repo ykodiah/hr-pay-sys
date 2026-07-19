@@ -121,13 +121,26 @@ export default function PayrollTaxReliefsPage() {
   const [uploading, setUploading] = useState(false)
 
   const loadCompany = useCallback(async () => {
+    // Prefer employees/meta, then Settings company bootstrap resolver.
     const res = await fetch("/api/employees/meta", { cache: "no-store", credentials: "include" })
-    const json = await res.json()
-    if (!res.ok || !json.company_id) {
-      throw new Error(json.error || "Unable to resolve company for this user")
+    const json = await res.json().catch(() => ({}))
+    if (res.ok && json.company_id) {
+      setCompanyId(json.company_id)
+      return json.company_id as string
     }
-    setCompanyId(json.company_id)
-    return json.company_id as string
+
+    const companyRes = await fetch("/api/settings/company", { cache: "no-store", credentials: "include" })
+    const companyJson = await companyRes.json().catch(() => ({}))
+    if (companyRes.ok && companyJson.company?.id) {
+      setCompanyId(companyJson.company.id)
+      return companyJson.company.id as string
+    }
+
+    throw new Error(
+      json.error ||
+        companyJson.error ||
+        "Unable to resolve company for this user. Open Company settings and save your company first.",
+    )
   }, [])
 
   const loadReliefs = useCallback(async (cid: string, year: number) => {

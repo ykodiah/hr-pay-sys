@@ -24,9 +24,18 @@ function isUuid(value: string) {
   )
 }
 
+async function companyExists(
+  service: ReturnType<typeof createServiceClient>,
+  companyId: string,
+): Promise<boolean> {
+  if (!isUuid(companyId)) return false
+  const { data } = await service.from("companies").select("id").eq("id", companyId).maybeSingle()
+  return Boolean(data?.id)
+}
+
 /**
  * Resolve the authenticated user's home company from trusted sources only.
- * Never falls back to "first/latest company in the database".
+ * Prefer identity-bound sources; never pick an arbitrary company when more than one exists.
  */
 async function resolveUserCompanyId(
   service: ReturnType<typeof createServiceClient>,
@@ -34,15 +43,30 @@ async function resolveUserCompanyId(
 ): Promise<string | null> {
   if (!user?.id) return null
 
+  // 1) users.company_id (explicit profile binding)
+  try {
+    const { data: profile } = await service.from("users").select("company_id").eq("id", user.id).maybeSingle()
+    const profileCompanyId = typeof profile?.company_id === "string" ? profile.company_id.trim() : ""
+    if (profileCompanyId && (await companyExists(service, profileCompanyId))) {
+      return profileCompanyId
+    }
+  } catch {
+    // optional table
+  }
+
+  // 2) JWT / user metadata
   const fromMeta =
     user.app_metadata?.company_id ||
     user.user_metadata?.company_id ||
+    user.app_metadata?.companyId ||
+    user.user_metadata?.companyId ||
     null
   if (typeof fromMeta === "string" && fromMeta.trim()) {
-    return fromMeta.trim()
+    const metaId = fromMeta.trim()
+    if (await companyExists(service, metaId)) return metaId
   }
 
-  // Prefer employee_profiles → employees (auth user linked to employee)
+  // 3) employee_profiles → employees
   try {
     const { data: profile } = await service
       .from("employee_profiles")
@@ -55,73 +79,147 @@ async function resolveUserCompanyId(
         .select("company_id")
         .eq("id", profile.employee_id)
         .maybeSingle()
-      if (emp?.company_id) return emp.company_id
+      if (emp?.company_id && (await companyExists(service, emp.company_id))) {
+        return emp.company_id
+      }
     }
   } catch {
     // optional table
   }
 
-  // Some deployments use employees.id = auth.uid()
+  // 4) employees.id = auth.uid()
   try {
     const { data: byId } = await service
       .from("employees")
       .select("company_id")
       .eq("id", user.id)
       .maybeSingle()
-    if (byId?.company_id) return byId.company_id
+    if (byId?.company_id && (await companyExists(service, byId.company_id))) {
+      return byId.company_id
+    }
   } catch {
     // ignore
   }
 
-  // Fallback: match by corporate/personal email on employees
-  if (user.email) {
+  const email = (user.email || "").trim()
+  if (email) {
+    // 5) employees by corporate/personal email
     try {
       const { data: byEmail } = await service
         .from("employees")
         .select("company_id")
-        .or(`corporate_email.eq.${user.email},personal_email.eq.${user.email}`)
-        .limit(1)
-        .maybeSingle()
-      if (byEmail?.company_id) return byEmail.company_id
+        .or(`corporate_email.eq.${email},personal_email.eq.${email},email.eq.${email}`)
+        .not("company_id", "is", null)
+        .limit(5)
+
+      for (const row of byEmail || []) {
+        if (row?.company_id && (await companyExists(service, row.company_id))) {
+          return row.company_id
+        }
+      }
     } catch {
       // ignore
     }
 
-    // Company contact email (common for tenant admins who are not employees)
+    // 6) companies contact email (tenant admins often aren't employees)
     try {
       const { data: byCompanyEmail } = await service
         .from("companies")
         .select("id")
-        .or(`email_address.eq.${user.email},email.eq.${user.email}`)
-        .limit(1)
-        .maybeSingle()
-      if (byCompanyEmail?.id) return byCompanyEmail.id
+        .or(`email_address.eq.${email},email.eq.${email}`)
+        .limit(5)
+
+      for (const row of byCompanyEmail || []) {
+        if (row?.id && (await companyExists(service, row.id))) return row.id
+      }
     } catch {
       // ignore
     }
+
+    // 7) company_settings email / settings_data.email_address
+    try {
+      const { data: bySettingsEmail } = await service
+        .from("company_settings")
+        .select("company_id")
+        .ilike("email", email)
+        .not("company_id", "is", null)
+        .limit(5)
+
+      for (const row of bySettingsEmail || []) {
+        if (row?.company_id && (await companyExists(service, row.company_id))) {
+          return row.company_id
+        }
+      }
+    } catch {
+      // email column may not exist — try settings_data scan as fallback
+      try {
+        const { data: settingsRows } = await service
+          .from("company_settings")
+          .select("company_id, settings_data")
+          .not("company_id", "is", null)
+          .limit(25)
+
+        for (const row of settingsRows || []) {
+          const settingsEmail =
+            (typeof row?.settings_data?.email_address === "string" && row.settings_data.email_address) ||
+            (typeof row?.settings_data?.email === "string" && row.settings_data.email) ||
+            ""
+          if (settingsEmail.trim().toLowerCase() === email.toLowerCase() && row?.company_id) {
+            if (await companyExists(service, row.company_id)) return row.company_id
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
   }
 
-  // JWT-based RPC only — accept when the company row exists.
-  // Skip known hardcoded placeholder UUID from old migrations.
+  // 8) RPC — accept any existing company UUID (including seed UUID environments)
   try {
     const { data: rpcId } = await service.rpc("get_current_user_company_id")
-    if (
-      typeof rpcId === "string" &&
-      isUuid(rpcId) &&
-      rpcId !== "550e8400-e29b-41d4-a716-446655440000"
-    ) {
-      const { data: company } = await service
-        .from("companies")
-        .select("id")
-        .eq("id", rpcId)
-        .maybeSingle()
-      if (company?.id) return company.id
+    if (typeof rpcId === "string" && (await companyExists(service, rpcId))) {
+      return rpcId
     }
   } catch {
     // optional RPC
   }
 
+  // 9) Last resort for single-tenant / early bootstrap: exactly one company row
+  try {
+    const { data: companies, error } = await service
+      .from("companies")
+      .select("id")
+      .order("created_at", { ascending: true })
+      .limit(2)
+    if (!error && Array.isArray(companies) && companies.length === 1 && companies[0]?.id) {
+      return companies[0].id
+    }
+  } catch {
+    // ignore
+  }
+
   return null
+}
+
+/** Persist company_id onto users so later Settings/API calls resolve consistently. */
+export async function ensureUserCompanyBinding(
+  service: ReturnType<typeof createServiceClient>,
+  userId: string | null | undefined,
+  companyId: string | null | undefined,
+) {
+  if (!userId || !companyId || !isUuid(companyId) || userId.startsWith("demo-")) return
+  try {
+    await service.from("users").upsert(
+      {
+        id: userId,
+        company_id: companyId,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" },
+    )
+  } catch {
+    // non-fatal — users table may not exist in all deployments
+  }
 }
 
 /**
@@ -129,12 +227,14 @@ async function resolveUserCompanyId(
  * Uses service-role for DB IO so RLS cannot silently reject tenant admin writes,
  * but only after the caller is authenticated and the company is membership-checked.
  *
- * Fail-closed: never picks an arbitrary "first/latest" company.
+ * Fail-closed when more than one company exists and the user has no binding.
+ * Pass `{ allowUnresolved: true }` for Company bootstrap GET/create flows.
  */
 export async function resolveTenantContext(
   req: NextRequest,
   companyIdFromClient?: string | null,
-): Promise<TenantContext | NextResponse> {
+  options?: { allowUnresolved?: boolean },
+): Promise<TenantContext | NextResponse | { unresolved: true; userId: string | null; demo: boolean; service: ReturnType<typeof createServiceClient> }> {
   const demo = isDemoMode()
   const service = createServiceClient()
 
@@ -201,18 +301,36 @@ export async function resolveTenantContext(
     if (homeCompanyId && requestedId !== homeCompanyId) {
       return forbidden("company_id does not belong to the authenticated user")
     }
+    await ensureUserCompanyBinding(service, userId, requestedId)
     return { companyId: requestedId, userId, demo, service }
   }
 
   if (homeCompanyId) {
+    await ensureUserCompanyBinding(service, userId, homeCompanyId)
     return { companyId: homeCompanyId, userId, demo, service }
   }
 
-  // Fail closed — do NOT fall back to newest/oldest company.
+  if (options?.allowUnresolved) {
+    return { unresolved: true, userId, demo, service }
+  }
+
+  // Fail closed — do NOT fall back to newest/oldest company when multiple exist.
   return badRequest(
     "Unable to resolve company for this user. Open Company settings and save your company, or set company_id on the user profile.",
     400,
   )
+}
+
+export function isTenantContext(
+  value: unknown,
+): value is TenantContext {
+  return Boolean(value && typeof value === "object" && "companyId" in (value as any) && "service" in (value as any))
+}
+
+export function isUnresolvedTenant(
+  value: unknown,
+): value is { unresolved: true; userId: string | null; demo: boolean; service: ReturnType<typeof createServiceClient> } {
+  return Boolean(value && typeof value === "object" && (value as any).unresolved === true)
 }
 
 export function jsonError(err: unknown, fallback = "Request failed") {

@@ -1,8 +1,32 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from "next/server"
-import { ensureArray, jsonError, resolveTenantContext } from "@/lib/settings/resolve-tenant"
+import {
+  ensureArray,
+  ensureUserCompanyBinding,
+  isUnresolvedTenant,
+  jsonError,
+  resolveTenantContext,
+} from "@/lib/settings/resolve-tenant"
 
 type CompanyRow = Record<string, any>
+
+function emptyCompanyResponse(email = "") {
+  return {
+    id: "",
+    name: "",
+    email_address: email,
+    tax_id: "",
+    ssnit_number: "",
+    industry: "",
+    status: "active",
+    address: "",
+    phone_number: "",
+    divisions: [] as string[],
+    departments: [] as string[],
+    locations: [] as string[],
+    logo_url: null as string | null,
+  }
+}
 
 function buildCompanyResponse(company: CompanyRow, settings: CompanyRow | null) {
   const settingsPayload = (settings?.settings_data || {}) as Record<string, unknown>
@@ -23,13 +47,13 @@ function buildCompanyResponse(company: CompanyRow, settings: CompanyRow | null) 
   return {
     id: company.id,
     name: String(pick("name", company.name || "")),
-    email_address: String(pick("email_address", company.email_address || "")),
+    email_address: String(pick("email_address", company.email_address || company.email || "")),
     tax_id: String(pick("tax_id", company.tax_id || "")),
     ssnit_number: String(pick("ssnit_number", company.ssnit_number || "")),
     industry: String(pick("industry", company.industry || "")),
     status: "active",
     address: String(pick("address", company.address || "")),
-    phone_number: String(pick("phone_number", company.phone_number || "")),
+    phone_number: String(pick("phone_number", company.phone_number || company.phone || "")),
     divisions,
     departments,
     locations,
@@ -53,18 +77,32 @@ async function loadCompanyBundle(service: any, companyId: string) {
 
 export async function GET(req: NextRequest) {
   try {
-    const ctx = await resolveTenantContext(req)
+    const ctx = await resolveTenantContext(req, null, { allowUnresolved: true })
     if (ctx instanceof NextResponse) return ctx
-    const { companyId, service } = ctx
 
+    if (isUnresolvedTenant(ctx)) {
+      return NextResponse.json({
+        company: emptyCompanyResponse(),
+        settings: null,
+        needs_bootstrap: true,
+      })
+    }
+
+    const { companyId, service } = ctx
     const bundle = await loadCompanyBundle(service, companyId)
     if (!bundle) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 })
+      // Company id resolved but row missing — allow Company tab to recreate.
+      return NextResponse.json({
+        company: { ...emptyCompanyResponse(), id: companyId },
+        settings: null,
+        needs_bootstrap: true,
+      })
     }
 
     return NextResponse.json({
       company: bundle.response,
       settings: bundle.settings,
+      needs_bootstrap: false,
     })
   } catch (err) {
     return jsonError(err, "Failed to load company settings")
@@ -74,9 +112,13 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const ctx = await resolveTenantContext(req, body.company_id)
+    const ctx = await resolveTenantContext(req, body.company_id || body.id || null, {
+      allowUnresolved: true,
+    })
     if (ctx instanceof NextResponse) return ctx
-    const { companyId, service } = ctx
+
+    const service = ctx.service
+    const userId = ctx.userId
     const now = new Date().toISOString()
 
     const divisions = ensureArray(body.divisions)
@@ -109,6 +151,73 @@ export async function POST(req: NextRequest) {
       locations,
       logo_url: logoUrl,
     }
+
+    let companyId: string | null = isUnresolvedTenant(ctx) ? null : ctx.companyId
+
+    // First-time save: create the companies row, then bind the user to it.
+    if (!companyId) {
+      const insertPayload: Record<string, unknown> = {
+        name: companyFields.name || "My Company",
+        industry: companyFields.industry || null,
+        tax_id: companyFields.tax_id || null,
+        ssnit_number: companyFields.ssnit_number || null,
+        email_address: companyFields.email_address || null,
+        phone_number: companyFields.phone_number || null,
+        address: companyFields.address || null,
+        logo_url: logoUrl,
+        created_at: now,
+        updated_at: now,
+      }
+
+      let created: any = null
+      let createError: any = null
+
+      ;({ data: created, error: createError } = await service
+        .from("companies")
+        .insert(insertPayload)
+        .select("id")
+        .single())
+
+      // Retry without optional columns some schemas lack.
+      if (createError) {
+        const minimal = {
+          name: companyFields.name || "My Company",
+          created_at: now,
+          updated_at: now,
+        }
+        ;({ data: created, error: createError } = await service
+          .from("companies")
+          .insert(minimal)
+          .select("id")
+          .single())
+      }
+
+      if (createError || !created?.id) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: createError?.message || "Failed to create company. Check companies table schema.",
+          },
+          { status: 500 },
+        )
+      }
+
+      companyId = created.id
+
+      // Best-effort fill of remaining fields after minimal insert.
+      await service
+        .from("companies")
+        .update({
+          ...companyFields,
+          divisions,
+          departments,
+          locations,
+          updated_at: now,
+        })
+        .eq("id", companyId)
+    }
+
+    await ensureUserCompanyBinding(service, userId, companyId)
 
     const warnings: string[] = []
     let companiesSaved = false
