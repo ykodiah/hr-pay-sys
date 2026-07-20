@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -118,10 +119,31 @@ interface Instructor {
 }
 
 export default function LearningPage() {
+  const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState("overview")
   const [showCourseDialog, setShowCourseDialog] = useState(false)
   const [showPathDialog, setShowPathDialog] = useState(false)
   const [showInstructorDialog, setShowInstructorDialog] = useState(false)
+
+  useEffect(() => {
+    const tab = searchParams.get("tab")
+    const action = searchParams.get("action")
+    const allowed = new Set([
+      "overview",
+      "courses",
+      "paths",
+      "enrollments",
+      "certifications",
+      "instructors",
+      "analytics",
+    ])
+    if (tab && allowed.has(tab)) setActiveTab(tab)
+    if (action === "add") {
+      if (tab === "courses") setShowCourseDialog(true)
+      if (tab === "paths") setShowPathDialog(true)
+      if (tab === "instructors") setShowInstructorDialog(true)
+    }
+  }, [searchParams])
 
   const [courses] = useState<Course[]>([
     {

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useReducer, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -269,8 +270,17 @@ function StatusBadge({ status }: { status: IntegrationStatus }) {
 
 export default function CommunicationIntegrationSettings() {
   const { toast } = useToast()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [state, dispatch] = useReducer(channelsReducer, initialState)
+  const [settingsTab, setSettingsTab] = useState("channels")
+
+  useEffect(() => {
+    const tab = searchParams.get("tab")
+    if (tab === "channels" || tab === "templates" || tab === "snippets") {
+      setSettingsTab(tab)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     async function loadIntegrations() {
@@ -439,7 +449,7 @@ export default function CommunicationIntegrationSettings() {
         </p>
       </div>
 
-      <Tabs defaultValue="channels" className="space-y-6">
+      <Tabs value={settingsTab} onValueChange={setSettingsTab} className="space-y-6">
         <TabsList className="grid w-full gap-2 sm:w-auto sm:grid-cols-3">
           <TabsTrigger value="channels">Channels</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>

@@ -5,6 +5,7 @@ import { DialogDescription } from "@/components/ui/dialog"
 
 import type React from "react"
 import { useState, useEffect, useCallback, useRef } from "react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -250,6 +251,14 @@ export default function EmployeesPage() {
   const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    if (searchParams.get("action") === "add") {
+      setIsAddDialogOpen(true)
+    }
+  }, [searchParams])
+
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedDepartment, setSelectedDepartment] = useState("all")

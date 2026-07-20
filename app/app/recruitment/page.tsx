@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react"
+import { useSearchParams } from "next/navigation"
 import {
   AlertCircle,
   BarChart3,
@@ -465,6 +466,7 @@ function EmptyState({
 }
 
 export default function RecruitmentPage() {
+  const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState("overview")
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [metrics, setMetrics] = useState<Metrics>(emptyMetrics)
@@ -494,6 +496,28 @@ export default function RecruitmentPage() {
   const [applicationForm, setApplicationForm] = useState<ApplicationForm>(initialApplicationForm)
   const [interviewForm, setInterviewForm] = useState<InterviewForm>(initialInterviewForm)
   const hasLoadedRef = useRef(false)
+
+  useEffect(() => {
+    const tab = searchParams.get("tab")
+    const action = searchParams.get("action")
+    const allowed = new Set([
+      "overview",
+      "requisitions",
+      "jobs",
+      "applications",
+      "interviews",
+      "offers",
+      "onboarding",
+      "analytics",
+    ])
+    if (tab && allowed.has(tab)) setActiveTab(tab)
+    if (action === "add") {
+      if (tab === "requisitions") setShowRequisitionDialog(true)
+      if (tab === "jobs") setShowJobDialog(true)
+      if (tab === "applications") setShowApplicationDialog(true)
+      if (tab === "interviews") setShowInterviewDialog(true)
+    }
+  }, [searchParams])
 
   const loadRecruitment = useCallback(
     async (knownCompanyId?: string | null) => {

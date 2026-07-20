@@ -2,6 +2,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -321,6 +322,14 @@ export default function FullyFunctionalDocumentVaultPage() {
   const [isArchiveOpen, setIsArchiveOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
   const [isUploadOpen, setIsUploadOpen] = useState(false)
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    if (searchParams.get("action") === "upload") {
+      setIsUploadOpen(true)
+    }
+  }, [searchParams])
+
   const [isAddPolicyOpen, setIsAddPolicyOpen] = useState(false)
   const [isAddWorkflowOpen, setIsAddWorkflowOpen] = useState(false)
   const [isAddIntegrationOpen, setIsAddIntegrationOpen] = useState(false)
