@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
+import { normalizePayrollCashRows } from "@/lib/payroll/cash-deductions"
 
 export async function GET(req: NextRequest) {
   try {
@@ -77,7 +78,7 @@ export async function GET(req: NextRequest) {
         }
         return NextResponse.json({
           success: true,
-          payslips: rows,
+          payslips: normalizePayrollCashRows(rows),
           count: rows.length,
           company_id: companyId,
         })
@@ -87,7 +88,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      payslips: data || [],
+      payslips: normalizePayrollCashRows(data || []),
       count: (data || []).length,
       company_id: companyId,
     })

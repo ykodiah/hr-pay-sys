@@ -77,6 +77,15 @@ describe("Act 766 SSNIT / Tier 2", () => {
     expect(fixed.tier2).toEqual(GRA_2025_TIER2)
   })
 
+  it("repairs legacy SSNIT 0.5% and Tier 2 employer 5%", () => {
+    const fixed = normalizePensionRates(
+      { employee_rate: 0.5, employer_rate: 13 },
+      { employee_rate: 5, employer_rate: 5 },
+    )
+    expect(fixed.ssnit.employee_rate).toBe(5.5)
+    expect(fixed.tier2.employer_rate).toBe(0)
+  })
+
   it("excludes Tier 2 from PAYE chargeable income (report-only)", () => {
     const result = calculateGhanaTax(
       { monthly_basic: 4000, monthly_allowances: { transport: 200 }, tier2_applicable: true },

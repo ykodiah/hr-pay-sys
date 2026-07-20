@@ -316,7 +316,10 @@ export function normalizePayeBands(bands: PAYEBand[] | null | undefined): {
 /**
  * Validate/normalise pension rates before calculation.
  * Falls back to GRA Act 766 defaults only when values are clearly invalid
- * (zero or missing). User-configured rates from DB are respected as-is.
+ * (zero or missing). User-configured rates from DB are respected as-is,
+ * with two legacy repairs:
+ *  - SSNIT employee < 1% (old 0.5% Tier-1 split typo) → 5.5%
+ *  - Tier 2 employer 5% (incorrect seed) → 0%
  */
 export function normalizePensionRates(ssnit: SSNITRates, tier2: Tier2Rates): {
   ssnit: SSNITRates
@@ -325,13 +328,23 @@ export function normalizePensionRates(ssnit: SSNITRates, tier2: Tier2Rates): {
   const ssnitEmp = Number(ssnit?.employee_rate)
   const ssnitEr  = Number(ssnit?.employer_rate)
   const t2Emp    = Number(tier2?.employee_rate)
+  const t2Er     = Number(tier2?.employer_rate)
 
-  // If rates are missing/NaN/zero, fall back to Act 766 defaults
+  // If rates are missing/NaN, fall back to Act 766 defaults
   if (!isFinite(ssnitEmp) || !isFinite(ssnitEr) || !isFinite(t2Emp)) {
     return { ssnit: { ...GRA_2025_SSNIT }, tier2: { ...GRA_2025_TIER2 } }
   }
 
-  return { ssnit, tier2 }
+  let nextSsnit: SSNITRates = {
+    employee_rate: ssnitEmp > 0 && ssnitEmp < 1 ? 5.5 : ssnitEmp,
+    employer_rate: ssnitEr,
+  }
+  let nextTier2: Tier2Rates = {
+    employee_rate: t2Emp,
+    employer_rate: !isFinite(t2Er) || t2Er === 5 ? 0 : t2Er,
+  }
+
+  return { ssnit: nextSsnit, tier2: nextTier2 }
 }
 
 export function calculateMonthlyPaye(

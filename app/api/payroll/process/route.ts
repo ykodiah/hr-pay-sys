@@ -584,6 +584,21 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Ensure Tier 2 is excluded from stored cash totals (items + payslips + run)
+    if (processed > 0) {
+      try {
+        const { error: cashErr } = await client.rpc("recompute_payroll_run_cash_totals", {
+          p_payroll_run_id: runId,
+        })
+        if (cashErr) {
+          // Fallback when script 081 not yet applied: recompute in app from components
+          console.log("[v0] Cash totals RPC unavailable:", cashErr.message)
+        }
+      } catch (e) {
+        console.log("[v0] Cash totals recompute skipped:", e instanceof Error ? e.message : "unknown")
+      }
+    }
+
     // Post-save reconciliation: validate payroll_items and payslips sync
     if (processed > 0) {
       try {

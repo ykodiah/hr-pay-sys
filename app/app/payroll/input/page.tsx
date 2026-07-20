@@ -14,6 +14,7 @@ import {
   calculateGhanaTax,
   DEFAULT_TAX_RATES,
   round2,
+  type TaxRates,
 } from "@/lib/ghana-tax/engine"
 import {
   RefreshCw,
@@ -95,11 +96,34 @@ export default function PayInputsPage() {
   const [search, setSearch] = useState("")
   const [isPending, startTransition] = useTransition()
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null)
+  const [taxRates, setTaxRates] = useState<TaxRates>(DEFAULT_TAX_RATES)
 
   const resolveCompany = useCallback(async () => {
     const id = await resolveClientCompanyId()
     setCompanyId(id)
     return id
+  }, [])
+
+  const loadTaxRates = useCallback(async (cid: string, period: string) => {
+    try {
+      const year = Number(period.slice(0, 4)) || new Date().getFullYear()
+      const res = await fetch(
+        `/api/settings/tax?company_id=${encodeURIComponent(cid)}&tax_year=${year}`,
+        { cache: "no-store", credentials: "include" },
+      )
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) return
+      setTaxRates({
+        ...DEFAULT_TAX_RATES,
+        ssnit: json.ssnit ?? DEFAULT_TAX_RATES.ssnit,
+        tier2: json.tier2 ?? DEFAULT_TAX_RATES.tier2,
+        tier3: json.tier3 ?? DEFAULT_TAX_RATES.tier3,
+        paye_bands: json.paye_bands ?? DEFAULT_TAX_RATES.paye_bands,
+        paye_bands_are_monthly: json.paye_bands_are_monthly ?? true,
+      })
+    } catch {
+      // keep defaults
+    }
   }, [])
 
   const loadRows = useCallback(async (cid: string, period: string) => {
@@ -129,10 +153,11 @@ export default function PayInputsPage() {
   useEffect(() => {
     void (async () => {
       const cid = companyId || (await resolveCompany())
-      if (cid) await loadRows(cid, payPeriod)
-      else setLoading(false)
+      if (cid) {
+        await Promise.all([loadRows(cid, payPeriod), loadTaxRates(cid, payPeriod)])
+      } else setLoading(false)
     })()
-  }, [companyId, payPeriod, resolveCompany, loadRows])
+  }, [companyId, payPeriod, resolveCompany, loadRows, loadTaxRates])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -160,8 +185,10 @@ export default function PayInputsPage() {
         monthly_allowances: { other: effectiveAllowances(row) },
         monthly_overtime: row.input.overtime_amount,
         monthly_bonus: row.input.bonus_amount,
+        // Tier 2 is report-only — still tracked for SSNIT Tier 2 reports, not cash net
         tier2_applicable: row.input.tier2_applicable,
         tier3_applicable: row.input.tier3_applicable,
+        tier3_employee_rate: row.input.tier3_employee_rate || undefined,
         other_deductions: {
           loan: row.input.loan_deduction,
           advance: row.input.advance_deduction,
@@ -169,10 +196,10 @@ export default function PayInputsPage() {
         },
       },
       {
-        ...DEFAULT_TAX_RATES,
+        ...taxRates,
         tier3: {
-          employee_rate: row.input.tier3_employee_rate || 0,
-          employer_rate: 0,
+          employee_rate: row.input.tier3_employee_rate || taxRates.tier3?.employee_rate || 0,
+          employer_rate: taxRates.tier3?.employer_rate || 0,
         },
       },
     )

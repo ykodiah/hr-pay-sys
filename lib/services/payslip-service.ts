@@ -10,6 +10,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import type { TaxCalculationResult } from "@/lib/ghana-tax/engine"
+import { normalizePayrollCashRow, normalizePayrollCashRows } from "@/lib/payroll/cash-deductions"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -216,7 +217,7 @@ export async function getEmployeePayslips(
   const { data, error } = await query
 
   if (error) return { data: [], error: error.message }
-  return { data: (data ?? []) as PayslipRow[], error: null }
+  return { data: normalizePayrollCashRows((data ?? []) as PayslipRow[]), error: null }
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +236,7 @@ export async function getPayslipById(
     .single()
 
   if (error) return { data: null, error: error.message }
-  return { data: data as PayslipRow, error: null }
+  return { data: data ? (normalizePayrollCashRow(data as PayslipRow) as PayslipRow) : null, error: null }
 }
 
 // ---------------------------------------------------------------------------
@@ -272,7 +273,7 @@ export async function getPayrollRunPayslips(
     .order("snapshot_employee_name", { ascending: true })
 
   if (error) return { data: [], error: error.message }
-  return { data: (data ?? []) as PayslipRow[], error: null }
+  return { data: normalizePayrollCashRows((data ?? []) as PayslipRow[]), error: null }
 }
 
 // ---------------------------------------------------------------------------

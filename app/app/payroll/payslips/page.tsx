@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { resolveClientCompanyId } from "@/lib/tenant/resolve-company-client"
+import { normalizePayrollCashRow, normalizePayrollCashRows } from "@/lib/payroll/cash-deductions"
 import {
   Search,
   Download,
@@ -155,32 +156,33 @@ function statusBadge(status: string) {
 // ─── Payslip Preview Component ────────────────────────────────────────────────
 
 function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | null }) {
+  const normalized = normalizePayrollCashRow(slip) as PayslipRow
   const earnings = [
-    { label: "Basic Salary",            val: slip.basic_salary },
-    { label: "Transport Allowance",     val: slip.transport_allowance },
-    { label: "Housing Allowance",       val: slip.housing_allowance },
-    { label: "Medical Allowance",       val: slip.medical_allowance },
-    { label: "Meal Allowance",          val: slip.meal_allowance },
-    { label: "Communication Allowance", val: slip.communication_allowance },
-    { label: "Other Allowances",        val: slip.other_allowances },
-    { label: "Overtime",                val: slip.overtime_pay },
-    { label: "Bonus",                   val: slip.bonus_pay },
+    { label: "Basic Salary",            val: normalized.basic_salary },
+    { label: "Transport Allowance",     val: normalized.transport_allowance },
+    { label: "Housing Allowance",       val: normalized.housing_allowance },
+    { label: "Medical Allowance",       val: normalized.medical_allowance },
+    { label: "Meal Allowance",          val: normalized.meal_allowance },
+    { label: "Communication Allowance", val: normalized.communication_allowance },
+    { label: "Other Allowances",        val: normalized.other_allowances },
+    { label: "Overtime",                val: normalized.overtime_pay },
+    { label: "Bonus",                   val: normalized.bonus_pay },
   ].filter(e => e.val > 0)
 
   const deductions = [
-    { label: "SSNIT (Employee 5.5%)",   val: slip.ssnit_employee },
-    { label: "Tier 3 / Provident Fund", val: slip.tier3_employee },
-    { label: "PAYE Tax",                val: slip.paye_tax },
-    { label: "Loan Repayment",          val: slip.loan_deduction },
-    { label: "Advance Deduction",       val: slip.advance_deduction },
-    { label: "Other Deductions",        val: slip.other_deductions },
+    { label: "SSNIT (Employee 5.5%)",   val: normalized.ssnit_employee },
+    { label: "Tier 3 / Provident Fund", val: normalized.tier3_employee },
+    { label: "PAYE Tax",                val: normalized.paye_tax },
+    { label: "Loan Repayment",          val: normalized.loan_deduction },
+    { label: "Advance Deduction",       val: normalized.advance_deduction },
+    { label: "Other Deductions",        val: normalized.other_deductions },
   ].filter(d => d.val > 0)
 
-  const hasLoan = loan || slip.loan_deduction > 0
+  const hasLoan = loan || normalized.loan_deduction > 0
 
   // Determine entity line: subsidiary name or parent company
-  const entityName = slip.snapshot_subsidiary || slip.snapshot_company_name || "Company"
-  const isSubsidiary = Boolean(slip.snapshot_subsidiary)
+  const entityName = normalized.snapshot_subsidiary || normalized.snapshot_company_name || "Company"
+  const isSubsidiary = Boolean(normalized.snapshot_subsidiary)
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
@@ -592,9 +594,9 @@ export default function PayslipsPage() {
         recentQ,
       ])
 
-      if (slipRes.data) setIndivSlip(slipRes.data as PayslipRow)
+      if (slipRes.data) setIndivSlip(normalizePayrollCashRow(slipRes.data as PayslipRow) as PayslipRow)
       if (loanRes.data) setActiveLoan(loanRes.data as ActiveLoan)
-      setRecentSlips((recentRes.data ?? []) as PayslipRow[])
+      setRecentSlips(normalizePayrollCashRows((recentRes.data ?? []) as PayslipRow[]) as PayslipRow[])
     } catch (err) {
       toast({ title: "Error", description: "Could not load payslip.", variant: "destructive" })
     } finally {
@@ -677,7 +679,7 @@ export default function PayslipsPage() {
         slips = slips.filter((s) => ids.has(s.employee_id))
       }
 
-      setBulkSlips(slips)
+      setBulkSlips(normalizePayrollCashRows(slips) as PayslipRow[])
       setBulkSelected(new Set(slips.map(s => s.id)))
     } catch (err) {
       toast({ title: "Error", description: "Failed to load payslips for bulk view.", variant: "destructive" })
@@ -736,7 +738,7 @@ export default function PayslipsPage() {
         throw new Error(json.error || `Failed to load custom payslips (${res.status})`)
       }
 
-      setCustomSlips((json.payslips ?? []) as PayslipRow[])
+      setCustomSlips(normalizePayrollCashRows((json.payslips ?? []) as PayslipRow[]) as PayslipRow[])
       setCustomLoaded(true)
       if (!(json.payslips ?? []).length) {
         toast({

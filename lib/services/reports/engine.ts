@@ -18,6 +18,7 @@ import type {
 import { REPORT_LABELS } from "./types"
 import { toCSV } from "./csv"
 import { loadCompanyBrand, type CompanyBrandInfo } from "@/lib/exports/company-branding"
+import { normalizePayrollCashRow } from "@/lib/payroll/cash-deductions"
 
 export { toCSV }
 
@@ -63,7 +64,7 @@ function mapPayslipToReportRow(p: any): PayrollReportRow {
     Number(p.communication_allowance ?? 0) +
     Number(p.other_allowances ?? 0)
 
-  return {
+  const base = {
     company_id: p.company_id,
     payroll_run_id: p.payroll_run_id,
     pay_period: p.pay_period,
@@ -116,13 +117,14 @@ function mapPayslipToReportRow(p: any): PayrollReportRow {
     cost_to_company:
       Number(p.gross_pay ?? 0) +
       Number(p.ssnit_employer ?? 0) +
-      Number(p.tier2_employer ?? 0) +
       Number(p.tier3_employer ?? 0),
     payslip_status: p.status ?? "draft",
     loan_amount: fin?.loan_amount ?? null,
     current_loan_balance: Number(p.loan_balance ?? fin?.loan_balance ?? 0),
     current_loan_deduction: Number(p.loan_deduction ?? 0),
   } as PayrollReportRow
+
+  return normalizePayrollCashRow(base) as PayrollReportRow
 }
 
 interface FetchRowsResult {
@@ -155,7 +157,10 @@ async function fetchReportRows(
 
   const { data, error } = await query
   if (!error && (data ?? []).length > 0) {
-    return { rows: data as PayrollReportRow[], source: "view", rowCount: data.length }
+    const rows = (data as PayrollReportRow[]).map((r) =>
+      normalizePayrollCashRow(r) as PayrollReportRow,
+    )
+    return { rows, source: "view", rowCount: rows.length }
   }
 
   // Fallback — direct payslips query
@@ -284,12 +289,12 @@ async function fetchReportRows(
       total_deductions: Number(it.total_deductions ?? 0),
       net_pay: Number(it.net_pay ?? 0),
       total_employer_cost: 0,
-      cost_to_company: Number(it.gross_pay ?? 0),
+      cost_to_company: Number(it.gross_pay ?? 0) + Number(it.ssnit_employer ?? 0) + Number(it.tier3_employer ?? 0),
       payslip_status: "from_payroll_items",
       current_loan_balance: 0,
       current_loan_deduction: Number(it.loan_deduction ?? 0),
-    } as PayrollReportRow
-  })
+    } as PayrollReportRow,
+  ).map((r) => normalizePayrollCashRow(r) as PayrollReportRow)
   
   return { 
     rows: mappedRows,

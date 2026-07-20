@@ -35,6 +35,7 @@ import {
   Info,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { normalizePayrollCashRows } from "@/lib/payroll/cash-deductions"
 import {
   Bar,
   BarChart,
@@ -122,6 +123,18 @@ export default function PayrollHistoryPage() {
     try {
       const { resolveClientCompanyId } = await import("@/lib/tenant/resolve-company-client")
       const companyId = await resolveClientCompanyId()
+
+      // Backfill stale totals that still include Tier 2 in total_deductions / net_pay
+      try {
+        await fetch("/api/payroll/recalculate-cash-totals", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ company_id: companyId }),
+        })
+      } catch {
+        // non-blocking — UI still normalizes item-level rows
+      }
 
       const [{ data: subsidiariesData }, runsRes] = await Promise.all([
         supabase.from("subsidiaries").select("id, name").eq("company_id", companyId).eq("status", "active"),
@@ -507,7 +520,7 @@ export default function PayrollHistoryPage() {
         })
         setPayrollItems([])
       } else {
-        setPayrollItems(data || [])
+        setPayrollItems(normalizePayrollCashRows(data || []))
       }
     } catch (err) {
       console.error("Unexpected error:", err)
