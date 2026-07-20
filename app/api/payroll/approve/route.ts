@@ -1,6 +1,40 @@
 import { NextRequest, NextResponse } from "next/server"
 import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
 import { issuePayrollRunPayslips } from "@/lib/services/payslip-service"
+import { resolveEmployeeForUser } from "@/lib/employees/resolve-employee"
+
+/**
+ * Resolve an actor id that satisfies legacy payroll_runs.*_by → employees(id) FKs.
+ * Prefer the linked employee row; fall back to auth user id (after script 079 drops the FK).
+ */
+async function resolveActorEmployeeId(
+  supabase: any,
+  opts: { userId: string | null; companyId: string; demo?: boolean },
+): Promise<string | null> {
+  if (opts.demo || !opts.userId) return null
+  try {
+    const emp = await resolveEmployeeForUser(supabase, {
+      userId: opts.userId,
+      companyId: opts.companyId,
+    })
+    if (emp?.id) return emp.id
+  } catch {
+    // ignore
+  }
+  // Last resort: some installs use employees.id = auth.uid()
+  try {
+    const { data } = await supabase
+      .from("employees")
+      .select("id")
+      .eq("id", opts.userId)
+      .eq("company_id", opts.companyId)
+      .maybeSingle()
+    if (data?.id) return data.id
+  } catch {
+    // ignore
+  }
+  return opts.userId
+}
 
 /**
  * POST /api/payroll/approve
@@ -35,8 +69,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Count employees on this run — never approve empty runs
+    const { count: itemCount } = await supabase
+      .from("payroll_items")
+      .select("id", { count: "exact", head: true })
+      .eq("payroll_run_id", payroll_run_id)
+      .eq("company_id", companyId)
+
+    if (action === "approve" && (!itemCount || itemCount < 1)) {
+      return NextResponse.json(
+        {
+          error:
+            "Cannot approve a payroll run with 0 employees. Re-run Payroll Processing with selected employees, then approve.",
+        },
+        { status: 422 },
+      )
+    }
+
     const now = new Date().toISOString()
-    const actorId = demo ? null : userId
+    const actorId = await resolveActorEmployeeId(supabase, {
+      userId: demo ? null : userId,
+      companyId,
+      demo,
+    })
 
     let updatePayload: Record<string, any> = { updated_at: now }
     let auditAction = action
@@ -157,7 +212,19 @@ export async function POST(request: NextRequest) {
         )
     }
 
-    const { data: updated, error: updateError } = await supabase
+    // Strip null actor fields so we don't overwrite with null when unresolved
+    for (const key of [
+      "approved_by",
+      "rejected_by",
+      "hr_reviewed_by",
+      "finance_reviewed_by",
+    ]) {
+      if (key in updatePayload && updatePayload[key] == null) {
+        delete updatePayload[key]
+      }
+    }
+
+    let { data: updated, error: updateError } = await supabase
       .from("payroll_runs")
       .update(updatePayload)
       .eq("id", payroll_run_id)
@@ -165,13 +232,41 @@ export async function POST(request: NextRequest) {
       .select("*")
       .maybeSingle()
 
+    // Legacy FK still pointing at employees(id): retry without actor columns
+    if (
+      updateError &&
+      /approved_by_fkey|rejected_by_fkey|reviewed_by_fkey|foreign key/i.test(
+        String(updateError.message || ""),
+      )
+    ) {
+      const retryPayload = { ...updatePayload }
+      delete retryPayload.approved_by
+      delete retryPayload.rejected_by
+      delete retryPayload.hr_reviewed_by
+      delete retryPayload.finance_reviewed_by
+      const retry = await supabase
+        .from("payroll_runs")
+        .update(retryPayload)
+        .eq("id", payroll_run_id)
+        .eq("company_id", companyId)
+        .select("*")
+        .maybeSingle()
+      updated = retry.data
+      updateError = retry.error
+      if (!updateError) {
+        console.warn(
+          "[payroll-approve] Actor FK blocked write — approved without actor id. Run scripts/079_payroll_runs_actor_fk_fix.sql",
+        )
+      }
+    }
+
     if (updateError) throw new Error(updateError.message)
 
     try {
       await supabase.from("payroll_approval_audit").insert({
         payroll_run_id,
         action: auditAction,
-        actor_id: actorId,
+        actor_id: actorId || userId || null,
         notes: notes ?? reason ?? null,
       })
     } catch {

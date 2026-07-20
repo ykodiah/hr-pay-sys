@@ -865,9 +865,7 @@ export default function PayrollPage() {
   }
 
   /**
-   * Run Payroll — direct completion path.
-   * Processes all calculated rows and marks the run as completed immediately
-   * without routing through the approval workflow.
+   * Run Payroll — process selected (or all) worksheet rows and queue for approval.
    */
   const handleRunPayroll = async (prorateMeta: Record<string, "prorate" | "full"> = {}) => {
     ensureDemoSessionCookie()
@@ -883,7 +881,14 @@ export default function PayrollPage() {
     setProcessing(true)
     setLastProcessMessage(null)
     try {
-      const baseEmployees = selected.length ? selected : rows
+      // Always recalculate the set we're about to process so amounts aren't stale
+      const baseEmployees = (selected.length ? selected : rows).map((r) =>
+        calculateRow(r, dbTaxRates, reliefsByEmployee[r.employeeId] || []),
+      )
+      if (!baseEmployees.length || baseEmployees.some((r) => !r.employeeId)) {
+        throw new Error("Selected employees are missing ids. Sync from DB and try again.")
+      }
+
       // Apply prorate decisions: scale basicSalary, allowances, grossPay, netPay proportionally
       const employeesToRun = baseEmployees.map((r) => {
         const decision = prorateMeta[r.employeeId]
@@ -917,9 +922,10 @@ export default function PayrollPage() {
               activeRun && !["approved", "paid", "cancelled"].includes(activeRun.status)
                 ? activeRun.id
                 : undefined,
-            submit_for_approval: false,
+            submit_for_approval: true,
             rows: employeesToRun.map((r) => ({
               employeeId: r.employeeId,
+              employee_id: r.employeeId,
               employeeCode: r.employeeCode,
               name: r.name,
               department: r.department,
@@ -949,19 +955,22 @@ export default function PayrollPage() {
       )
       const json = await res.json().catch(() => ({}))
 
-      if (!res.ok && res.status !== 422) {
+      if (!res.ok) {
         throw new Error(json.error || `Run failed (${res.status})`)
       }
 
       const processed = json.processed || 0
+      if (processed < 1) {
+        throw new Error(json.error || "No employees were saved to the payroll run.")
+      }
       const warnings = json.errors || []
-      setRows((prev) => prev.map((r) => ({ ...r, status: "Processed" })))
+      setRows((prev) => prev.map((r) => ({ ...r, status: "Submitted" })))
       setLastProcessMessage(
-        `${processed} employee(s) processed and saved. Payroll run is now complete.`,
+        `${processed} employee(s) processed and queued for approval.`,
       )
       toast({
-        title: "✓ Payroll run complete",
-        description: `${processed} of ${employeesToRun.length} employee(s) saved${warnings.length ? ` with ${warnings.length} warning(s)` : ""}. View payslips and reports.`,
+        title: "✓ Submitted for approval",
+        description: `${processed} of ${employeesToRun.length} employee(s) saved${warnings.length ? ` with ${warnings.length} warning(s)` : ""}. Open Approvals to review.`,
       })
       setTimeout(() => void loadWorksheet(companyId, payPeriod), 1500)
     } catch (err) {

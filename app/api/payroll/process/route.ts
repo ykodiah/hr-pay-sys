@@ -42,6 +42,43 @@ type ProcessRow = {
   netPay?: number
 }
 
+/** Accept camelCase or snake_case worksheet rows from the client. */
+function normalizeProcessRows(raw: any[] | undefined): ProcessRow[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((r) => {
+      if (!r || typeof r !== "object") return null
+      const employeeId = String(r.employeeId || r.employee_id || "").trim()
+      if (!employeeId) return null
+      return {
+        employeeId,
+        employeeCode: r.employeeCode ?? r.employee_code ?? "",
+        name: r.name ?? r.full_name ?? "",
+        department: r.department ?? "",
+        position: r.position ?? "",
+        basicSalary: Number(r.basicSalary ?? r.basic_salary ?? 0),
+        allowances: Number(r.allowances ?? 0),
+        overtime: Number(r.overtime ?? r.overtime_amount ?? 0),
+        bonus: Number(r.bonus ?? r.bonus_amount ?? 0),
+        loan: Number(r.loan ?? r.loan_deduction ?? 0),
+        advance: Number(r.advance ?? r.advance_deduction ?? 0),
+        other: Number(r.other ?? r.other_deductions ?? 0),
+        grossPay: Number(r.grossPay ?? r.gross_pay ?? 0),
+        providentFund: Number(r.providentFund ?? r.tier3_employee ?? 0),
+        ssnitEmployee: Number(r.ssnitEmployee ?? r.ssnit_employee ?? 0),
+        tier2Employee: Number(r.tier2Employee ?? r.tier2_employee ?? 0),
+        taxableIncome: Number(r.taxableIncome ?? r.taxable_income ?? 0),
+        paye: Number(r.paye ?? r.paye_tax ?? 0),
+        overtimeTax: Number(r.overtimeTax ?? r.overtime_tax ?? 0),
+        bonusTax: Number(r.bonusTax ?? r.bonus_tax ?? 0),
+        taxReliefTotal: Number(r.taxReliefTotal ?? r.tax_relief_total ?? 0),
+        totalDeductions: Number(r.totalDeductions ?? r.total_deductions ?? 0),
+        netPay: Number(r.netPay ?? r.net_pay ?? 0),
+      } as ProcessRow
+    })
+    .filter(Boolean) as ProcessRow[]
+}
+
 function periodBounds(payPeriod: string) {
   const [y, m] = payPeriod.split("-").map(Number)
   const start = new Date(Date.UTC(y, m - 1, 1))
@@ -123,14 +160,15 @@ async function persistRowsFromWorksheet(
         continue
       }
 
-      if (typeof row.basicSalary !== "number" || row.basicSalary < 0) {
+      const basicSalaryNum = Number(row.basicSalary)
+      if (!Number.isFinite(basicSalaryNum) || basicSalaryNum < 0) {
         const empError = `${row.name || row.employeeId}: invalid basic salary`
         errors.push(empError)
         employeeErrors[row.employeeId] = empError
         continue
       }
 
-      const basic = n(row.basicSalary)
+      const basic = n(basicSalaryNum)
       const allowances = n(row.allowances)
       const overtime = n(row.overtime)
       const bonus = n(row.bonus)
@@ -343,7 +381,21 @@ export async function POST(req: NextRequest) {
 
     const bounds = periodBounds(pay_period)
     let runId = payroll_run_id
-    const worksheetRows = Array.isArray(rows) ? rows.filter((r) => r && r.employeeId) : []
+    const rawRowsProvided = Array.isArray(rows)
+    const worksheetRows = normalizeProcessRows(rows)
+
+    // If the client sent rows but none had a usable employeeId, fail clearly —
+    // do NOT silently fall back to processing every active employee.
+    if (rawRowsProvided && worksheetRows.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "No valid employees in the payroll worksheet. Select employees and ensure each row has an employee id, then retry.",
+          processed: 0,
+        },
+        { status: 422 },
+      )
+    }
 
     // Never reuse approved/paid/cancelled runs — always scoped to this tenant
     if (runId) {
@@ -433,7 +485,7 @@ export async function POST(req: NextRequest) {
       processed = result.processed
       processErrors = result.errors
     } else {
-      // Legacy / API-only path
+      // Legacy / API-only path (no worksheet rows supplied)
       const service = createPayrollService(true)
       const result = await withTimeout(
         service.processPayrollRun(runId, company_id),
@@ -455,15 +507,19 @@ export async function POST(req: NextRequest) {
       processErrors = result.data.errors
     }
 
-    if (processed === 0 && processErrors.length > 0) {
+    // Hard guard: never queue empty runs for approval
+    if (processed === 0) {
       await client
         .from("payroll_runs")
         .update({ status: "draft", updated_at: new Date().toISOString() })
         .eq("id", runId)
       return NextResponse.json(
         {
-          error: `No employees processed. ${processErrors[0]}`,
+          error: processErrors[0]
+            ? `No employees processed. ${processErrors[0]}`
+            : "No employees processed. Select employees on the worksheet, recalculate, then Run Payroll again.",
           errors: processErrors,
+          processed: 0,
           payroll_run_id: runId,
         },
         { status: 422 },

@@ -38,7 +38,8 @@ export async function GET(req: NextRequest) {
 
     if (status && status !== "all") {
       if (status === "pending") {
-        query = query.in("status", ["draft", "processing", "pending", "completed", "partial"])
+        // Only runs actually waiting for approval (exclude empty drafts)
+        query = query.in("status", ["pending", "partial"])
       } else {
         query = query.eq("status", status)
       }
@@ -73,10 +74,16 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const enriched = (runs ?? []).map((run) => ({
-      ...run,
-      employee_count: counts.get(run.id) ?? 0,
-    }))
+    const enriched = (runs ?? [])
+      .map((run) => ({
+        ...run,
+        employee_count: counts.get(run.id) ?? 0,
+      }))
+      .filter((run) => {
+        // Approvals "pending" should not surface empty / draft shells
+        if (status === "pending") return Number(run.employee_count) > 0
+        return true
+      })
 
     return NextResponse.json({
       success: true,
