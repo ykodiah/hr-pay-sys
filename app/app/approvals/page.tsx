@@ -59,8 +59,8 @@ export default function ApprovalsPage() {
   const leaveRequests: any[] = leaveData?.requests   ?? leaveData?.data     ?? []
   const otRequests:    any[] = overtimeData?.requests ?? overtimeData?.data ?? []
 
-  const pendingStatuses = ["draft", "processing", "pending", "completed", "partial"]
-  const totalPending = payrollRuns.filter(r => pendingStatuses.includes(r.status)).length
+  const pendingStatuses = ["pending", "partial"]
+  const totalPending = payrollRuns.filter(r => pendingStatuses.includes(r.status) && Number(r.employee_count || 0) > 0).length
                      + leaveRequests.length + otRequests.length
 
   const handlePayrollApprove = async (id: string) => {
