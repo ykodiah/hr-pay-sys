@@ -330,6 +330,12 @@ export default function FullyFunctionalDocumentVaultPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("list")
   const [showArchived, setShowArchived] = useState(false)
   const [showDeleted, setShowDeleted] = useState(false)
+  const [commentText, setCommentText] = useState("")
+  const [shareEmail, setShareEmail] = useState("")
+  const [sharePermission, setSharePermission] = useState("view")
+  const [auditLogs, setAuditLogs] = useState<any[]>([])
+  const [workflowData, setWorkflowData] = useState<any>(null)
+  const [actionBusy, setActionBusy] = useState(false)
   
   // Bulk operations
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([])
@@ -371,6 +377,168 @@ export default function FullyFunctionalDocumentVaultPage() {
   const bulkFileInputRef = useRef<HTMLInputElement>(null)
 
   const documentService = AdvancedDocumentService.getInstance()
+
+  const patchDocument = async (documentId: string, action: string, notes?: string) => {
+    setActionBusy(true)
+    try {
+      const res = await fetch(`/api/documents/${documentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action, notes }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || `Failed to ${action} document`)
+      await loadData()
+      return json.document
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  const handleViewDocument = (document: AdvancedDocument) => {
+    setSelectedDocument(document)
+    setIsPreviewOpen(true)
+    if (document.id) {
+      void fetch(`/api/documents/${document.id}`, { credentials: "include" }).catch(() => null)
+    }
+  }
+
+  const handleDownloadDocument = async (document: AdvancedDocument) => {
+    if (!document.fileUrl) {
+      toast({
+        title: "No file available",
+        description: "This document has no downloadable file URL.",
+        variant: "destructive",
+      })
+      return
+    }
+    try {
+      const a = window.document.createElement("a")
+      a.href = document.fileUrl
+      a.download = document.fileName || "document"
+      a.target = "_blank"
+      a.rel = "noopener noreferrer"
+      window.document.body.appendChild(a)
+      a.click()
+      a.remove()
+      if (document.id) {
+        await fetch(`/api/documents/${document.id}?log=download`, { credentials: "include" }).catch(() => null)
+      }
+      toast({ title: "Download started", description: document.fileName })
+    } catch (err: any) {
+      toast({
+        title: "Download failed",
+        description: err?.message || "Could not download file",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const openComments = async (document: AdvancedDocument) => {
+    setSelectedDocument(document)
+    setCommentText("")
+    setIsCommentOpen(true)
+  }
+
+  const submitComment = async () => {
+    if (!selectedDocument?.id || !commentText.trim()) return
+    setActionBusy(true)
+    try {
+      const res = await fetch(`/api/documents/${selectedDocument.id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ comment: commentText.trim() }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Failed to add comment")
+      toast({ title: "Comment added", description: "Your comment was saved." })
+      setIsCommentOpen(false)
+      setCommentText("")
+    } catch (err: any) {
+      toast({ title: "Comment failed", description: err.message, variant: "destructive" })
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  const openShare = (document: AdvancedDocument) => {
+    setSelectedDocument(document)
+    setShareEmail("")
+    setSharePermission("view")
+    setIsShareOpen(true)
+  }
+
+  const submitShare = async () => {
+    if (!selectedDocument?.id || !shareEmail.trim()) return
+    setActionBusy(true)
+    try {
+      const res = await fetch(`/api/documents/${selectedDocument.id}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email: shareEmail.trim(), permission: sharePermission }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Failed to share")
+      toast({ title: "Document shared", description: json.message || `Shared with ${shareEmail}` })
+      setIsShareOpen(false)
+    } catch (err: any) {
+      toast({ title: "Share failed", description: err.message, variant: "destructive" })
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  const openAudit = async (document: AdvancedDocument) => {
+    setSelectedDocument(document)
+    setIsAuditOpen(true)
+    setAuditLogs([])
+    try {
+      const res = await fetch(`/api/documents/${document.id}/audit`, { credentials: "include" })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Failed to load audit trail")
+      setAuditLogs(json.logs || [])
+    } catch (err: any) {
+      toast({ title: "Audit trail", description: err.message, variant: "destructive" })
+    }
+  }
+
+  const openWorkflow = async (document: AdvancedDocument) => {
+    setSelectedDocument(document)
+    setIsWorkflowOpen(true)
+    setWorkflowData(null)
+    try {
+      const res = await fetch(`/api/documents/${document.id}/workflow`, { credentials: "include" })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Failed to load workflow")
+      setWorkflowData(json)
+    } catch (err: any) {
+      toast({ title: "Workflow", description: err.message, variant: "destructive" })
+    }
+  }
+
+  const startWorkflow = async () => {
+    if (!selectedDocument?.id) return
+    setActionBusy(true)
+    try {
+      const res = await fetch(`/api/documents/${selectedDocument.id}/workflow`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: "Document approval" }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Failed to start workflow")
+      toast({ title: "Workflow started", description: "Approval workflow created." })
+      await openWorkflow(selectedDocument)
+    } catch (err: any) {
+      toast({ title: "Workflow failed", description: err.message, variant: "destructive" })
+    } finally {
+      setActionBusy(false)
+    }
+  }
 
   useEffect(() => {
     loadData()
@@ -1259,19 +1427,11 @@ export default function FullyFunctionalDocumentVaultPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => {
-                                setSelectedDocument(document)
-                                setIsPreviewOpen(true)
-                              }}>
+                              <DropdownMenuItem onClick={() => handleViewDocument(document)}>
                                 <Eye className="w-4 h-4 mr-2" />
                                 View
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => {
-                                toast({
-                                  title: "Download Started",
-                                  description: "Document is being downloaded...",
-                                })
-                              }}>
+                              <DropdownMenuItem onClick={() => handleDownloadDocument(document)}>
                                 <Download className="w-4 h-4 mr-2" />
                                 Download
                               </DropdownMenuItem>
@@ -1284,81 +1444,117 @@ export default function FullyFunctionalDocumentVaultPage() {
                                   Sign Document
                                 </DropdownMenuItem>
                               )}
-                              <DropdownMenuItem onClick={() => {
-                                setSelectedDocument(document)
-                                setIsCommentOpen(true)
-                              }}>
+                              <DropdownMenuItem onClick={() => openComments(document)}>
                                 <MessageSquare className="w-4 h-4 mr-2" />
                                 Add Comment
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => {
-                                setSelectedDocument(document)
-                                setIsShareOpen(true)
-                              }}>
+                              <DropdownMenuItem onClick={() => openShare(document)}>
                                 <Share2 className="w-4 h-4 mr-2" />
                                 Share
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => {
-                                setSelectedDocument(document)
-                                setIsAuditOpen(true)
-                              }}>
+                              <DropdownMenuItem onClick={() => openAudit(document)}>
                                 <History className="w-4 h-4 mr-2" />
                                 View Audit Trail
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => {
-                                setSelectedDocument(document)
-                                setIsWorkflowOpen(true)
-                              }}>
+                              <DropdownMenuItem onClick={() => openWorkflow(document)}>
                                 <Activity className="w-4 h-4 mr-2" />
                                 View Workflow
                               </DropdownMenuItem>
                               {document.status === "pending" && (
                                 <>
-                                  <DropdownMenuItem onClick={() => {
-                                    documentService.updateDocumentStatus(document.id, "approved", "Approved by user")
-                                    loadData()
-                                    toast({
-                                      title: "Document Approved",
-                                      description: "Document has been approved successfully.",
-                                    })
-                                  }}>
+                                  <DropdownMenuItem
+                                    disabled={actionBusy}
+                                    onClick={async () => {
+                                      try {
+                                        await patchDocument(document.id, "approve")
+                                        toast({
+                                          title: "Document Approved",
+                                          description: "Document has been approved successfully.",
+                                        })
+                                      } catch (err: any) {
+                                        toast({
+                                          title: "Approve failed",
+                                          description: err.message,
+                                          variant: "destructive",
+                                        })
+                                      }
+                                    }}
+                                  >
                                     <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
                                     Approve
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => {
-                                    documentService.updateDocumentStatus(document.id, "rejected", "Rejected by user")
-                                    loadData()
-                                    toast({
-                                      title: "Document Rejected",
-                                      description: "Document has been rejected.",
-                                    })
-                                  }}>
+                                  <DropdownMenuItem
+                                    disabled={actionBusy}
+                                    onClick={async () => {
+                                      try {
+                                        await patchDocument(document.id, "reject")
+                                        toast({
+                                          title: "Document Rejected",
+                                          description: "Document has been rejected.",
+                                        })
+                                      } catch (err: any) {
+                                        toast({
+                                          title: "Reject failed",
+                                          description: err.message,
+                                          variant: "destructive",
+                                        })
+                                      }
+                                    }}
+                                  >
                                     <XCircle className="w-4 h-4 mr-2 text-red-600" />
                                     Reject
                                   </DropdownMenuItem>
                                 </>
                               )}
-                              {!document.isArchived && (
-                                <DropdownMenuItem onClick={() => {
-                                  documentService.archiveDocument(document.id, "Manual archive")
-                                  loadData()
-                                  toast({
-                                    title: "Document Archived",
-                                    description: "Document has been archived successfully.",
-                                  })
-                                }}>
+                              {!document.isArchived && document.status !== "archived" && (
+                                <DropdownMenuItem
+                                  disabled={actionBusy}
+                                  onClick={async () => {
+                                    try {
+                                      await patchDocument(document.id, "archive")
+                                      toast({
+                                        title: "Document Archived",
+                                        description: "Document has been archived successfully.",
+                                      })
+                                    } catch (err: any) {
+                                      toast({
+                                        title: "Archive failed",
+                                        description: err.message,
+                                        variant: "destructive",
+                                      })
+                                    }
+                                  }}
+                                >
                                   <Archive className="w-4 h-4 mr-2" />
                                   Archive
                                 </DropdownMenuItem>
                               )}
-                              <DropdownMenuItem className="text-red-600" onClick={() => {
-                                documentService.deleteDocument(document.id, "Manual delete")
-                                loadData()
-                                toast({
-                                  title: "Document Deleted",
-                                  description: "Document has been deleted successfully.",
-                                })
-                              }}>
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                disabled={actionBusy}
+                                onClick={async () => {
+                                  if (!window.confirm(`Delete “${document.fileName}”?`)) return
+                                  try {
+                                    const res = await fetch(`/api/documents/${document.id}`, {
+                                      method: "DELETE",
+                                      credentials: "include",
+                                    })
+                                    const json = await res.json().catch(() => ({}))
+                                    if (!res.ok) throw new Error(json.error || "Delete failed")
+                                    await loadData()
+                                    toast({
+                                      title: "Document Deleted",
+                                      description: "Document has been deleted successfully.",
+                                    })
+                                  } catch (err: any) {
+                                    toast({
+                                      title: "Delete failed",
+                                      description: err.message,
+                                      variant: "destructive",
+                                    })
+                                  }
+                                }}
+                              >
                                 <TrashIcon className="w-4 h-4 mr-2" />
                                 Delete
                               </DropdownMenuItem>
@@ -2178,6 +2374,206 @@ export default function FullyFunctionalDocumentVaultPage() {
               <CloudCheckIcon className="w-4 h-4 mr-2" />
               Connect Integration
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview */}
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5" />
+              {selectedDocument?.fileName || "Document preview"}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedDocument && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div><span className="text-muted-foreground">Employee:</span> {selectedDocument.employeeName || "—"}</div>
+                <div><span className="text-muted-foreground">Status:</span> {selectedDocument.status}</div>
+                <div><span className="text-muted-foreground">Category:</span> {selectedDocument.category || "—"}</div>
+                <div><span className="text-muted-foreground">Type:</span> {selectedDocument.fileType || "—"}</div>
+              </div>
+              {selectedDocument.notes && (
+                <p className="text-sm text-muted-foreground italic">{selectedDocument.notes}</p>
+              )}
+              {selectedDocument.fileUrl ? (
+                selectedDocument.fileType?.startsWith("image/") || /\.(png|jpe?g|gif|webp)$/i.test(selectedDocument.fileName || "") ? (
+                  <img src={selectedDocument.fileUrl} alt={selectedDocument.fileName} className="max-h-[60vh] w-auto mx-auto rounded border" />
+                ) : (
+                  <iframe
+                    src={selectedDocument.fileUrl}
+                    title={selectedDocument.fileName}
+                    className="w-full h-[60vh] rounded border"
+                  />
+                )
+              ) : (
+                <p className="text-sm text-muted-foreground">No file URL available for preview.</p>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>Close</Button>
+            {selectedDocument?.fileUrl && (
+              <Button onClick={() => selectedDocument && handleDownloadDocument(selectedDocument)}>
+                <Download className="w-4 h-4 mr-2" />
+                Download
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Comment */}
+      <Dialog open={isCommentOpen} onOpenChange={setIsCommentOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5" />
+              Add comment
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Comment on {selectedDocument?.fileName}</Label>
+            <Textarea
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder="Write your comment…"
+              rows={4}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCommentOpen(false)}>Cancel</Button>
+            <Button disabled={actionBusy || !commentText.trim()} onClick={submitComment}>
+              Save comment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Share */}
+      <Dialog open={isShareOpen} onOpenChange={setIsShareOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Share2 className="w-5 h-5" />
+              Share document
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={shareEmail}
+                onChange={(e) => setShareEmail(e.target.value)}
+                placeholder="colleague@company.com"
+              />
+            </div>
+            <div>
+              <Label>Permission</Label>
+              <Select value={sharePermission} onValueChange={setSharePermission}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="view">View</SelectItem>
+                  <SelectItem value="download">Download</SelectItem>
+                  <SelectItem value="comment">Comment</SelectItem>
+                  <SelectItem value="edit">Edit</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsShareOpen(false)}>Cancel</Button>
+            <Button disabled={actionBusy || !shareEmail.trim()} onClick={submitShare}>
+              Share
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Audit trail */}
+      <Dialog open={isAuditOpen} onOpenChange={setIsAuditOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-5 h-5" />
+              Audit trail — {selectedDocument?.fileName}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {auditLogs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No audit events yet.</p>
+            ) : (
+              auditLogs.map((log) => (
+                <div key={log.id} className="rounded border p-2 text-sm">
+                  <div className="flex justify-between gap-2">
+                    <span className="font-medium capitalize">{log.action}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {log.created_at ? new Date(log.created_at).toLocaleString() : ""}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">{log.user_name || "System"}</div>
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAuditOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Workflow */}
+      <Dialog open={isWorkflowOpen} onOpenChange={setIsWorkflowOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Activity className="w-5 h-5" />
+              Workflow — {selectedDocument?.fileName}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Document status: <strong>{workflowData?.document?.status || selectedDocument?.status}</strong>
+            </p>
+            {(workflowData?.workflows || []).length === 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">No workflow started for this document.</p>
+                <Button disabled={actionBusy} onClick={startWorkflow}>
+                  Start approval workflow
+                </Button>
+              </div>
+            ) : (
+              (workflowData.workflows || []).map((wf: any) => (
+                <div key={wf.id} className="rounded border p-3 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium">{wf.name || "Workflow"}</span>
+                    <Badge variant="outline">{wf.status}</Badge>
+                  </div>
+                  {(wf.workflow_steps || []).length > 0 ? (
+                    <ol className="list-decimal pl-5 text-sm space-y-1">
+                      {(wf.workflow_steps || [])
+                        .slice()
+                        .sort((a: any, b: any) => (a.step_order || 0) - (b.step_order || 0))
+                        .map((step: any) => (
+                          <li key={step.id}>
+                            {step.step_name} — <span className="text-muted-foreground">{step.status}</span>
+                          </li>
+                        ))}
+                    </ol>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Steps will appear after reload.</p>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsWorkflowOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
