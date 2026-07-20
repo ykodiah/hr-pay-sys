@@ -111,6 +111,54 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   })
 }
 
+function isMissingColumnError(error: any) {
+  const message = String(error?.message || error || "")
+  return (
+    error?.code === "PGRST204" ||
+    /could not find the .* column/i.test(message) ||
+    /schema cache/i.test(message) ||
+    /column .* does not exist/i.test(message)
+  )
+}
+
+function missingColumnName(error: any): string | null {
+  const message = String(error?.message || "")
+  const match =
+    message.match(/could not find the ['"]([^'"]+)['"] column/i) ||
+    message.match(/column ['"]([^'"]+)['"] of relation/i) ||
+    message.match(/column "([^"]+)" does not exist/i)
+  return match?.[1] || null
+}
+
+async function insertWithMissingColumnRetry(
+  client: any,
+  table: string,
+  payload: Record<string, any>,
+  select = "id",
+) {
+  let current = { ...payload }
+  let lastError: any = null
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const { data, error } = await client.from(table).insert(current).select(select).maybeSingle()
+    if (!error) return { data, error: null }
+    lastError = error
+    if (!isMissingColumnError(error)) return { data: null, error }
+    const col = missingColumnName(error)
+    if (!col || !(col in current)) return { data: null, error }
+    const next = { ...current }
+    delete next[col]
+    // Keep OT/bonus tax inside breakdown JSON when dedicated columns are missing
+    if ((col === "bonus_tax" || col === "overtime_tax" || col === "paye_tax") && next.calculation_breakdown) {
+      next.calculation_breakdown = {
+        ...(typeof next.calculation_breakdown === "object" ? next.calculation_breakdown : {}),
+        [col]: payload[col],
+      }
+    }
+    current = next
+  }
+  return { data: null, error: lastError }
+}
+
 async function persistRowsFromWorksheet(
   client: any,
   runId: string,
@@ -263,13 +311,14 @@ async function persistRowsFromWorksheet(
         updated_at: new Date().toISOString(),
       }
 
-      const { data: insertedItem, error: itemErr } = await client
-        .from("payroll_items")
-        .insert(itemPayload)
-        .select("id")
-        .single()
-      if (itemErr) {
-        const empError = `${row.name || row.employeeId}: ${itemErr.message}`
+      const { data: insertedItem, error: itemErr } = await insertWithMissingColumnRetry(
+        client,
+        "payroll_items",
+        itemPayload,
+        "id",
+      )
+      if (itemErr || !insertedItem?.id) {
+        const empError = `${row.name || row.employeeId}: ${itemErr?.message || "failed to save payroll item"}`
         errors.push(empError)
         employeeErrors[row.employeeId] = empError
         continue
@@ -323,7 +372,12 @@ async function persistRowsFromWorksheet(
         updated_at: new Date().toISOString(),
       }
 
-      const { error: slipErr } = await client.from("payslips").insert(payslipPayload)
+      const { error: slipErr } = await insertWithMissingColumnRetry(
+        client,
+        "payslips",
+        payslipPayload,
+        "id",
+      )
       if (slipErr) {
         const empError = `${row.name || row.employeeId}: payslip ${slipErr.message}`
         errors.push(empError)

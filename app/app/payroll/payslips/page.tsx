@@ -718,27 +718,39 @@ export default function PayslipsPage() {
     setLoadingCustom(true)
     setCustomLoaded(false)
     try {
-      let query = supabase
-        .from("payslips")
-        .select("*")
-        .eq("company_id", cid)
-        .gte("pay_period", customPeriodFrom)
-        .order("snapshot_employee_name", { ascending: true })
-
-      if (customPeriodTo && customPeriodTo !== customPeriodFrom) {
-        query = query.lte("pay_period", customPeriodTo)
-      } else {
-        query = query.lte("pay_period", customPeriodFrom)
+      const params = new URLSearchParams({
+        company_id: cid,
+        period_from: customPeriodFrom,
+        period_to: customPeriodTo || customPeriodFrom,
+        limit: "500",
+      })
+      if (customEmpIds.size > 0) {
+        params.set("employee_ids", [...customEmpIds].join(","))
       }
 
-      if (customEmpIds.size > 0) query = query.in("employee_id", [...customEmpIds])
+      const res = await fetch(`/api/payslips/search?${params.toString()}`, {
+        cache: "no-store",
+        credentials: "include",
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(json.error || `Failed to load custom payslips (${res.status})`)
+      }
 
-      const { data, error } = await query.limit(500)
-      if (error) throw error
-      setCustomSlips((data ?? []) as PayslipRow[])
+      setCustomSlips((json.payslips ?? []) as PayslipRow[])
       setCustomLoaded(true)
+      if (!(json.payslips ?? []).length) {
+        toast({
+          title: "No payslips found",
+          description: "No slips matched that period/employee filter. Process payroll first, then retry.",
+        })
+      }
     } catch (err) {
-      toast({ title: "Error", description: "Failed to load custom payslips.", variant: "destructive" })
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to load custom payslips.",
+        variant: "destructive",
+      })
     } finally {
       setLoadingCustom(false)
     }
@@ -1214,10 +1226,13 @@ export default function PayslipsPage() {
                 </div>
                 <div>
                   <Label className="text-xs text-gray-500 mb-1 block">To Period (optional)</Label>
-                  <Select value={customPeriodTo} onValueChange={setCustomPeriodTo}>
+                  <Select
+                    value={customPeriodTo || "__same__"}
+                    onValueChange={(v) => setCustomPeriodTo(v === "__same__" ? "" : v)}
+                  >
                     <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Same as from" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Same as from</SelectItem>
+                      <SelectItem value="__same__">Same as from</SelectItem>
                       {periodOptions.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
