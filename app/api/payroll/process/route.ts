@@ -222,8 +222,11 @@ async function persistRowsFromWorksheet(
       const bonus = n(row.bonus)
       const gross = n(row.grossPay) || n(basic + allowances + overtime + bonus)
       const ssnit = n(row.ssnitEmployee)
-      // Tier 2: use the computed value from the worksheet; fall back to 5% of basic
-      const tier2 = row.tier2Employee != null ? n(row.tier2Employee) : n(basic * 0.05)
+      // Tier 2 is report-only — compute for storage/reports, never add to cash deductions
+      const tier2ForReports =
+        row.tier2Employee != null && Number(row.tier2Employee) > 0
+          ? n(row.tier2Employee)
+          : n(basic * 0.05)
       // SSNIT employer: 13% of basic (not a ratio of employee share)
       const ssnitEmployer = n(basic * 0.13)
       const pf = n(row.providentFund)
@@ -236,7 +239,7 @@ async function persistRowsFromWorksheet(
       const advance = n(row.advance)
       const other = n(row.other)
       const totalDeductions =
-        n(row.totalDeductions) || n(ssnit + tier2 + pf + paye + loan + advance + other)
+        n(row.totalDeductions) || n(ssnit + pf + paye + loan + advance + other)
       const net = n(row.netPay) || n(gross - totalDeductions)
       const taxable = n(row.taxableIncome)
       const taxReliefTotal = n(row.taxReliefTotal)
@@ -276,7 +279,7 @@ async function persistRowsFromWorksheet(
         gross_pay: gross,
         ssnit_employee: ssnit,
         ssnit_employer: ssnitEmployer,
-        tier2_employee: tier2,
+        tier2_employee: tier2ForReports,
         tier2_employer: 0,
         tier3_employee: pf,
         tier3_employer: 0,
@@ -296,7 +299,8 @@ async function persistRowsFromWorksheet(
         calculation_breakdown: {
           allowances,
           ssnit_employee: ssnit,
-          tier2_employee: tier2,
+          tier2_employee: tier2ForReports,
+          tier2_excluded_from_payroll_deductions: true,
           tier3_employee: pf,
           tax_relief_monthly: taxReliefTotal,
           paye_base: basePaye,
@@ -356,7 +360,7 @@ async function persistRowsFromWorksheet(
         gross_pay: gross,
         ssnit_employee: ssnit,
         ssnit_employer: ssnitEmployer,
-        tier2_employee: tier2,
+        tier2_employee: tier2ForReports,
         tier3_employee: pf,
         paye_taxable_income: taxable,
         paye_tax: paye,

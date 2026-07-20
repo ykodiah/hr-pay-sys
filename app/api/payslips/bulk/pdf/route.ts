@@ -48,7 +48,6 @@ function renderOneSlip(slip: PayslipRow & { loan?: any }, company: any): string 
 
   const deductions: [string, number][] = [
     ["SSNIT (Employee 5.5%)",   Number(slip.ssnit_employee)],
-    ["Tier 2 (Employee 5%)",    Number(slip.tier2_employee)],
     ["Tier 3 / Provident Fund", Number(slip.tier3_employee)],
     ["PAYE Tax",                Number(slip.paye_tax)],
     ["Loan Repayment",          Number(slip.loan_deduction)],

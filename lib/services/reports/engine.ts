@@ -937,24 +937,52 @@ function buildProvidentFundReport(
   }
 }
 
-/** Report 9 — Full Payroll Summary */
+/** Report 9 — Full Payroll Summary (Tier 2 excluded — use SSNIT Tier 2 report) */
 function buildPayrollSummaryReport(
   rows: PayrollReportRow[],
   meta: ReportMeta
 ): GeneratedReport {
+  const formatAllowances = (r: PayrollReportRow) => {
+    const parts: string[] = []
+    if (r.transport_allowance > 0) parts.push(`Transport ${ghs(r.transport_allowance).toFixed(2)}`)
+    if (r.housing_allowance > 0) parts.push(`Housing ${ghs(r.housing_allowance).toFixed(2)}`)
+    if (r.medical_allowance > 0) parts.push(`Medical ${ghs(r.medical_allowance).toFixed(2)}`)
+    if (r.meal_allowance > 0) parts.push(`Meal ${ghs(r.meal_allowance).toFixed(2)}`)
+    if (r.communication_allowance > 0) parts.push(`Comm ${ghs(r.communication_allowance).toFixed(2)}`)
+    if (r.other_allowances > 0) parts.push(`Other ${ghs(r.other_allowances).toFixed(2)}`)
+    if (r.overtime_pay > 0) parts.push(`OT ${ghs(r.overtime_pay).toFixed(2)}`)
+    if (r.bonus_pay > 0) parts.push(`Bonus ${ghs(r.bonus_pay).toFixed(2)}`)
+    return parts.length ? parts.join("; ") : "—"
+  }
+
+  const formatDeductionTypes = (r: PayrollReportRow) => {
+    const parts: string[] = []
+    if (r.ssnit_employee > 0) parts.push("SSNIT")
+    if (r.tier3_employee > 0) parts.push("Tier3/PF")
+    if (r.paye_tax > 0) parts.push("PAYE")
+    if (r.loan_deduction > 0) parts.push("Loan")
+    if (r.advance_deduction > 0) parts.push("Advance")
+    if (r.other_deductions > 0) parts.push("Other")
+    return parts.length ? parts.join(", ") : "—"
+  }
+
   const columns: ReportColumn[] = [
-    { key: "employee_id_no",   label: "Employee ID",          type: "text" },
-    { key: "employee_name",    label: "Employee Name",        type: "text" },
-    { key: "department",       label: "Department",           type: "text" },
-    { key: "basic_salary",     label: "Basic (GHS)",          type: "currency" },
-    { key: "total_allowances", label: "Allowances (GHS)",     type: "currency" },
-    { key: "gross_pay",        label: "Gross Pay (GHS)",      type: "currency" },
-    { key: "ssnit_employee",   label: "SSNIT Emp (GHS)",      type: "currency" },
-    { key: "tier2_employee",   label: "Tier 2 Emp (GHS)",     type: "currency" },
-    { key: "paye_tax",         label: "PAYE Tax (GHS)",       type: "currency" },
-    { key: "loan_deduction",   label: "Loan (GHS)",           type: "currency" },
+    { key: "employee_id_no",   label: "Employee ID",            type: "text" },
+    { key: "employee_name",    label: "Employee Name",          type: "text" },
+    { key: "department",       label: "Department",             type: "text" },
+    { key: "basic_salary",     label: "Basic (GHS)",            type: "currency" },
+    { key: "allowance_types",  label: "Allowances (by type)",   type: "text" },
+    { key: "total_allowances", label: "Allowances Total (GHS)", type: "currency" },
+    { key: "gross_pay",        label: "Gross Pay (GHS)",        type: "currency" },
+    { key: "ssnit_employee",   label: "SSNIT Emp (GHS)",        type: "currency" },
+    { key: "tier3_employee",   label: "Tier 3 / PF (GHS)",      type: "currency" },
+    { key: "tax_relief_total", label: "Tax Relief (GHS)",       type: "currency" },
+    { key: "paye_taxable_income", label: "Taxable Income (GHS)", type: "currency" },
+    { key: "paye_tax",         label: "PAYE Tax (GHS)",         type: "currency" },
+    { key: "loan_deduction",   label: "Loans (GHS)",            type: "currency" },
+    { key: "deduction_types",  label: "Deduction Types",        type: "text" },
     { key: "total_deductions", label: "Total Deductions (GHS)", type: "currency" },
-    { key: "net_pay",          label: "Net Pay (GHS)",        type: "currency" },
+    { key: "net_pay",          label: "Net Pay (GHS)",          type: "currency" },
   ]
 
   const typedRows = rows.map((r) => ({
@@ -962,12 +990,16 @@ function buildPayrollSummaryReport(
     employee_name:    r.employee_name ?? "",
     department:       r.department ?? "",
     basic_salary:     ghs(r.basic_salary),
+    allowance_types:  formatAllowances(r),
     total_allowances: ghs(r.total_allowances),
     gross_pay:        ghs(r.gross_pay),
     ssnit_employee:   ghs(r.ssnit_employee),
-    tier2_employee:   ghs(r.tier2_employee),
+    tier3_employee:   ghs(r.tier3_employee),
+    tax_relief_total: ghs(r.tax_relief_total),
+    paye_taxable_income: ghs(r.paye_taxable_income),
     paye_tax:         ghs(r.paye_tax),
     loan_deduction:   ghs(r.loan_deduction),
+    deduction_types:  formatDeductionTypes(r),
     total_deductions: ghs(r.total_deductions),
     net_pay:          ghs(r.net_pay),
   }))
@@ -987,12 +1019,16 @@ function buildPayrollSummaryReport(
       employee_name:    `${rows.length} employee(s)`,
       department:       "",
       basic_salary:     typedRows.reduce((s, r) => s + r.basic_salary, 0),
+      allowance_types:  "",
       total_allowances: typedRows.reduce((s, r) => s + r.total_allowances, 0),
       gross_pay:        summary.total_gross,
       ssnit_employee:   typedRows.reduce((s, r) => s + r.ssnit_employee, 0),
-      tier2_employee:   typedRows.reduce((s, r) => s + r.tier2_employee, 0),
+      tier3_employee:   typedRows.reduce((s, r) => s + r.tier3_employee, 0),
+      tax_relief_total: typedRows.reduce((s, r) => s + r.tax_relief_total, 0),
+      paye_taxable_income: typedRows.reduce((s, r) => s + r.paye_taxable_income, 0),
       paye_tax:         summary.total_paye,
       loan_deduction:   typedRows.reduce((s, r) => s + r.loan_deduction, 0),
+      deduction_types:  "",
       total_deductions: summary.total_deductions,
       net_pay:          summary.total_net_pay,
       _is_total_row:    true,

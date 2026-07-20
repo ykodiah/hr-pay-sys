@@ -169,7 +169,6 @@ function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | n
 
   const deductions = [
     { label: "SSNIT (Employee 5.5%)",   val: slip.ssnit_employee },
-    { label: "Tier 2 (Employee 5%)",    val: slip.tier2_employee },
     { label: "Tier 3 / Provident Fund", val: slip.tier3_employee },
     { label: "PAYE Tax",                val: slip.paye_tax },
     { label: "Loan Repayment",          val: slip.loan_deduction },

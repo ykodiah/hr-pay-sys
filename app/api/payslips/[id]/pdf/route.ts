@@ -61,7 +61,6 @@ export async function GET(
 
     const deductions: [string, number][] = [
       ["SSNIT (Employee 5.5%)",   Number(data.ssnit_employee)],
-      ["Tier 2 (Employee 5%)",    Number(data.tier2_employee)],
       ["Tier 3 / Provident Fund", Number(data.tier3_employee)],
       ["PAYE Tax",                Number(data.paye_tax)],
       ["Loan Repayment",          Number(data.loan_deduction)],

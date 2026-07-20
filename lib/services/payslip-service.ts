@@ -118,8 +118,7 @@ export async function createPayslip(
   const totalPaye =
     r.monthly_total_paye_withheld ??
     r.monthly_paye_tax + (r.monthly_overtime_tax ?? 0) + (r.monthly_bonus_tax ?? 0)
-  const pensionEmployee =
-    r.monthly_pension_employee ?? r.monthly_ssnit_employee + r.monthly_tier2_employee
+  const pensionEmployee = r.monthly_ssnit_employee
   const totalDeductions =
     pensionEmployee +
     r.monthly_tier3_employee +
@@ -151,6 +150,7 @@ export async function createPayslip(
     gross_pay: grossPay,
     ssnit_employee: r.monthly_ssnit_employee,
     ssnit_employer: r.monthly_ssnit_employer,
+    // Tier 2 stored for reports only — not included in total_deductions / net_pay
     tier2_employee: r.monthly_tier2_employee,
     tier2_employer: r.monthly_tier2_employer,
     tier3_employee: r.monthly_tier3_employee,
@@ -175,6 +175,7 @@ export async function createPayslip(
       monthly_other_deduction: other,
       monthly_total_paye_withheld: totalPaye,
       monthly_net_pay: netPay,
+      tier2_excluded_from_payroll_deductions: true,
     } as unknown as object,
     status: "draft",
   }

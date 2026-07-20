@@ -65,7 +65,6 @@ export function renderPayslipHtml(slip: any, opts?: { autoPrint?: boolean }) {
     <thead><tr><th>Deductions</th><th class="right">Amount</th></tr></thead>
     <tbody>
       <tr><td>SSNIT (Employee)</td><td class="right">${money(slip.ssnit_employee)}</td></tr>
-      <tr><td>Tier 2 (Employee)</td><td class="right">${money(slip.tier2_employee)}</td></tr>
       <tr><td>Tier 3 / PF (Employee)</td><td class="right">${money(slip.tier3_employee)}</td></tr>
       <tr><td>PAYE Tax</td><td class="right">${money(slip.paye_tax)}</td></tr>
       <tr><td>Loan</td><td class="right">${money(slip.loan_deduction)}</td></tr>

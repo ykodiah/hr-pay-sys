@@ -39,8 +39,7 @@ export function PayslipDocument({ payslip: p, showPrintButton = true }: Props) {
 
   const deductionRows = [
     { name: "SSNIT Employee (5.5%)",  amount: Number(p.ssnit_employee) },
-    p.tier2_employee > 0  ? { name: "Tier 2 (5%)",          amount: Number(p.tier2_employee) }    : null,
-    p.tier3_employee > 0  ? { name: "Tier 3 (Voluntary)",   amount: Number(p.tier3_employee) }    : null,
+    p.tier3_employee > 0  ? { name: "Tier 3 / Provident Fund", amount: Number(p.tier3_employee) } : null,
     { name: "PAYE / Income Tax",       amount: Number(p.paye_tax) },
     p.loan_deduction > 0  ? { name: "Loan Deduction",        amount: Number(p.loan_deduction) }   : null,
     p.advance_deduction > 0 ? { name: "Advance Recovery",   amount: Number(p.advance_deduction) } : null,
@@ -159,9 +158,6 @@ export function PayslipDocument({ payslip: p, showPrintButton = true }: Props) {
           <p className="font-semibold">Employer Contributions:</p>
           <div className="pl-4 space-y-1">
             <EmpRow label="SSNIT – Employer (13%)"    value={fmtLabel(p.ssnit_employer)} />
-            {Number(p.tier2_employer) > 0 && (
-              <EmpRow label="Tier 2 – Employer (5%)"  value={fmtLabel(p.tier2_employer)} />
-            )}
             {Number(p.tier3_employer) > 0 && (
               <EmpRow label="Tier 3 – Employer"       value={fmtLabel(p.tier3_employer)} />
             )}

@@ -4,8 +4,9 @@
  * Implements:
  *   - GRA PAYE rates effective 1 January 2024 (monthly progressive bands)
  *   - National Pensions Act 766 employee deductions (applied on basic salary):
- *       Tier 1 (SSNIT)  — employee 5.5%, employer 13%  → total 18.5% to SSNIT
- *       Tier 2 (Trustee) — employee 5%,  employer 0%   → total 5% to trustee
+ *       Tier 1 (SSNIT)  — employee 5.5%, employer 13%  → deducted on payroll / payslip
+ *       Tier 2 (Trustee) — employee 5%,  employer 0%   → computed for compliance REPORTS only
+ *         (not deducted on payroll/payslip; not included in total deductions or net pay)
  *   - Voluntary Tier 3 provident fund
  *   - Overtime taxed at marginal PAYE rate (remitted with PAYE)
  *   - Bonus final withholding at 5% (when within GRA bonus rules)
@@ -178,10 +179,9 @@ const OBSOLETE_FIRST_BAND_THRESHOLDS = new Set([365, 402, 4380, 4824])
 
 /**
  * GRA Act 766 defaults.
- * Tier 1 (SSNIT): employee 5.5%, employer 13% of basic salary.
- * Tier 2 (Trustee): employee 5%, employer 0% of basic salary.
- * Total employee pension deduction = 10.5% of basic.
- * Total employer pension cost = 13% of basic.
+ * Tier 1 (SSNIT): employee 5.5%, employer 13% of basic salary — deducted on payroll.
+ * Tier 2 (Trustee): employee 5%, employer 0% of basic salary — reports only (not payroll cash).
+ * Voluntary Tier 3 / PF may also be deducted when applicable.
  */
 export const GRA_2025_SSNIT: SSNITRates = { employee_rate: 5.5, employer_rate: 13 }
 export const GRA_2025_TIER2: Tier2Rates = { employee_rate: 5, employer_rate: 0 }
@@ -369,11 +369,12 @@ export function calculateGhanaTax(
   const monthlyOvertime = round2(input.monthly_overtime ?? 0)
   const monthlyBonus = round2(input.monthly_bonus ?? 0)
 
-  // Act 766: Tier 1 (SSNIT) on basic
+  // Act 766: Tier 1 (SSNIT) on basic — deducted on payroll / payslip
   const monthlySsnitEmployee = round2(input.monthly_basic * (ssnitRates.employee_rate / 100))
   const monthlySsnitEmployer = round2(input.monthly_basic * (ssnitRates.employer_rate / 100))
 
-  // Tier 2 on basic (mandatory for most employees)
+  // Tier 2 on basic — computed for compliance REPORTS only.
+  // It is NOT deducted on payroll / payslip and does NOT reduce chargeable income here.
   const tier2Applicable = input.tier2_applicable !== false
   const monthlyTier2Employee = tier2Applicable
     ? round2(input.monthly_basic * (tier2Rates.employee_rate / 100))
@@ -382,8 +383,9 @@ export function calculateGhanaTax(
     ? round2(input.monthly_basic * (tier2Rates.employer_rate / 100))
     : 0
 
-  const monthlyPensionEmployee = round2(monthlySsnitEmployee + monthlyTier2Employee)
-  const monthlyPensionEmployer = round2(monthlySsnitEmployer + monthlyTier2Employer)
+  // Payroll pension (cash) = SSNIT Tier 1 only
+  const monthlyPensionEmployee = monthlySsnitEmployee
+  const monthlyPensionEmployer = monthlySsnitEmployer
 
   // Tier 3 / Provident Fund voluntary — employee rate capped at 16.5%
   const tier3Applicable = input.tier3_applicable === true
@@ -410,7 +412,8 @@ export function calculateGhanaTax(
   )
   const monthlyTaxReliefs = round2(annualTaxReliefs / 12)
 
-  // Chargeable income: cash emoluments − employee pension (5.5%) − employee Tier 3 − reliefs
+  // Chargeable income: cash emoluments − SSNIT Tier 1 − Tier 3 − reliefs
+  // (Tier 2 excluded from payroll chargeable-income path — report-only)
   const monthlyTaxableIncome = round2(
     Math.max(
       0,

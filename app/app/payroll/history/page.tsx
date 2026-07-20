@@ -155,7 +155,8 @@ export default function PayrollHistoryPage() {
         const totals = (slips ?? []).reduce(
           (acc, s: any) => ({
             paye: acc.paye + Number(s.paye_tax ?? 0),
-            ssnit: acc.ssnit + Number(s.ssnit_employee ?? 0) + Number(s.tier2_employee ?? 0),
+            // Tier 2 is report-only — do not include in payroll deduction charts
+            ssnit: acc.ssnit + Number(s.ssnit_employee ?? 0),
             tier3: acc.tier3 + Number(s.tier3_employee ?? 0),
             other:
               acc.other +
@@ -271,7 +272,7 @@ export default function PayrollHistoryPage() {
     deductionTotals.paye + deductionTotals.ssnit + deductionTotals.tier3 + deductionTotals.other > 0
       ? [
           { name: "PAYE Tax", value: Math.round(deductionTotals.paye), color: "#ef4444" },
-          { name: "SSNIT / Tier 2", value: Math.round(deductionTotals.ssnit), color: "#3b82f6" },
+          { name: "SSNIT", value: Math.round(deductionTotals.ssnit), color: "#3b82f6" },
           { name: "Tier 3", value: Math.round(deductionTotals.tier3), color: "#8b5cf6" },
           { name: "Other", value: Math.round(deductionTotals.other), color: "#6b7280" },
         ]

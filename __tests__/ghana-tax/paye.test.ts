@@ -48,32 +48,41 @@ describe("GRA PAYE bands (effective Jan 2024)", () => {
 })
 
 describe("Act 766 SSNIT / Tier 2", () => {
-  it("deducts 5.5% employee pension total (not 10.5%)", () => {
+  it("deducts SSNIT (5.5%) on payroll and keeps Tier 2 (5%) report-only", () => {
     const result = calculateGhanaTax(
       { monthly_basic: 4000, monthly_allowances: {}, tier2_applicable: true },
       DEFAULT_TAX_RATES,
     )
-    expect(result.monthly_ssnit_employee).toBeCloseTo(20, 2) // 0.5%
-    expect(result.monthly_tier2_employee).toBeCloseTo(200, 2) // 5%
-    expect(result.monthly_pension_employee).toBeCloseTo(220, 2) // 5.5%
+    expect(result.monthly_ssnit_employee).toBeCloseTo(220, 2) // 5.5%
+    expect(result.monthly_tier2_employee).toBeCloseTo(200, 2) // 5% (reports only)
+    // Payroll pension cash = SSNIT only (Tier 2 excluded from deductions / net)
+    expect(result.monthly_pension_employee).toBeCloseTo(220, 2)
     expect(result.monthly_pension_employer).toBeCloseTo(520, 2) // 13%
+    expect(result.monthly_total_employee_deductions).toBeCloseTo(
+      result.monthly_ssnit_employee + result.monthly_total_paye_withheld,
+      2,
+    )
+    expect(result.monthly_total_employee_deductions).not.toBeCloseTo(
+      result.monthly_ssnit_employee + result.monthly_tier2_employee + result.monthly_total_paye_withheld,
+      2,
+    )
   })
 
-  it("normalizes legacy double-count rates (5.5 + 5)", () => {
+  it("normalizes missing rates to Act 766 defaults", () => {
     const fixed = normalizePensionRates(
-      { employee_rate: 5.5, employer_rate: 13 },
-      { employee_rate: 5, employer_rate: 5 },
+      { employee_rate: Number.NaN, employer_rate: 13 },
+      { employee_rate: 5, employer_rate: 0 },
     )
     expect(fixed.ssnit).toEqual(GRA_2025_SSNIT)
     expect(fixed.tier2).toEqual(GRA_2025_TIER2)
   })
 
-  it("uses pension total for PAYE chargeable income", () => {
+  it("excludes Tier 2 from PAYE chargeable income (report-only)", () => {
     const result = calculateGhanaTax(
       { monthly_basic: 4000, monthly_allowances: { transport: 200 }, tier2_applicable: true },
       DEFAULT_TAX_RATES,
     )
-    // Gross 4200 − pension 220 = 3980
+    // Gross 4200 − SSNIT 220 (Tier 2 not subtracted) = 3980
     expect(result.monthly_taxable_income).toBeCloseTo(3980, 2)
   })
 })

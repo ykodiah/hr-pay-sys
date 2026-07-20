@@ -390,10 +390,10 @@ function LiveCalculator({ bands, rates }: { bands: TaxBandRow[]; rates: TaxRateR
           <div className="rounded-lg border p-4 space-y-2 bg-muted/20">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Social contributions breakdown</p>
             {[
-              { label: "SSNIT employee (5.5%)", value: result.monthly_ssnit_employee },
+              { label: "SSNIT employee (5.5%) — payroll", value: result.monthly_ssnit_employee },
               { label: "SSNIT employer (13%)", value: result.monthly_ssnit_employer },
-              { label: "Tier 2 employee (5%)", value: result.monthly_tier2_employee },
-              { label: "Tier 2 employer (5%)", value: result.monthly_tier2_employer },
+              { label: "Tier 2 employee (5%) — reports only", value: result.monthly_tier2_employee },
+              { label: "Tier 2 employer", value: result.monthly_tier2_employer },
             ].map(({ label, value }) => (
               <div key={label} className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">{label}</span>
