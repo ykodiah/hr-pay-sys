@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifySuperAdminToken } from '@/lib/superadmin/auth'
-import { createClient } from '@supabase/supabase-js'
+import { getSuperadminDb } from '@/lib/superadmin/db'
 import { logAudit } from '@/lib/superadmin/audit'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -25,6 +19,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (assigned_to) updates.assigned_to = assigned_to
     if (status === 'resolved') updates.resolved_at = new Date().toISOString()
 
+    const supabase = getSuperadminDb()
     const { data: issue, error } = await supabase
       .from('superadmin_issues')
       .update(updates)
@@ -55,6 +50,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { id } = await params
+    const supabase = getSuperadminDb()
     const { error } = await supabase.from('superadmin_issues').delete().eq('id', id)
     if (error) throw error
 

@@ -1,11 +1,12 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 
+/** Lazy service-role client. Safe during `next build` when env is unset. */
 export function getSuperadminDb(): SupabaseClient {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-    process.env.SUPABASE_SERVICE_ROLE_KEY || "",
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  )
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co"
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-service-role-key"
+  return createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
 }
 
 export function slugify(input: string): string {

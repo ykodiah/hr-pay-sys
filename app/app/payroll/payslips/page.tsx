@@ -252,7 +252,7 @@ function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | n
               ))}
               <div className="flex justify-between items-center py-2 mt-1 bg-emerald-50 rounded-lg px-3">
                 <span className="text-sm font-bold text-emerald-800">Gross Pay</span>
-                <span className="text-sm font-bold text-emerald-800">{money(slip.gross_pay)}</span>
+                <span className="text-sm font-bold text-emerald-800">{money(normalized.gross_pay)}</span>
               </div>
             </div>
           </div>
@@ -272,7 +272,7 @@ function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | n
               ))}
               <div className="flex justify-between items-center py-2 mt-1 bg-red-50 rounded-lg px-3">
                 <span className="text-sm font-bold text-red-800">Total Deductions</span>
-                <span className="text-sm font-bold text-red-800">{money(slip.total_deductions)}</span>
+                <span className="text-sm font-bold text-red-800">{money(normalized.total_deductions)}</span>
               </div>
             </div>
           </div>
@@ -282,11 +282,11 @@ function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | n
         <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-xl px-5 py-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-400 uppercase tracking-wider">Net Pay</p>
-            <p className="text-2xl font-bold text-white mt-0.5">{money(slip.net_pay)}</p>
+            <p className="text-2xl font-bold text-white mt-0.5">{money(normalized.net_pay)}</p>
           </div>
           <div className="text-right">
             <p className="text-xs text-gray-400">Taxable Income</p>
-            <p className="text-base font-semibold text-gray-200">{money(slip.paye_taxable_income)}</p>
+            <p className="text-base font-semibold text-gray-200">{money(normalized.paye_taxable_income)}</p>
           </div>
         </div>
 

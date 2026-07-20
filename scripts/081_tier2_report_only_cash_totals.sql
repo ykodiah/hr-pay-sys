@@ -6,6 +6,18 @@
 -- Safe / idempotent. Run after 080.
 -- =============================================================================
 
+-- ── Ensure payroll_runs aggregate columns exist (older DBs omit employee_count)
+ALTER TABLE public.payroll_runs
+  ADD COLUMN IF NOT EXISTS total_gross_pay NUMERIC(15,2) DEFAULT 0;
+ALTER TABLE public.payroll_runs
+  ADD COLUMN IF NOT EXISTS total_deductions NUMERIC(15,2) DEFAULT 0;
+ALTER TABLE public.payroll_runs
+  ADD COLUMN IF NOT EXISTS total_net_pay NUMERIC(15,2) DEFAULT 0;
+ALTER TABLE public.payroll_runs
+  ADD COLUMN IF NOT EXISTS employee_count INTEGER DEFAULT 0;
+ALTER TABLE public.payroll_runs
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
+
 -- ── Schema: mark Tier 2 as report-only on payroll tables ─────────────────────
 ALTER TABLE public.payslips
   ADD COLUMN IF NOT EXISTS tier2_report_only BOOLEAN NOT NULL DEFAULT true;

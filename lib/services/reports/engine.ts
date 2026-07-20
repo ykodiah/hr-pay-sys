@@ -293,8 +293,8 @@ async function fetchReportRows(
       payslip_status: "from_payroll_items",
       current_loan_balance: 0,
       current_loan_deduction: Number(it.loan_deduction ?? 0),
-    } as PayrollReportRow,
-  ).map((r) => normalizePayrollCashRow(r) as PayrollReportRow)
+    } as PayrollReportRow
+  }).map((r) => normalizePayrollCashRow(r) as PayrollReportRow)
   
   return { 
     rows: mappedRows,
