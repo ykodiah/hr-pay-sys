@@ -136,19 +136,70 @@ export async function POST(req: NextRequest) {
       body.display_name ||
       `${body.first_name} ${body.last_name}`.trim()
 
-    // Ensure sequential employee_id: use provided code if unique, else allocate next
-    let employeeCode = body.employee_id ? String(body.employee_id).trim() : ""
+    // Reject near-duplicates (same emails) — common when the UI double-submits
+    const corporateEmail = body.corporate_email ? String(body.corporate_email).trim() : ""
+    const personalEmail = body.personal_email ? String(body.personal_email).trim() : ""
+    if (corporateEmail || personalEmail) {
+      const checks: PromiseLike<{ data: any[] | null }>[] = []
+      if (corporateEmail) {
+        checks.push(
+          client
+            .from("employees")
+            .select("id, employee_id, corporate_email, personal_email")
+            .eq("company_id", companyId)
+            .ilike("corporate_email", corporateEmail)
+            .limit(1),
+        )
+      }
+      if (personalEmail) {
+        checks.push(
+          client
+            .from("employees")
+            .select("id, employee_id, corporate_email, personal_email")
+            .eq("company_id", companyId)
+            .ilike("personal_email", personalEmail)
+            .limit(1),
+        )
+      }
+      const results = await Promise.all(checks)
+      const hit = results.flatMap((r) => r.data || [])[0]
+      if (hit) {
+        return NextResponse.json(
+          {
+            error: `An employee with this email already exists (${hit.employee_id || hit.id}).`,
+            existing_employee_id: hit.id,
+            existing_employee_code: hit.employee_id,
+          },
+          { status: 409 },
+        )
+      }
+    }
+
+    // Ensure sequential employee_id: use provided code if unique, else allocate next.
+    // If the client explicitly sent a code that already exists, return 409 instead of
+    // silently minting a second employee with a different code (double-submit case).
+    const providedCode = body.employee_id ? String(body.employee_id).trim() : ""
+    let employeeCode = providedCode
     if (employeeCode) {
       const { data: clash } = await client
         .from("employees")
-        .select("id")
+        .select("id, employee_id")
         .eq("company_id", companyId)
         .eq("employee_id", employeeCode)
         .maybeSingle()
-      if (clash) employeeCode = ""
+      if (clash) {
+        return NextResponse.json(
+          {
+            error: `Employee ID ${employeeCode} already exists.`,
+            existing_employee_id: clash.id,
+            existing_employee_code: clash.employee_id,
+          },
+          { status: 409 },
+        )
+      }
     }
     if (!employeeCode) {
-      const prefix = String(body.prefix || employeeCode || "EMP")
+      const prefix = String(body.prefix || "EMP")
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, "")
         .slice(0, 4)
@@ -221,7 +272,19 @@ export async function POST(req: NextRequest) {
       .select()
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      // Unique index on (company_id, employee_id) — race from double-submit
+      if (String(error.message || "").toLowerCase().includes("duplicate") || error.code === "23505") {
+        return NextResponse.json(
+          {
+            error: `Employee ID ${employeeCode} already exists (or a concurrent create raced).`,
+            code: error.code,
+          },
+          { status: 409 },
+        )
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
 
     const financial = body.financial ?? null
     if (financial || body.monthly_salary != null || body.salary != null) {

@@ -884,7 +884,12 @@ export default function EmployeesPage() {
     }
   }
 
+  const addEmployeeInFlight = useRef(false)
+
   const handleAddEmployee = async (employeeData: any) => {
+    // Guard against double-click / double-submit creating two rows
+    if (addEmployeeInFlight.current) return
+    addEmployeeInFlight.current = true
     try {
       console.log("[v0] Adding employee:", employeeData)
       const payload = formToApiPayload(employeeData, companyId || companySettings?.id)
@@ -918,6 +923,9 @@ export default function EmployeesPage() {
         description: error instanceof Error ? error.message : "Failed to add employee. Please try again.",
         variant: "destructive",
       })
+      throw error
+    } finally {
+      addEmployeeInFlight.current = false
     }
   }
 
@@ -2226,7 +2234,7 @@ function AddEmployeeForm({
   companyId = "",
 }: {
   employee?: any
-  onSubmit: (data: any) => void
+  onSubmit: (data: any) => void | Promise<void>
   onClose: () => void
   subsidiaries: any[]
   setFormData: (data: any) => void
@@ -2250,6 +2258,7 @@ function AddEmployeeForm({
   const [supervisorSearchTerm, setSupervisorSearchTerm] = useState("")
   const [headSearchTerm, setHeadSearchTerm] = useState("")
   const [subsidiarySearchTerm, setSubsidiarySearchTerm] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
   const [currentTab, setCurrentTab] = useState("personal")
 
@@ -2897,53 +2906,60 @@ function AddEmployeeForm({
   }
 
   const handleSubmit = async () => {
-    if (validateForm()) {
-      const fullName = `${formData.firstName} ${formData.otherNames || ""} ${formData.lastName}`.replace(/\s+/g, " ").trim()
-      const displayName = `${formData.firstName} ${formData.lastName}`.trim()
-      const monthly =
-        formData.salary && Number(formData.salary) > 0
-          ? formData.salary
-          : formData.annualSalary
-            ? String(Number(formData.annualSalary) / 12)
-            : formData.salary
-      const annual =
-        formData.annualSalary && Number(formData.annualSalary) > 0
-          ? formData.annualSalary
-          : monthly
-            ? String(Number(monthly) * 12)
-            : formData.annualSalary
-
-      const employeeData = {
-        ...formData,
-        fullName,
-        displayName,
-        employeeId: formData.employeeId,
-        salary: monthly,
-        annualSalary: annual,
-        selectedAllowances,
-        selectedDeductions,
-        uploadedDocuments,
-        documents: uploadedDocuments.map((d) => ({
-          documentType: d.documentType,
-          fileName: d.fileName,
-          fileSize: d.fileSize,
-          fileType: d.fileType,
-          fileUrl: d.fileUrl,
-          file_url: d.fileUrl,
-          file_content: d.file_content || null,
-          vaultDocumentId: d.vaultDocumentId || d.id,
-          vault_document_id: d.vaultDocumentId || d.id,
-          uploadedBy: d.uploadedBy,
-        })),
-      }
-
-      onSubmit(employeeData)
-    } else {
+    if (isSubmitting) return
+    if (!validateForm()) {
       toast({
         title: "Error",
         description: "Please fill in all required fields correctly.",
         variant: "destructive",
       })
+      return
+    }
+
+    const fullName = `${formData.firstName} ${formData.otherNames || ""} ${formData.lastName}`.replace(/\s+/g, " ").trim()
+    const displayName = `${formData.firstName} ${formData.lastName}`.trim()
+    const monthly =
+      formData.salary && Number(formData.salary) > 0
+        ? formData.salary
+        : formData.annualSalary
+          ? String(Number(formData.annualSalary) / 12)
+          : formData.salary
+    const annual =
+      formData.annualSalary && Number(formData.annualSalary) > 0
+        ? formData.annualSalary
+        : monthly
+          ? String(Number(monthly) * 12)
+          : formData.annualSalary
+
+    const employeeData = {
+      ...formData,
+      fullName,
+      displayName,
+      employeeId: formData.employeeId,
+      salary: monthly,
+      annualSalary: annual,
+      selectedAllowances,
+      selectedDeductions,
+      uploadedDocuments,
+      documents: uploadedDocuments.map((d) => ({
+        documentType: d.documentType,
+        fileName: d.fileName,
+        fileSize: d.fileSize,
+        fileType: d.fileType,
+        fileUrl: d.fileUrl,
+        file_url: d.fileUrl,
+        file_content: d.file_content || null,
+        vaultDocumentId: d.vaultDocumentId || d.id,
+        vault_document_id: d.vaultDocumentId || d.id,
+        uploadedBy: d.uploadedBy,
+      })),
+    }
+
+    setIsSubmitting(true)
+    try {
+      await Promise.resolve(onSubmit(employeeData))
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -5041,11 +5057,22 @@ function AddEmployeeForm({
           </Button>
         ) : (
           <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={onClose} className="border-gray-300 hover:bg-gray-50 bg-transparent">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="border-gray-300 hover:bg-gray-50 bg-transparent"
+            >
               Cancel
             </Button>
-            <Button onClick={handleSubmit} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              Submit
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {isSubmitting ? "Saving..." : "Submit"}
             </Button>
           </div>
         )}
