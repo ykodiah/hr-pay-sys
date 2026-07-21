@@ -6,6 +6,7 @@ import { buildOfferLetterText, defaultOnboardingTasks } from "@/lib/recruitment/
 import { buildRichOfferLetter } from "@/lib/recruitment/build-offer-letter"
 import { ensureOfferCodes, asBenefitsList, logOfferEvent } from "@/lib/recruitment/offer-sync"
 import { formatCompanyAddress } from "@/lib/exports/company-branding"
+import { ensureOnboardingFromHire } from "@/lib/recruitment/ensure-onboarding"
 
 export async function GET(req: NextRequest) {
   try {
@@ -302,29 +303,18 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (action === "start_onboarding" || action === "hire") {
-      const { data: checklist, error: clErr } = await client
-        .from("recruitment_onboarding_checklists")
-        .insert({
-          company_id: current.company_id,
-          application_id: body.id,
-          candidate_id: current.candidate_id,
-          candidate_name: candidate?.candidate_name ?? "Candidate",
-          start_date: body.start_date ?? new Date().toISOString().slice(0, 10),
-          status: "in_progress",
-          progress: 0,
-          created_by: user.isDemo ? null : user.id,
-        })
-        .select()
-        .single()
-      if (clErr) return NextResponse.json({ error: clErr.message }, { status: 500 })
-
-      const tasks = defaultOnboardingTasks(body.start_date).map((t) => ({
-        checklist_id: checklist.id,
-        ...t,
-        status: "pending",
-      }))
-      await client.from("recruitment_onboarding_tasks").insert(tasks)
-      extras.checklist = checklist
+      const onboarding = await ensureOnboardingFromHire(client, {
+        companyId: current.company_id,
+        applicationId: body.id,
+        candidateId: current.candidate_id,
+        candidateName: candidate?.candidate_name ?? "Candidate",
+        jobTitle: job?.title,
+        department: job?.department,
+        startDate: body.start_date ?? new Date().toISOString().slice(0, 10),
+        actorId: user.isDemo ? null : user.id,
+        autoStarted: false,
+      })
+      extras.checklist = onboarding.checklist
     }
 
     return NextResponse.json({ success: true, application: updated, ...extras })

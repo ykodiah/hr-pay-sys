@@ -239,6 +239,8 @@ type OnboardingTask = {
   priority: string | null
   completed_at: string | null
   created_at?: string | null
+  stage?: string | null
+  sort_order?: number | null
 }
 
 type OnboardingChecklist = {
@@ -251,6 +253,15 @@ type OnboardingChecklist = {
   progress: number | null
   tasks?: OnboardingTask[]
   created_at?: string | null
+  offer_id?: string | null
+  job_title?: string | null
+  department?: string | null
+  stage?: string | null
+  progress_notes?: string | null
+  auto_started?: boolean | null
+  hired_at?: string | null
+  buddy_name?: string | null
+  manager_name?: string | null
 }
 
 type RecruitmentResponse = {
@@ -1224,10 +1235,20 @@ export default function RecruitmentPage() {
         action === "send" && json.email
           ? ` Email: ${json.email.status}${json.email.error ? ` (${json.email.error})` : ""}.`
           : ""
-      toast({
-        title: "Offer updated",
-        description: `Offer for ${getOfferCandidateName(offer)} marked ${action}.${emailNote}`,
-      })
+      if (action === "accept") {
+        toast({
+          title: "Offer accepted",
+          description: json.onboarding_created
+            ? `${getOfferCandidateName(offer)} moved to onboarding.`
+            : `${getOfferCandidateName(offer)} accepted — onboarding is ready.`,
+        })
+        setActiveTab("onboarding")
+      } else {
+        toast({
+          title: "Offer updated",
+          description: `Offer for ${getOfferCandidateName(offer)} marked ${action}.${emailNote}`,
+        })
+      }
     } catch (err) {
       toast({
         title: "Offer action failed",
@@ -1315,7 +1336,11 @@ export default function RecruitmentPage() {
   }
 
   const getOnboardingJobTitle = (checklist: OnboardingChecklist) => {
-    return applicationsById.get(checklist.application_id || "")?.job_title || "New hire"
+    return (
+      checklist.job_title ||
+      applicationsById.get(checklist.application_id || "")?.job_title ||
+      "New hire"
+    )
   }
 
   const handleExportAnalytics = () => {
@@ -2676,11 +2701,6 @@ export default function RecruitmentPage() {
           <Card>
             <CardHeader>
               <CardTitle>Offer letters</CardTitle>
-              <CardDescription>
-                Draft remuneration & benefits, edit the letter, send a candidate portal link (accept / decline / withdraw),
-                download PDF, and sync application status automatically or manually.
-                Run SQL <code className="text-xs">088_recruitment_offers_portal.sql</code> if Copy link / Send fails.
-              </CardDescription>
             </CardHeader>
             <CardContent>
               {offers.length ? (
@@ -2756,26 +2776,62 @@ export default function RecruitmentPage() {
                                 Copy link
                               </Button>
                             </div>
+                            {(() => {
+                              const terminal = ["accepted", "rejected", "withdrawn", "expired"].includes(
+                                String(offer.status || ""),
+                              )
+                              const accepted = offer.status === "accepted"
+                              return (
                             <div className="flex flex-wrap justify-end gap-2">
                               <Button
                                 size="sm"
                                 className="bg-emerald-600 hover:bg-emerald-700"
-                                disabled={saving || offer.status === "accepted"}
+                                disabled={saving || terminal}
                                 onClick={() => void handleOfferAction(offer, "send")}
                               >
                                 <Send className="h-4 w-4" />
                                 Send email + link
                               </Button>
-                              <Button size="sm" variant="outline" disabled={saving} onClick={() => void handleOfferAction(offer, "accept")}>
-                                Accept
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className={accepted ? "opacity-40 pointer-events-none" : ""}
+                                disabled={saving || terminal}
+                                onClick={() => void handleOfferAction(offer, "accept")}
+                              >
+                                {accepted ? "Accepted" : "Accept"}
                               </Button>
-                              <Button size="sm" variant="outline" disabled={saving} onClick={() => void handleOfferAction(offer, "reject")}>
+                              {accepted ? (
+                                <Button
+                                  size="sm"
+                                  className="bg-emerald-600 hover:bg-emerald-700"
+                                  onClick={() => setActiveTab("onboarding")}
+                                >
+                                  <UserPlus className="h-4 w-4" />
+                                  Go to onboarding
+                                </Button>
+                              ) : null}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={saving || terminal}
+                                className={terminal && !accepted ? "opacity-40" : ""}
+                                onClick={() => void handleOfferAction(offer, "reject")}
+                              >
                                 Decline
                               </Button>
-                              <Button size="sm" variant="destructive" disabled={saving} onClick={() => void handleOfferAction(offer, "withdraw")}>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                disabled={saving || terminal}
+                                className={terminal ? "opacity-40" : ""}
+                                onClick={() => void handleOfferAction(offer, "withdraw")}
+                              >
                                 Withdraw
                               </Button>
                             </div>
+                              )
+                            })()}
                             <div className="flex flex-wrap justify-end gap-2 items-center">
                               <span className="text-xs text-muted-foreground">Manual status</span>
                               <Select
@@ -2812,96 +2868,212 @@ export default function RecruitmentPage() {
         </TabsContent>
 
         <TabsContent value="onboarding" className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Card>
+              <CardContent className="pt-5">
+                <p className="text-xs text-muted-foreground">Active hires</p>
+                <p className="text-2xl font-semibold text-emerald-700">
+                  {onboarding.filter((c) => c.status === "in_progress" || c.status === "pending").length}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-5">
+                <p className="text-xs text-muted-foreground">Completed</p>
+                <p className="text-2xl font-semibold">
+                  {onboarding.filter((c) => c.status === "completed").length}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-5">
+                <p className="text-xs text-muted-foreground">Avg. progress</p>
+                <p className="text-2xl font-semibold">
+                  {onboarding.length
+                    ? Math.round(
+                        onboarding.reduce((sum, c) => sum + Number(c.progress || 0), 0) / onboarding.length,
+                      )
+                    : 0}
+                  %
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
           <Card>
-            <CardHeader>
-              <CardTitle>Onboarding</CardTitle>
-              <CardDescription>Complete onboarding tasks and close onboarding checklists.</CardDescription>
+            <CardHeader className="pb-3">
+              <CardTitle>New hire onboarding</CardTitle>
             </CardHeader>
             <CardContent>
               {onboarding.length ? (
-                <div className="grid gap-4">
-                  {onboarding.map((checklist) => (
-                    <div key={checklist.id} className="rounded-lg border p-4">
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-lg font-semibold">{checklist.candidate_name || "Candidate"}</h3>
-                            <Badge variant="outline" className={statusClass(checklist.status)}>
-                              {checklist.status || "unknown"}
-                            </Badge>
+                <div className="grid gap-5">
+                  {onboarding.map((checklist) => {
+                    const stages = [
+                      "welcome",
+                      "documents",
+                      "accounts",
+                      "payroll_setup",
+                      "orientation",
+                      "day_one",
+                      "completed",
+                    ]
+                    const stageLabels: Record<string, string> = {
+                      welcome: "Welcome",
+                      documents: "Documents",
+                      accounts: "Accounts",
+                      payroll_setup: "Payroll",
+                      orientation: "Orientation",
+                      day_one: "Day one",
+                      completed: "Done",
+                    }
+                    const currentStage = checklist.stage || "welcome"
+                    const stageIdx = Math.max(0, stages.indexOf(currentStage))
+                    const tasks = [...(checklist.tasks || [])].sort(
+                      (a, b) => Number(a.sort_order ?? 999) - Number(b.sort_order ?? 999),
+                    )
+                    const doneCount = tasks.filter(
+                      (t) => t.status === "completed" || t.status === "skipped",
+                    ).length
+                    return (
+                      <div
+                        key={checklist.id}
+                        className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm"
+                      >
+                        <div className="flex flex-col gap-4 border-b bg-white/80 p-5 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="space-y-2 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-xl font-semibold tracking-tight">
+                                {checklist.candidate_name || "New hire"}
+                              </h3>
+                              <Badge variant="outline" className={statusClass(checklist.status)}>
+                                {checklist.status || "in_progress"}
+                              </Badge>
+                              {checklist.auto_started ? (
+                                <Badge variant="secondary">Auto-started</Badge>
+                              ) : null}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {checklist.job_title || getOnboardingJobTitle(checklist)}
+                              {checklist.department ? ` · ${checklist.department}` : ""}
+                              {" · "}Start {formatDate(checklist.start_date)}
+                            </p>
+                            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                              {checklist.manager_name ? <span>Manager: {checklist.manager_name}</span> : null}
+                              {checklist.buddy_name ? <span>Buddy: {checklist.buddy_name}</span> : null}
+                              <span>
+                                Tasks {doneCount}/{tasks.length}
+                              </span>
+                            </div>
                           </div>
-                          <p className="text-sm text-muted-foreground">
-                            {getOnboardingJobTitle(checklist)} · Start {formatDate(checklist.start_date)}
-                          </p>
-                          <div className="flex items-center gap-3">
-                            <Progress value={checklist.progress ?? 0} className="w-52" />
-                            <span className="text-sm font-medium">{checklist.progress ?? 0}%</span>
+                          <div className="flex flex-col items-end gap-2 shrink-0">
+                            <div className="flex items-center gap-3">
+                              <Progress value={checklist.progress ?? 0} className="h-2 w-40" />
+                              <span className="text-sm font-semibold tabular-nums">
+                                {checklist.progress ?? 0}%
+                              </span>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={saving || checklist.status === "completed"}
+                              onClick={() => void handleCompleteOnboarding(checklist)}
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                              {checklist.status === "completed" ? "Completed" : "Mark onboarding complete"}
+                            </Button>
                           </div>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={saving || checklist.status === "completed"}
-                          onClick={() => void handleCompleteOnboarding(checklist)}
-                        >
-                          <CheckCircle2 className="h-4 w-4" />
-                          Complete onboarding
-                        </Button>
-                      </div>
-                      <div className="mt-4">
-                        {checklist.tasks?.length ? (
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Task</TableHead>
-                                <TableHead>Owner</TableHead>
-                                <TableHead>Due</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Action</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {checklist.tasks.map((task) => (
-                                <TableRow key={task.id}>
-                                  <TableCell>
-                                    <p className="font-medium">{task.title}</p>
-                                    <p className="text-xs text-muted-foreground">{task.description || task.task_type || "Onboarding task"}</p>
-                                  </TableCell>
-                                  <TableCell>
-                                    {task.assigned_department || task.assigned_to || task.department || "Unassigned"}
-                                  </TableCell>
-                                  <TableCell>{formatDate(task.due_date)}</TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline" className={statusClass(task.status)}>
-                                      {task.status || "pending"}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-right">
+
+                        <div className="space-y-4 p-5">
+                          <div className="flex flex-wrap gap-2">
+                            {stages.map((stage, idx) => {
+                              const active = idx === stageIdx
+                              const done = idx < stageIdx || currentStage === "completed"
+                              return (
+                                <div
+                                  key={stage}
+                                  className={`rounded-full px-3 py-1 text-xs font-medium border ${
+                                    done
+                                      ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                      : active
+                                        ? "bg-slate-900 text-white border-slate-900"
+                                        : "bg-white text-slate-500 border-slate-200"
+                                  }`}
+                                >
+                                  {stageLabels[stage] || stage}
+                                </div>
+                              )
+                            })}
+                          </div>
+
+                          {checklist.progress_notes ? (
+                            <p className="rounded-lg border border-amber-100 bg-amber-50/70 px-3 py-2 text-xs text-amber-950">
+                              Latest note: {checklist.progress_notes}
+                            </p>
+                          ) : null}
+
+                          <div className="grid gap-2">
+                            {tasks.length ? (
+                              tasks.map((task) => {
+                                const done = task.status === "completed" || task.status === "skipped"
+                                return (
+                                  <div
+                                    key={task.id}
+                                    className={`flex flex-col gap-3 rounded-xl border bg-white p-3 sm:flex-row sm:items-center sm:justify-between ${
+                                      done ? "opacity-70" : ""
+                                    }`}
+                                  >
+                                    <div className="min-w-0 space-y-1">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <p className={`font-medium ${done ? "line-through" : ""}`}>
+                                          {task.title}
+                                        </p>
+                                        {task.stage ? (
+                                          <Badge variant="outline" className="text-[10px] capitalize">
+                                            {String(task.stage).replace(/_/g, " ")}
+                                          </Badge>
+                                        ) : null}
+                                        <Badge variant="outline" className={statusClass(task.status)}>
+                                          {task.status || "pending"}
+                                        </Badge>
+                                      </div>
+                                      <p className="text-xs text-muted-foreground">
+                                        {task.description || task.task_type || "Onboarding task"}
+                                        {" · "}
+                                        {task.assigned_department || task.assigned_to || task.department || "Unassigned"}
+                                        {" · Due "}
+                                        {formatDate(task.due_date)}
+                                      </p>
+                                    </div>
                                     <Button
                                       size="sm"
-                                      variant="outline"
-                                      disabled={saving || task.status === "completed"}
+                                      variant={done ? "secondary" : "outline"}
+                                      disabled={saving || done}
                                       onClick={() => void handleTaskComplete(task)}
                                     >
-                                      Mark completed
+                                      {done ? "Done" : "Mark complete"}
                                     </Button>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        ) : (
-                          <EmptyState icon={ClipboardCheck} title="No onboarding tasks" description="Tasks will appear after onboarding is started." />
-                        )}
+                                  </div>
+                                )
+                              })
+                            ) : (
+                              <EmptyState
+                                icon={ClipboardCheck}
+                                title="No onboarding tasks"
+                                description="Tasks appear when onboarding starts from an accepted offer."
+                              />
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : (
                 <EmptyState
                   icon={UserPlus}
-                  title="No onboarding checklists"
-                  description="Start onboarding from an accepted or ready application."
+                  title="No active onboarding"
+                  description="When an offer is accepted (portal or admin), the hire appears here automatically."
                 />
               )}
             </CardContent>

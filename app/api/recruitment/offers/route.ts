@@ -23,6 +23,7 @@ import {
   offerRespondUrl,
   safeUpdateOffer,
 } from "@/lib/recruitment/offer-db"
+import { ensureOnboardingFromHire } from "@/lib/recruitment/ensure-onboarding"
 
 function db() {
   try {
@@ -364,6 +365,32 @@ export async function PATCH(req: NextRequest) {
       })
     }
 
+    let onboarding: any = null
+    const shouldStartOnboarding =
+      action === "accept" || (action === "set_status" && body.status === "accepted")
+    if (shouldStartOnboarding) {
+      try {
+        onboarding = await ensureOnboardingFromHire(client, {
+          companyId,
+          applicationId: data.application_id,
+          offerId: data.id,
+          candidateId: application?.candidate_id || candidate?.id,
+          candidateName:
+            data.candidate_name_snapshot ||
+            current.candidate_name_snapshot ||
+            candidate?.candidate_name ||
+            "New hire",
+          jobTitle: data.job_title_snapshot || current.job_title_snapshot || job?.title,
+          department: data.department || current.department || job?.department,
+          startDate: data.start_date || current.start_date,
+          actorId,
+          autoStarted: true,
+        })
+      } catch (err) {
+        console.warn("[offers] onboarding auto-start failed", err)
+      }
+    }
+
     await logOfferEvent(client, {
       companyId,
       offerId: data.id,
@@ -377,6 +404,7 @@ export async function PATCH(req: NextRequest) {
       payload: {
         fields: Object.keys(patch),
         email_status: emailResult?.status,
+        onboarding_id: onboarding?.checklist?.id,
       },
     })
 
@@ -384,6 +412,8 @@ export async function PATCH(req: NextRequest) {
       success: true,
       offer: flattenOffer(data),
       email: emailResult,
+      onboarding: onboarding?.checklist || null,
+      onboarding_created: Boolean(onboarding?.created),
     })
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 })

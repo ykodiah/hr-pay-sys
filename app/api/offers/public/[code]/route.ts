@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { asBenefitsList, logOfferEvent, syncApplicationForOfferAction } from "@/lib/recruitment/offer-sync"
 import { loadOfferForPublic, OFFER_CORE_COLUMNS, isSchemaCacheError } from "@/lib/recruitment/offer-db"
+import { ensureOnboardingFromHire } from "@/lib/recruitment/ensure-onboarding"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -225,6 +226,26 @@ export async function POST(
       notes: `Candidate ${action} via offer portal${note ? `: ${note}` : ""}`,
     })
 
+    let onboarding: any = null
+    if (action === "accept") {
+      try {
+        onboarding = await ensureOnboardingFromHire(client, {
+          companyId: offer.company_id,
+          applicationId: offer.application_id,
+          offerId: offer.id,
+          candidateId: null,
+          candidateName: offer.candidate_name_snapshot || "New hire",
+          jobTitle: offer.job_title_snapshot,
+          department: offer.department,
+          startDate: offer.start_date,
+          actorId: null,
+          autoStarted: true,
+        })
+      } catch (err) {
+        console.warn("[public-offer] onboarding auto-start failed", err)
+      }
+    }
+
     await logOfferEvent(client, {
       companyId: offer.company_id,
       offerId: offer.id,
@@ -235,6 +256,7 @@ export async function POST(
       fromStatus: offer.status,
       toStatus: updated.status,
       notes: note,
+      payload: { onboarding_id: onboarding?.checklist?.id },
     })
 
     const { data: company } = await client
@@ -246,9 +268,10 @@ export async function POST(
     return NextResponse.json({
       success: true,
       offer: publicOfferView(updated, company),
+      onboarding: onboarding?.checklist || null,
       message:
         action === "accept"
-          ? "Thank you — you have accepted this offer. HR will contact you about onboarding."
+          ? "Thank you — you have accepted this offer. Your onboarding checklist has been started; HR will contact you with next steps."
           : action === "reject"
             ? "You have declined this offer. Thank you for your time."
             : "You have withdrawn your interest. Thank you for letting us know.",
