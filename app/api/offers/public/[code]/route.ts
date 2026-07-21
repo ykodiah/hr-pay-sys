@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { asBenefitsList, logOfferEvent, syncApplicationForOfferAction } from "@/lib/recruitment/offer-sync"
+import { loadOfferForPublic, OFFER_CORE_COLUMNS, isSchemaCacheError } from "@/lib/recruitment/offer-db"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -22,7 +23,7 @@ function db() {
 function publicOfferView(offer: any, company: any) {
   return {
     id: offer.id,
-    short_code: offer.short_code,
+    short_code: offer.short_code || offer.id,
     status: offer.status,
     salary: offer.salary,
     currency: offer.currency || "GHS",
@@ -52,27 +53,28 @@ function publicOfferView(offer: any, company: any) {
   }
 }
 
-async function loadOfferByCode(client: any, code: string) {
-  const key = String(code || "").trim()
-  if (!key) return { offer: null, error: "code required" }
-
-  let { data: offer, error } = await client
+async function safePublicUpdate(client: any, offerId: string, patch: Record<string, unknown>) {
+  let { data, error } = await client
     .from("recruitment_offers")
+    .update(patch)
+    .eq("id", offerId)
     .select("*")
-    .ilike("short_code", key)
-    .maybeSingle()
+    .single()
+  if (!error) return { data, error: null }
 
-  if ((!offer || error) && key.length > 16) {
-    const byToken = await client
-      .from("recruitment_offers")
-      .select("*")
-      .eq("response_token", key)
-      .maybeSingle()
-    offer = byToken.data
-    error = byToken.error
+  if (!isSchemaCacheError(error.message)) return { data: null, error }
+
+  const legacy: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(patch)) {
+    if (OFFER_CORE_COLUMNS.has(k)) legacy[k] = v
   }
-
-  return { offer, error }
+  const retry = await client
+    .from("recruitment_offers")
+    .update(legacy)
+    .eq("id", offerId)
+    .select("*")
+    .single()
+  return { data: retry.data, error: retry.error }
 }
 
 export async function GET(
@@ -82,11 +84,13 @@ export async function GET(
   try {
     const { code } = await params
     const client: any = await db()
-    const { offer, error } = await loadOfferByCode(client, code)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    const { offer, error } = await loadOfferForPublic(client, code)
+    if (error?.message && !offer) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
     if (!offer) return NextResponse.json({ error: "Offer not found" }, { status: 404 })
 
-    // Increment views (best-effort)
+    // Increment views (best-effort; ignore if column missing)
     await client
       .from("recruitment_offers")
       .update({
@@ -112,7 +116,27 @@ export async function GET(
       toStatus: offer.status,
     })
 
-    return NextResponse.json({ success: true, offer: publicOfferView(offer, company) })
+    // Enrich snapshots from application if missing
+    let view = publicOfferView(offer, company)
+    if (!view.candidate_name || !view.job_title) {
+      const { data: app } = await client
+        .from("recruitment_applications")
+        .select(
+          `candidate:recruitment_candidates(candidate_name, email), job:recruitment_job_postings(title, department)`,
+        )
+        .eq("id", offer.application_id)
+        .maybeSingle()
+      const candidate = Array.isArray(app?.candidate) ? app?.candidate[0] : app?.candidate
+      const job = Array.isArray(app?.job) ? app?.job[0] : app?.job
+      view = {
+        ...view,
+        candidate_name: view.candidate_name || candidate?.candidate_name || null,
+        job_title: view.job_title || job?.title || null,
+        department: view.department || job?.department || null,
+      }
+    }
+
+    return NextResponse.json({ success: true, offer: view })
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load offer" },
@@ -137,11 +161,12 @@ export async function POST(
       )
     }
 
-    const { offer, error } = await loadOfferByCode(client, code)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    const { offer, error } = await loadOfferForPublic(client, code)
+    if (error?.message && !offer) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
     if (!offer) return NextResponse.json({ error: "Offer not found" }, { status: 404 })
 
-    // Optional token check when present on both sides
     if (offer.response_token && body.token && body.token !== offer.response_token) {
       return NextResponse.json({ error: "Invalid response token" }, { status: 403 })
     }
@@ -156,14 +181,13 @@ export async function POST(
       )
     }
 
-    // Deadline guard
     if (offer.acceptance_deadline) {
       const deadline = new Date(`${offer.acceptance_deadline}T23:59:59.000Z`)
       if (Number.isFinite(deadline.getTime()) && Date.now() > deadline.getTime() && action === "accept") {
-        await client
-          .from("recruitment_offers")
-          .update({ status: "expired", updated_at: new Date().toISOString() })
-          .eq("id", offer.id)
+        await safePublicUpdate(client, offer.id, {
+          status: "expired",
+          updated_at: new Date().toISOString(),
+        })
         return NextResponse.json(
           { error: "This offer has expired. Please contact HR." },
           { status: 410 },
@@ -191,12 +215,7 @@ export async function POST(
       patch.withdrawn_reason = note || "Withdrawn by candidate via portal"
     }
 
-    const { data: updated, error: updErr } = await client
-      .from("recruitment_offers")
-      .update(patch)
-      .eq("id", offer.id)
-      .select("*")
-      .single()
+    const { data: updated, error: updErr } = await safePublicUpdate(client, offer.id, patch)
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 })
 
     await syncApplicationForOfferAction(client, {

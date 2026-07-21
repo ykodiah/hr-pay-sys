@@ -4,19 +4,29 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { requireApiUser } from "@/lib/auth/api-user"
 import { resolveCompanyId } from "@/lib/employees/resolve-company"
+import { ensurePersistedOfferCodes, offerRespondUrl } from "@/lib/recruitment/offer-db"
+
+function db() {
+  try {
+    return createServiceClient()
+  } catch {
+    return createClient()
+  }
+}
 
 export async function GET(req: NextRequest) {
   try {
     const user = await requireApiUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const client = await createClient()
+    const client: any = await db()
+    const authClient = await createClient()
     let companyId = new URL(req.url).searchParams.get("company_id")
     if (!companyId) {
-      const resolved = await resolveCompanyId(client, user.isDemo ? null : user.id)
+      const resolved = await resolveCompanyId(authClient, user.isDemo ? null : user.id, user)
       companyId = resolved?.companyId ?? null
     }
     if (!companyId) return NextResponse.json({ error: "company_id required" }, { status: 400 })
@@ -24,17 +34,13 @@ export async function GET(req: NextRequest) {
     const [jobs, apps, interviews, offers, requisitions, onboarding] = await Promise.all([
       client
         .from("recruitment_job_postings")
-        .select(
-          "id, company_id, requisition_id, slug, short_code, title, description, public_summary, requirements, benefits, salary_min, salary_max, currency, location, department, employment_type, status, published_at, expires_at, views_count, applications_count, created_at, updated_at",
-        )
+        .select("*")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false }),
       client
         .from("recruitment_applications")
         .select(
-          `id, company_id, status, score, source, applied_at, notes, cover_letter, job_posting_id, candidate_id, resume_url, resume_filename, screening_score, screening_summary, screening_status, screened_at,
-           candidate:recruitment_candidates(*),
-           job:recruitment_job_postings(id, title, department, slug, short_code)`,
+          `*, candidate:recruitment_candidates(*), job:recruitment_job_postings(id, title, department, slug, short_code)`,
         )
         .eq("company_id", companyId)
         .order("applied_at", { ascending: false }),
@@ -65,6 +71,17 @@ export async function GET(req: NextRequest) {
         .eq("company_id", companyId)
         .order("created_at", { ascending: false }),
     ])
+
+    // Surface hard failures instead of empty silent lists
+    if (offers.error) {
+      console.warn("[recruitment] offers query:", offers.error.message)
+    }
+    if (apps.error) {
+      console.warn("[recruitment] apps query:", apps.error.message)
+    }
+    if (jobs.error) {
+      console.warn("[recruitment] jobs query:", jobs.error.message)
+    }
 
     const jobRows = jobs.data ?? []
     const appCounts = new Map<string, number>()
@@ -114,21 +131,40 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    const offerRows = (offers.data ?? []).map((o: any) => {
-      const application = Array.isArray(o.application) ? o.application[0] : o.application
-      const candidate = Array.isArray(application?.candidate) ? application?.candidate[0] : application?.candidate
-      const job = Array.isArray(application?.job) ? application?.job[0] : application?.job
-      const shortCode = o.short_code || null
-      return {
-        ...o,
-        candidate_name: o.candidate_name_snapshot || candidate?.candidate_name || null,
-        candidate_email: o.candidate_email_snapshot || candidate?.email || null,
-        job_title: o.job_title_snapshot || job?.title || null,
-        department: o.department || job?.department || null,
-        short_code: shortCode,
-        respond_url: shortCode ? `/o/${encodeURIComponent(shortCode)}` : null,
-      }
-    })
+    const offerRows = await Promise.all(
+      (offers.data ?? []).map(async (o: any) => {
+        const application = Array.isArray(o.application) ? o.application[0] : o.application
+        const candidate = Array.isArray(application?.candidate)
+          ? application?.candidate[0]
+          : application?.candidate
+        const job = Array.isArray(application?.job) ? application?.job[0] : application?.job
+
+        let shortCode = o.short_code || null
+        if (!shortCode) {
+          try {
+            const codes = await ensurePersistedOfferCodes(client, {
+              id: o.id,
+              company_id: o.company_id || companyId,
+              short_code: o.short_code,
+              response_token: o.response_token,
+            })
+            shortCode = codes.persisted ? codes.short_code : null
+          } catch {
+            /* ignore */
+          }
+        }
+
+        return {
+          ...o,
+          short_code: shortCode,
+          candidate_name: o.candidate_name_snapshot || candidate?.candidate_name || null,
+          candidate_email: o.candidate_email_snapshot || candidate?.email || null,
+          job_title: o.job_title_snapshot || job?.title || null,
+          department: o.department || job?.department || null,
+          respond_url: offerRespondUrl({ id: o.id, short_code: shortCode }),
+        }
+      }),
+    )
 
     const onboardingRows = (onboarding.data ?? []).map((checklist: any) => ({
       ...checklist,

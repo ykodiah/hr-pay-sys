@@ -1247,11 +1247,11 @@ export default function RecruitmentPage() {
     const url =
       offer.respond_url ||
       (offer.short_code ? buildOfferRespondUrl(offer.short_code) : "") ||
-      ""
+      (offer.id ? buildOfferRespondUrl(offer.id) : "")
     if (!url) {
       toast({
         title: "No link yet",
-        description: "Save or send the offer once to generate a candidate response link.",
+        description: "Could not build a candidate response link for this offer.",
         variant: "destructive",
       })
       return
@@ -2666,15 +2666,13 @@ export default function RecruitmentPage() {
               <CardDescription>
                 Draft remuneration & benefits, edit the letter, send a candidate portal link (accept / decline / withdraw),
                 download PDF, and sync application status automatically or manually.
+                Run SQL <code className="text-xs">088_recruitment_offers_portal.sql</code> if Copy link / Send fails.
               </CardDescription>
             </CardHeader>
             <CardContent>
               {offers.length ? (
                 <div className="grid gap-4">
                   {offers.map((offer) => {
-                    const link =
-                      offer.respond_url ||
-                      (offer.short_code ? buildOfferRespondUrl(offer.short_code) : "")
                     const benefits = asStringList(offer.benefits)
                     return (
                       <div key={offer.id} className="rounded-xl border bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm">
@@ -2740,7 +2738,7 @@ export default function RecruitmentPage() {
                                 <Download className="h-4 w-4" />
                                 PDF
                               </Button>
-                              <Button size="sm" variant="outline" onClick={() => void copyOfferLink(offer)} disabled={!link}>
+                              <Button size="sm" variant="outline" onClick={() => void copyOfferLink(offer)}>
                                 <Link2 className="h-4 w-4" />
                                 Copy link
                               </Button>

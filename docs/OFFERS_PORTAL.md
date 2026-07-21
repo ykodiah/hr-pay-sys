@@ -1,20 +1,35 @@
 # Recruitment offers portal
 
-## SQL
+## Critical: run SQL first
 
-Run **`scripts/088_recruitment_offers_portal.sql`** after `087`.
+Offer edit / send / candidate `/o/{code}` links require:
 
-Adds on `recruitment_offers`: short codes, remuneration fields, email/response tracking, and `recruitment_offer_events` audit table.
+```text
+scripts/088_recruitment_offers_portal.sql
+```
+
+Also mirrored at:
+
+```text
+supabase/migrations/20260721080000_recruitment_offers_portal.sql
+```
+
+Run in the Supabase SQL editor, then refresh the schema cache (`NOTIFY pgrst, 'reload schema';` is included).
+
+Without `088`, the app still works in degraded mode:
+- Edit salary / letter / status using core columns
+- Candidate links use the **offer UUID** (`/o/{offer-id}`)
+- Short codes, email_status, public_views, events may be unavailable
 
 ## Features
 
 - Edit offer letter, salary, benefits, allowances, probation/notice, signatory
-- Regenerate letter (Ghana Labour Act template) + optional **AI polish** (`GROQ_API_KEY`)
-- **PDF** via branded printable HTML (`/api/recruitment/offers/[id]/pdf` → Print → Save as PDF)
-- **Send email** with secure link `/o/{short_code}` for Accept / Decline / Withdraw
-- Candidate response **auto-updates** application status (`hired` / `rejected` / `withdrawn`)
-- Admin can also Accept / Decline / Withdraw or set status manually (same sync)
+- Regenerate letter + optional **AI polish** (`GROQ_API_KEY`)
+- **PDF** via `/api/recruitment/offers/[id]/pdf` → Print → Save as PDF
+- **Send email** with Accept / Decline / Withdraw link
+- Candidate response auto-updates application status; admin can also set status manually
 
-## Public path
+## Public paths
 
-`/o/[code]` and `/api/offers/public/[code]` are public (middleware).
+`/o/[code]` and `/api/offers/public/[code]` (middleware allow-list).
+`code` may be `short_code` **or** the offer UUID.

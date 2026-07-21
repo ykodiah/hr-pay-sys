@@ -9,7 +9,8 @@ import { requireApiUser } from "@/lib/auth/api-user"
 import { resolveCompanyId } from "@/lib/employees/resolve-company"
 import { renderOfferLetterHtml } from "@/lib/recruitment/offer-html"
 import { asBenefitsList, ensureOfferCodes } from "@/lib/recruitment/offer-sync"
-import { buildOfferRespondUrl, getPublicSiteOrigin } from "@/lib/recruitment/public-origin"
+import { offerRespondUrl, ensurePersistedOfferCodes } from "@/lib/recruitment/offer-db"
+import { getPublicSiteOrigin } from "@/lib/recruitment/public-origin"
 
 function db() {
   try {
@@ -66,17 +67,8 @@ export async function GET(
       .eq("id", companyId)
       .maybeSingle()
 
-    const codes = ensureOfferCodes(offer)
-    if (!offer.short_code) {
-      await client
-        .from("recruitment_offers")
-        .update({
-          short_code: codes.short_code,
-          response_token: codes.response_token,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", offer.id)
-    }
+    const codes = await ensurePersistedOfferCodes(client, offer)
+    const publicCode = codes.persisted ? codes.short_code : offer.id
 
     const candidateName =
       offer.candidate_name_snapshot || candidate?.candidate_name || "Candidate"
@@ -96,7 +88,10 @@ export async function GET(
       status: offer.status,
       letterText: offer.offer_letter_text || "No offer letter text available.",
       benefits: asBenefitsList(offer.benefits),
-      respondUrl: buildOfferRespondUrl(codes.short_code, getPublicSiteOrigin(req.nextUrl.origin)),
+      respondUrl: offerRespondUrl(
+        { id: offer.id, short_code: publicCode !== offer.id ? publicCode : offer.short_code },
+        getPublicSiteOrigin(req.nextUrl.origin),
+      ),
       autoPrint: sp.get("print") !== "0",
     })
 

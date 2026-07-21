@@ -18,6 +18,11 @@ import {
 } from "@/lib/recruitment/offer-sync"
 import { buildOfferRespondUrl, getPublicSiteOrigin } from "@/lib/recruitment/public-origin"
 import { formatCompanyAddress } from "@/lib/exports/company-branding"
+import {
+  ensurePersistedOfferCodes,
+  offerRespondUrl,
+  safeUpdateOffer,
+} from "@/lib/recruitment/offer-db"
 
 function db() {
   try {
@@ -33,13 +38,15 @@ function flattenOffer(o: any) {
     ? application?.candidate[0]
     : application?.candidate
   const job = Array.isArray(application?.job) ? application?.job[0] : application?.job
+  const shortCode = o.short_code || null
   return {
     ...o,
     candidate_name: o.candidate_name_snapshot || candidate?.candidate_name,
     candidate_email: o.candidate_email_snapshot || candidate?.email,
     job_title: o.job_title_snapshot || job?.title,
     department: o.department || job?.department,
-    respond_url: o.short_code ? buildOfferRespondUrl(o.short_code) : null,
+    short_code: shortCode,
+    respond_url: offerRespondUrl({ id: o.id, short_code: shortCode }),
   }
 }
 
@@ -115,11 +122,13 @@ export async function PATCH(req: NextRequest) {
       : application?.candidate
     const job = Array.isArray(application?.job) ? application?.job[0] : application?.job
 
-    const codes = ensureOfferCodes(current)
+    const codes = await ensurePersistedOfferCodes(client, current)
     const patch: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
-      short_code: codes.short_code,
-      response_token: codes.response_token,
+    }
+    if (codes.persisted) {
+      patch.short_code = String(codes.short_code).toUpperCase()
+      patch.response_token = codes.response_token
     }
 
     const fieldKeys = [
@@ -238,10 +247,12 @@ export async function PATCH(req: NextRequest) {
         .eq("id", companyId)
         .maybeSingle()
 
-      const respondUrl = buildOfferRespondUrl(
-        codes.short_code,
-        getPublicSiteOrigin(req.nextUrl.origin),
-      )
+      const respondUrl =
+        offerRespondUrl(
+          { id: current.id, short_code: codes.persisted ? codes.short_code : current.short_code },
+          getPublicSiteOrigin(req.nextUrl.origin),
+        ) ||
+        buildOfferRespondUrl(current.id, getPublicSiteOrigin(req.nextUrl.origin))
       const toEmail =
         current.candidate_email_snapshot ||
         candidate?.email ||
@@ -300,19 +311,24 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    const { data, error } = await client
-      .from("recruitment_offers")
-      .update(patch)
-      .eq("id", body.id)
-      .eq("company_id", companyId)
-      .select(
-        `*, application:recruitment_applications(
-          id, status, candidate:recruitment_candidates(candidate_name, email),
-          job:recruitment_job_postings(title, department)
-        )`,
+    const { data, error, usedLegacy } = await safeUpdateOffer(client, body.id, companyId, patch)
+    if (error) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          hint: usedLegacy
+            ? "Run scripts/088_recruitment_offers_portal.sql (or supabase/migrations/20260721080000_recruitment_offers_portal.sql) then retry."
+            : undefined,
+        },
+        { status: 500 },
       )
-      .single()
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    if (!data) return NextResponse.json({ error: "Offer update failed" }, { status: 500 })
+
+    // Merge in-memory public code for response even if column missing
+    if (!data.short_code) {
+      data.short_code = codes.persisted ? codes.short_code : null
+    }
 
     const action = body.action as string | undefined
     if (action === "send" || action === "accept" || action === "reject" || action === "withdraw") {
