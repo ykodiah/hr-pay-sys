@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { requireApiUser } from "@/lib/auth/api-user"
 import { normalizeEmployeeStatus } from "@/lib/employees/status"
 import { mapEmployeeRow } from "@/lib/employees/dto"
@@ -355,7 +355,6 @@ export async function DELETE(
     // Prefer service client so deactivate is not blocked by RLS on the user session
     let client: any
     try {
-      const { createServiceClient } = await import("@/lib/supabase/server")
       client = createServiceClient()
     } catch {
       client = await createClient()
