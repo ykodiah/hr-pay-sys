@@ -243,6 +243,25 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (body.action === "send") {
+      const hrSigned =
+        body.hr_signature_name ||
+        current.hr_signature_name ||
+        current.hr_signed_at
+      if (!hrSigned) {
+        return NextResponse.json(
+          {
+            error: "HR Head must sign the offer letter before it can be sent for acceptance.",
+            hint: "Open Edit → Signatures on this offer letter → Sign as HR Head, then send.",
+          },
+          { status: 400 },
+        )
+      }
+      // Ensure HR signature fields are stamped when sending
+      if (!current.hr_signature_name && !patch.hr_signature_name) {
+        patch.hr_signature_name = body.hr_signature_name || current.signatory_name
+        patch.hr_signed_at = current.hr_signed_at || new Date().toISOString()
+      }
+
       patch.status = "sent"
       patch.sent_at = new Date().toISOString()
       if (current.acceptance_deadline) {

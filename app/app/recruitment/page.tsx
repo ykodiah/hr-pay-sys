@@ -1204,10 +1204,24 @@ export default function RecruitmentPage() {
     })
   }
 
-  const saveOfferEdits = async (opts?: { regenerate?: boolean; polish?: boolean }) => {
+  const saveOfferEdits = async (opts?: {
+    regenerate?: boolean
+    polish?: boolean
+    signHr?: boolean
+  }) => {
     if (!editingOffer || !offerEditForm) return
+    if (opts?.signHr && !offerEditForm.hr_signature_name.trim()) {
+      toast({
+        title: "HR Head signature required",
+        description: "Type the HR Head full name to sign this offer letter.",
+        variant: "destructive",
+      })
+      return
+    }
     setOfferSaving(true)
     try {
+      const hrName =
+        offerEditForm.hr_signature_name.trim() || offerEditForm.signatory_name.trim() || null
       const body: Record<string, unknown> = {
         id: editingOffer.id,
         company_id: companyId || editingOffer.company_id,
@@ -1222,13 +1236,15 @@ export default function RecruitmentPage() {
         working_hours: offerEditForm.working_hours || null,
         probation_months: Number(offerEditForm.probation_months) || 3,
         notice_months: Number(offerEditForm.notice_months) || 1,
-        signatory_name: offerEditForm.signatory_name || null,
+        signatory_name: hrName || offerEditForm.signatory_name || null,
         signatory_title: offerEditForm.signatory_title || null,
-        hr_signature_name: offerEditForm.hr_signature_name || offerEditForm.signatory_name || null,
-        hr_signed_at: offerEditForm.hr_signature_name || offerEditForm.signatory_name
-          ? new Date().toISOString()
-          : null,
+        hr_signature_name: opts?.signHr || editingOffer.hr_signed_at ? hrName : hrName,
         department: offerEditForm.department || null,
+      }
+      if (opts?.signHr && hrName) {
+        body.hr_signature_name = hrName
+        body.hr_signed_at = new Date().toISOString()
+        body.signatory_name = hrName
       }
       if (opts?.regenerate) body.action = "regenerate_letter"
       if (opts?.polish) body.action = "polish_letter"
@@ -1242,7 +1258,7 @@ export default function RecruitmentPage() {
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json.error || json.hint || "Failed to save offer")
 
-      const keepEditorOpen = Boolean(opts?.regenerate || opts?.polish)
+      const keepEditorOpen = Boolean(opts?.regenerate || opts?.polish || opts?.signHr)
       if (keepEditorOpen && json.offer) {
         setEditingOffer(json.offer)
         setOfferEditForm((prev) =>
@@ -1253,26 +1269,26 @@ export default function RecruitmentPage() {
                 benefits: asStringList(json.offer.benefits).join("\n"),
                 salary: String(json.offer.salary ?? prev.salary),
                 currency: json.offer.currency || prev.currency,
+                hr_signature_name:
+                  json.offer.hr_signature_name || json.offer.signatory_name || prev.hr_signature_name,
+                signatory_name:
+                  json.offer.signatory_name || prev.signatory_name,
+                signatory_title: json.offer.signatory_title || prev.signatory_title,
               }
             : prev,
         )
+        toast({
+          title: opts?.signHr ? "HR Head signed" : opts?.polish ? "Letter polished" : "Letter regenerated",
+          description: opts?.signHr
+            ? "HR Head signature is on the offer letter. You can now send it for acceptance."
+            : "Offer letter updated.",
+        })
       } else {
-        // Plain save — close dialog so the user returns to the Offers list
         setEditingOffer(null)
         setOfferEditForm(null)
+        toast({ title: "Offer saved", description: "Changes saved successfully." })
       }
-
-      toast({
-        title: opts?.polish ? "Letter polished" : opts?.regenerate ? "Letter regenerated" : "Offer saved",
-        description: opts?.polish
-          ? json.offer?.ai_letter_notes || "AI updated the letter draft."
-          : opts?.regenerate
-            ? "Letter regenerated from remuneration and benefits."
-            : "Remuneration, benefits, and letter were updated.",
-      })
-
-      // Refresh list in the background so the Save button isn't stuck waiting
-      void loadRecruitment(companyId || editingOffer.company_id)
+      await loadRecruitment(companyId)
     } catch (err) {
       toast({
         title: "Save failed",
@@ -1288,6 +1304,18 @@ export default function RecruitmentPage() {
     offer: Offer,
     action: "send" | "accept" | "reject" | "withdraw",
   ) => {
+    if (action === "send") {
+      const hrSigned = Boolean(offer.hr_signature_name || offer.hr_signed_at)
+      if (!hrSigned) {
+        toast({
+          title: "HR Head must sign first",
+          description: "Open Edit on the offer letter, sign as HR Head under Signatures, then send.",
+          variant: "destructive",
+        })
+        openOfferEditor(offer)
+        return
+      }
+    }
     setSaving(true)
     try {
       const res = await fetch("/api/recruitment/offers", {
@@ -2938,6 +2966,20 @@ export default function RecruitmentPage() {
                               {offer.response_channel ? (
                                 <Badge variant="outline">via {offer.response_channel}</Badge>
                               ) : null}
+                              {offer.hr_signature_name || offer.hr_signed_at ? (
+                                <Badge className="bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
+                                  HR signed
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-amber-700 border-amber-300">
+                                  HR signature needed
+                                </Badge>
+                              )}
+                              {offer.candidate_signature_name ? (
+                                <Badge className="bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
+                                  Candidate signed
+                                </Badge>
+                              ) : null}
                             </div>
                             <p className="text-sm text-muted-foreground">
                               {getOfferJobTitle(offer)}
@@ -3004,9 +3046,16 @@ export default function RecruitmentPage() {
                                 className="bg-emerald-600 hover:bg-emerald-700"
                                 disabled={saving || terminal}
                                 onClick={() => void handleOfferAction(offer, "send")}
+                                title={
+                                  offer.hr_signature_name || offer.hr_signed_at || offer.signatory_name
+                                    ? "Send email + response link"
+                                    : "HR Head must sign the letter first"
+                                }
                               >
                                 <Send className="h-4 w-4" />
-                                Send email + link
+                                {offer.hr_signature_name || offer.hr_signed_at
+                                  ? "Send email + link"
+                                  : "Sign HR Head, then send"}
                               </Button>
                               <Button
                                 size="sm"
@@ -3865,21 +3914,6 @@ export default function RecruitmentPage() {
                     onChange={(e) => setOfferEditForm({ ...offerEditForm, signatory_title: e.target.value })}
                   />
                 </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label>HR Head signature (typed full name)</Label>
-                  <Input
-                    value={offerEditForm.hr_signature_name}
-                    onChange={(e) =>
-                      setOfferEditForm({ ...offerEditForm, hr_signature_name: e.target.value })
-                    }
-                    placeholder="Type HR Head full name to sign"
-                  />
-                  <p className="text-[11px] text-muted-foreground">
-                    Saving with this name records the HR Head signature. When the candidate also signs on the
-                    portal, the signed letter is filed to Document Vault and linked to the onboarding contract
-                    task.
-                  </p>
-                </div>
               </div>
               <div className="space-y-1.5">
                 <Label>Benefits (one per line)</Label>
@@ -3945,6 +3979,95 @@ export default function RecruitmentPage() {
                 {editingOffer.ai_letter_notes ? (
                   <p className="text-xs text-muted-foreground">{editingOffer.ai_letter_notes}</p>
                 ) : null}
+
+                {/* Signature section on the offer letter */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-4">
+                  <div>
+                    <p className="text-sm font-semibold">Signatures on this offer letter</p>
+                    <p className="text-xs text-muted-foreground">
+                      HR Head must sign before the letter is sent. The candidate signs on the response portal
+                      when accepting.
+                    </p>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-lg border bg-white p-3 space-y-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        HR Head (sign first)
+                      </p>
+                      {editingOffer.hr_signed_at || editingOffer.hr_signature_name ? (
+                        <div>
+                          <p className="font-serif text-xl italic text-slate-900">
+                            {offerEditForm.hr_signature_name ||
+                              editingOffer.hr_signature_name ||
+                              editingOffer.signatory_name}
+                          </p>
+                          <p className="text-xs text-emerald-700">
+                            Signed
+                            {editingOffer.hr_signed_at
+                              ? ` · ${new Date(editingOffer.hr_signed_at).toLocaleString()}`
+                              : ""}
+                            {offerEditForm.signatory_title
+                              ? ` · ${offerEditForm.signatory_title}`
+                              : ""}
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <Input
+                            value={offerEditForm.hr_signature_name}
+                            onChange={(e) =>
+                              setOfferEditForm({
+                                ...offerEditForm,
+                                hr_signature_name: e.target.value,
+                                signatory_name: e.target.value || offerEditForm.signatory_name,
+                              })
+                            }
+                            placeholder="Type HR Head full name"
+                          />
+                          <Input
+                            value={offerEditForm.signatory_title}
+                            onChange={(e) =>
+                              setOfferEditForm({ ...offerEditForm, signatory_title: e.target.value })
+                            }
+                            placeholder="Title (e.g. Head of HR)"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="bg-emerald-600 hover:bg-emerald-700"
+                            disabled={offerSaving || !offerEditForm.hr_signature_name.trim()}
+                            onClick={() => void saveOfferEdits({ signHr: true })}
+                          >
+                            {offerSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            Sign as HR Head
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                    <div className="rounded-lg border bg-white p-3 space-y-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        Candidate (signs on accept)
+                      </p>
+                      {editingOffer.candidate_signature_name ? (
+                        <div>
+                          <p className="font-serif text-xl italic text-slate-900">
+                            {editingOffer.candidate_signature_name}
+                          </p>
+                          <p className="text-xs text-emerald-700">
+                            Signed
+                            {editingOffer.candidate_signed_at
+                              ? ` · ${new Date(editingOffer.candidate_signed_at).toLocaleString()}`
+                              : ""}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          Awaiting candidate signature on the offer portal after send.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => { setEditingOffer(null); setOfferEditForm(null) }}>
@@ -3979,6 +4102,47 @@ export default function RecruitmentPage() {
               <pre className="max-h-[50vh] overflow-y-auto whitespace-pre-wrap rounded-xl border bg-white p-4 text-xs">
                 {offerPreview.offer_letter_text || "No letter drafted yet."}
               </pre>
+              <div className="grid gap-4 sm:grid-cols-2 rounded-xl border bg-slate-50 p-4">
+                <div className="space-y-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    HR Head signature
+                  </p>
+                  {offerPreview.hr_signature_name || offerPreview.signatory_name ? (
+                    <>
+                      <p className="font-serif text-xl italic">
+                        {offerPreview.hr_signature_name || offerPreview.signatory_name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {offerPreview.signatory_title || "HR Head"}
+                        {offerPreview.hr_signed_at
+                          ? ` · ${new Date(offerPreview.hr_signed_at).toLocaleString()}`
+                          : ""}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-amber-700">Not signed yet — sign before sending</p>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Candidate signature
+                  </p>
+                  {offerPreview.candidate_signature_name ? (
+                    <>
+                      <p className="font-serif text-xl italic">{offerPreview.candidate_signature_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {offerPreview.candidate_signed_at
+                          ? new Date(offerPreview.candidate_signed_at).toLocaleString()
+                          : "Signed"}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Candidate signs on the portal when accepting
+                    </p>
+                  )}
+                </div>
+              </div>
               <div className="flex flex-wrap gap-2 justify-end">
                 <Button variant="outline" onClick={() => handleDownloadOfferPdf(offerPreview)}>
                   <Download className="h-4 w-4" />
