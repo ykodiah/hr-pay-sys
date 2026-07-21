@@ -262,6 +262,8 @@ type OnboardingChecklist = {
   hired_at?: string | null
   buddy_name?: string | null
   manager_name?: string | null
+  employee_id?: string | null
+  converted_at?: string | null
 }
 
 type RecruitmentResponse = {
@@ -587,6 +589,27 @@ export default function RecruitmentPage() {
   const [offerEditForm, setOfferEditForm] = useState<OfferEditForm | null>(null)
   const [offerSaving, setOfferSaving] = useState(false)
   const [offerPreview, setOfferPreview] = useState<Offer | null>(null)
+  const [convertChecklist, setConvertChecklist] = useState<OnboardingChecklist | null>(null)
+  const [convertPreview, setConvertPreview] = useState<any>(null)
+  const [convertLoading, setConvertLoading] = useState(false)
+  const [convertSaving, setConvertSaving] = useState(false)
+  const [convertIncludePayroll, setConvertIncludePayroll] = useState(false)
+  const [focusedOnboardingId, setFocusedOnboardingId] = useState<string | null>(null)
+  const [focusOnboardingLookup, setFocusOnboardingLookup] = useState<{
+    checklistId?: string
+    offerId?: string
+    applicationId?: string
+  } | null>(null)
+  const [convertDraft, setConvertDraft] = useState<{
+    first_name: string
+    last_name: string
+    personal_email: string
+    corporate_email: string
+    phone: string
+    position: string
+    department: string
+    date_of_joining: string
+  } | null>(null)
   const [requisitionSearch, setRequisitionSearch] = useState("")
   const [requisitionStatus, setRequisitionStatus] = useState("all")
   const [jobSearch, setJobSearch] = useState("")
@@ -693,12 +716,15 @@ export default function RecruitmentPage() {
         setApplications(body.applications ?? [])
         setInterviews(body.interviews ?? [])
         setOffers(body.offers ?? [])
-        setOnboarding(body.onboarding ?? [])
+        const nextOnboarding = body.onboarding ?? []
+        setOnboarding(nextOnboarding)
         setLastSynced(new Date())
+        return nextOnboarding
       } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to load recruitment data."
         setLoadError(message)
         toast({ title: "Recruitment sync failed", description: message, variant: "destructive" })
+        return [] as OnboardingChecklist[]
       } finally {
         setLoading(false)
       }
@@ -712,9 +738,38 @@ export default function RecruitmentPage() {
     void loadRecruitment()
   }, [loadRecruitment])
 
+  // Resolve + scroll to the hire when navigating from Offers → Onboarding
+  useEffect(() => {
+    if (activeTab !== "onboarding" || !focusOnboardingLookup) return
+    const match =
+      (focusOnboardingLookup.checklistId &&
+        onboarding.find((c) => c.id === focusOnboardingLookup.checklistId)) ||
+      (focusOnboardingLookup.offerId &&
+        onboarding.find((c) => c.offer_id === focusOnboardingLookup.offerId)) ||
+      (focusOnboardingLookup.applicationId &&
+        onboarding.find((c) => c.application_id === focusOnboardingLookup.applicationId)) ||
+      null
+    if (!match) return
+    setFocusedOnboardingId(match.id)
+    const t = window.setTimeout(() => {
+      document.getElementById(`onboarding-${match.id}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+    }, 120)
+    return () => window.clearTimeout(t)
+  }, [activeTab, focusOnboardingLookup, onboarding])
+
   const applicationsById = useMemo(() => {
     return new Map(applications.map((application) => [application.id, application]))
   }, [applications])
+
+  const orderedOnboarding = useMemo(() => {
+    if (!focusedOnboardingId) return onboarding
+    const focused = onboarding.filter((c) => c.id === focusedOnboardingId)
+    const rest = onboarding.filter((c) => c.id !== focusedOnboardingId)
+    return [...focused, ...rest]
+  }, [onboarding, focusedOnboardingId])
 
   const applicationsByJob = useMemo(() => {
     const counts = new Map<string, number>()
@@ -1236,11 +1291,18 @@ export default function RecruitmentPage() {
           ? ` Email: ${json.email.status}${json.email.error ? ` (${json.email.error})` : ""}.`
           : ""
       if (action === "accept") {
+        const onboardId = json.onboarding?.id || json.onboarding?.checklist?.id || null
+        setFocusOnboardingLookup({
+          checklistId: onboardId || undefined,
+          offerId: offer.id,
+          applicationId: offer.application_id || undefined,
+        })
+        if (onboardId) setFocusedOnboardingId(onboardId)
         toast({
           title: "Offer accepted",
-          description: json.onboarding_created
-            ? `${getOfferCandidateName(offer)} moved to onboarding.`
-            : `${getOfferCandidateName(offer)} accepted — onboarding is ready.`,
+          description: onboardId
+            ? `${getOfferCandidateName(offer)} moved to onboarding — continue their checklist below.`
+            : `${getOfferCandidateName(offer)} accepted. If no checklist appears, run SQL 089 and try Go to onboarding.`,
         })
         setActiveTab("onboarding")
       } else {
@@ -1257,6 +1319,47 @@ export default function RecruitmentPage() {
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const goToOnboardingForOffer = async (offer: Offer) => {
+    setActiveTab("onboarding")
+    setFocusOnboardingLookup({
+      offerId: offer.id,
+      applicationId: offer.application_id || undefined,
+    })
+    // Resolve immediately from current state if possible
+    const existing =
+      onboarding.find((c) => c.offer_id === offer.id) ||
+      onboarding.find((c) => c.application_id && c.application_id === offer.application_id) ||
+      null
+    if (existing) {
+      setFocusedOnboardingId(existing.id)
+    }
+    const list = await loadRecruitment(companyId || offer.company_id)
+    const match =
+      list.find((c) => c.offer_id === offer.id) ||
+      list.find((c) => c.application_id && c.application_id === offer.application_id) ||
+      existing
+    if (match) {
+      setFocusedOnboardingId(match.id)
+      toast({
+        title: "Continue onboarding",
+        description: `Checklist for ${getOfferCandidateName(offer)} is ready — complete the next task, then Add to employees.`,
+      })
+      window.setTimeout(() => {
+        document.getElementById(`onboarding-${match.id}`)?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        })
+      }, 150)
+    } else {
+      toast({
+        title: "No onboarding checklist yet",
+        description:
+          "Accept the offer first to auto-start onboarding. If already accepted, run SQL 089 (onboarding pipeline) and refresh.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -1321,6 +1424,102 @@ export default function RecruitmentPage() {
       "Onboarding completed",
       `${checklist.candidate_name || "Candidate"} onboarding is complete.`,
     )
+    if (!checklist.employee_id) {
+      void openHireConvert(checklist)
+    }
+  }
+
+  const openHireConvert = async (checklist: OnboardingChecklist) => {
+    setConvertChecklist(checklist)
+    setConvertPreview(null)
+    setConvertDraft(null)
+    setConvertIncludePayroll(false)
+    setConvertLoading(true)
+    try {
+      const res = await fetch("/api/recruitment/onboarding/convert", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          checklist_id: checklist.id,
+          company_id: companyId,
+          preview: true,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Could not load employee preview")
+      setConvertPreview(json)
+      const d = json.draft || {}
+      setConvertDraft({
+        first_name: d.first_name || "",
+        last_name: d.last_name || "",
+        personal_email: d.personal_email || "",
+        corporate_email: d.corporate_email || "",
+        phone: d.phone || "",
+        position: d.position || "",
+        department: d.department || "",
+        date_of_joining: d.date_of_joining || "",
+      })
+    } catch (err) {
+      toast({
+        title: "Convert preview failed",
+        description: err instanceof Error ? err.message : "Could not prepare employee draft",
+        variant: "destructive",
+      })
+      setConvertChecklist(null)
+    } finally {
+      setConvertLoading(false)
+    }
+  }
+
+  const confirmHireConvert = async () => {
+    if (!convertChecklist || !convertDraft) return
+    setConvertSaving(true)
+    try {
+      const res = await fetch("/api/recruitment/onboarding/convert", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          checklist_id: convertChecklist.id,
+          company_id: companyId,
+          confirm: true,
+          include_payroll: convertIncludePayroll,
+          link_existing: true,
+          overrides: {
+            first_name: convertDraft.first_name,
+            last_name: convertDraft.last_name,
+            personal_email: convertDraft.personal_email || null,
+            corporate_email: convertDraft.corporate_email || null,
+            phone: convertDraft.phone || null,
+            position: convertDraft.position || null,
+            department: convertDraft.department || null,
+            date_of_joining: convertDraft.date_of_joining || null,
+          },
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Could not create employee")
+      toast({
+        title: json.action === "linked_existing" ? "Employee linked" : "Employee created",
+        description: json.message || "Hire is now on the employee list. Opening Employees…",
+      })
+      setConvertChecklist(null)
+      setConvertPreview(null)
+      setConvertDraft(null)
+      await loadRecruitment(companyId)
+      window.setTimeout(() => {
+        window.location.assign("/app/employees")
+      }, 600)
+    } catch (err) {
+      toast({
+        title: "Conversion failed",
+        description: err instanceof Error ? err.message : "Could not add employee",
+        variant: "destructive",
+      })
+    } finally {
+      setConvertSaving(false)
+    }
   }
 
   const getApplicationJobTitle = (application: Application) => {
@@ -2805,7 +3004,7 @@ export default function RecruitmentPage() {
                                 <Button
                                   size="sm"
                                   className="bg-emerald-600 hover:bg-emerald-700"
-                                  onClick={() => setActiveTab("onboarding")}
+                                  onClick={() => void goToOnboardingForOffer(offer)}
                                 >
                                   <UserPlus className="h-4 w-4" />
                                   Go to onboarding
@@ -2905,9 +3104,26 @@ export default function RecruitmentPage() {
               <CardTitle>New hire onboarding</CardTitle>
             </CardHeader>
             <CardContent>
-              {onboarding.length ? (
+              {orderedOnboarding.length ? (
                 <div className="grid gap-5">
-                  {onboarding.map((checklist) => {
+                  {focusedOnboardingId ? (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-950">
+                      Continue onboarding for the highlighted hire — complete remaining tasks, then{" "}
+                      <strong>Add to employees</strong> to place them on the employee list.
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="ml-2 h-7"
+                        onClick={() => {
+                          setFocusedOnboardingId(null)
+                          setFocusOnboardingLookup(null)
+                        }}
+                      >
+                        Clear focus
+                      </Button>
+                    </div>
+                  ) : null}
+                  {orderedOnboarding.map((checklist) => {
                     const stages = [
                       "welcome",
                       "documents",
@@ -2934,11 +3150,26 @@ export default function RecruitmentPage() {
                     const doneCount = tasks.filter(
                       (t) => t.status === "completed" || t.status === "skipped",
                     ).length
+                    const nextTask = tasks.find(
+                      (t) => t.status !== "completed" && t.status !== "skipped",
+                    )
+                    const isFocused = checklist.id === focusedOnboardingId
                     return (
                       <div
+                        id={`onboarding-${checklist.id}`}
                         key={checklist.id}
-                        className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm"
+                        className={`overflow-hidden rounded-2xl border bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm scroll-mt-24 ${
+                          isFocused
+                            ? "border-emerald-500 ring-2 ring-emerald-300"
+                            : "border-slate-200"
+                        }`}
                       >
+                        {isFocused ? (
+                          <div className="bg-emerald-700 px-5 py-2 text-sm text-white">
+                            Continue here
+                            {nextTask ? ` · Next: ${nextTask.title}` : " · All tasks done — add to employees"}
+                          </div>
+                        ) : null}
                         <div className="flex flex-col gap-4 border-b bg-white/80 p-5 lg:flex-row lg:items-start lg:justify-between">
                           <div className="space-y-2 min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
@@ -2950,6 +3181,11 @@ export default function RecruitmentPage() {
                               </Badge>
                               {checklist.auto_started ? (
                                 <Badge variant="secondary">Auto-started</Badge>
+                              ) : null}
+                              {checklist.employee_id ? (
+                                <Badge className="bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
+                                  On employee list
+                                </Badge>
                               ) : null}
                             </div>
                             <p className="text-sm text-muted-foreground">
@@ -2972,15 +3208,43 @@ export default function RecruitmentPage() {
                                 {checklist.progress ?? 0}%
                               </span>
                             </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={saving || checklist.status === "completed"}
-                              onClick={() => void handleCompleteOnboarding(checklist)}
-                            >
-                              <CheckCircle2 className="h-4 w-4" />
-                              {checklist.status === "completed" ? "Completed" : "Mark onboarding complete"}
-                            </Button>
+                            <div className="flex flex-wrap justify-end gap-2">
+                              {nextTask ? (
+                                <Button
+                                  size="sm"
+                                  className="bg-emerald-600 hover:bg-emerald-700"
+                                  disabled={saving}
+                                  onClick={() => void handleTaskComplete(nextTask)}
+                                >
+                                  <Check className="h-4 w-4" />
+                                  Complete next task
+                                </Button>
+                              ) : null}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={saving || checklist.status === "completed"}
+                                onClick={() => void handleCompleteOnboarding(checklist)}
+                              >
+                                <CheckCircle2 className="h-4 w-4" />
+                                {checklist.status === "completed" ? "Completed" : "Mark complete"}
+                              </Button>
+                              {checklist.employee_id ? (
+                                <Button size="sm" variant="secondary" asChild>
+                                  <a href="/app/employees">View employee list</a>
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  className="bg-emerald-600 hover:bg-emerald-700"
+                                  disabled={convertLoading}
+                                  onClick={() => void openHireConvert(checklist)}
+                                >
+                                  <UserPlus className="h-4 w-4" />
+                                  Add to employees
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
 
@@ -3669,6 +3933,154 @@ export default function RecruitmentPage() {
               </div>
             </div>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Hire → employee convert preview */}
+      <Dialog
+        open={Boolean(convertChecklist)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConvertChecklist(null)
+            setConvertPreview(null)
+            setConvertDraft(null)
+          }
+        }}
+      >
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add hire to employee list</DialogTitle>
+          </DialogHeader>
+          {convertLoading ? (
+            <div className="flex items-center gap-2 py-10 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Preparing employee draft…
+            </div>
+          ) : convertDraft ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Details are prefilled from the offer and candidate profile. Confirm to create (or link) the
+                employee securely — nothing is invented for bank/SSNIT unless you opt in to payroll.
+              </p>
+
+              {convertPreview?.conflicts?.already_converted || convertPreview?.conflicts?.existing_employee ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                  {convertPreview?.conflicts?.already_converted
+                    ? "This onboarding is already linked to an employee."
+                    : `An employee with this email already exists (${convertPreview.conflicts.existing_employee.employee_id}). Confirming will link that record instead of creating a duplicate.`}
+                </div>
+              ) : null}
+
+              {convertPreview?.missing_fields?.length ? (
+                <p className="text-xs text-amber-700">
+                  Review missing fields: {convertPreview.missing_fields.join(", ")}
+                </p>
+              ) : null}
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>First name</Label>
+                  <Input
+                    value={convertDraft.first_name}
+                    onChange={(e) => setConvertDraft({ ...convertDraft, first_name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Last name</Label>
+                  <Input
+                    value={convertDraft.last_name}
+                    onChange={(e) => setConvertDraft({ ...convertDraft, last_name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Personal email</Label>
+                  <Input
+                    type="email"
+                    value={convertDraft.personal_email}
+                    onChange={(e) => setConvertDraft({ ...convertDraft, personal_email: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Corporate email (optional)</Label>
+                  <Input
+                    type="email"
+                    value={convertDraft.corporate_email}
+                    onChange={(e) => setConvertDraft({ ...convertDraft, corporate_email: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Phone</Label>
+                  <Input
+                    value={convertDraft.phone}
+                    onChange={(e) => setConvertDraft({ ...convertDraft, phone: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Start / joining date</Label>
+                  <Input
+                    type="date"
+                    value={convertDraft.date_of_joining}
+                    onChange={(e) => setConvertDraft({ ...convertDraft, date_of_joining: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Position</Label>
+                  <Input
+                    value={convertDraft.position}
+                    onChange={(e) => setConvertDraft({ ...convertDraft, position: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Department</Label>
+                  <Input
+                    value={convertDraft.department}
+                    onChange={(e) => setConvertDraft({ ...convertDraft, department: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {convertPreview?.draft?.suggested_monthly_salary != null ? (
+                <label className="flex items-start gap-2 rounded-lg border bg-slate-50 p-3 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={convertIncludePayroll}
+                    onChange={(e) => setConvertIncludePayroll(e.target.checked)}
+                  />
+                  <span>
+                    Also set suggested monthly salary{" "}
+                    <strong>
+                      {convertPreview.draft.currency || "GHS"}{" "}
+                      {Number(convertPreview.draft.suggested_monthly_salary).toLocaleString()}
+                    </strong>{" "}
+                    (no bank/SSNIT placeholders — HR completes payroll setup later).
+                  </span>
+                </label>
+              ) : null}
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setConvertChecklist(null)
+                    setConvertPreview(null)
+                    setConvertDraft(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  disabled={convertSaving || !convertDraft.first_name || !convertDraft.last_name}
+                  onClick={() => void confirmHireConvert()}
+                >
+                  {convertSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {convertPreview?.conflicts?.existing_employee ? "Link existing employee" : "Create employee"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No draft available.</p>
+          )}
         </DialogContent>
       </Dialog>
     </div>
