@@ -26,3 +26,11 @@ export function buildJobApplyUrl(shortCode: string, fallbackOrigin?: string | nu
   if (!origin) return `/j/${encodeURIComponent(code)}`
   return `${origin}/j/${encodeURIComponent(code)}`
 }
+
+export function buildOfferRespondUrl(shortCode: string, fallbackOrigin?: string | null) {
+  const origin = getPublicSiteOrigin(fallbackOrigin)
+  const code = String(shortCode || "").trim()
+  if (!code) return ""
+  if (!origin) return `/o/${encodeURIComponent(code)}`
+  return `${origin}/o/${encodeURIComponent(code)}`
+}

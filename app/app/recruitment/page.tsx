@@ -15,23 +15,26 @@ import {
   Copy,
   Download,
   FileText,
+  Link2,
   Loader2,
   Mail,
   MapPin,
   PauseCircle,
+  Pencil,
   PlayCircle,
   Plus,
   RefreshCw,
   Search,
   Send,
   Share2,
+  Sparkles,
   Trash2,
   UserPlus,
   Users,
   XCircle,
   type LucideIcon,
 } from "lucide-react"
-import { buildJobApplyUrl } from "@/lib/recruitment/public-origin"
+import { buildJobApplyUrl, buildOfferRespondUrl } from "@/lib/recruitment/public-origin"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -171,6 +174,7 @@ type Interview = {
 
 type Offer = {
   id: string
+  company_id?: string | null
   application_id: string | null
   salary: number | null
   currency: string | null
@@ -187,6 +191,38 @@ type Offer = {
   candidate_email?: string | null
   job_title?: string | null
   department?: string | null
+  short_code?: string | null
+  respond_url?: string | null
+  working_hours?: string | null
+  probation_months?: number | null
+  notice_months?: number | null
+  signatory_name?: string | null
+  signatory_title?: string | null
+  remuneration?: any
+  email_status?: string | null
+  last_email_at?: string | null
+  public_views?: number | null
+  response_channel?: string | null
+  candidate_response_note?: string | null
+  ai_letter_notes?: string | null
+  offer_letter_version?: number | null
+}
+
+type OfferEditForm = {
+  salary: string
+  currency: string
+  start_date: string
+  acceptance_deadline: string
+  benefits: string
+  remuneration_extras: string
+  terms: string
+  offer_letter_text: string
+  working_hours: string
+  probation_months: string
+  notice_months: string
+  signatory_name: string
+  signatory_title: string
+  department: string
 }
 
 type OnboardingTask = {
@@ -536,6 +572,10 @@ export default function RecruitmentPage() {
   } | null>(null)
   const [overrideScore, setOverrideScore] = useState("")
   const [overrideReason, setOverrideReason] = useState("")
+  const [editingOffer, setEditingOffer] = useState<Offer | null>(null)
+  const [offerEditForm, setOfferEditForm] = useState<OfferEditForm | null>(null)
+  const [offerSaving, setOfferSaving] = useState(false)
+  const [offerPreview, setOfferPreview] = useState<Offer | null>(null)
   const [requisitionSearch, setRequisitionSearch] = useState("")
   const [requisitionStatus, setRequisitionStatus] = useState("all")
   const [jobSearch, setJobSearch] = useState("")
@@ -1063,13 +1103,172 @@ export default function RecruitmentPage() {
     )
   }
 
-  const handleOfferAction = async (offer: Offer, action: "send" | "accept" | "reject" | "withdraw") => {
+  const openOfferEditor = (offer: Offer) => {
+    const rem = offer.remuneration && typeof offer.remuneration === "object" ? offer.remuneration : {}
+    const extras = Array.isArray(rem.extras) ? rem.extras : []
+    setEditingOffer(offer)
+    setOfferEditForm({
+      salary: String(offer.salary ?? 0),
+      currency: offer.currency || "GHS",
+      start_date: offer.start_date || "",
+      acceptance_deadline: offer.acceptance_deadline || "",
+      benefits: asStringList(offer.benefits).join("\n"),
+      remuneration_extras: extras.map(String).join("\n"),
+      terms: offer.terms || "",
+      offer_letter_text: offer.offer_letter_text || "",
+      working_hours: offer.working_hours || "08:00 – 17:00",
+      probation_months: String(offer.probation_months ?? 3),
+      notice_months: String(offer.notice_months ?? 1),
+      signatory_name: offer.signatory_name || "",
+      signatory_title: offer.signatory_title || "",
+      department: offer.department || "",
+    })
+  }
+
+  const saveOfferEdits = async (opts?: { regenerate?: boolean; polish?: boolean }) => {
+    if (!editingOffer || !offerEditForm) return
+    setOfferSaving(true)
+    try {
+      const body: Record<string, unknown> = {
+        id: editingOffer.id,
+        company_id: companyId || editingOffer.company_id,
+        salary: Number(offerEditForm.salary) || 0,
+        currency: offerEditForm.currency || "GHS",
+        start_date: offerEditForm.start_date || null,
+        acceptance_deadline: offerEditForm.acceptance_deadline || null,
+        benefits: splitList(offerEditForm.benefits.replace(/\n/g, ",")),
+        remuneration_extras: splitList(offerEditForm.remuneration_extras.replace(/\n/g, ",")),
+        terms: offerEditForm.terms || null,
+        offer_letter_text: offerEditForm.offer_letter_text,
+        working_hours: offerEditForm.working_hours || null,
+        probation_months: Number(offerEditForm.probation_months) || 3,
+        notice_months: Number(offerEditForm.notice_months) || 1,
+        signatory_name: offerEditForm.signatory_name || null,
+        signatory_title: offerEditForm.signatory_title || null,
+        department: offerEditForm.department || null,
+      }
+      if (opts?.regenerate) body.action = "regenerate_letter"
+      if (opts?.polish) body.action = "polish_letter"
+
+      const res = await fetch("/api/recruitment/offers", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Failed to save offer")
+      if (json.offer) {
+        setEditingOffer(json.offer)
+        setOfferEditForm((prev) =>
+          prev
+            ? {
+                ...prev,
+                offer_letter_text: json.offer.offer_letter_text || prev.offer_letter_text,
+                benefits: asStringList(json.offer.benefits).join("\n"),
+              }
+            : prev,
+        )
+      }
+      await loadRecruitment(companyId)
+      toast({
+        title: opts?.polish ? "Letter polished" : opts?.regenerate ? "Letter regenerated" : "Offer saved",
+        description: opts?.polish
+          ? json.offer?.ai_letter_notes || "AI updated the letter draft."
+          : "Remuneration, benefits, and letter were updated.",
+      })
+    } catch (err) {
+      toast({
+        title: "Save failed",
+        description: err instanceof Error ? err.message : "Could not save offer",
+        variant: "destructive",
+      })
+    } finally {
+      setOfferSaving(false)
+    }
+  }
+
+  const handleOfferAction = async (
+    offer: Offer,
+    action: "send" | "accept" | "reject" | "withdraw",
+  ) => {
+    setSaving(true)
+    try {
+      const res = await fetch("/api/recruitment/offers", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: offer.id,
+          company_id: companyId || offer.company_id,
+          action,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Offer update failed")
+      await loadRecruitment(companyId)
+      const emailNote =
+        action === "send" && json.email
+          ? ` Email: ${json.email.status}${json.email.error ? ` (${json.email.error})` : ""}.`
+          : ""
+      toast({
+        title: "Offer updated",
+        description: `Offer for ${getOfferCandidateName(offer)} marked ${action}.${emailNote}`,
+      })
+    } catch (err) {
+      toast({
+        title: "Offer action failed",
+        description: err instanceof Error ? err.message : "Could not update offer",
+        variant: "destructive",
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleManualOfferStatus = async (offer: Offer, status: string) => {
     await runMutation(
       "/api/recruitment/offers",
-      { method: "PATCH", body: JSON.stringify({ id: offer.id, action }) },
-      "Offer updated",
-      `Offer for ${getOfferCandidateName(offer)} was updated.`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          id: offer.id,
+          company_id: companyId || offer.company_id,
+          action: "set_status",
+          status,
+        }),
+      },
+      "Status updated",
+      `Offer status set to ${status}. Application portal synced.`,
     )
+  }
+
+  const copyOfferLink = async (offer: Offer) => {
+    const url =
+      offer.respond_url ||
+      (offer.short_code ? buildOfferRespondUrl(offer.short_code) : "") ||
+      ""
+    if (!url) {
+      toast({
+        title: "No link yet",
+        description: "Save or send the offer once to generate a candidate response link.",
+        variant: "destructive",
+      })
+      return
+    }
+    const absolute = url.startsWith("http") ? url : `${window.location.origin}${url}`
+    await navigator.clipboard.writeText(absolute)
+    toast({ title: "Link copied", description: absolute })
+  }
+
+  const handleDownloadOfferPdf = (offer: Offer) => {
+    const cid = companyId || offer.company_id || ""
+    const qs = cid ? `?company_id=${encodeURIComponent(cid)}` : ""
+    window.open(`/api/recruitment/offers/${offer.id}/pdf${qs}`, "_blank", "noopener,noreferrer")
+    toast({
+      title: "Opening PDF view",
+      description: "Use your browser Print dialog → Save as PDF.",
+    })
   }
 
   const handleTaskComplete = async (task: OnboardingTask) => {
@@ -1104,30 +1303,6 @@ export default function RecruitmentPage() {
 
   const getOnboardingJobTitle = (checklist: OnboardingChecklist) => {
     return applicationsById.get(checklist.application_id || "")?.job_title || "New hire"
-  }
-
-  const handleDownloadOffer = (offer: Offer) => {
-    const candidateName = getOfferCandidateName(offer)
-    const content = [
-      "Offer Letter",
-      "============",
-      "",
-      `Candidate: ${candidateName}`,
-      `Role: ${getOfferJobTitle(offer)}`,
-      `Salary: ${offer.currency || "GHS"} ${(offer.salary ?? 0).toLocaleString()}`,
-      `Start Date: ${formatDate(offer.start_date)}`,
-      `Acceptance Deadline: ${formatDate(offer.acceptance_deadline)}`,
-      "",
-      "Letter Text",
-      "-----------",
-      offer.offer_letter_text || "No offer letter text is available for this offer.",
-      "",
-      "Terms",
-      "-----",
-      offer.terms || "No terms provided.",
-    ].join("\n")
-    downloadBlob(`${candidateName.replace(/\s+/g, "_")}_offer.txt`, content, "text/plain;charset=utf-8")
-    toast({ title: "Offer downloaded", description: "The offer letter text file was generated." })
   }
 
   const handleExportAnalytics = () => {
@@ -2487,70 +2662,138 @@ export default function RecruitmentPage() {
         <TabsContent value="offers" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Offers</CardTitle>
-              <CardDescription>Send, accept, reject, withdraw, and download offer letters.</CardDescription>
+              <CardTitle>Offer letters</CardTitle>
+              <CardDescription>
+                Draft remuneration & benefits, edit the letter, send a candidate portal link (accept / decline / withdraw),
+                download PDF, and sync application status automatically or manually.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {offers.length ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Candidate</TableHead>
-                      <TableHead>Salary</TableHead>
-                      <TableHead>Dates</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {offers.map((offer) => (
-                      <TableRow key={offer.id}>
-                        <TableCell>
-                          <p className="font-medium">{getOfferCandidateName(offer)}</p>
-                          <p className="text-xs text-muted-foreground">{getOfferJobTitle(offer)}</p>
-                        </TableCell>
-                        <TableCell>
-                          {offer.currency || "GHS"} {(offer.salary ?? 0).toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <p>Start {formatDate(offer.start_date)}</p>
-                          <p className="text-xs text-muted-foreground">Deadline {formatDate(offer.acceptance_deadline)}</p>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={statusClass(offer.status)}>
-                            {offer.status || "unknown"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap justify-end gap-2">
-                            <Button size="sm" variant="outline" disabled={saving} onClick={() => void handleOfferAction(offer, "send")}>
-                              <Send className="h-4 w-4" />
-                              Send
-                            </Button>
-                            <Button size="sm" variant="outline" disabled={saving} onClick={() => void handleOfferAction(offer, "accept")}>
-                              Accept
-                            </Button>
-                            <Button size="sm" variant="outline" disabled={saving} onClick={() => void handleOfferAction(offer, "reject")}>
-                              Reject
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleDownloadOffer(offer)}>
-                              <Download className="h-4 w-4" />
-                              TXT
-                            </Button>
-                            <Button size="sm" variant="destructive" disabled={saving} onClick={() => void handleOfferAction(offer, "withdraw")}>
-                              Withdraw
-                            </Button>
+                <div className="grid gap-4">
+                  {offers.map((offer) => {
+                    const link =
+                      offer.respond_url ||
+                      (offer.short_code ? buildOfferRespondUrl(offer.short_code) : "")
+                    const benefits = asStringList(offer.benefits)
+                    return (
+                      <div key={offer.id} className="rounded-xl border bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="space-y-2 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-lg font-semibold">{getOfferCandidateName(offer)}</h3>
+                              <Badge variant="outline" className={statusClass(offer.status)}>
+                                {offer.status || "draft"}
+                              </Badge>
+                              {offer.email_status ? (
+                                <Badge variant="secondary">Email {offer.email_status}</Badge>
+                              ) : null}
+                              {offer.response_channel ? (
+                                <Badge variant="outline">via {offer.response_channel}</Badge>
+                              ) : null}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {getOfferJobTitle(offer)}
+                              {offer.department ? ` · ${offer.department}` : ""}
+                              {offer.candidate_email ? ` · ${offer.candidate_email}` : ""}
+                            </p>
+                            <div className="grid gap-2 sm:grid-cols-3 text-sm">
+                              <div className="rounded-lg border bg-white px-3 py-2">
+                                <p className="text-xs text-muted-foreground">Remuneration</p>
+                                <p className="font-semibold text-emerald-800">
+                                  {offer.currency || "GHS"} {(offer.salary ?? 0).toLocaleString()}
+                                </p>
+                              </div>
+                              <div className="rounded-lg border bg-white px-3 py-2">
+                                <p className="text-xs text-muted-foreground">Start / deadline</p>
+                                <p>Start {formatDate(offer.start_date)}</p>
+                                <p className="text-xs text-muted-foreground">By {formatDate(offer.acceptance_deadline)}</p>
+                              </div>
+                              <div className="rounded-lg border bg-white px-3 py-2">
+                                <p className="text-xs text-muted-foreground">Portal</p>
+                                <p className="truncate text-xs">{offer.short_code || "—"}</p>
+                                <p className="text-xs text-muted-foreground">{offer.public_views ?? 0} views</p>
+                              </div>
+                            </div>
+                            {benefits.length ? (
+                              <p className="text-xs text-muted-foreground line-clamp-2">
+                                Benefits: {benefits.join(" · ")}
+                              </p>
+                            ) : null}
+                            {offer.candidate_response_note ? (
+                              <p className="text-xs rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-amber-900">
+                                Candidate note: {offer.candidate_response_note}
+                              </p>
+                            ) : null}
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                          <div className="flex flex-col gap-2 shrink-0">
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <Button size="sm" variant="outline" onClick={() => openOfferEditor(offer)}>
+                                <Pencil className="h-4 w-4" />
+                                Edit
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => setOfferPreview(offer)}>
+                                <FileText className="h-4 w-4" />
+                                Preview
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => handleDownloadOfferPdf(offer)}>
+                                <Download className="h-4 w-4" />
+                                PDF
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => void copyOfferLink(offer)} disabled={!link}>
+                                <Link2 className="h-4 w-4" />
+                                Copy link
+                              </Button>
+                            </div>
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <Button
+                                size="sm"
+                                className="bg-emerald-600 hover:bg-emerald-700"
+                                disabled={saving || offer.status === "accepted"}
+                                onClick={() => void handleOfferAction(offer, "send")}
+                              >
+                                <Send className="h-4 w-4" />
+                                Send email + link
+                              </Button>
+                              <Button size="sm" variant="outline" disabled={saving} onClick={() => void handleOfferAction(offer, "accept")}>
+                                Accept
+                              </Button>
+                              <Button size="sm" variant="outline" disabled={saving} onClick={() => void handleOfferAction(offer, "reject")}>
+                                Decline
+                              </Button>
+                              <Button size="sm" variant="destructive" disabled={saving} onClick={() => void handleOfferAction(offer, "withdraw")}>
+                                Withdraw
+                              </Button>
+                            </div>
+                            <div className="flex flex-wrap justify-end gap-2 items-center">
+                              <span className="text-xs text-muted-foreground">Manual status</span>
+                              <Select
+                                value={offer.status || "draft"}
+                                onValueChange={(value) => void handleManualOfferStatus(offer, value)}
+                              >
+                                <SelectTrigger className="h-8 w-[140px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {["draft", "sent", "accepted", "rejected", "withdrawn", "expired"].map((s) => (
+                                    <SelectItem key={s} value={s}>
+                                      {s}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               ) : (
                 <EmptyState
                   icon={FileText}
-                  title="No offers"
-                  description="Generate offers from the Applications tab when candidates are ready."
+                  title="No offers yet"
+                  description="Generate an offer from Applications when a candidate is ready. You can then edit salary, benefits, and the letter before sending."
                 />
               )}
             </CardContent>
@@ -2802,8 +3045,8 @@ export default function RecruitmentPage() {
                     <Badge variant="outline">No CV</Badge>
                   )}
                 </div>
-                {(previewApplication as any).resume_extract_warning ? (
-                  <p className="text-xs text-amber-700">{(previewApplication as any).resume_extract_warning}</p>
+                {previewApplication.resume_extract_warning ? (
+                  <p className="text-xs text-amber-700">{previewApplication.resume_extract_warning}</p>
                 ) : null}
                 {previewApplication.resume_url ? (
                   <Button asChild variant="outline" size="sm">
@@ -3017,6 +3260,229 @@ export default function RecruitmentPage() {
                     Save final score
                   </Button>
                 </div>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Offer editor */}
+      <Dialog
+        open={Boolean(editingOffer && offerEditForm)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingOffer(null)
+            setOfferEditForm(null)
+          }
+        }}
+      >
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              Edit offer — {editingOffer ? getOfferCandidateName(editingOffer) : "Candidate"}
+            </DialogTitle>
+          </DialogHeader>
+          {editingOffer && offerEditForm ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                {getOfferJobTitle(editingOffer)}
+                {editingOffer.candidate_email ? ` · ${editingOffer.candidate_email}` : ""}
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Monthly salary</Label>
+                  <Input
+                    type="number"
+                    value={offerEditForm.salary}
+                    onChange={(e) => setOfferEditForm({ ...offerEditForm, salary: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Currency</Label>
+                  <Input
+                    value={offerEditForm.currency}
+                    onChange={(e) => setOfferEditForm({ ...offerEditForm, currency: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Start date</Label>
+                  <Input
+                    type="date"
+                    value={offerEditForm.start_date}
+                    onChange={(e) => setOfferEditForm({ ...offerEditForm, start_date: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Acceptance deadline</Label>
+                  <Input
+                    type="date"
+                    value={offerEditForm.acceptance_deadline}
+                    onChange={(e) =>
+                      setOfferEditForm({ ...offerEditForm, acceptance_deadline: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Working hours</Label>
+                  <Input
+                    value={offerEditForm.working_hours}
+                    onChange={(e) => setOfferEditForm({ ...offerEditForm, working_hours: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Department</Label>
+                  <Input
+                    value={offerEditForm.department}
+                    onChange={(e) => setOfferEditForm({ ...offerEditForm, department: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Probation (months)</Label>
+                  <Input
+                    type="number"
+                    value={offerEditForm.probation_months}
+                    onChange={(e) =>
+                      setOfferEditForm({ ...offerEditForm, probation_months: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Notice (months)</Label>
+                  <Input
+                    type="number"
+                    value={offerEditForm.notice_months}
+                    onChange={(e) => setOfferEditForm({ ...offerEditForm, notice_months: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Signatory name</Label>
+                  <Input
+                    value={offerEditForm.signatory_name}
+                    onChange={(e) => setOfferEditForm({ ...offerEditForm, signatory_name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Signatory title</Label>
+                  <Input
+                    value={offerEditForm.signatory_title}
+                    onChange={(e) => setOfferEditForm({ ...offerEditForm, signatory_title: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Benefits (one per line)</Label>
+                <Textarea
+                  rows={3}
+                  value={offerEditForm.benefits}
+                  onChange={(e) => setOfferEditForm({ ...offerEditForm, benefits: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Extra remuneration (allowances, transport, etc.)</Label>
+                <Textarea
+                  rows={2}
+                  value={offerEditForm.remuneration_extras}
+                  onChange={(e) =>
+                    setOfferEditForm({ ...offerEditForm, remuneration_extras: e.target.value })
+                  }
+                  placeholder="Housing allowance GHS 500&#10;Transport allowance…"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Additional terms</Label>
+                <Textarea
+                  rows={2}
+                  value={offerEditForm.terms}
+                  onChange={(e) => setOfferEditForm({ ...offerEditForm, terms: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Label>Offer letter</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={offerSaving}
+                      onClick={() => void saveOfferEdits({ regenerate: true })}
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Regenerate
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={offerSaving}
+                      onClick={() => void saveOfferEdits({ polish: true })}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      AI polish
+                    </Button>
+                  </div>
+                </div>
+                <Textarea
+                  rows={14}
+                  value={offerEditForm.offer_letter_text}
+                  onChange={(e) =>
+                    setOfferEditForm({ ...offerEditForm, offer_letter_text: e.target.value })
+                  }
+                  className="font-mono text-xs"
+                />
+                {editingOffer.ai_letter_notes ? (
+                  <p className="text-xs text-muted-foreground">{editingOffer.ai_letter_notes}</p>
+                ) : null}
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => { setEditingOffer(null); setOfferEditForm(null) }}>
+                  Cancel
+                </Button>
+                <Button disabled={offerSaving} onClick={() => void saveOfferEdits()}>
+                  {offerSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Save changes
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Offer preview */}
+      <Dialog open={Boolean(offerPreview)} onOpenChange={(open) => !open && setOfferPreview(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Offer preview</DialogTitle>
+          </DialogHeader>
+          {offerPreview ? (
+            <div className="space-y-4">
+              <div className="rounded-xl border bg-slate-50 p-4">
+                <p className="font-semibold">{getOfferCandidateName(offerPreview)}</p>
+                <p className="text-sm text-muted-foreground">{getOfferJobTitle(offerPreview)}</p>
+                <p className="mt-2 text-sm">
+                  {offerPreview.currency || "GHS"} {(offerPreview.salary ?? 0).toLocaleString()} · Start{" "}
+                  {formatDate(offerPreview.start_date)}
+                </p>
+              </div>
+              <pre className="max-h-[50vh] overflow-y-auto whitespace-pre-wrap rounded-xl border bg-white p-4 text-xs">
+                {offerPreview.offer_letter_text || "No letter drafted yet."}
+              </pre>
+              <div className="flex flex-wrap gap-2 justify-end">
+                <Button variant="outline" onClick={() => handleDownloadOfferPdf(offerPreview)}>
+                  <Download className="h-4 w-4" />
+                  PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setOfferPreview(null)
+                    openOfferEditor(offerPreview)
+                  }}
+                >
+                  <Pencil className="h-4 w-4" />
+                  Edit
+                </Button>
+                <Button onClick={() => setOfferPreview(null)}>Close</Button>
               </div>
             </div>
           ) : null}

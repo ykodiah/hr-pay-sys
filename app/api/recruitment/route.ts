@@ -118,12 +118,15 @@ export async function GET(req: NextRequest) {
       const application = Array.isArray(o.application) ? o.application[0] : o.application
       const candidate = Array.isArray(application?.candidate) ? application?.candidate[0] : application?.candidate
       const job = Array.isArray(application?.job) ? application?.job[0] : application?.job
+      const shortCode = o.short_code || null
       return {
         ...o,
-        candidate_name: candidate?.candidate_name ?? null,
-        candidate_email: candidate?.email ?? null,
-        job_title: job?.title ?? null,
-        department: job?.department ?? null,
+        candidate_name: o.candidate_name_snapshot || candidate?.candidate_name || null,
+        candidate_email: o.candidate_email_snapshot || candidate?.email || null,
+        job_title: o.job_title_snapshot || job?.title || null,
+        department: o.department || job?.department || null,
+        short_code: shortCode,
+        respond_url: shortCode ? `/o/${encodeURIComponent(shortCode)}` : null,
       }
     })
 

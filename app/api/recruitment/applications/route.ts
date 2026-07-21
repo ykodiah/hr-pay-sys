@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 import { requireApiUser } from "@/lib/auth/api-user"
 import { resolveCompanyId } from "@/lib/employees/resolve-company"
 import { buildOfferLetterText, defaultOnboardingTasks } from "@/lib/recruitment/defaults"
+import { buildRichOfferLetter } from "@/lib/recruitment/build-offer-letter"
+import { ensureOfferCodes, asBenefitsList, logOfferEvent } from "@/lib/recruitment/offer-sync"
+import { formatCompanyAddress } from "@/lib/exports/company-branding"
 
 export async function GET(req: NextRequest) {
   try {
@@ -180,33 +183,122 @@ export async function PATCH(req: NextRequest) {
 
     if (action === "generate_offer") {
       const salary = Number(body.salary ?? job?.salary_min ?? job?.salary_max ?? 0)
-      const letter = buildOfferLetterText({
-        candidateName: candidate?.candidate_name ?? "Candidate",
-        jobTitle: job?.title ?? "Role",
+      const currency = job?.currency ?? body.currency ?? "GHS"
+      const benefits = asBenefitsList(body.benefits ?? job?.benefits ?? [])
+      const codes = ensureOfferCodes()
+
+      let companyName = body.company_name as string | undefined
+      let companyAddress: string | undefined
+      try {
+        const { data: company } = await client
+          .from("companies")
+          .select("*")
+          .eq("id", current.company_id)
+          .maybeSingle()
+        companyName = companyName || company?.name
+        companyAddress = formatCompanyAddress(company)
+      } catch {
+        /* optional */
+      }
+
+      const letter =
+        body.offer_letter_text ||
+        buildRichOfferLetter({
+          candidateName: candidate?.candidate_name ?? "Candidate",
+          jobTitle: job?.title ?? "Role",
+          department: job?.department,
+          salary,
+          currency,
+          startDate: body.start_date,
+          acceptanceDeadline: body.acceptance_deadline,
+          benefits,
+          terms: body.terms ?? "Standard employment terms under Ghana Labour Act, 2003 (Act 651).",
+          companyName,
+          companyAddress,
+          workingHours: body.working_hours ?? "08:00 – 17:00",
+          probationMonths: body.probation_months ?? 3,
+          noticeMonths: body.notice_months ?? 1,
+          signatoryName: body.signatory_name,
+          signatoryTitle: body.signatory_title,
+          remunerationExtras: asBenefitsList(body.remuneration_extras),
+        }) ||
+        buildOfferLetterText({
+          candidateName: candidate?.candidate_name ?? "Candidate",
+          jobTitle: job?.title ?? "Role",
+          salary,
+          currency,
+          startDate: body.start_date,
+          companyName,
+        })
+
+      const offerPayload: Record<string, unknown> = {
+        company_id: current.company_id,
+        application_id: body.id,
         salary,
-        currency: job?.currency ?? "GHS",
-        startDate: body.start_date,
-        companyName: body.company_name,
-      })
-      const { data: offer, error: oErr } = await client
+        currency,
+        start_date: body.start_date ?? null,
+        benefits,
+        terms: body.terms ?? "Standard employment terms under Ghana Labour Act, 2003 (Act 651).",
+        status: "draft",
+        offer_letter_text: letter,
+        acceptance_deadline: body.acceptance_deadline ?? null,
+        short_code: codes.short_code,
+        response_token: codes.response_token,
+        working_hours: body.working_hours ?? "08:00 – 17:00",
+        probation_months: body.probation_months ?? 3,
+        notice_months: body.notice_months ?? 1,
+        signatory_name: body.signatory_name ?? null,
+        signatory_title: body.signatory_title ?? null,
+        department: job?.department ?? null,
+        job_title_snapshot: job?.title ?? null,
+        candidate_name_snapshot: candidate?.candidate_name ?? null,
+        candidate_email_snapshot: candidate?.email ?? null,
+        remuneration: {
+          extras: asBenefitsList(body.remuneration_extras),
+          salary,
+          currency,
+        },
+        created_by: user.isDemo ? null : user.id,
+      }
+
+      let { data: offer, error: oErr } = await client
         .from("recruitment_offers")
-        .insert({
+        .insert(offerPayload)
+        .select()
+        .single()
+
+      // Fallback if migration 088 not applied yet
+      if (oErr && /column|schema cache/i.test(oErr.message)) {
+        const legacy = {
           company_id: current.company_id,
           application_id: body.id,
           salary,
-          currency: job?.currency ?? "GHS",
+          currency,
           start_date: body.start_date ?? null,
-          benefits: body.benefits ?? job?.benefits ?? [],
-          terms: body.terms ?? "Standard employment terms under Ghana Labour Act.",
+          benefits,
+          terms: body.terms ?? "Standard employment terms under Ghana Labour Act, 2003 (Act 651).",
           status: "draft",
           offer_letter_text: letter,
           acceptance_deadline: body.acceptance_deadline ?? null,
           created_by: user.isDemo ? null : user.id,
-        })
-        .select()
-        .single()
+        }
+        const retry = await client.from("recruitment_offers").insert(legacy).select().single()
+        offer = retry.data
+        oErr = retry.error
+      }
       if (oErr) return NextResponse.json({ error: oErr.message }, { status: 500 })
       extras.offer = offer
+
+      await logOfferEvent(client, {
+        companyId: current.company_id,
+        offerId: offer.id,
+        applicationId: body.id,
+        eventType: "created",
+        actorType: "admin",
+        actorId: user.isDemo ? null : user.id,
+        toStatus: "draft",
+        notes: "Offer draft generated",
+      })
     }
 
     if (action === "start_onboarding" || action === "hire") {
