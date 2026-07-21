@@ -8,6 +8,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { isUuid } from "@/lib/recruitment/job-lookup"
 import { storeEmployeeDocumentFile } from "@/lib/employees/document-upload"
+import { sendApplicantConfirmationEmail } from "@/lib/recruitment/applicant-confirmation-email"
+import { formatCompanyAddress } from "@/lib/exports/company-branding"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -39,7 +41,7 @@ async function parseBody(req: NextRequest) {
 async function findPublishedJob(client: any, jobKey: string) {
   let jobQuery = client
     .from("recruitment_job_postings")
-    .select("id, company_id, title, status, short_code, slug, department, location")
+    .select("id, company_id, title, status, short_code, slug, department, location, employment_type")
     .eq("status", "published")
 
   if (isUuid(jobKey)) jobQuery = jobQuery.eq("id", jobKey)
@@ -53,7 +55,7 @@ async function findPublishedJob(client: any, jobKey: string) {
   if ((!job || jobErr) && !isUuid(jobKey)) {
     const retry = await client
       .from("recruitment_job_postings")
-      .select("id, company_id, title, status, short_code, slug, department, location")
+      .select("id, company_id, title, status, short_code, slug, department, location, employment_type")
       .eq("status", "published")
       .ilike("short_code", jobKey)
       .maybeSingle()
@@ -188,11 +190,55 @@ export async function POST(req: NextRequest) {
         : "Application submitted via public apply link",
     })
 
+    // Best-effort confirmation email with a copy of the submitted application
+    let emailStatus: string | null = null
+    try {
+      const { data: company } = await client
+        .from("companies")
+        .select("*")
+        .eq("id", job.company_id)
+        .maybeSingle()
+
+      const mail = await sendApplicantConfirmationEmail(client, {
+        companyId: job.company_id,
+        companyName: company?.name,
+        companyAddress: formatCompanyAddress(company),
+        applicationId: application.id,
+        candidateId: candidate.id,
+        candidateName,
+        email,
+        phone: body.phone ?? null,
+        location: body.location ?? null,
+        jobTitle: job.title,
+        department: job.department ?? null,
+        employmentType: (job as any).employment_type ?? null,
+        skills: Array.isArray(body.skills)
+          ? body.skills
+          : String(body.skills || "")
+              .split(",")
+              .map((s: string) => s.trim())
+              .filter(Boolean),
+        experienceText: body.experience_text ?? null,
+        education: body.education ?? null,
+        previousCompany: body.previous_company ?? null,
+        coverLetter: body.cover_letter ?? null,
+        resumeFilename,
+        resumeUrl,
+        linkedinUrl: body.linkedin_url ?? null,
+        appliedAt: application.applied_at || application.created_at,
+      })
+      emailStatus = mail.status
+    } catch (err) {
+      console.warn("[careers/applications] confirmation email failed", err)
+      emailStatus = "failed"
+    }
+
     return NextResponse.json(
       {
         success: true,
         application_id: application.id,
         job_title: job.title,
+        email_status: emailStatus,
         message: "Application submitted successfully",
       },
       { status: 201 },

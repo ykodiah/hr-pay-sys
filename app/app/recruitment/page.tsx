@@ -120,15 +120,28 @@ type Application = {
   source: string | null
   applied_at: string | null
   notes?: string | null
+  cover_letter?: string | null
   candidate_name?: string | null
   candidate_email?: string | null
   candidate_phone?: string | null
   skills?: unknown
+  experience_text?: string | null
+  education?: string | null
+  previous_company?: string | null
+  linkedin_url?: string | null
   resume_filename?: string | null
   resume_url?: string | null
   resume_content?: string | null
   job_title?: string | null
   department?: string | null
+  location?: string | null
+  employment_type?: string | null
+  job_description?: string | null
+  job_requirements?: unknown
+  screening_score?: number | null
+  screening_summary?: string | null
+  screening_status?: string | null
+  screened_at?: string | null
 }
 
 type Interview = {
@@ -501,6 +514,14 @@ export default function RecruitmentPage() {
   const [showJobDialog, setShowJobDialog] = useState(false)
   const [showApplicationDialog, setShowApplicationDialog] = useState(false)
   const [showInterviewDialog, setShowInterviewDialog] = useState(false)
+  const [previewApplication, setPreviewApplication] = useState<Application | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [screeningApplication, setScreeningApplication] = useState<Application | null>(null)
+  const [screeningLoading, setScreeningLoading] = useState(false)
+  const [screeningSaving, setScreeningSaving] = useState(false)
+  const [screeningResult, setScreeningResult] = useState<any>(null)
+  const [overrideScore, setOverrideScore] = useState("")
+  const [overrideReason, setOverrideReason] = useState("")
   const [requisitionSearch, setRequisitionSearch] = useState("")
   const [requisitionStatus, setRequisitionStatus] = useState("all")
   const [jobSearch, setJobSearch] = useState("")
@@ -857,10 +878,116 @@ export default function RecruitmentPage() {
     }
   }
 
+  const openApplicationPreview = async (application: Application) => {
+    setPreviewLoading(true)
+    setPreviewApplication(application)
+    try {
+      const res = await fetch(`/api/recruitment/applications/${application.id}`, {
+        cache: "no-store",
+        credentials: "include",
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Failed to load application")
+      setPreviewApplication(json.application)
+    } catch (err) {
+      toast({
+        title: "Preview failed",
+        description: err instanceof Error ? err.message : "Could not load application",
+        variant: "destructive",
+      })
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  const openScreeningWorkspace = async (application: Application) => {
+    setScreeningApplication(application)
+    setScreeningResult(null)
+    setOverrideScore(String(application.score ?? ""))
+    setOverrideReason("")
+    setScreeningLoading(true)
+    toast({
+      title: "ATS screening started",
+      description: `Analyzing ${application.candidate_name || "candidate"} materials against the role requirements…`,
+    })
+    try {
+      const res = await fetch("/api/recruitment/applications/screen", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ application_id: application.id, company_id: companyId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Screening failed")
+      setScreeningResult(json.result || json.screening)
+      setOverrideScore(String(json.result?.ai_score ?? json.screening?.ai_score ?? ""))
+      await loadRecruitment(companyId)
+      toast({
+        title: "Screening complete",
+        description: `Proposed score: ${json.result?.ai_score ?? json.screening?.ai_score ?? "—"}/100`,
+      })
+    } catch (err) {
+      toast({
+        title: "Screening failed",
+        description: err instanceof Error ? err.message : "Could not screen application",
+        variant: "destructive",
+      })
+    } finally {
+      setScreeningLoading(false)
+    }
+  }
+
+  const saveScreeningOverride = async () => {
+    if (!screeningApplication) return
+    const score = Number(overrideScore)
+    if (!Number.isFinite(score) || score < 0 || score > 100) {
+      toast({ title: "Invalid score", description: "Enter a score between 0 and 100.", variant: "destructive" })
+      return
+    }
+    setScreeningSaving(true)
+    try {
+      const res = await fetch("/api/recruitment/applications/screen", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          application_id: screeningApplication.id,
+          company_id: companyId,
+          final_score: score,
+          override_reason: overrideReason || "Manual override by recruiter",
+          save_only: Boolean(screeningResult),
+          summary: screeningResult?.summary,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Could not save score")
+      // If save_only was false because first run already happened with final_score, re-run with score
+      if (!screeningResult) {
+        /* already handled */
+      }
+      await loadRecruitment(companyId)
+      toast({ title: "Score saved", description: `Final screening score set to ${score}/100.` })
+      setScreeningApplication(null)
+      setScreeningResult(null)
+    } catch (err) {
+      toast({
+        title: "Save failed",
+        description: err instanceof Error ? err.message : "Could not save screening score",
+        variant: "destructive",
+      })
+    } finally {
+      setScreeningSaving(false)
+    }
+  }
+
   const handleApplicationAction = async (
     application: Application,
     action: "screen" | "reject" | "generate_offer" | "start_onboarding",
   ) => {
+    if (action === "screen") {
+      await openScreeningWorkspace(application)
+      return
+    }
     await runMutation(
       "/api/recruitment/applications",
       { method: "PATCH", body: JSON.stringify({ id: application.id, action }) },
@@ -2033,7 +2160,13 @@ export default function RecruitmentPage() {
                       <TableRow key={application.id}>
                         <TableCell>
                           <div>
-                            <p className="font-medium">{application.candidate_name || "Candidate"}</p>
+                            <button
+                              type="button"
+                              className="font-medium text-left text-emerald-700 hover:underline"
+                              onClick={() => void openApplicationPreview(application)}
+                            >
+                              {application.candidate_name || "Candidate"}
+                            </button>
                             <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
                               {application.candidate_email ? (
                                 <span className="inline-flex items-center gap-1">
@@ -2536,6 +2669,238 @@ export default function RecruitmentPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Application preview */}
+      <Dialog open={Boolean(previewApplication)} onOpenChange={(open) => !open && setPreviewApplication(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Application preview</DialogTitle>
+          </DialogHeader>
+          {previewLoading ? (
+            <div className="flex items-center gap-2 py-10 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading application…
+            </div>
+          ) : previewApplication ? (
+            <div className="space-y-5">
+              <div className="rounded-xl border bg-slate-50 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-xl font-semibold">{previewApplication.candidate_name || "Candidate"}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {previewApplication.job_title || "Role"}
+                      {previewApplication.department ? ` · ${previewApplication.department}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className={statusClass(previewApplication.status)}>
+                      {previewApplication.status || "unknown"}
+                    </Badge>
+                    <Badge variant="secondary">{previewApplication.score ?? 0}% score</Badge>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 text-sm">
+                <p><span className="text-muted-foreground">Email:</span> {previewApplication.candidate_email || "—"}</p>
+                <p><span className="text-muted-foreground">Phone:</span> {previewApplication.candidate_phone || "—"}</p>
+                <p><span className="text-muted-foreground">Location:</span> {previewApplication.location || "—"}</p>
+                <p><span className="text-muted-foreground">Source:</span> {previewApplication.source || "—"}</p>
+                <p><span className="text-muted-foreground">Education:</span> {previewApplication.education || "—"}</p>
+                <p><span className="text-muted-foreground">Previous company:</span> {previewApplication.previous_company || "—"}</p>
+                <p className="sm:col-span-2">
+                  <span className="text-muted-foreground">Skills:</span>{" "}
+                  {asStringList(previewApplication.skills).join(", ") || "—"}
+                </p>
+                {previewApplication.linkedin_url ? (
+                  <p className="sm:col-span-2">
+                    <span className="text-muted-foreground">LinkedIn:</span>{" "}
+                    <a href={previewApplication.linkedin_url} target="_blank" rel="noreferrer" className="text-emerald-700 hover:underline">
+                      {previewApplication.linkedin_url}
+                    </a>
+                  </p>
+                ) : null}
+              </div>
+
+              {previewApplication.experience_text ? (
+                <div>
+                  <h4 className="font-medium mb-1">Experience</h4>
+                  <p className="text-sm whitespace-pre-wrap text-muted-foreground">{previewApplication.experience_text}</p>
+                </div>
+              ) : null}
+
+              {previewApplication.cover_letter ? (
+                <div>
+                  <h4 className="font-medium mb-1">Cover note</h4>
+                  <p className="text-sm whitespace-pre-wrap text-muted-foreground">{previewApplication.cover_letter}</p>
+                </div>
+              ) : null}
+
+              <div className="flex flex-wrap gap-2">
+                {previewApplication.resume_url ? (
+                  <Button asChild variant="outline" size="sm">
+                    <a href={previewApplication.resume_url} target="_blank" rel="noreferrer">
+                      <FileText className="h-4 w-4" />
+                      {previewApplication.resume_filename || "View CV"}
+                    </a>
+                  </Button>
+                ) : (
+                  <span className="text-sm text-muted-foreground">No CV uploaded</span>
+                )}
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setPreviewApplication(null)
+                    void openScreeningWorkspace(previewApplication)
+                  }}
+                >
+                  Run ATS screen
+                </Button>
+              </div>
+
+              {previewApplication.screening_summary ? (
+                <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-3 text-sm">
+                  <p className="font-medium text-emerald-900">Latest screening</p>
+                  <p className="mt-1 text-emerald-900/80">{previewApplication.screening_summary}</p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* ATS screening workspace */}
+      <Dialog
+        open={Boolean(screeningApplication)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setScreeningApplication(null)
+            setScreeningResult(null)
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>ATS screening</DialogTitle>
+          </DialogHeader>
+          {screeningApplication ? (
+            <div className="space-y-4">
+              <div>
+                <p className="font-semibold">{screeningApplication.candidate_name || "Candidate"}</p>
+                <p className="text-sm text-muted-foreground">
+                  {screeningApplication.job_title || getApplicationJobTitle(screeningApplication)}
+                </p>
+              </div>
+
+              {screeningLoading ? (
+                <div className="rounded-xl border bg-slate-50 p-6 space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Screening CV / cover letter against role requirements…
+                  </div>
+                  <Progress value={66} className="h-2" />
+                  <p className="text-xs text-muted-foreground">
+                    Status moves to <strong>screening</strong>. AI proposes a score; you can override before saving.
+                  </p>
+                </div>
+              ) : null}
+
+              {screeningResult ? (
+                <div className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-lg border p-3">
+                      <p className="text-xs text-muted-foreground">AI score</p>
+                      <p className="text-2xl font-bold text-emerald-700">{screeningResult.ai_score}/100</p>
+                    </div>
+                    <div className="rounded-lg border p-3 sm:col-span-2">
+                      <p className="text-xs text-muted-foreground">Recommendation</p>
+                      <p className="text-lg font-semibold capitalize">
+                        {String(screeningResult.recommendation || "").replace(/_/g, " ")}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">Model: {screeningResult.model_used}</p>
+                    </div>
+                  </div>
+
+                  <p className="text-sm whitespace-pre-wrap">{screeningResult.summary}</p>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <h4 className="text-sm font-medium mb-1">Strengths</h4>
+                      <ul className="list-disc pl-4 text-sm text-muted-foreground space-y-1">
+                        {(screeningResult.strengths || []).map((s: string) => (
+                          <li key={s}>{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium mb-1">Gaps</h4>
+                      <ul className="list-disc pl-4 text-sm text-muted-foreground space-y-1">
+                        {(screeningResult.gaps || []).map((s: string) => (
+                          <li key={s}>{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  {screeningResult.criteria_scores ? (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium">Criteria</h4>
+                      {Object.entries(screeningResult.criteria_scores).map(([key, value]) => (
+                        <div key={key} className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="capitalize">{key.replace(/_/g, " ")}</span>
+                            <span>{Number(value)}%</span>
+                          </div>
+                          <Progress value={Number(value)} className="h-1.5" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : !screeningLoading ? (
+                <p className="text-sm text-muted-foreground">No screening result yet.</p>
+              ) : null}
+
+              <div className="rounded-xl border p-4 space-y-3">
+                <h4 className="text-sm font-semibold">Manual score override</h4>
+                <p className="text-xs text-muted-foreground">
+                  Accept the AI score or set your own. Saving keeps status as screening and updates the queue score.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label>Final score (0–100)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={overrideScore}
+                      onChange={(e) => setOverrideScore(e.target.value)}
+                      disabled={screeningLoading}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Override reason</Label>
+                    <Input
+                      value={overrideReason}
+                      onChange={(e) => setOverrideReason(e.target.value)}
+                      placeholder="Optional"
+                      disabled={screeningLoading}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setScreeningApplication(null)}>
+                    Close
+                  </Button>
+                  <Button disabled={screeningLoading || screeningSaving} onClick={() => void saveScreeningOverride()}>
+                    {screeningSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    Save final score
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

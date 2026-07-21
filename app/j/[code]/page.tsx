@@ -304,7 +304,7 @@ function ApplyPageContent() {
                 <h2 className="text-xl font-semibold text-slate-900">Application received</h2>
                 <p className="text-sm text-slate-600">
                   Thank you. Your application for <strong>{job.title}</strong> has been sent to {companyName}.
-                  Our talent team will review it shortly.
+                  Our talent team will review it shortly. A confirmation copy has also been emailed to you when email delivery is configured.
                 </p>
               </div>
             ) : (
