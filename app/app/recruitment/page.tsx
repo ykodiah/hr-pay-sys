@@ -1156,9 +1156,11 @@ export default function RecruitmentPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || "Failed to save offer")
-      if (json.offer) {
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || json.hint || "Failed to save offer")
+
+      const keepEditorOpen = Boolean(opts?.regenerate || opts?.polish)
+      if (keepEditorOpen && json.offer) {
         setEditingOffer(json.offer)
         setOfferEditForm((prev) =>
           prev
@@ -1166,17 +1168,28 @@ export default function RecruitmentPage() {
                 ...prev,
                 offer_letter_text: json.offer.offer_letter_text || prev.offer_letter_text,
                 benefits: asStringList(json.offer.benefits).join("\n"),
+                salary: String(json.offer.salary ?? prev.salary),
+                currency: json.offer.currency || prev.currency,
               }
             : prev,
         )
+      } else {
+        // Plain save — close dialog so the user returns to the Offers list
+        setEditingOffer(null)
+        setOfferEditForm(null)
       }
-      await loadRecruitment(companyId)
+
       toast({
         title: opts?.polish ? "Letter polished" : opts?.regenerate ? "Letter regenerated" : "Offer saved",
         description: opts?.polish
           ? json.offer?.ai_letter_notes || "AI updated the letter draft."
-          : "Remuneration, benefits, and letter were updated.",
+          : opts?.regenerate
+            ? "Letter regenerated from remuneration and benefits."
+            : "Remuneration, benefits, and letter were updated.",
       })
+
+      // Refresh list in the background so the Save button isn't stuck waiting
+      void loadRecruitment(companyId || editingOffer.company_id)
     } catch (err) {
       toast({
         title: "Save failed",

@@ -8,7 +8,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { requireApiUser } from "@/lib/auth/api-user"
 import { resolveCompanyId } from "@/lib/employees/resolve-company"
 import { renderOfferLetterHtml } from "@/lib/recruitment/offer-html"
-import { asBenefitsList, ensureOfferCodes } from "@/lib/recruitment/offer-sync"
+import { asBenefitsList } from "@/lib/recruitment/offer-sync"
 import { offerRespondUrl, ensurePersistedOfferCodes } from "@/lib/recruitment/offer-db"
 import { getPublicSiteOrigin } from "@/lib/recruitment/public-origin"
 
