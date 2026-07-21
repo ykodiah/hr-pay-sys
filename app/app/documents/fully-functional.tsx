@@ -298,6 +298,7 @@ const signatureApps = [
 
 export default function FullyFunctionalDocumentVaultPage() {
   const [documents, setDocuments] = useState<AdvancedDocument[]>([])
+  const [vaultEmployees, setVaultEmployees] = useState<{ id: string; name: string; code?: string }[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedEmployee, setSelectedEmployee] = useState("all")
   const [selectedDocumentType, setSelectedDocumentType] = useState("all")
@@ -564,7 +565,9 @@ export default function FullyFunctionalDocumentVaultPage() {
       const fromDb: AdvancedDocument[] = (json.documents || []).map((d: any) => ({
         id: d.id,
         employeeId: d.employeeId,
+        employeeCode: d.employeeCode,
         employeeName: d.employeeName,
+        documentCode: d.documentCode,
         documentType: d.documentType || "other",
         fileName: d.fileName || "Document",
         fileSize: Number(d.fileSize || 0),
@@ -587,11 +590,32 @@ export default function FullyFunctionalDocumentVaultPage() {
         encryptionStatus: "unencrypted",
         versionNumber: 1,
         isLatestVersion: true,
-        metadata: {},
+        metadata: { documentCode: d.documentCode, employeeCode: d.employeeCode },
         tags: ["employee-module"],
         createdAt: new Date(d.uploadDate || Date.now()),
         updatedAt: new Date(d.uploadDate || Date.now()),
       }))
+
+      // Prefer API-deduped employee list when present
+      if (Array.isArray(json.employees) && json.employees.length) {
+        setVaultEmployees(json.employees)
+      } else {
+        const map = new Map<string, { id: string; name: string; code?: string }>()
+        for (const doc of fromDb) {
+          const key =
+            doc.employeeId ||
+            (doc.employeeName ? `name:${String(doc.employeeName).toLowerCase().trim()}` : "")
+          if (!key) continue
+          if (!map.has(key)) {
+            map.set(key, {
+              id: doc.employeeId || key,
+              name: doc.employeeName || "Employee",
+              code: (doc as any).employeeCode,
+            })
+          }
+        }
+        setVaultEmployees([...map.values()])
+      }
 
       // Merge any in-session local uploads that are not yet in DB
       const local = documentService.getAllDocuments()
@@ -1025,7 +1049,27 @@ export default function FullyFunctionalDocumentVaultPage() {
 
   const stats = getDocumentStats()
   const filteredDocuments = getFilteredDocuments()
-  const employees = [...new Set(documents.map((doc) => ({ id: doc.employeeId, name: doc.employeeName })))]
+  const employees = (() => {
+    const map = new Map<string, { id: string; name: string; code?: string }>()
+    for (const emp of vaultEmployees) {
+      if (!emp?.id) continue
+      map.set(emp.id, emp)
+    }
+    for (const doc of documents) {
+      const key =
+        doc.employeeId ||
+        (doc.employeeName ? `name:${String(doc.employeeName).toLowerCase().trim()}` : "")
+      if (!key) continue
+      if (!map.has(key)) {
+        map.set(key, {
+          id: doc.employeeId || key,
+          name: doc.employeeName || "Employee",
+          code: (doc as any).employeeCode || doc.metadata?.employeeCode,
+        })
+      }
+    }
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
+  })()
   const documentTypes = [...new Set(documents.map((doc) => doc.documentType))]
 
   return (
@@ -1079,15 +1123,15 @@ export default function FullyFunctionalDocumentVaultPage() {
       </div>
 
       {/* Enhanced Stats Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2">
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
-                <p className="text-sm text-gray-600">Total Documents</p>
+                <div className="text-xl font-bold text-gray-900">{stats.total}</div>
+                <p className="text-xs text-gray-600">Total Documents</p>
               </div>
-              <FolderOpen className="w-8 h-8 text-gray-400" />
+              <FolderOpen className="w-6 h-6 text-gray-400" />
             </div>
           </CardContent>
         </Card>
@@ -1169,8 +1213,8 @@ export default function FullyFunctionalDocumentVaultPage() {
 
       {/* Enhanced Filters and Search */}
       <Card>
-        <CardContent className="p-6">
-          <div className="space-y-4">
+        <CardContent className="p-3">
+          <div className="space-y-2">
             {/* Search Bar */}
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -1178,29 +1222,29 @@ export default function FullyFunctionalDocumentVaultPage() {
                 placeholder="Search documents, employees, tags, or content..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 h-9"
               />
             </div>
             
-            {/* Filter Row 1 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            {/* Filters + controls on one compact row */}
+            <div className="flex flex-wrap items-center gap-2">
               <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by employee" />
+                <SelectTrigger className="h-8 w-[140px]">
+                  <SelectValue placeholder="Employee" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Employees</SelectItem>
                   {employees.map((emp) => (
                     <SelectItem key={emp.id} value={emp.id}>
-                      {emp.name}
+                      {emp.name}{emp.code ? ` (${emp.code})` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               
               <Select value={selectedDocumentType} onValueChange={setSelectedDocumentType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Document type" />
+                <SelectTrigger className="h-8 w-[120px]">
+                  <SelectValue placeholder="Type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
@@ -1213,7 +1257,7 @@ export default function FullyFunctionalDocumentVaultPage() {
               </Select>
               
               <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger>
+                <SelectTrigger className="h-8 w-[110px]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1226,8 +1270,8 @@ export default function FullyFunctionalDocumentVaultPage() {
               </Select>
               
               <Select value={selectedAccessLevel} onValueChange={setSelectedAccessLevel}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Access Level" />
+                <SelectTrigger className="h-8 w-[120px]">
+                  <SelectValue placeholder="Access" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Access Levels</SelectItem>
@@ -1239,8 +1283,8 @@ export default function FullyFunctionalDocumentVaultPage() {
               </Select>
               
               <Select value={selectedSignatureStatus} onValueChange={setSelectedSignatureStatus}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Signature Status" />
+                <SelectTrigger className="h-8 w-[130px]">
+                  <SelectValue placeholder="Signature" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Signature Status</SelectItem>
@@ -1251,30 +1295,27 @@ export default function FullyFunctionalDocumentVaultPage() {
                   <SelectItem value="declined">Declined</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            
-            {/* Additional Controls */}
-            <div className="flex flex-wrap gap-4 items-center">
-              <div className="flex items-center space-x-2">
+
+              <div className="flex items-center gap-1.5">
                 <Switch
                   id="show-archived"
                   checked={showArchived}
                   onCheckedChange={setShowArchived}
                 />
-                <Label htmlFor="show-archived">Show Archived</Label>
+                <Label htmlFor="show-archived" className="text-xs whitespace-nowrap">Archived</Label>
               </div>
               
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-1.5">
                 <Switch
                   id="show-deleted"
                   checked={showDeleted}
                   onCheckedChange={setShowDeleted}
                 />
-                <Label htmlFor="show-deleted">Show Deleted</Label>
+                <Label htmlFor="show-deleted" className="text-xs whitespace-nowrap">Deleted</Label>
               </div>
               
               <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="h-8 w-[120px]">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1289,6 +1330,7 @@ export default function FullyFunctionalDocumentVaultPage() {
               <Button
                 variant="outline"
                 size="sm"
+                className="h-8 w-8 p-0"
                 onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
               >
                 {sortOrder === "asc" ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
@@ -1297,6 +1339,7 @@ export default function FullyFunctionalDocumentVaultPage() {
               <Button
                 variant="outline"
                 size="sm"
+                className="h-8 w-8 p-0"
                 onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
               >
                 {viewMode === "grid" ? <List className="w-4 h-4" /> : <Grid className="w-4 h-4" />}
@@ -1397,7 +1440,13 @@ export default function FullyFunctionalDocumentVaultPage() {
                                       : "SYS"}
                                   </AvatarFallback>
                                 </Avatar>
-                                {document.employeeName || "System"} {document.employeeId && `(${document.employeeId})`}
+                                {document.employeeName || "System"}
+                                {(document as any).employeeCode || document.metadata?.employeeCode
+                                  ? ` (${(document as any).employeeCode || document.metadata?.employeeCode})`
+                                  : ""}
+                                {(document as any).documentCode || document.metadata?.documentCode
+                                  ? ` · Doc ${(document as any).documentCode || document.metadata?.documentCode}`
+                                  : ""}
                               </div>
                               <div className="flex items-center text-sm text-gray-500">
                                 <FileText className="w-4 h-4 mr-1" />

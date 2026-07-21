@@ -3,6 +3,7 @@
  *
  * Loads the Document Vault from database (document_vault + employee_documents backfill).
  * Strictly tenant-scoped — never falls back to unfiltered rows.
+ * Enriches with employee business codes (EMP0001) and dedupes by vault id / URL / type.
  */
 
 import { NextRequest, NextResponse } from "next/server"
@@ -36,18 +37,16 @@ export async function GET(req: NextRequest) {
       console.warn("[documents] vault query failed:", vaultError.message)
     }
 
-    const docs = (vaultRows ?? []).map(mapVaultRow)
-    const vaultIds = new Set(docs.map((d) => d.id))
-    const vaultUrls = new Set(docs.map((d) => d.fileUrl).filter(Boolean))
-
-    // Only backfill employee_documents for employees in THIS company
     const { data: companyEmployees } = await service
       .from("employees")
-      .select("id, full_name, display_name, first_name, last_name, preferred_name, company_id")
+      .select(
+        "id, employee_id, full_name, display_name, first_name, last_name, preferred_name, company_id",
+      )
       .eq("company_id", companyId)
       .limit(5000)
 
     const nameById = new Map<string, string>()
+    const codeById = new Map<string, string>()
     const companyEmployeeIds = new Set<string>()
     for (const e of companyEmployees ?? []) {
       companyEmployeeIds.add(e.id)
@@ -59,7 +58,26 @@ export async function GET(req: NextRequest) {
           `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim() ||
           "Employee",
       )
+      if (e.employee_id) codeById.set(e.id, String(e.employee_id))
     }
+
+    const docs = (vaultRows ?? []).map((row: any) => {
+      const empId = row.employee_id
+      const mapped = mapVaultRow(row, empId ? codeById.get(empId) : null)
+      // Prefer canonical employee name so filter doesn't duplicate variants
+      if (empId && nameById.has(empId)) {
+        mapped.employeeName = nameById.get(empId)
+      }
+      return mapped
+    })
+
+    const vaultIds = new Set(docs.map((d) => d.id))
+    const vaultUrls = new Set(docs.map((d) => d.fileUrl).filter(Boolean))
+    const vaultTypeKeys = new Set(
+      docs
+        .filter((d) => d.employeeId && d.documentType)
+        .map((d) => `${d.employeeId}::${d.documentType}`),
+    )
 
     if (companyEmployeeIds.size) {
       let empDocsQuery = service
@@ -74,34 +92,56 @@ export async function GET(req: NextRequest) {
       for (const row of empDocs ?? []) {
         if (!companyEmployeeIds.has(row.employee_id)) continue
         const url = row.file_url || row.file_path || row.file_content
+        const typeKey =
+          row.employee_id && row.document_type
+            ? `${row.employee_id}::${row.document_type}`
+            : null
         const already =
           (row.vault_document_id && vaultIds.has(row.vault_document_id)) ||
-          (url && vaultUrls.has(url))
+          (url && vaultUrls.has(url)) ||
+          (typeKey && vaultTypeKeys.has(typeKey))
         if (already) continue
 
         const mapped = mapEmployeeDocumentRow(
           row,
           nameById.get(row.employee_id) || row.employee_name || "Employee",
+          codeById.get(row.employee_id),
         )
         docs.push(mapped)
         vaultIds.add(mapped.id)
         if (mapped.fileUrl) vaultUrls.add(mapped.fileUrl)
+        if (typeKey) vaultTypeKeys.add(typeKey)
       }
     }
 
     docs.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime())
 
+    // Unique employees for filters (one entry per person)
+    const employeeMap = new Map<string, { id: string; name: string; code?: string }>()
+    for (const d of docs) {
+      const key = d.employeeId || `name:${(d.employeeName || "").toLowerCase().trim()}`
+      if (!key || key === "name:") continue
+      if (!employeeMap.has(key)) {
+        employeeMap.set(key, {
+          id: d.employeeId || key,
+          name: d.employeeName || "Employee",
+          code: d.employeeCode,
+        })
+      }
+    }
+
     return NextResponse.json({
       success: true,
       documents: docs,
+      employees: [...employeeMap.values()].sort((a, b) => a.name.localeCompare(b.name)),
       company_id: companyId,
       meta: {
         count: docs.length,
         vault_count: (vaultRows ?? []).length,
-        fetched_at: new Date().toISOString(),
+        employee_count: employeeMap.size,
       },
     })
   } catch (err) {
-    return jsonError(err, "Failed to load documents")
+    return jsonError(err instanceof Error ? err.message : "Failed to load documents", 500)
   }
 }

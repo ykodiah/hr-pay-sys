@@ -9,6 +9,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { asBenefitsList, logOfferEvent, syncApplicationForOfferAction } from "@/lib/recruitment/offer-sync"
 import { loadOfferForPublic, OFFER_CORE_COLUMNS, isSchemaCacheError } from "@/lib/recruitment/offer-db"
 import { ensureOnboardingFromHire } from "@/lib/recruitment/ensure-onboarding"
+import { syncSignedOfferToOnboarding } from "@/lib/recruitment/sync-signed-offer"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -40,6 +41,12 @@ function publicOfferView(offer: any, company: any) {
     job_title: offer.job_title_snapshot,
     department: offer.department,
     candidate_name: offer.candidate_name_snapshot,
+    signatory_name: offer.signatory_name,
+    signatory_title: offer.signatory_title,
+    candidate_signature_name: offer.candidate_signature_name,
+    candidate_signed_at: offer.candidate_signed_at,
+    hr_signature_name: offer.hr_signature_name || offer.signatory_name,
+    hr_signed_at: offer.hr_signed_at,
     company: company
       ? {
           name: company.name,
@@ -207,6 +214,18 @@ export async function POST(
     if (action === "accept") {
       patch.status = "accepted"
       patch.responded_at = now
+      const sigName = String(body.candidate_signature_name || body.signature_name || "").trim()
+      if (!sigName) {
+        return NextResponse.json(
+          { error: "Please type your full name to sign the offer letter before accepting." },
+          { status: 400 },
+        )
+      }
+      patch.candidate_signature_name = sigName
+      patch.candidate_signed_at = now
+      if (body.candidate_signature_data) {
+        patch.candidate_signature_data = String(body.candidate_signature_data).slice(0, 200000)
+      }
     } else if (action === "reject") {
       patch.status = "rejected"
       patch.responded_at = now
@@ -227,6 +246,7 @@ export async function POST(
     })
 
     let onboarding: any = null
+    let signedSync: any = null
     if (action === "accept") {
       try {
         onboarding = await ensureOnboardingFromHire(client, {
@@ -244,6 +264,11 @@ export async function POST(
       } catch (err) {
         console.warn("[public-offer] onboarding auto-start failed", err)
       }
+      try {
+        signedSync = await syncSignedOfferToOnboarding(client, updated)
+      } catch (err) {
+        console.warn("[public-offer] signed letter sync skipped", err)
+      }
     }
 
     await logOfferEvent(client, {
@@ -256,7 +281,7 @@ export async function POST(
       fromStatus: offer.status,
       toStatus: updated.status,
       notes: note,
-      payload: { onboarding_id: onboarding?.checklist?.id },
+      payload: { onboarding_id: onboarding?.checklist?.id, signed_vault_id: signedSync?.vaultId },
     })
 
     const { data: company } = await client
@@ -269,9 +294,10 @@ export async function POST(
       success: true,
       offer: publicOfferView(updated, company),
       onboarding: onboarding?.checklist || null,
+      signed_letter: signedSync,
       message:
         action === "accept"
-          ? "Thank you — you have accepted this offer. Your onboarding checklist has been started; HR will contact you with next steps."
+          ? "Thank you — you have signed and accepted this offer. Your onboarding checklist has been started; HR will contact you with next steps."
           : action === "reject"
             ? "You have declined this offer. Thank you for your time."
             : "You have withdrawn your interest. Thank you for letting us know.",

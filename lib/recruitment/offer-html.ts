@@ -24,6 +24,11 @@ export function renderOfferLetterHtml(opts: {
   benefits?: string[]
   respondUrl?: string | null
   autoPrint?: boolean
+  candidateSignatureName?: string | null
+  candidateSignedAt?: string | null
+  hrSignatureName?: string | null
+  hrSignatoryTitle?: string | null
+  hrSignedAt?: string | null
 }) {
   const letterBlocks = escapeHtml(opts.letterText)
     .split(/\n{2,}/)
@@ -43,6 +48,30 @@ export function renderOfferLetterHtml(opts: {
        </p>`
     : ""
 
+  const signatures = `
+    <div style="margin-top:28px;display:grid;grid-template-columns:1fr 1fr;gap:24px">
+      <div style="border-top:1px solid #cbd5e1;padding-top:12px">
+        <p style="margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#64748b">Candidate</p>
+        <p style="margin:8px 0 0;font-family:Georgia,serif;font-size:20px;font-style:italic">
+          ${escapeHtml(opts.candidateSignatureName || "________________")}
+        </p>
+        <p style="margin:4px 0 0;font-size:12px;color:#64748b">
+          ${opts.candidateSignedAt ? escapeHtml(opts.candidateSignedAt) : "Date: ____________"}
+        </p>
+      </div>
+      <div style="border-top:1px solid #cbd5e1;padding-top:12px">
+        <p style="margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#64748b">HR Head</p>
+        <p style="margin:8px 0 0;font-family:Georgia,serif;font-size:20px;font-style:italic">
+          ${escapeHtml(opts.hrSignatureName || "________________")}
+        </p>
+        <p style="margin:4px 0 0;font-size:12px;color:#64748b">
+          ${escapeHtml(opts.hrSignatoryTitle || "HR Head")}
+          ${opts.hrSignedAt ? ` · ${escapeHtml(opts.hrSignedAt)}` : ""}
+        </p>
+      </div>
+    </div>
+  `
+
   const bodyHtml = `
     <div style="margin-bottom:16px;display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:#334155">
       <div><strong>Candidate:</strong> ${escapeHtml(opts.candidateName)}</div>
@@ -55,6 +84,7 @@ export function renderOfferLetterHtml(opts: {
     <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0" />
     <div class="offer-letter">${letterBlocks}</div>
     ${benefits}
+    ${signatures}
     ${respond}
   `
 

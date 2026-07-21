@@ -5,6 +5,8 @@ import { useParams } from "next/navigation"
 import { CheckCircle2, FileText, Loader2, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 
 type PublicOffer = {
@@ -24,6 +26,12 @@ type PublicOffer = {
   job_title?: string | null
   department?: string | null
   candidate_name?: string | null
+  signatory_name?: string | null
+  signatory_title?: string | null
+  candidate_signature_name?: string | null
+  candidate_signed_at?: string | null
+  hr_signature_name?: string | null
+  hr_signed_at?: string | null
   company?: { name?: string; address?: string; logo_url?: string | null } | null
   can_respond?: boolean
   responded_at?: string | null
@@ -36,6 +44,7 @@ export default function PublicOfferPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState("")
+  const [signatureName, setSignatureName] = useState("")
   const [submitting, setSubmitting] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
@@ -47,6 +56,9 @@ export default function PublicOfferPage() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Offer not found")
       setOffer(json.offer)
+      if (json.offer?.candidate_name) {
+        setSignatureName((prev: string) => prev || json.offer.candidate_name)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load offer")
       setOffer(null)
@@ -61,13 +73,22 @@ export default function PublicOfferPage() {
 
   const respond = async (action: "accept" | "reject" | "withdraw") => {
     if (!offer) return
+    if (action === "accept" && !signatureName.trim()) {
+      setError("Type your full name in the signature box to accept this offer.")
+      return
+    }
     setSubmitting(action)
     setMessage(null)
+    setError(null)
     try {
       const res = await fetch(`/api/offers/public/${encodeURIComponent(code)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, note }),
+        body: JSON.stringify({
+          action,
+          note,
+          candidate_signature_name: action === "accept" ? signatureName.trim() : undefined,
+        }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Could not submit response")
@@ -171,6 +192,57 @@ export default function PublicOfferPage() {
               </pre>
             </div>
 
+            <div className="grid gap-4 sm:grid-cols-2 rounded-xl border border-slate-200 bg-white p-4">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Candidate signature
+                </p>
+                {offer.candidate_signature_name ? (
+                  <div>
+                    <p className="font-serif text-xl italic text-slate-900">
+                      {offer.candidate_signature_name}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Signed
+                      {offer.candidate_signed_at
+                        ? ` · ${new Date(offer.candidate_signed_at).toLocaleString()}`
+                        : ""}
+                    </p>
+                  </div>
+                ) : locked ? (
+                  <p className="text-sm text-slate-500">Not signed</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="candidate-sig">Type your full legal name</Label>
+                    <Input
+                      id="candidate-sig"
+                      value={signatureName}
+                      onChange={(e) => setSignatureName(e.target.value)}
+                      placeholder="Your full name as signature"
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  HR Head signature
+                </p>
+                {offer.hr_signature_name ? (
+                  <div>
+                    <p className="font-serif text-xl italic text-slate-900">{offer.hr_signature_name}</p>
+                    <p className="text-xs text-slate-500">
+                      {offer.signatory_title || "HR Head"}
+                      {offer.hr_signed_at
+                        ? ` · ${new Date(offer.hr_signed_at).toLocaleString()}`
+                        : ""}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">Pending employer signature</p>
+                )}
+              </div>
+            </div>
+
             {message ? (
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 flex gap-2">
                 <CheckCircle2 className="h-5 w-5 shrink-0" />
@@ -192,11 +264,11 @@ export default function PublicOfferPage() {
                 <div className="flex flex-wrap gap-2">
                   <Button
                     className="bg-emerald-600 hover:bg-emerald-700"
-                    disabled={Boolean(submitting)}
+                    disabled={Boolean(submitting) || !signatureName.trim()}
                     onClick={() => void respond("accept")}
                   >
                     {submitting === "accept" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                    Accept offer
+                    Sign & accept offer
                   </Button>
                   <Button
                     variant="outline"
@@ -216,8 +288,8 @@ export default function PublicOfferPage() {
                   </Button>
                 </div>
                 <p className="text-xs text-slate-500">
-                  Accepting updates the employer portal automatically. You can also reach out to HR
-                  if you need more time.
+                  Signing with your typed name records acceptance and starts onboarding. Contact HR if
+                  you need more time.
                 </p>
               </div>
             ) : (

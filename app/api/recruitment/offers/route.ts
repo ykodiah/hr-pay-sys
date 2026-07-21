@@ -24,6 +24,7 @@ import {
   safeUpdateOffer,
 } from "@/lib/recruitment/offer-db"
 import { ensureOnboardingFromHire } from "@/lib/recruitment/ensure-onboarding"
+import { syncSignedOfferToOnboarding } from "@/lib/recruitment/sync-signed-offer"
 
 function db() {
   try {
@@ -145,6 +146,12 @@ export async function PATCH(req: NextRequest) {
       "notice_months",
       "signatory_name",
       "signatory_title",
+      "hr_signature_name",
+      "hr_signature_data",
+      "hr_signed_at",
+      "candidate_signature_name",
+      "candidate_signature_data",
+      "candidate_signed_at",
       "department",
       "job_title_snapshot",
       "candidate_name_snapshot",
@@ -408,12 +415,24 @@ export async function PATCH(req: NextRequest) {
       },
     })
 
+    let signedSync: any = null
+    try {
+      signedSync = await syncSignedOfferToOnboarding(client, {
+        ...data,
+        hr_signature_name: data.hr_signature_name || data.signatory_name,
+        candidate_signature_name: data.candidate_signature_name,
+      })
+    } catch (err) {
+      console.warn("[offers] signed letter sync skipped", err)
+    }
+
     return NextResponse.json({
       success: true,
       offer: flattenOffer(data),
       email: emailResult,
       onboarding: onboarding?.checklist || null,
       onboarding_created: Boolean(onboarding?.created),
+      signed_letter: signedSync,
     })
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 })

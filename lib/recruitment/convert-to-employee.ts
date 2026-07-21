@@ -276,6 +276,16 @@ export async function convertChecklistToEmployee(
       draft,
     })
 
+    await syncOnboardingArtifactsToEmployee(client, {
+      companyId: input.companyId,
+      checklistId: checklist.id,
+      employeeId: existingId,
+      employeeName:
+        `${conflicts.existing_employee.first_name || ""} ${conflicts.existing_employee.last_name || ""}`.trim() ||
+        draft.first_name + " " + draft.last_name,
+      actorId: input.actorId,
+    })
+
     const { data: emp } = await client.from("employees").select("*").eq("id", existingId).maybeSingle()
     return { action: "linked_existing" as const, employee: emp, checklist, draft }
   }
@@ -352,6 +362,15 @@ export async function convertChecklistToEmployee(
     draft,
   })
 
+  // Attach onboarding vault docs + typed payroll fields to the new employee card
+  await syncOnboardingArtifactsToEmployee(client, {
+    companyId: input.companyId,
+    checklistId: checklist.id,
+    employeeId: created.id,
+    employeeName: fullName,
+    actorId: input.actorId,
+  })
+
   try {
     await client.from("recruitment_onboarding_notes").insert({
       company_id: input.companyId,
@@ -366,6 +385,94 @@ export async function convertChecklistToEmployee(
   }
 
   return { action: "created" as const, employee: created, checklist, draft }
+}
+
+/** Link vault docs collected during onboarding onto the employee record. */
+export async function syncOnboardingArtifactsToEmployee(
+  client: any,
+  input: {
+    companyId: string
+    checklistId: string
+    employeeId: string
+    employeeName: string
+    actorId?: string | null
+  },
+) {
+  try {
+    // Point checklist-linked vault rows at the employee
+    await client
+      .from("document_vault")
+      .update({
+        employee_id: input.employeeId,
+        employee_name: input.employeeName,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("company_id", input.companyId)
+      .eq("checklist_id", input.checklistId)
+
+    const { data: tasks } = await client
+      .from("recruitment_onboarding_tasks")
+      .select("id, title, vault_document_id, document_type, attachment_url, attachment_name, response_data")
+      .eq("checklist_id", input.checklistId)
+
+    for (const task of tasks || []) {
+      if (task.vault_document_id) {
+        await client
+          .from("document_vault")
+          .update({
+            employee_id: input.employeeId,
+            employee_name: input.employeeName,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", task.vault_document_id)
+
+        try {
+          await client.from("employee_documents").upsert(
+            {
+              employee_id: input.employeeId,
+              document_type: task.document_type || "onboarding-document",
+              document_name: task.attachment_name || task.title,
+              file_name: task.attachment_name || task.title,
+              file_path: task.attachment_url,
+              file_url: task.attachment_url,
+              upload_date: new Date().toISOString(),
+              uploaded_by: input.actorId || null,
+              notes: `Synced from onboarding: ${task.title}`,
+              vault_document_id: task.vault_document_id,
+            },
+            { onConflict: "employee_id,document_type" },
+          )
+        } catch {
+          /* unique/schema optional */
+        }
+      }
+
+      const rd = task.response_data || {}
+      if (rd.bank_name || rd.account_number || rd.ssnit_number) {
+        const { data: existingFin } = await client
+          .from("employee_financial")
+          .select("id")
+          .eq("employee_id", input.employeeId)
+          .maybeSingle()
+        const finPayload = {
+          bank_name: rd.bank_name || null,
+          bank_account_number: rd.account_number || null,
+          account_name: rd.account_name || null,
+          ssnit_number: rd.ssnit_number || null,
+        }
+        if (existingFin?.id) {
+          await client.from("employee_financial").update(finPayload).eq("id", existingFin.id)
+        } else {
+          await client.from("employee_financial").insert({
+            employee_id: input.employeeId,
+            ...finPayload,
+          })
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[hire-convert] artifact sync skipped", err)
+  }
 }
 
 async function logConversion(

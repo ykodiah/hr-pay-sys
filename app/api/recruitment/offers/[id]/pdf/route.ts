@@ -93,6 +93,13 @@ export async function GET(
         getPublicSiteOrigin(req.nextUrl.origin),
       ),
       autoPrint: sp.get("print") !== "0",
+      candidateSignatureName: offer.candidate_signature_name,
+      candidateSignedAt: offer.candidate_signed_at
+        ? new Date(offer.candidate_signed_at).toLocaleString()
+        : null,
+      hrSignatureName: offer.hr_signature_name || offer.signatory_name,
+      hrSignatoryTitle: offer.signatory_title || "HR Head",
+      hrSignedAt: offer.hr_signed_at ? new Date(offer.hr_signed_at).toLocaleString() : null,
     })
 
     return new NextResponse(html, {

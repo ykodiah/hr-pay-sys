@@ -35,6 +35,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { buildJobApplyUrl, buildOfferRespondUrl } from "@/lib/recruitment/public-origin"
+import { OnboardingTaskArtifactPanel } from "@/components/recruitment/onboarding-task-artifact"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -198,6 +199,11 @@ type Offer = {
   notice_months?: number | null
   signatory_name?: string | null
   signatory_title?: string | null
+  candidate_signature_name?: string | null
+  candidate_signed_at?: string | null
+  hr_signature_name?: string | null
+  hr_signed_at?: string | null
+  signed_letter_vault_id?: string | null
   remuneration?: any
   email_status?: string | null
   last_email_at?: string | null
@@ -222,6 +228,7 @@ type OfferEditForm = {
   notice_months: string
   signatory_name: string
   signatory_title: string
+  hr_signature_name: string
   department: string
 }
 
@@ -241,6 +248,11 @@ type OnboardingTask = {
   created_at?: string | null
   stage?: string | null
   sort_order?: number | null
+  response_data?: Record<string, string> | null
+  attachment_url?: string | null
+  attachment_name?: string | null
+  vault_document_id?: string | null
+  document_type?: string | null
 }
 
 type OnboardingChecklist = {
@@ -1187,6 +1199,7 @@ export default function RecruitmentPage() {
       notice_months: String(offer.notice_months ?? 1),
       signatory_name: offer.signatory_name || "",
       signatory_title: offer.signatory_title || "",
+      hr_signature_name: offer.hr_signature_name || offer.signatory_name || "",
       department: offer.department || "",
     })
   }
@@ -1211,6 +1224,10 @@ export default function RecruitmentPage() {
         notice_months: Number(offerEditForm.notice_months) || 1,
         signatory_name: offerEditForm.signatory_name || null,
         signatory_title: offerEditForm.signatory_title || null,
+        hr_signature_name: offerEditForm.hr_signature_name || offerEditForm.signatory_name || null,
+        hr_signed_at: offerEditForm.hr_signature_name || offerEditForm.signatory_name
+          ? new Date().toISOString()
+          : null,
         department: offerEditForm.department || null,
       }
       if (opts?.regenerate) body.action = "regenerate_letter"
@@ -3280,43 +3297,76 @@ export default function RecruitmentPage() {
                             {tasks.length ? (
                               tasks.map((task) => {
                                 const done = task.status === "completed" || task.status === "skipped"
+                                const linkedOffer =
+                                  checklist.offer_id
+                                    ? offers.find((o) => o.id === checklist.offer_id)
+                                    : null
                                 return (
                                   <div
                                     key={task.id}
-                                    className={`flex flex-col gap-3 rounded-xl border bg-white p-3 sm:flex-row sm:items-center sm:justify-between ${
-                                      done ? "opacity-70" : ""
+                                    className={`flex flex-col gap-2 rounded-xl border bg-white p-3 ${
+                                      done ? "opacity-80" : ""
                                     }`}
                                   >
-                                    <div className="min-w-0 space-y-1">
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <p className={`font-medium ${done ? "line-through" : ""}`}>
-                                          {task.title}
-                                        </p>
-                                        {task.stage ? (
-                                          <Badge variant="outline" className="text-[10px] capitalize">
-                                            {String(task.stage).replace(/_/g, " ")}
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                      <div className="min-w-0 space-y-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <p className={`font-medium ${done ? "line-through" : ""}`}>
+                                            {task.title}
+                                          </p>
+                                          {task.stage ? (
+                                            <Badge variant="outline" className="text-[10px] capitalize">
+                                              {String(task.stage).replace(/_/g, " ")}
+                                            </Badge>
+                                          ) : null}
+                                          <Badge variant="outline" className={statusClass(task.status)}>
+                                            {task.status || "pending"}
                                           </Badge>
-                                        ) : null}
-                                        <Badge variant="outline" className={statusClass(task.status)}>
-                                          {task.status || "pending"}
-                                        </Badge>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                          {task.description || task.task_type || "Onboarding task"}
+                                          {" · "}
+                                          {task.assigned_department ||
+                                            task.assigned_to ||
+                                            task.department ||
+                                            "Unassigned"}
+                                          {" · Due "}
+                                          {formatDate(task.due_date)}
+                                        </p>
                                       </div>
-                                      <p className="text-xs text-muted-foreground">
-                                        {task.description || task.task_type || "Onboarding task"}
-                                        {" · "}
-                                        {task.assigned_department || task.assigned_to || task.department || "Unassigned"}
-                                        {" · Due "}
-                                        {formatDate(task.due_date)}
-                                      </p>
+                                      <Button
+                                        size="sm"
+                                        variant={done ? "secondary" : "outline"}
+                                        className="shrink-0"
+                                        disabled={saving || done}
+                                        onClick={() => void handleTaskComplete(task)}
+                                      >
+                                        {done ? "Done" : "Mark complete"}
+                                      </Button>
                                     </div>
-                                    <Button
-                                      size="sm"
-                                      variant={done ? "secondary" : "outline"}
-                                      disabled={saving || done}
-                                      onClick={() => void handleTaskComplete(task)}
-                                    >
-                                      {done ? "Done" : "Mark complete"}
-                                    </Button>
+                                    <OnboardingTaskArtifactPanel
+                                      task={task}
+                                      companyId={companyId}
+                                      disabled={saving}
+                                      offerSignatures={{
+                                        candidate: linkedOffer?.candidate_signature_name || null,
+                                        hr:
+                                          linkedOffer?.hr_signature_name ||
+                                          linkedOffer?.signatory_name ||
+                                          null,
+                                        vaultId: linkedOffer?.signed_letter_vault_id || null,
+                                      }}
+                                      onSaved={async () => {
+                                        await loadRecruitment(companyId)
+                                      }}
+                                      onError={(message) =>
+                                        toast({
+                                          title: "Could not save task details",
+                                          description: message,
+                                          variant: "destructive",
+                                        })
+                                      }
+                                    />
                                   </div>
                                 )
                               })
@@ -3814,6 +3864,21 @@ export default function RecruitmentPage() {
                     value={offerEditForm.signatory_title}
                     onChange={(e) => setOfferEditForm({ ...offerEditForm, signatory_title: e.target.value })}
                   />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>HR Head signature (typed full name)</Label>
+                  <Input
+                    value={offerEditForm.hr_signature_name}
+                    onChange={(e) =>
+                      setOfferEditForm({ ...offerEditForm, hr_signature_name: e.target.value })
+                    }
+                    placeholder="Type HR Head full name to sign"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Saving with this name records the HR Head signature. When the candidate also signs on the
+                    portal, the signed letter is filed to Document Vault and linked to the onboarding contract
+                    task.
+                  </p>
                 </div>
               </div>
               <div className="space-y-1.5">
