@@ -311,7 +311,3 @@ export default function PublicOfferPage() {
     </div>
   )
 }
-'''
-)
-print("wrote", path, "bytes", path.stat().st_size)
-PY
