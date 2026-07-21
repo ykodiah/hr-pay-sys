@@ -962,7 +962,11 @@ export default function EmployeesPage() {
     }
   }
 
+  const deleteEmployeeInFlight = useRef(false)
+
   const handleDeleteEmployee = async (employeeId: string | number) => {
+    if (deleteEmployeeInFlight.current) return
+    deleteEmployeeInFlight.current = true
     try {
       if (isDemoMode() && String(employeeId).length < 10) {
         setEmployees(employees.filter((emp) => emp.id !== employeeId))
@@ -974,15 +978,25 @@ export default function EmployeesPage() {
         return
       }
 
-      const res = await fetch(`/api/employees/${employeeId}`, { method: "DELETE" })
-      const json = await res.json()
+      const res = await fetch(`/api/employees/${employeeId}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json.error || "Failed to deactivate employee")
 
+      // Optimistic UI update, then refresh from DB
+      setEmployees((prev) =>
+        prev.map((emp) =>
+          emp.id === employeeId
+            ? { ...emp, status: "Inactive", inactive_reason: "Deactivated via employee module" }
+            : emp,
+        ),
+      )
       await loadEmployees(companyId)
       toast({
         title: "Employee Deactivated",
         description: "Employee status set to Inactive in the database.",
-        variant: "destructive",
       })
     } catch (error) {
       toast({
@@ -990,6 +1004,8 @@ export default function EmployeesPage() {
         description: error instanceof Error ? error.message : "Could not deactivate employee",
         variant: "destructive",
       })
+    } finally {
+      deleteEmployeeInFlight.current = false
     }
   }
 
@@ -1524,11 +1540,38 @@ export default function EmployeesPage() {
                                 <Edit className="w-4 h-4 mr-2" />
                                 Edit Employee
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  const email =
+                                    String(employee.corporate_email || employee.personal_email || "").trim()
+                                  if (!email) {
+                                    toast({
+                                      title: "No email on file",
+                                      description: `${listDisplayName(employee)} has no corporate or personal email.`,
+                                      variant: "destructive",
+                                    })
+                                    return
+                                  }
+                                  const subject = encodeURIComponent(
+                                    `Message for ${listDisplayName(employee)}`,
+                                  )
+                                  window.location.href = `mailto:${email}?subject=${subject}`
+                                }}
+                              >
                                 <Mail className="w-4 h-4 mr-2" />
                                 Send Email
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-600">
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={() => {
+                                  const name = listDisplayName(employee)
+                                  const ok = window.confirm(
+                                    `Deactivate ${name}? They will be set to Inactive and removed from active lists.`,
+                                  )
+                                  if (!ok) return
+                                  void handleDeleteEmployee(employee.id)
+                                }}
+                              >
                                 <Trash2 className="w-4 h-4 mr-2" />
                                 Delete Employee
                               </DropdownMenuItem>

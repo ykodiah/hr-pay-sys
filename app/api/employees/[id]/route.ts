@@ -350,8 +350,27 @@ export async function DELETE(
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { id } = await params
-    const client = await createClient()
+    if (!id) return NextResponse.json({ error: "Employee id is required" }, { status: 400 })
 
+    // Prefer service client so deactivate is not blocked by RLS on the user session
+    let client: any
+    try {
+      const { createServiceClient } = await import("@/lib/supabase/server")
+      client = createServiceClient()
+    } catch {
+      client = await createClient()
+    }
+
+    const { data: existing, error: findErr } = await client
+      .from("employees")
+      .select("id, company_id, status, full_name, display_name, first_name, last_name")
+      .eq("id", id)
+      .maybeSingle()
+
+    if (findErr) return NextResponse.json({ error: findErr.message }, { status: 500 })
+    if (!existing) return NextResponse.json({ error: "Employee not found" }, { status: 404 })
+
+    // Soft-delete: mark Inactive (keeps payroll/history intact)
     const { data, error } = await client
       .from("employees")
       .update({
