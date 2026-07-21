@@ -12,11 +12,11 @@ scripts/091_onboarding_artifacts_and_offer_signatures.sql
 
 Document / payroll / info tasks show inline forms:
 
-- Typed fields (TIN, bank, SSNIT, emergency contact, etc.)
-- File upload where needed
+- Typed fields (Ghana Card number required on employee-info; bank dropdown from tenant banks + defaults; no TIN field)
+- File upload only where needed (not for payroll banking/SSNIT or day-one check-in)
 - **Save draft** or **Save & complete**
 
-Uploads and form summaries are copied into **Document Vault** (`source: recruitment-onboarding`) with `checklist_id` / `onboarding_task_id`. When the hire is converted to an employee, vault rows and `employee_documents` are linked to that employee (and bank/SSNIT fields sync into `employee_financial` when present).
+Uploads and form summaries are copied into **Document Vault** (`source: recruitment-onboarding`) with short notes (task title only). When the hire is converted to an employee, vault rows and `employee_documents` are linked to that employee (and bank/SSNIT fields sync into `employee_financial` when present).
 
 The **Sign employment contract** task completes when **both** Candidate and HR Head have signed the offer letter.
 
