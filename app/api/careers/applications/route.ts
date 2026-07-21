@@ -10,6 +10,7 @@ import { isUuid } from "@/lib/recruitment/job-lookup"
 import { storeEmployeeDocumentFile } from "@/lib/employees/document-upload"
 import { sendApplicantConfirmationEmail } from "@/lib/recruitment/applicant-confirmation-email"
 import { formatCompanyAddress } from "@/lib/exports/company-branding"
+import { extractResumeTextFromFile } from "@/lib/recruitment/extract-resume-text"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -117,6 +118,11 @@ export async function POST(req: NextRequest) {
     let resumeContent: string | null = body.resume_content ?? null
     let resumeMime: string | null = body.resume_mime_type ?? null
     let resumeSize: number | null = body.resume_size != null ? Number(body.resume_size) : null
+    let resumeText: string | null = null
+    let resumeTextMethod: string | null = null
+    let resumeTextChars: number | null = null
+    let resumeTextExtractedAt: string | null = null
+    let resumeExtractWarning: string | null = null
 
     if (resume) {
       if (resume.size > 8 * 1024 * 1024) {
@@ -128,6 +134,26 @@ export async function POST(req: NextRequest) {
       resumeFilename = resume.name
       resumeMime = resume.type || "application/octet-stream"
       resumeSize = resume.size
+
+      // Extract plain text so ATS AI/ML can read the CV (not binary/data-URL)
+      try {
+        const extracted = await extractResumeTextFromFile(resume)
+        if (extracted.chars > 0) {
+          resumeText = extracted.text
+          resumeTextMethod = extracted.method
+          resumeTextChars = extracted.chars
+          resumeTextExtractedAt = new Date().toISOString()
+          // Prefer storing readable text in resume_content for older screeners
+          if (!resumeContent || String(resumeContent).startsWith("data:")) {
+            resumeContent = extracted.text
+          }
+        }
+        if (extracted.warning) resumeExtractWarning = extracted.warning
+      } catch (err) {
+        resumeExtractWarning =
+          err instanceof Error ? err.message : "Resume text extraction failed"
+        console.warn("[careers/applications] resume extract failed", err)
+      }
     }
 
     const skills = Array.isArray(body.skills)
@@ -156,6 +182,10 @@ export async function POST(req: NextRequest) {
         resume_url: resumeUrl,
         resume_mime_type: resumeMime,
         resume_size: resumeSize,
+        resume_text: resumeText,
+        resume_text_method: resumeTextMethod,
+        resume_text_chars: resumeTextChars,
+        resume_text_extracted_at: resumeTextExtractedAt,
         updated_at: new Date().toISOString(),
       })
       .select()
@@ -239,6 +269,9 @@ export async function POST(req: NextRequest) {
         application_id: application.id,
         job_title: job.title,
         email_status: emailStatus,
+        resume_text_chars: resumeTextChars,
+        resume_text_method: resumeTextMethod,
+        resume_extract_warning: resumeExtractWarning,
         message: "Application submitted successfully",
       },
       { status: 201 },

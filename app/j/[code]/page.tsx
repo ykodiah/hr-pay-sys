@@ -406,7 +406,7 @@ function ApplyPageContent() {
                     />
                   </div>
                   <div className="space-y-1.5 sm:col-span-2">
-                    <Label>CV / Resume (PDF, DOC, DOCX — max 8MB)</Label>
+                    <Label>CV / Resume (PDF or DOCX with selectable text — max 8MB)</Label>
                     <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center hover:border-emerald-400 hover:bg-emerald-50/40 transition">
                       <Upload className="h-5 w-5 text-slate-500" />
                       <span className="text-sm text-slate-700">
@@ -417,7 +417,12 @@ function ApplyPageContent() {
                           <FileText className="h-3.5 w-3.5" />
                           {(resume.size / 1024).toFixed(0)} KB
                         </span>
-                      ) : null}
+                      ) : (
+                        <span className="text-xs text-slate-500">
+                          Prefer a text-based PDF/DOCX so our ATS can read your experience automatically.
+                          Scanned image-only PDFs may not extract well.
+                        </span>
+                      )}
                       <input
                         type="file"
                         className="hidden"

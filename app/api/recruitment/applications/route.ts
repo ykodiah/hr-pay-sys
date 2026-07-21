@@ -83,10 +83,15 @@ export async function POST(req: NextRequest) {
         skills: body.skills ?? [],
         education: body.education ?? null,
         previous_company: body.previous_company ?? null,
+        linkedin_url: body.linkedin_url ?? null,
         source: body.source ?? "direct",
         resume_filename: body.resume_filename ?? null,
         resume_content: body.resume_content ?? null,
         resume_url: body.resume_url ?? null,
+        resume_text: body.resume_text ?? null,
+        resume_text_method: body.resume_text_method ?? null,
+        resume_text_chars: body.resume_text_chars != null ? Number(body.resume_text_chars) : null,
+        resume_text_extracted_at: body.resume_text ? new Date().toISOString() : null,
       })
       .select()
       .single()

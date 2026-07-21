@@ -132,6 +132,10 @@ type Application = {
   resume_filename?: string | null
   resume_url?: string | null
   resume_content?: string | null
+  resume_text?: string | null
+  resume_text_chars?: number | null
+  resume_text_method?: string | null
+  resume_text_extracted_at?: string | null
   job_title?: string | null
   department?: string | null
   location?: string | null
@@ -269,6 +273,7 @@ type ApplicationForm = {
   skills: string
   education: string
   previous_company: string
+  linkedin_url: string
   source: string
   score: string
   cover_letter: string
@@ -344,6 +349,7 @@ const initialApplicationForm: ApplicationForm = {
   skills: "",
   education: "",
   previous_company: "",
+  linkedin_url: "",
   source: "direct",
   score: "0",
   cover_letter: "",
@@ -520,6 +526,12 @@ export default function RecruitmentPage() {
   const [screeningLoading, setScreeningLoading] = useState(false)
   const [screeningSaving, setScreeningSaving] = useState(false)
   const [screeningResult, setScreeningResult] = useState<any>(null)
+  const [screeningMeta, setScreeningMeta] = useState<{
+    chars?: number
+    method?: string
+    warning?: string | null
+    groq_configured?: boolean
+  } | null>(null)
   const [overrideScore, setOverrideScore] = useState("")
   const [overrideReason, setOverrideReason] = useState("")
   const [requisitionSearch, setRequisitionSearch] = useState("")
@@ -863,6 +875,7 @@ export default function RecruitmentPage() {
           skills: splitList(applicationForm.skills),
           education: applicationForm.education || null,
           previous_company: applicationForm.previous_company || null,
+          linkedin_url: applicationForm.linkedin_url || null,
           source: applicationForm.source || "direct",
           score: numberFromForm(applicationForm.score) ?? 0,
           cover_letter: applicationForm.cover_letter || null,
@@ -903,6 +916,7 @@ export default function RecruitmentPage() {
   const openScreeningWorkspace = async (application: Application) => {
     setScreeningApplication(application)
     setScreeningResult(null)
+    setScreeningMeta(null)
     setOverrideScore(String(application.score ?? ""))
     setOverrideReason("")
     setScreeningLoading(true)
@@ -920,6 +934,7 @@ export default function RecruitmentPage() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Screening failed")
       setScreeningResult(json.result || json.screening)
+      setScreeningMeta(json.resume_extract || null)
       setOverrideScore(String(json.result?.ai_score ?? json.screening?.ai_score ?? ""))
       await loadRecruitment(companyId)
       toast({
@@ -2091,12 +2106,23 @@ export default function RecruitmentPage() {
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="app-experience">Experience</Label>
+                        <Label htmlFor="app-experience">Experience summary</Label>
                         <Textarea
                           id="app-experience"
                           rows={2}
                           value={applicationForm.experience_text}
                           onChange={(event) => setApplicationForm((prev) => ({ ...prev, experience_text: event.target.value }))}
+                          placeholder="Relevant roles, years, achievements"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="app-linkedin">LinkedIn URL</Label>
+                        <Input
+                          id="app-linkedin"
+                          type="url"
+                          value={applicationForm.linkedin_url}
+                          onChange={(event) => setApplicationForm((prev) => ({ ...prev, linkedin_url: event.target.value }))}
+                          placeholder="https://linkedin.com/in/…"
                         />
                       </div>
                       <div className="grid gap-4 md:grid-cols-2">
@@ -2711,22 +2737,29 @@ export default function RecruitmentPage() {
                   <span className="text-muted-foreground">Skills:</span>{" "}
                   {asStringList(previewApplication.skills).join(", ") || "—"}
                 </p>
-                {previewApplication.linkedin_url ? (
-                  <p className="sm:col-span-2">
-                    <span className="text-muted-foreground">LinkedIn:</span>{" "}
-                    <a href={previewApplication.linkedin_url} target="_blank" rel="noreferrer" className="text-emerald-700 hover:underline">
+                <p className="sm:col-span-2">
+                  <span className="text-muted-foreground">LinkedIn:</span>{" "}
+                  {previewApplication.linkedin_url ? (
+                    <a
+                      href={previewApplication.linkedin_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-emerald-700 hover:underline break-all"
+                    >
                       {previewApplication.linkedin_url}
                     </a>
-                  </p>
-                ) : null}
+                  ) : (
+                    "—"
+                  )}
+                </p>
               </div>
 
-              {previewApplication.experience_text ? (
-                <div>
-                  <h4 className="font-medium mb-1">Experience</h4>
-                  <p className="text-sm whitespace-pre-wrap text-muted-foreground">{previewApplication.experience_text}</p>
-                </div>
-              ) : null}
+              <div>
+                <h4 className="font-medium mb-1">Experience summary</h4>
+                <p className="text-sm whitespace-pre-wrap text-muted-foreground">
+                  {previewApplication.experience_text?.trim() || "No experience summary provided."}
+                </p>
+              </div>
 
               {previewApplication.cover_letter ? (
                 <div>
@@ -2735,7 +2768,22 @@ export default function RecruitmentPage() {
                 </div>
               ) : null}
 
-              <div className="flex flex-wrap gap-2">
+              <div className="rounded-xl border bg-slate-50/80 p-4 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="font-medium">CV / Resume for ATS</h4>
+                  {previewApplication.resume_text_chars && previewApplication.resume_text_chars > 40 ? (
+                    <Badge variant="secondary" className="bg-emerald-100 text-emerald-800">
+                      Readable · {previewApplication.resume_text_chars.toLocaleString()} chars
+                      {previewApplication.resume_text_method ? ` · ${previewApplication.resume_text_method}` : ""}
+                    </Badge>
+                  ) : previewApplication.resume_url || previewApplication.resume_filename ? (
+                    <Badge variant="outline" className="text-amber-800 border-amber-300">
+                      Uploaded — text will extract on screen
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">No CV</Badge>
+                  )}
+                </div>
                 {previewApplication.resume_url ? (
                   <Button asChild variant="outline" size="sm">
                     <a href={previewApplication.resume_url} target="_blank" rel="noreferrer">
@@ -2744,8 +2792,20 @@ export default function RecruitmentPage() {
                     </a>
                   </Button>
                 ) : (
-                  <span className="text-sm text-muted-foreground">No CV uploaded</span>
+                  <p className="text-sm text-muted-foreground">No CV uploaded</p>
                 )}
+                {previewApplication.resume_text?.trim() ? (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Extracted text (used by ATS AI)</p>
+                    <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-lg border bg-white p-3 text-xs text-slate-700">
+                      {previewApplication.resume_text.slice(0, 4000)}
+                      {previewApplication.resume_text.length > 4000 ? "…" : ""}
+                    </pre>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   onClick={() => {
@@ -2775,6 +2835,7 @@ export default function RecruitmentPage() {
           if (!open) {
             setScreeningApplication(null)
             setScreeningResult(null)
+            setScreeningMeta(null)
           }
         }}
       >
@@ -2820,7 +2881,46 @@ export default function RecruitmentPage() {
                     </div>
                   </div>
 
+                  <div className="rounded-lg border bg-slate-50 p-3 text-xs text-muted-foreground space-y-1">
+                    <p>
+                      CV text used:{" "}
+                      <span className="font-medium text-foreground">
+                        {screeningResult.resume_chars_used ?? screeningMeta?.chars ?? 0} chars
+                      </span>
+                      {screeningMeta?.method ? ` (${screeningMeta.method})` : ""}
+                    </p>
+                    {screeningMeta?.warning ? <p className="text-amber-700">{screeningMeta.warning}</p> : null}
+                    {screeningMeta?.groq_configured === false ||
+                    String(screeningResult.model_used || "").includes("heuristic") ? (
+                      <p>
+                        Groq AI key not active — using heuristic scoring. Set{" "}
+                        <code className="rounded bg-white px-1">GROQ_API_KEY</code> in your deployment env
+                        (see docs/GROQ_API_SETUP.md). Get a free key at{" "}
+                        <a
+                          href="https://console.groq.com/keys"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-emerald-700 underline"
+                        >
+                          console.groq.com/keys
+                        </a>
+                        .
+                      </p>
+                    ) : (
+                      <p className="text-emerald-800">Groq AI screening active.</p>
+                    )}
+                  </div>
+
                   <p className="text-sm whitespace-pre-wrap">{screeningResult.summary}</p>
+
+                  {screeningResult.resume_excerpt ? (
+                    <div>
+                      <h4 className="text-sm font-medium mb-1">CV excerpt used by ATS</h4>
+                      <pre className="max-h-36 overflow-y-auto whitespace-pre-wrap rounded-lg border bg-white p-3 text-xs text-slate-700">
+                        {screeningResult.resume_excerpt}
+                      </pre>
+                    </div>
+                  ) : null}
 
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>

@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
         .from("recruitment_applications")
         .select(
           `id, status, score, source, applied_at, notes, cover_letter, job_posting_id, candidate_id, resume_url, resume_filename, screening_score, screening_summary, screening_status, screened_at,
-           candidate:recruitment_candidates(id, candidate_name, email, phone, skills, experience_text, education, resume_filename, resume_url, previous_company, linkedin_url),
+           candidate:recruitment_candidates(id, candidate_name, email, phone, skills, experience_text, education, resume_filename, resume_url, resume_text, resume_text_chars, resume_text_method, previous_company, linkedin_url),
            job:recruitment_job_postings(id, title, department, slug, short_code)`,
         )
         .eq("company_id", companyId)
@@ -86,6 +86,9 @@ export async function GET(req: NextRequest) {
         education: candidate?.education ?? null,
         resume_filename: a.resume_filename || candidate?.resume_filename || null,
         resume_url: a.resume_url || candidate?.resume_url || null,
+        resume_text: candidate?.resume_text ?? null,
+        resume_text_chars: candidate?.resume_text_chars ?? null,
+        resume_text_method: candidate?.resume_text_method ?? null,
         previous_company: candidate?.previous_company ?? null,
         linkedin_url: candidate?.linkedin_url ?? null,
         screening_score: a.screening_score ?? null,

@@ -15,8 +15,11 @@ export type ScreenInput = {
   experienceText?: string | null
   education?: string | null
   previousCompany?: string | null
+  linkedinUrl?: string | null
   coverLetter?: string | null
   resumeFilename?: string | null
+  /** Prefer pre-extracted plain text from PDF/DOCX */
+  resumeText?: string | null
   resumeContent?: string | null
 }
 
@@ -31,6 +34,7 @@ export type ScreenResult = {
   resume_excerpt: string
   cover_letter_excerpt: string
   job_requirements_snapshot: string[]
+  resume_chars_used?: number
 }
 
 function asList(value: unknown): string[] {
@@ -69,22 +73,33 @@ function extractReadableResume(resumeContent?: string | null, max = 6000) {
     }
   }
   if (raw.startsWith("data:")) {
-    // Binary (PDF/DOC) — not usable as plain text for LLM in this pipeline
+    // Binary (PDF/DOC) — not usable as plain text without extraction
     return ""
   }
   return raw.slice(0, max)
 }
 
+/** Prefer dedicated resume_text, then readable resume_content. */
+export function resolveScreeningResumeText(input: ScreenInput, max = 6000) {
+  const dedicated = String(input.resumeText || "").trim()
+  if (dedicated && !dedicated.startsWith("data:")) {
+    return dedicated.slice(0, max)
+  }
+  return extractReadableResume(input.resumeContent, max)
+}
+
 function heuristicScreen(input: ScreenInput): ScreenResult {
   const requirements = asList(input.requirements)
   const skills = asList(input.skills).map((s) => s.toLowerCase())
+  const resumeText = resolveScreeningResumeText(input)
   const blob = [
     input.experienceText,
     input.education,
     input.coverLetter,
     input.previousCompany,
+    input.linkedinUrl,
     skills.join(" "),
-    extractReadableResume(input.resumeContent),
+    resumeText,
   ]
     .filter(Boolean)
     .join(" ")
@@ -111,7 +126,7 @@ function heuristicScreen(input: ScreenInput): ScreenResult {
     (input.coverLetter ? 8 : 0) +
     (input.experienceText ? 8 : 0) +
     (input.education ? 5 : 0) +
-    (input.resumeFilename || input.resumeContent ? 9 : 0)
+    (resumeText || input.resumeFilename || input.resumeContent ? 9 : 0)
   const ai_score = clampScore(reqScore + profileBonus)
 
   return {
@@ -121,23 +136,25 @@ function heuristicScreen(input: ScreenInput): ScreenResult {
     gaps: gaps.slice(0, 6),
     criteria_scores: {
       requirements_match: clampScore(requirements.length ? (matched / requirements.length) * 100 : 50),
-      experience_signal: input.experienceText ? 70 : 35,
+      experience_signal: input.experienceText || resumeText ? 70 : 35,
       cover_letter: input.coverLetter ? 75 : 30,
       education: input.education ? 70 : 40,
-      resume_present: input.resumeFilename || input.resumeContent ? 90 : 20,
+      resume_present: resumeText || input.resumeFilename || input.resumeContent ? 90 : 20,
+      resume_readable: resumeText.length > 40 ? 95 : resumeText ? 50 : 10,
     },
-    summary: `Heuristic screen scored ${ai_score}/100 for ${input.candidateName} against ${input.jobTitle}. ${matched}/${requirements.length || 0} listed requirements appear evidenced in the application materials.`,
+    summary: `Heuristic screen scored ${ai_score}/100 for ${input.candidateName} against ${input.jobTitle}. ${matched}/${requirements.length || 0} listed requirements appear evidenced in the application materials.${resumeText.length > 40 ? ` Used ${resumeText.length} chars of extracted CV text.` : " Limited/no extractable CV text — score relies on profile fields."}`,
     model_used: "heuristic-v1",
-    resume_excerpt: extractReadableResume(input.resumeContent, 1200) || (input.resumeFilename ? `[File: ${input.resumeFilename}]` : ""),
+    resume_excerpt: resumeText.slice(0, 1200) || (input.resumeFilename ? `[File: ${input.resumeFilename}]` : ""),
     cover_letter_excerpt: String(input.coverLetter || "").slice(0, 1200),
     job_requirements_snapshot: requirements,
+    resume_chars_used: resumeText.length,
   }
 }
 
 export async function screenApplicationAgainstJob(input: ScreenInput): Promise<ScreenResult> {
   const requirements = asList(input.requirements)
   const skills = asList(input.skills)
-  const resumeText = extractReadableResume(input.resumeContent, 5000)
+  const resumeText = resolveScreeningResumeText(input, 8000)
   const fallback = heuristicScreen(input)
 
   if (!process.env.GROQ_API_KEY) return fallback
@@ -160,21 +177,22 @@ Candidate: ${input.candidateName}
 Skills: ${skills.join(", ") || "n/a"}
 Education: ${input.education || "n/a"}
 Previous company: ${input.previousCompany || "n/a"}
-Experience:
-${String(input.experienceText || "").slice(0, 2000)}
+LinkedIn: ${input.linkedinUrl || "n/a"}
+Experience summary:
+${String(input.experienceText || "").slice(0, 2500)}
 
 Cover letter:
 ${String(input.coverLetter || "").slice(0, 2000)}
 
-Resume text (may be empty if only a binary file was uploaded named "${input.resumeFilename || "n/a"}"):
-${resumeText || "(no extractable resume text — score using profile + cover letter)"}`
+Resume / CV text extracted for ATS (may be empty if the upload was unscannable; file name "${input.resumeFilename || "n/a"}"):
+${resumeText || "(no extractable resume text — score using profile + cover letter + LinkedIn signals only)"}`
 
   try {
     const result = await Promise.race([
       generateText({
         model: "groq/llama-3.3-70b-versatile",
         system:
-          "You screen job applications objectively. Prefer evidence from the materials. Never invent credentials. JSON only.",
+          "You screen job applications objectively. Prefer evidence from the CV text and experience summary. Never invent credentials. JSON only.",
         prompt,
         temperature: 0.2,
         maxOutputTokens: 1200,
@@ -210,6 +228,7 @@ ${resumeText || "(no extractable resume text — score using profile + cover let
       resume_excerpt: resumeText.slice(0, 1200) || (input.resumeFilename ? `[File: ${input.resumeFilename}]` : ""),
       cover_letter_excerpt: String(input.coverLetter || "").slice(0, 1200),
       job_requirements_snapshot: requirements,
+      resume_chars_used: resumeText.length,
     }
   } catch (err) {
     console.warn("[ai-screen] falling back to heuristic", err)

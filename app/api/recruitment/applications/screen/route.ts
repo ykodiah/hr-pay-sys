@@ -9,6 +9,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { requireApiUser } from "@/lib/auth/api-user"
 import { resolveCompanyId } from "@/lib/employees/resolve-company"
 import { screenApplicationAgainstJob } from "@/lib/recruitment/ai-screen-application"
+import { resolveResumeTextForScreening } from "@/lib/recruitment/extract-resume-text"
 
 function db() {
   try {
@@ -122,6 +123,39 @@ export async function POST(req: NextRequest) {
       .eq("id", applicationId)
       .eq("company_id", companyId)
 
+    // Ensure CV text is readable for ATS (extract from PDF/DOCX/URL if needed)
+    const resumeResolved = await resolveResumeTextForScreening({
+      resumeText: candidate?.resume_text,
+      resumeContent: candidate?.resume_content,
+      resumeUrl: application.resume_url || candidate?.resume_url,
+      resumeFilename: candidate?.resume_filename || application.resume_filename,
+      resumeMimeType: candidate?.resume_mime_type,
+    })
+
+    if (candidate?.id && resumeResolved.chars > 40) {
+      const needsPersist =
+        !String(candidate.resume_text || "").trim() ||
+        Number(candidate.resume_text_chars || 0) < resumeResolved.chars
+      if (needsPersist) {
+        await client
+          .from("recruitment_candidates")
+          .update({
+            resume_text: resumeResolved.text,
+            resume_text_method: resumeResolved.method,
+            resume_text_chars: resumeResolved.chars,
+            resume_text_extracted_at: new Date().toISOString(),
+            // Keep a readable copy for legacy paths when content was binary
+            resume_content:
+              candidate.resume_content && !String(candidate.resume_content).startsWith("data:")
+                ? candidate.resume_content
+                : resumeResolved.text,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", candidate.id)
+          .eq("company_id", companyId)
+      }
+    }
+
     const result = await screenApplicationAgainstJob({
       jobTitle: job?.title || "Role",
       jobDescription: job?.description,
@@ -132,8 +166,10 @@ export async function POST(req: NextRequest) {
       experienceText: candidate?.experience_text,
       education: candidate?.education,
       previousCompany: candidate?.previous_company,
+      linkedinUrl: candidate?.linkedin_url,
       coverLetter: application.cover_letter,
       resumeFilename: candidate?.resume_filename || application.resume_filename,
+      resumeText: resumeResolved.text || candidate?.resume_text,
       resumeContent: candidate?.resume_content,
     })
 
@@ -211,6 +247,12 @@ export async function POST(req: NextRequest) {
       screening,
       application: updated,
       result,
+      resume_extract: {
+        chars: resumeResolved.chars,
+        method: resumeResolved.method,
+        warning: resumeResolved.warning || null,
+        groq_configured: Boolean(process.env.GROQ_API_KEY),
+      },
     })
   } catch (err) {
     return NextResponse.json(
