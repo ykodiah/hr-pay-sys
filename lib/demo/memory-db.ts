@@ -161,6 +161,8 @@ type Filter =
   | { type: "lte"; col: string; val: unknown }
   | { type: "gt"; col: string; val: unknown }
   | { type: "lt"; col: string; val: unknown }
+  | { type: "ilike"; col: string; val: unknown }
+  | { type: "like"; col: string; val: unknown }
 
 function applyFilters(rows: DemoRow[], filters: Filter[]): DemoRow[] {
   return rows.filter((row) =>
@@ -181,6 +183,15 @@ function applyFilters(rows: DemoRow[], filters: Filter[]): DemoRow[] {
           return v > (f.val as any)
         case "lt":
           return v < (f.val as any)
+        case "ilike":
+        case "like": {
+          const pattern = String(f.val ?? "")
+            .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+            .replace(/%/g, ".*")
+            .replace(/_/g, ".")
+          const re = new RegExp(`^${pattern}$`, f.type === "ilike" ? "i" : undefined)
+          return re.test(String(v ?? ""))
+        }
         default:
           return true
       }
@@ -411,10 +422,12 @@ export function createMemoryQueryBuilder(table: string) {
       state.filters.push({ type: "lt", col, val })
       return builder
     },
-    like() {
+    like(col: string, val: unknown) {
+      state.filters.push({ type: "like", col, val })
       return builder
     },
-    ilike() {
+    ilike(col: string, val: unknown) {
+      state.filters.push({ type: "ilike", col, val })
       return builder
     },
     is(col: string, val: unknown) {

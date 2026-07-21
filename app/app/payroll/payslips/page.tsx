@@ -13,6 +13,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
+import { resolveClientCompanyId } from "@/lib/tenant/resolve-company-client"
+import { normalizePayrollCashRow, normalizePayrollCashRows } from "@/lib/payroll/cash-deductions"
 import {
   Search,
   Download,
@@ -154,33 +156,33 @@ function statusBadge(status: string) {
 // ─── Payslip Preview Component ────────────────────────────────────────────────
 
 function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | null }) {
+  const normalized = normalizePayrollCashRow(slip) as PayslipRow
   const earnings = [
-    { label: "Basic Salary",            val: slip.basic_salary },
-    { label: "Transport Allowance",     val: slip.transport_allowance },
-    { label: "Housing Allowance",       val: slip.housing_allowance },
-    { label: "Medical Allowance",       val: slip.medical_allowance },
-    { label: "Meal Allowance",          val: slip.meal_allowance },
-    { label: "Communication Allowance", val: slip.communication_allowance },
-    { label: "Other Allowances",        val: slip.other_allowances },
-    { label: "Overtime",                val: slip.overtime_pay },
-    { label: "Bonus",                   val: slip.bonus_pay },
+    { label: "Basic Salary",            val: normalized.basic_salary },
+    { label: "Transport Allowance",     val: normalized.transport_allowance },
+    { label: "Housing Allowance",       val: normalized.housing_allowance },
+    { label: "Medical Allowance",       val: normalized.medical_allowance },
+    { label: "Meal Allowance",          val: normalized.meal_allowance },
+    { label: "Communication Allowance", val: normalized.communication_allowance },
+    { label: "Other Allowances",        val: normalized.other_allowances },
+    { label: "Overtime",                val: normalized.overtime_pay },
+    { label: "Bonus",                   val: normalized.bonus_pay },
   ].filter(e => e.val > 0)
 
   const deductions = [
-    { label: "SSNIT (Employee 5.5%)",   val: slip.ssnit_employee },
-    { label: "Tier 2 (Employee 5%)",    val: slip.tier2_employee },
-    { label: "Tier 3 / Provident Fund", val: slip.tier3_employee },
-    { label: "PAYE Tax",                val: slip.paye_tax },
-    { label: "Loan Repayment",          val: slip.loan_deduction },
-    { label: "Advance Deduction",       val: slip.advance_deduction },
-    { label: "Other Deductions",        val: slip.other_deductions },
+    { label: "SSNIT (Employee 5.5%)",   val: normalized.ssnit_employee },
+    { label: "Tier 3 / Provident Fund", val: normalized.tier3_employee },
+    { label: "PAYE Tax",                val: normalized.paye_tax },
+    { label: "Loan Repayment",          val: normalized.loan_deduction },
+    { label: "Advance Deduction",       val: normalized.advance_deduction },
+    { label: "Other Deductions",        val: normalized.other_deductions },
   ].filter(d => d.val > 0)
 
-  const hasLoan = loan || slip.loan_deduction > 0
+  const hasLoan = loan || normalized.loan_deduction > 0
 
   // Determine entity line: subsidiary name or parent company
-  const entityName = slip.snapshot_subsidiary || slip.snapshot_company_name || "Company"
-  const isSubsidiary = Boolean(slip.snapshot_subsidiary)
+  const entityName = normalized.snapshot_subsidiary || normalized.snapshot_company_name || "Company"
+  const isSubsidiary = Boolean(normalized.snapshot_subsidiary)
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
@@ -250,7 +252,7 @@ function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | n
               ))}
               <div className="flex justify-between items-center py-2 mt-1 bg-emerald-50 rounded-lg px-3">
                 <span className="text-sm font-bold text-emerald-800">Gross Pay</span>
-                <span className="text-sm font-bold text-emerald-800">{money(slip.gross_pay)}</span>
+                <span className="text-sm font-bold text-emerald-800">{money(normalized.gross_pay)}</span>
               </div>
             </div>
           </div>
@@ -270,7 +272,7 @@ function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | n
               ))}
               <div className="flex justify-between items-center py-2 mt-1 bg-red-50 rounded-lg px-3">
                 <span className="text-sm font-bold text-red-800">Total Deductions</span>
-                <span className="text-sm font-bold text-red-800">{money(slip.total_deductions)}</span>
+                <span className="text-sm font-bold text-red-800">{money(normalized.total_deductions)}</span>
               </div>
             </div>
           </div>
@@ -280,11 +282,11 @@ function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | n
         <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-xl px-5 py-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-400 uppercase tracking-wider">Net Pay</p>
-            <p className="text-2xl font-bold text-white mt-0.5">{money(slip.net_pay)}</p>
+            <p className="text-2xl font-bold text-white mt-0.5">{money(normalized.net_pay)}</p>
           </div>
           <div className="text-right">
             <p className="text-xs text-gray-400">Taxable Income</p>
-            <p className="text-base font-semibold text-gray-200">{money(slip.paye_taxable_income)}</p>
+            <p className="text-base font-semibold text-gray-200">{money(normalized.paye_taxable_income)}</p>
           </div>
         </div>
 
@@ -373,6 +375,7 @@ function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | n
 
 export default function PayslipsPage() {
   const supabase = createClient()
+  const [companyId, setCompanyId] = useState("")
   const { toast } = useToast()
 
   // Global state
@@ -441,48 +444,98 @@ export default function PayslipsPage() {
 
   const loadAll = async () => {
     setLoadingRuns(true)
-    const [runsRes, empsRes, subsRes] = await Promise.all([
-      supabase.from("payroll_runs").select("id, pay_period_start, pay_period_end, status").order("pay_period_start", { ascending: false }).limit(48),
-      supabase.from("employees").select("id, first_name, last_name, employee_id, department, division, location, subsidiary_id").in("status", ["active", "Active"]).order("first_name"),
-      supabase.from("subsidiaries").select("id, name").eq("status", "active"),
-    ])
+    try {
+      const cid = companyId || (await resolveClientCompanyId())
+      setCompanyId(cid)
 
-    const runs = (runsRes.data ?? []) as PayrollRun[]
-    setPayrollRuns(runs)
+      const [runsApi, empsApi, subsRes] = await Promise.all([
+        fetch(`/api/payroll/runs?company_id=${encodeURIComponent(cid)}&limit=48`, {
+          cache: "no-store",
+          credentials: "include",
+        }),
+        fetch(`/api/employees?company_id=${encodeURIComponent(cid)}&status=active&limit=2000`, {
+          cache: "no-store",
+          credentials: "include",
+        }),
+        supabase.from("subsidiaries").select("id, name").eq("company_id", cid).eq("status", "active"),
+      ])
 
-    const emps = (empsRes.data ?? []) as Employee[]
-    setEmployees(emps)
-    setFilteredEmps(emps)
+      const runsJson = await runsApi.json().catch(() => ({}))
+      const empsJson = await empsApi.json().catch(() => ({}))
 
-    const depts = [...new Set(emps.map(e => e.department).filter(Boolean))].sort() as string[]
-    const divs  = [...new Set(emps.map(e => e.division).filter(Boolean))].sort() as string[]
-    const locs  = [...new Set(emps.map(e => e.location).filter(Boolean))].sort() as string[]
-    setDepartments(depts)
-    setDivisions(divs)
-    setLocations(locs)
-    setSubsidiaries((subsRes.data ?? []) as { id: string; name: string }[])
-    setLoadingRuns(false)
+      const runs = (runsJson.runs ?? runsJson.data ?? []) as PayrollRun[]
+      setPayrollRuns(runs)
 
-    // Set default periods once runs load
-    if (runs.length > 0) {
-      const firstPeriod = periodFromDate(runs[0].pay_period_start)
-      setSelectedPeriod(prev => prev || firstPeriod)
-      setBulkPeriod(prev => prev || firstPeriod)
-      setCustomPeriodFrom(prev => prev || firstPeriod)
+      const emps = (empsJson.employees ?? empsJson.data ?? []) as Employee[]
+      setEmployees(emps)
+      setFilteredEmps(emps)
+
+      const depts = [...new Set(emps.map((e) => e.department).filter(Boolean))].sort() as string[]
+      const divs = [...new Set(emps.map((e) => e.division).filter(Boolean))].sort() as string[]
+      const locs = [...new Set(emps.map((e) => e.location).filter(Boolean))].sort() as string[]
+      setDepartments(depts)
+      setDivisions(divs)
+      setLocations(locs)
+      setSubsidiaries((subsRes.data ?? []) as { id: string; name: string }[])
+
+      if (runs.length > 0) {
+        const firstPeriod = periodFromDate(runs[0].pay_period_start)
+        setSelectedPeriod((prev) => prev || firstPeriod)
+        setBulkPeriod((prev) => prev || firstPeriod)
+        setCustomPeriodFrom((prev) => prev || firstPeriod)
+      }
+
+      void loadStats(cid)
+    } catch (err) {
+      toast({
+        title: "Could not load payslips",
+        description: err instanceof Error ? err.message : "Tenant resolve failed",
+        variant: "destructive",
+      })
+      setPayrollRuns([])
+      setEmployees([])
+      setFilteredEmps([])
+    } finally {
+      setLoadingRuns(false)
     }
-
-    void loadStats()
   }
 
-  const loadStats = async () => {
+  const loadStats = async (cid?: string) => {
+    const company = cid || companyId
+    if (!company) return
+    // Scope stats via tenant runs → payslips for those runs only
+    const runsRes = await fetch(`/api/payroll/runs?company_id=${encodeURIComponent(company)}&limit=100`, {
+      cache: "no-store",
+      credentials: "include",
+    })
+    const runsJson = await runsRes.json().catch(() => ({}))
+    const runIds = ((runsJson.runs ?? runsJson.data ?? []) as any[]).map((r) => r.id).filter(Boolean)
+    if (!runIds.length) {
+      setStats({ totalIssued: 0, totalDraft: 0, latestPeriod: "" })
+      return
+    }
     const [issuedRes, draftRes, periodRes] = await Promise.all([
-      supabase.from("payslips").select("id", { count: "exact", head: true }).eq("status", "issued"),
-      supabase.from("payslips").select("id", { count: "exact", head: true }).eq("status", "draft"),
-      supabase.from("payslips").select("pay_period").order("pay_period", { ascending: false }).limit(1).maybeSingle(),
+      supabase
+        .from("payslips")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "issued")
+        .in("payroll_run_id", runIds),
+      supabase
+        .from("payslips")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "draft")
+        .in("payroll_run_id", runIds),
+      supabase
+        .from("payslips")
+        .select("pay_period")
+        .in("payroll_run_id", runIds)
+        .order("pay_period", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ])
     setStats({
       totalIssued: issuedRes.count ?? 0,
-      totalDraft:  draftRes.count ?? 0,
+      totalDraft: draftRes.count ?? 0,
       latestPeriod: (periodRes.data as any)?.pay_period ?? "",
     })
   }
@@ -504,19 +557,46 @@ export default function PayslipsPage() {
   // ── Load individual payslip ──
   const loadIndividualSlip = useCallback(async (empId: string, period: string) => {
     if (!empId || !period) return
+    const cid = companyId || (await resolveClientCompanyId().catch(() => ""))
+    if (cid && !companyId) setCompanyId(cid)
     setLoadingSlip(true)
     setIndivSlip(null)
     setActiveLoan(null)
     try {
+      let slipQ = supabase
+        .from("payslips")
+        .select("*")
+        .eq("employee_id", empId)
+        .eq("pay_period", period)
+        .order("created_at", { ascending: false })
+        .limit(1)
+      let loanQ = supabase
+        .from("employee_loans")
+        .select("*")
+        .eq("employee_id", empId)
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(1)
+      let recentQ = supabase
+        .from("payslips")
+        .select("*")
+        .eq("employee_id", empId)
+        .order("pay_period", { ascending: false })
+        .limit(8)
+      if (cid) {
+        slipQ = slipQ.eq("company_id", cid)
+        loanQ = loanQ.eq("company_id", cid)
+        recentQ = recentQ.eq("company_id", cid)
+      }
       const [slipRes, loanRes, recentRes] = await Promise.all([
-        supabase.from("payslips").select("*").eq("employee_id", empId).eq("pay_period", period).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-        supabase.from("employee_loans").select("*").eq("employee_id", empId).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle(),
-        supabase.from("payslips").select("*").eq("employee_id", empId).order("pay_period", { ascending: false }).limit(8),
+        slipQ.maybeSingle(),
+        loanQ.maybeSingle(),
+        recentQ,
       ])
 
-      if (slipRes.data) setIndivSlip(slipRes.data as PayslipRow)
+      if (slipRes.data) setIndivSlip(normalizePayrollCashRow(slipRes.data as PayslipRow) as PayslipRow)
       if (loanRes.data) setActiveLoan(loanRes.data as ActiveLoan)
-      setRecentSlips((recentRes.data ?? []) as PayslipRow[])
+      setRecentSlips(normalizePayrollCashRows((recentRes.data ?? []) as PayslipRow[]) as PayslipRow[])
     } catch (err) {
       toast({ title: "Error", description: "Could not load payslip.", variant: "destructive" })
     } finally {
@@ -550,6 +630,12 @@ export default function PayslipsPage() {
   // ── Load bulk payslips ──
   const loadBulkSlips = useCallback(async () => {
     if (!bulkPeriod) return
+    const cid = companyId || (await resolveClientCompanyId().catch(() => ""))
+    if (cid && !companyId) setCompanyId(cid)
+    if (!cid) {
+      toast({ title: "Company required", description: "Unable to resolve your company.", variant: "destructive" })
+      return
+    }
     setLoadingBulk(true)
     setBulkSlips([])
     setBulkSelected(new Set())
@@ -557,6 +643,7 @@ export default function PayslipsPage() {
       let query = supabase
         .from("payslips")
         .select("*")
+        .eq("company_id", cid)
         .eq("pay_period", bulkPeriod)
         .order("snapshot_employee_name", { ascending: true })
 
@@ -573,29 +660,33 @@ export default function PayslipsPage() {
 
       let slips = (data ?? []) as PayslipRow[]
 
-      // Subsidiary / company filter — client-side
+      // Subsidiary / company filter — client-side, still tenant-scoped
       if (bulkFilterType === "subsidiary" && bulkFilterValue !== "all") {
         const { data: empIds } = await supabase
           .from("employees")
           .select("id")
+          .eq("company_id", cid)
           .eq("subsidiary_id", bulkFilterValue)
         const ids = new Set((empIds ?? []).map((e: any) => e.id))
-        slips = slips.filter(s => ids.has(s.employee_id))
+        slips = slips.filter((s) => ids.has(s.employee_id))
       } else if (bulkFilterType === "company") {
-        // parent company employees only — those without a subsidiary
-        const { data: empIds } = await supabase.from("employees").select("id").is("subsidiary_id", null)
+        const { data: empIds } = await supabase
+          .from("employees")
+          .select("id")
+          .eq("company_id", cid)
+          .is("subsidiary_id", null)
         const ids = new Set((empIds ?? []).map((e: any) => e.id))
-        slips = slips.filter(s => ids.has(s.employee_id))
+        slips = slips.filter((s) => ids.has(s.employee_id))
       }
 
-      setBulkSlips(slips)
+      setBulkSlips(normalizePayrollCashRows(slips) as PayslipRow[])
       setBulkSelected(new Set(slips.map(s => s.id)))
     } catch (err) {
       toast({ title: "Error", description: "Failed to load payslips for bulk view.", variant: "destructive" })
     } finally {
       setLoadingBulk(false)
     }
-  }, [bulkPeriod, bulkFilterType, bulkFilterValue, supabase, toast])
+  }, [bulkPeriod, bulkFilterType, bulkFilterValue, companyId, supabase, toast])
 
   useEffect(() => {
     if (activeTab === "bulk" && bulkPeriod) void loadBulkSlips()
@@ -619,29 +710,48 @@ export default function PayslipsPage() {
       toast({ title: "Select a start period", variant: "destructive" })
       return
     }
+    const cid = companyId || (await resolveClientCompanyId().catch(() => ""))
+    if (cid && !companyId) setCompanyId(cid)
+    if (!cid) {
+      toast({ title: "Company required", description: "Unable to resolve your company.", variant: "destructive" })
+      return
+    }
     setLoadingCustom(true)
     setCustomLoaded(false)
     try {
-      let query = supabase
-        .from("payslips")
-        .select("*")
-        .gte("pay_period", customPeriodFrom)
-        .order("snapshot_employee_name", { ascending: true })
-
-      if (customPeriodTo && customPeriodTo !== customPeriodFrom) {
-        query = query.lte("pay_period", customPeriodTo)
-      } else {
-        query = query.lte("pay_period", customPeriodFrom)
+      const params = new URLSearchParams({
+        company_id: cid,
+        period_from: customPeriodFrom,
+        period_to: customPeriodTo || customPeriodFrom,
+        limit: "500",
+      })
+      if (customEmpIds.size > 0) {
+        params.set("employee_ids", [...customEmpIds].join(","))
       }
 
-      if (customEmpIds.size > 0) query = query.in("employee_id", [...customEmpIds])
+      const res = await fetch(`/api/payslips/search?${params.toString()}`, {
+        cache: "no-store",
+        credentials: "include",
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(json.error || `Failed to load custom payslips (${res.status})`)
+      }
 
-      const { data, error } = await query.limit(500)
-      if (error) throw error
-      setCustomSlips((data ?? []) as PayslipRow[])
+      setCustomSlips(normalizePayrollCashRows((json.payslips ?? []) as PayslipRow[]) as PayslipRow[])
       setCustomLoaded(true)
+      if (!(json.payslips ?? []).length) {
+        toast({
+          title: "No payslips found",
+          description: "No slips matched that period/employee filter. Process payroll first, then retry.",
+        })
+      }
     } catch (err) {
-      toast({ title: "Error", description: "Failed to load custom payslips.", variant: "destructive" })
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to load custom payslips.",
+        variant: "destructive",
+      })
     } finally {
       setLoadingCustom(false)
     }
@@ -1117,10 +1227,13 @@ export default function PayslipsPage() {
                 </div>
                 <div>
                   <Label className="text-xs text-gray-500 mb-1 block">To Period (optional)</Label>
-                  <Select value={customPeriodTo} onValueChange={setCustomPeriodTo}>
+                  <Select
+                    value={customPeriodTo || "__same__"}
+                    onValueChange={(v) => setCustomPeriodTo(v === "__same__" ? "" : v)}
+                  >
                     <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Same as from" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Same as from</SelectItem>
+                      <SelectItem value="__same__">Same as from</SelectItem>
                       {periodOptions.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
                     </SelectContent>
                   </Select>

@@ -1,4 +1,4 @@
-/** Default onboarding tasks for newly hired candidates. */
+/** Default onboarding tasks for newly hired candidates (staged pipeline). */
 export function defaultOnboardingTasks(startDate?: string | null) {
   const start = startDate ? new Date(startDate) : new Date()
   const due = (days: number) => {
@@ -10,30 +10,25 @@ export function defaultOnboardingTasks(startDate?: string | null) {
   return [
     {
       task_type: "hr",
-      title: "Complete employee information form",
-      description: "Personal details, emergency contacts, and tax info",
+      stage: "welcome",
+      title: "Send welcome pack & first-day logistics",
+      description: "Confirm start date, reporting location, dress code, and welcome email",
+      assigned_department: "HR",
+      due_date: due(0),
+      priority: "high",
+    },
+    {
+      task_type: "hr",
+      stage: "documents",
+      title: "Collect employee information & tax forms",
+      description: "Personal details, emergency contacts, TIN, and Ghana Card copies",
       assigned_department: "HR",
       due_date: due(1),
       priority: "high",
     },
     {
-      task_type: "it",
-      title: "Provision laptop and accounts",
-      description: "Email, Slack, and system access",
-      assigned_department: "IT",
-      due_date: due(2),
-      priority: "high",
-    },
-    {
-      task_type: "finance",
-      title: "Set up payroll banking details",
-      description: "Bank account and SSNIT registration",
-      assigned_department: "Finance",
-      due_date: due(3),
-      priority: "medium",
-    },
-    {
       task_type: "hr",
+      stage: "documents",
       title: "Sign employment contract",
       description: "Review and sign Ghana Labour Act compliant contract",
       assigned_department: "HR",
@@ -41,11 +36,39 @@ export function defaultOnboardingTasks(startDate?: string | null) {
       priority: "high",
     },
     {
+      task_type: "it",
+      stage: "accounts",
+      title: "Provision laptop and system accounts",
+      description: "Email, Slack/Teams, VPN, and HRIS access",
+      assigned_department: "IT",
+      due_date: due(2),
+      priority: "high",
+    },
+    {
+      task_type: "finance",
+      stage: "payroll_setup",
+      title: "Set up payroll banking & SSNIT",
+      description: "Bank account details and SSNIT registration",
+      assigned_department: "Finance",
+      due_date: due(3),
+      priority: "high",
+    },
+    {
       task_type: "orientation",
+      stage: "orientation",
       title: "Company orientation session",
-      description: "Culture, policies, and benefits overview",
+      description: "Culture, policies, benefits, and compliance overview",
       assigned_department: "HR",
       due_date: due(5),
+      priority: "medium",
+    },
+    {
+      task_type: "hr",
+      stage: "day_one",
+      title: "Day-one check-in with manager",
+      description: "Workspace tour, introductions, and 30-day goals",
+      assigned_department: "HR",
+      due_date: due(0),
       priority: "medium",
     },
   ]

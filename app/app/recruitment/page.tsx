@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react"
+import { useSearchParams } from "next/navigation"
 import {
   AlertCircle,
   BarChart3,
@@ -14,21 +15,27 @@ import {
   Copy,
   Download,
   FileText,
+  Link2,
   Loader2,
   Mail,
   MapPin,
   PauseCircle,
+  Pencil,
   PlayCircle,
   Plus,
   RefreshCw,
   Search,
   Send,
+  Share2,
+  Sparkles,
   Trash2,
   UserPlus,
   Users,
   XCircle,
   type LucideIcon,
 } from "lucide-react"
+import { buildJobApplyUrl, buildOfferRespondUrl } from "@/lib/recruitment/public-origin"
+import { OnboardingTaskArtifactPanel } from "@/components/recruitment/onboarding-task-artifact"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -80,8 +87,10 @@ type JobPosting = {
   id: string
   requisition_id?: string | null
   slug?: string | null
+  short_code?: string | null
   title: string
   description?: string | null
+  public_summary?: string | null
   requirements?: unknown
   benefits?: unknown
   salary_min?: number | null
@@ -98,8 +107,17 @@ type JobPosting = {
   applications_count?: number | null
 }
 
+type OrgPerson = {
+  id: string
+  name: string
+  department?: string | null
+  position?: string | null
+  special_role?: string | null
+}
+
 type Application = {
   id: string
+  company_id?: string | null
   job_posting_id: string | null
   candidate_id?: string | null
   status: string | null
@@ -107,15 +125,33 @@ type Application = {
   source: string | null
   applied_at: string | null
   notes?: string | null
+  cover_letter?: string | null
   candidate_name?: string | null
   candidate_email?: string | null
   candidate_phone?: string | null
   skills?: unknown
+  experience_text?: string | null
+  education?: string | null
+  previous_company?: string | null
+  linkedin_url?: string | null
   resume_filename?: string | null
   resume_url?: string | null
   resume_content?: string | null
+  resume_text?: string | null
+  resume_text_chars?: number | null
+  resume_text_method?: string | null
+  resume_text_extracted_at?: string | null
+  resume_extract_warning?: string | null
   job_title?: string | null
   department?: string | null
+  location?: string | null
+  employment_type?: string | null
+  job_description?: string | null
+  job_requirements?: unknown
+  screening_score?: number | null
+  screening_summary?: string | null
+  screening_status?: string | null
+  screened_at?: string | null
 }
 
 type Interview = {
@@ -139,6 +175,7 @@ type Interview = {
 
 type Offer = {
   id: string
+  company_id?: string | null
   application_id: string | null
   salary: number | null
   currency: string | null
@@ -155,6 +192,44 @@ type Offer = {
   candidate_email?: string | null
   job_title?: string | null
   department?: string | null
+  short_code?: string | null
+  respond_url?: string | null
+  working_hours?: string | null
+  probation_months?: number | null
+  notice_months?: number | null
+  signatory_name?: string | null
+  signatory_title?: string | null
+  candidate_signature_name?: string | null
+  candidate_signed_at?: string | null
+  hr_signature_name?: string | null
+  hr_signed_at?: string | null
+  signed_letter_vault_id?: string | null
+  remuneration?: any
+  email_status?: string | null
+  last_email_at?: string | null
+  public_views?: number | null
+  response_channel?: string | null
+  candidate_response_note?: string | null
+  ai_letter_notes?: string | null
+  offer_letter_version?: number | null
+}
+
+type OfferEditForm = {
+  salary: string
+  currency: string
+  start_date: string
+  acceptance_deadline: string
+  benefits: string
+  remuneration_extras: string
+  terms: string
+  offer_letter_text: string
+  working_hours: string
+  probation_months: string
+  notice_months: string
+  signatory_name: string
+  signatory_title: string
+  hr_signature_name: string
+  department: string
 }
 
 type OnboardingTask = {
@@ -171,6 +246,13 @@ type OnboardingTask = {
   priority: string | null
   completed_at: string | null
   created_at?: string | null
+  stage?: string | null
+  sort_order?: number | null
+  response_data?: Record<string, string> | null
+  attachment_url?: string | null
+  attachment_name?: string | null
+  vault_document_id?: string | null
+  document_type?: string | null
 }
 
 type OnboardingChecklist = {
@@ -183,6 +265,17 @@ type OnboardingChecklist = {
   progress: number | null
   tasks?: OnboardingTask[]
   created_at?: string | null
+  offer_id?: string | null
+  job_title?: string | null
+  department?: string | null
+  stage?: string | null
+  progress_notes?: string | null
+  auto_started?: boolean | null
+  hired_at?: string | null
+  buddy_name?: string | null
+  manager_name?: string | null
+  employee_id?: string | null
+  converted_at?: string | null
 }
 
 type RecruitmentResponse = {
@@ -211,6 +304,8 @@ type RequisitionForm = {
   currency: string
   headcount: string
   requester_name: string
+  requester_employee_id: string
+  requester_mode: string
   deadline: string
   description: string
   requirements: string
@@ -241,6 +336,7 @@ type ApplicationForm = {
   skills: string
   education: string
   previous_company: string
+  linkedin_url: string
   source: string
   score: string
   cover_letter: string
@@ -284,6 +380,8 @@ const initialRequisitionForm: RequisitionForm = {
   currency: "GHS",
   headcount: "1",
   requester_name: "",
+  requester_employee_id: "",
+  requester_mode: "",
   deadline: "",
   description: "",
   requirements: "",
@@ -314,6 +412,7 @@ const initialApplicationForm: ApplicationForm = {
   skills: "",
   education: "",
   previous_company: "",
+  linkedin_url: "",
   source: "direct",
   score: "0",
   cover_letter: "",
@@ -465,6 +564,7 @@ function EmptyState({
 }
 
 export default function RecruitmentPage() {
+  const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState("overview")
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [metrics, setMetrics] = useState<Metrics>(emptyMetrics)
@@ -483,6 +583,45 @@ export default function RecruitmentPage() {
   const [showJobDialog, setShowJobDialog] = useState(false)
   const [showApplicationDialog, setShowApplicationDialog] = useState(false)
   const [showInterviewDialog, setShowInterviewDialog] = useState(false)
+  const [previewApplication, setPreviewApplication] = useState<Application | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [screeningApplication, setScreeningApplication] = useState<Application | null>(null)
+  const [screeningLoading, setScreeningLoading] = useState(false)
+  const [screeningSaving, setScreeningSaving] = useState(false)
+  const [screeningResult, setScreeningResult] = useState<any>(null)
+  const [screeningMeta, setScreeningMeta] = useState<{
+    chars?: number
+    method?: string
+    warning?: string | null
+    groq_configured?: boolean
+  } | null>(null)
+  const [overrideScore, setOverrideScore] = useState("")
+  const [overrideReason, setOverrideReason] = useState("")
+  const [editingOffer, setEditingOffer] = useState<Offer | null>(null)
+  const [offerEditForm, setOfferEditForm] = useState<OfferEditForm | null>(null)
+  const [offerSaving, setOfferSaving] = useState(false)
+  const [offerPreview, setOfferPreview] = useState<Offer | null>(null)
+  const [convertChecklist, setConvertChecklist] = useState<OnboardingChecklist | null>(null)
+  const [convertPreview, setConvertPreview] = useState<any>(null)
+  const [convertLoading, setConvertLoading] = useState(false)
+  const [convertSaving, setConvertSaving] = useState(false)
+  const [convertIncludePayroll, setConvertIncludePayroll] = useState(false)
+  const [focusedOnboardingId, setFocusedOnboardingId] = useState<string | null>(null)
+  const [focusOnboardingLookup, setFocusOnboardingLookup] = useState<{
+    checklistId?: string
+    offerId?: string
+    applicationId?: string
+  } | null>(null)
+  const [convertDraft, setConvertDraft] = useState<{
+    first_name: string
+    last_name: string
+    personal_email: string
+    corporate_email: string
+    phone: string
+    position: string
+    department: string
+    date_of_joining: string
+  } | null>(null)
   const [requisitionSearch, setRequisitionSearch] = useState("")
   const [requisitionStatus, setRequisitionStatus] = useState("all")
   const [jobSearch, setJobSearch] = useState("")
@@ -493,7 +632,78 @@ export default function RecruitmentPage() {
   const [jobForm, setJobForm] = useState<JobForm>(initialJobForm)
   const [applicationForm, setApplicationForm] = useState<ApplicationForm>(initialApplicationForm)
   const [interviewForm, setInterviewForm] = useState<InterviewForm>(initialInterviewForm)
+  const [departments, setDepartments] = useState<string[]>([])
+  const [locations, setLocations] = useState<string[]>([])
+  const [requestorOptions, setRequestorOptions] = useState<OrgPerson[]>([])
   const hasLoadedRef = useRef(false)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/employees/meta", { cache: "no-store", credentials: "include" })
+        const json = await res.json()
+        if (!res.ok || cancelled) return
+        const deps = Array.isArray(json.departments) ? json.departments.map(String).filter(Boolean) : []
+        const locs = Array.isArray(json.locations) ? json.locations.map(String).filter(Boolean) : []
+        setDepartments(deps)
+        setLocations(locs)
+        if (json.company_id && !companyId) setCompanyId(json.company_id)
+
+        const peopleMap = new Map<string, OrgPerson>()
+        for (const list of [json.heads_of_department, json.supervisors, json.employees]) {
+          for (const p of list || []) {
+            if (!p?.id || !p?.name) continue
+            if (!peopleMap.has(p.id)) {
+              peopleMap.set(p.id, {
+                id: p.id,
+                name: p.name,
+                department: p.department,
+                position: p.position,
+                special_role: p.special_role,
+              })
+            }
+          }
+        }
+        // Prefer HOD/supervisors first in the list
+        const hodIds = new Set((json.heads_of_department || []).map((p: any) => p.id))
+        const supIds = new Set((json.supervisors || []).map((p: any) => p.id))
+        const sorted = Array.from(peopleMap.values()).sort((a, b) => {
+          const rank = (p: OrgPerson) => (hodIds.has(p.id) ? 0 : supIds.has(p.id) ? 1 : 2)
+          return rank(a) - rank(b) || a.name.localeCompare(b.name)
+        })
+        setRequestorOptions(sorted)
+      } catch {
+        /* keep empty catalogs */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    const tab = searchParams.get("tab")
+    const action = searchParams.get("action")
+    const allowed = new Set([
+      "overview",
+      "requisitions",
+      "jobs",
+      "applications",
+      "interviews",
+      "offers",
+      "onboarding",
+      "analytics",
+    ])
+    if (tab && allowed.has(tab)) setActiveTab(tab)
+    if (action === "add") {
+      if (tab === "requisitions") setShowRequisitionDialog(true)
+      if (tab === "jobs") setShowJobDialog(true)
+      if (tab === "applications") setShowApplicationDialog(true)
+      if (tab === "interviews") setShowInterviewDialog(true)
+    }
+  }, [searchParams])
 
   const loadRecruitment = useCallback(
     async (knownCompanyId?: string | null) => {
@@ -518,12 +728,15 @@ export default function RecruitmentPage() {
         setApplications(body.applications ?? [])
         setInterviews(body.interviews ?? [])
         setOffers(body.offers ?? [])
-        setOnboarding(body.onboarding ?? [])
+        const nextOnboarding = body.onboarding ?? []
+        setOnboarding(nextOnboarding)
         setLastSynced(new Date())
+        return nextOnboarding
       } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to load recruitment data."
         setLoadError(message)
         toast({ title: "Recruitment sync failed", description: message, variant: "destructive" })
+        return [] as OnboardingChecklist[]
       } finally {
         setLoading(false)
       }
@@ -537,9 +750,38 @@ export default function RecruitmentPage() {
     void loadRecruitment()
   }, [loadRecruitment])
 
+  // Resolve + scroll to the hire when navigating from Offers → Onboarding
+  useEffect(() => {
+    if (activeTab !== "onboarding" || !focusOnboardingLookup) return
+    const match =
+      (focusOnboardingLookup.checklistId &&
+        onboarding.find((c) => c.id === focusOnboardingLookup.checklistId)) ||
+      (focusOnboardingLookup.offerId &&
+        onboarding.find((c) => c.offer_id === focusOnboardingLookup.offerId)) ||
+      (focusOnboardingLookup.applicationId &&
+        onboarding.find((c) => c.application_id === focusOnboardingLookup.applicationId)) ||
+      null
+    if (!match) return
+    setFocusedOnboardingId(match.id)
+    const t = window.setTimeout(() => {
+      document.getElementById(`onboarding-${match.id}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+    }, 120)
+    return () => window.clearTimeout(t)
+  }, [activeTab, focusOnboardingLookup, onboarding])
+
   const applicationsById = useMemo(() => {
     return new Map(applications.map((application) => [application.id, application]))
   }, [applications])
+
+  const orderedOnboarding = useMemo(() => {
+    if (!focusedOnboardingId) return onboarding
+    const focused = onboarding.filter((c) => c.id === focusedOnboardingId)
+    const rest = onboarding.filter((c) => c.id !== focusedOnboardingId)
+    return [...focused, ...rest]
+  }, [onboarding, focusedOnboardingId])
 
   const applicationsByJob = useMemo(() => {
     const counts = new Map<string, number>()
@@ -640,6 +882,10 @@ export default function RecruitmentPage() {
           currency: requisitionForm.currency || "GHS",
           headcount: numberFromForm(requisitionForm.headcount) ?? 1,
           requester_name: requisitionForm.requester_name || null,
+          requester_employee_id:
+            requisitionForm.requester_mode === "__manual__" || !requisitionForm.requester_employee_id
+              ? null
+              : requisitionForm.requester_employee_id,
           deadline: requisitionForm.deadline || null,
           description: requisitionForm.description || null,
           requirements: splitList(requisitionForm.requirements),
@@ -749,6 +995,7 @@ export default function RecruitmentPage() {
           skills: splitList(applicationForm.skills),
           education: applicationForm.education || null,
           previous_company: applicationForm.previous_company || null,
+          linkedin_url: applicationForm.linkedin_url || null,
           source: applicationForm.source || "direct",
           score: numberFromForm(applicationForm.score) ?? 0,
           cover_letter: applicationForm.cover_letter || null,
@@ -764,10 +1011,130 @@ export default function RecruitmentPage() {
     }
   }
 
+  const openApplicationPreview = async (application: Application) => {
+    setPreviewLoading(true)
+    setPreviewApplication(application)
+    try {
+      const cid = companyId || application.company_id || ""
+      const qs = cid ? `?company_id=${encodeURIComponent(cid)}` : ""
+      const res = await fetch(`/api/recruitment/applications/${application.id}${qs}`, {
+        cache: "no-store",
+        credentials: "include",
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Failed to load application")
+      setPreviewApplication(json.application)
+      if (json.application?.company_id && !companyId) {
+        setCompanyId(json.application.company_id)
+      }
+    } catch (err) {
+      toast({
+        title: "Preview failed",
+        description: err instanceof Error ? err.message : "Could not load application",
+        variant: "destructive",
+      })
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  const openScreeningWorkspace = async (application: Application) => {
+    setScreeningApplication(application)
+    setScreeningResult(null)
+    setScreeningMeta(null)
+    setOverrideScore(String(application.score ?? ""))
+    setOverrideReason("")
+    setScreeningLoading(true)
+    toast({
+      title: "ATS screening started",
+      description: `Analyzing ${application.candidate_name || "candidate"} materials against the role requirements…`,
+    })
+    try {
+      const cid = companyId || application.company_id || null
+      const res = await fetch("/api/recruitment/applications/screen", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          application_id: application.id,
+          company_id: cid,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Screening failed")
+      setScreeningResult(json.result || json.screening)
+      setScreeningMeta(json.resume_extract || null)
+      setOverrideScore(String(json.result?.ai_score ?? json.screening?.ai_score ?? ""))
+      if (cid && !companyId) setCompanyId(cid)
+      await loadRecruitment(cid || companyId)
+      toast({
+        title: "Screening complete",
+        description: `Proposed score: ${json.result?.ai_score ?? json.screening?.ai_score ?? "—"}/100`,
+      })
+    } catch (err) {
+      toast({
+        title: "Screening failed",
+        description: err instanceof Error ? err.message : "Could not screen application",
+        variant: "destructive",
+      })
+    } finally {
+      setScreeningLoading(false)
+    }
+  }
+
+  const saveScreeningOverride = async () => {
+    if (!screeningApplication) return
+    const score = Number(overrideScore)
+    if (!Number.isFinite(score) || score < 0 || score > 100) {
+      toast({ title: "Invalid score", description: "Enter a score between 0 and 100.", variant: "destructive" })
+      return
+    }
+    setScreeningSaving(true)
+    try {
+      const cid = companyId || screeningApplication.company_id || null
+      const res = await fetch("/api/recruitment/applications/screen", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          application_id: screeningApplication.id,
+          company_id: cid,
+          final_score: score,
+          override_reason: overrideReason || "Manual override by recruiter",
+          save_only: Boolean(screeningResult),
+          summary: screeningResult?.summary,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Could not save score")
+      // If save_only was false because first run already happened with final_score, re-run with score
+      if (!screeningResult) {
+        /* already handled */
+      }
+      await loadRecruitment(cid || companyId)
+      toast({ title: "Score saved", description: `Final screening score set to ${score}/100.` })
+      setScreeningApplication(null)
+      setScreeningResult(null)
+      setScreeningMeta(null)
+    } catch (err) {
+      toast({
+        title: "Save failed",
+        description: err instanceof Error ? err.message : "Could not save screening score",
+        variant: "destructive",
+      })
+    } finally {
+      setScreeningSaving(false)
+    }
+  }
+
   const handleApplicationAction = async (
     application: Application,
     action: "screen" | "reject" | "generate_offer" | "start_onboarding",
   ) => {
+    if (action === "screen") {
+      await openScreeningWorkspace(application)
+      return
+    }
     await runMutation(
       "/api/recruitment/applications",
       { method: "PATCH", body: JSON.stringify({ id: application.id, action }) },
@@ -814,13 +1181,276 @@ export default function RecruitmentPage() {
     )
   }
 
-  const handleOfferAction = async (offer: Offer, action: "send" | "accept" | "reject" | "withdraw") => {
+  const openOfferEditor = (offer: Offer) => {
+    const rem = offer.remuneration && typeof offer.remuneration === "object" ? offer.remuneration : {}
+    const extras = Array.isArray(rem.extras) ? rem.extras : []
+    setEditingOffer(offer)
+    setOfferEditForm({
+      salary: String(offer.salary ?? 0),
+      currency: offer.currency || "GHS",
+      start_date: offer.start_date || "",
+      acceptance_deadline: offer.acceptance_deadline || "",
+      benefits: asStringList(offer.benefits).join("\n"),
+      remuneration_extras: extras.map(String).join("\n"),
+      terms: offer.terms || "",
+      offer_letter_text: offer.offer_letter_text || "",
+      working_hours: offer.working_hours || "08:00 – 17:00",
+      probation_months: String(offer.probation_months ?? 3),
+      notice_months: String(offer.notice_months ?? 1),
+      signatory_name: offer.signatory_name || "",
+      signatory_title: offer.signatory_title || "",
+      hr_signature_name: offer.hr_signature_name || offer.signatory_name || "",
+      department: offer.department || "",
+    })
+  }
+
+  const saveOfferEdits = async (opts?: {
+    regenerate?: boolean
+    polish?: boolean
+    signHr?: boolean
+  }) => {
+    if (!editingOffer || !offerEditForm) return
+    if (opts?.signHr && !offerEditForm.hr_signature_name.trim()) {
+      toast({
+        title: "HR Head signature required",
+        description: "Type the HR Head full name to sign this offer letter.",
+        variant: "destructive",
+      })
+      return
+    }
+    setOfferSaving(true)
+    try {
+      const hrName =
+        offerEditForm.hr_signature_name.trim() || offerEditForm.signatory_name.trim() || null
+      const body: Record<string, unknown> = {
+        id: editingOffer.id,
+        company_id: companyId || editingOffer.company_id,
+        salary: Number(offerEditForm.salary) || 0,
+        currency: offerEditForm.currency || "GHS",
+        start_date: offerEditForm.start_date || null,
+        acceptance_deadline: offerEditForm.acceptance_deadline || null,
+        benefits: splitList(offerEditForm.benefits.replace(/\n/g, ",")),
+        remuneration_extras: splitList(offerEditForm.remuneration_extras.replace(/\n/g, ",")),
+        terms: offerEditForm.terms || null,
+        offer_letter_text: offerEditForm.offer_letter_text,
+        working_hours: offerEditForm.working_hours || null,
+        probation_months: Number(offerEditForm.probation_months) || 3,
+        notice_months: Number(offerEditForm.notice_months) || 1,
+        signatory_name: hrName || offerEditForm.signatory_name || null,
+        signatory_title: offerEditForm.signatory_title || null,
+        hr_signature_name: opts?.signHr || editingOffer.hr_signed_at ? hrName : hrName,
+        department: offerEditForm.department || null,
+      }
+      if (opts?.signHr && hrName) {
+        body.hr_signature_name = hrName
+        body.hr_signed_at = new Date().toISOString()
+        body.signatory_name = hrName
+      }
+      if (opts?.regenerate) body.action = "regenerate_letter"
+      if (opts?.polish) body.action = "polish_letter"
+
+      const res = await fetch("/api/recruitment/offers", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || json.hint || "Failed to save offer")
+
+      const keepEditorOpen = Boolean(opts?.regenerate || opts?.polish || opts?.signHr)
+      if (keepEditorOpen && json.offer) {
+        setEditingOffer(json.offer)
+        setOfferEditForm((prev) =>
+          prev
+            ? {
+                ...prev,
+                offer_letter_text: json.offer.offer_letter_text || prev.offer_letter_text,
+                benefits: asStringList(json.offer.benefits).join("\n"),
+                salary: String(json.offer.salary ?? prev.salary),
+                currency: json.offer.currency || prev.currency,
+                hr_signature_name:
+                  json.offer.hr_signature_name || json.offer.signatory_name || prev.hr_signature_name,
+                signatory_name:
+                  json.offer.signatory_name || prev.signatory_name,
+                signatory_title: json.offer.signatory_title || prev.signatory_title,
+              }
+            : prev,
+        )
+        toast({
+          title: opts?.signHr ? "HR Head signed" : opts?.polish ? "Letter polished" : "Letter regenerated",
+          description: opts?.signHr
+            ? "HR Head signature is on the offer letter. You can now send it for acceptance."
+            : "Offer letter updated.",
+        })
+      } else {
+        setEditingOffer(null)
+        setOfferEditForm(null)
+        toast({ title: "Offer saved", description: "Changes saved successfully." })
+      }
+      await loadRecruitment(companyId)
+    } catch (err) {
+      toast({
+        title: "Save failed",
+        description: err instanceof Error ? err.message : "Could not save offer",
+        variant: "destructive",
+      })
+    } finally {
+      setOfferSaving(false)
+    }
+  }
+
+  const handleOfferAction = async (
+    offer: Offer,
+    action: "send" | "accept" | "reject" | "withdraw",
+  ) => {
+    if (action === "send") {
+      const hrSigned = Boolean(offer.hr_signature_name || offer.hr_signed_at)
+      if (!hrSigned) {
+        toast({
+          title: "HR Head must sign first",
+          description: "Open Edit on the offer letter, sign as HR Head under Signatures, then send.",
+          variant: "destructive",
+        })
+        openOfferEditor(offer)
+        return
+      }
+    }
+    setSaving(true)
+    try {
+      const res = await fetch("/api/recruitment/offers", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: offer.id,
+          company_id: companyId || offer.company_id,
+          action,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Offer update failed")
+      await loadRecruitment(companyId)
+      const emailNote =
+        action === "send" && json.email
+          ? ` Email: ${json.email.status}${json.email.error ? ` (${json.email.error})` : ""}.`
+          : ""
+      if (action === "accept") {
+        const onboardId = json.onboarding?.id || json.onboarding?.checklist?.id || null
+        setFocusOnboardingLookup({
+          checklistId: onboardId || undefined,
+          offerId: offer.id,
+          applicationId: offer.application_id || undefined,
+        })
+        if (onboardId) setFocusedOnboardingId(onboardId)
+        toast({
+          title: "Offer accepted",
+          description: onboardId
+            ? `${getOfferCandidateName(offer)} moved to onboarding — continue their checklist below.`
+            : `${getOfferCandidateName(offer)} accepted. If no checklist appears, run SQL 089 and try Go to onboarding.`,
+        })
+        setActiveTab("onboarding")
+      } else {
+        toast({
+          title: "Offer updated",
+          description: `Offer for ${getOfferCandidateName(offer)} marked ${action}.${emailNote}`,
+        })
+      }
+    } catch (err) {
+      toast({
+        title: "Offer action failed",
+        description: err instanceof Error ? err.message : "Could not update offer",
+        variant: "destructive",
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const goToOnboardingForOffer = async (offer: Offer) => {
+    setActiveTab("onboarding")
+    setFocusOnboardingLookup({
+      offerId: offer.id,
+      applicationId: offer.application_id || undefined,
+    })
+    // Resolve immediately from current state if possible
+    const existing =
+      onboarding.find((c) => c.offer_id === offer.id) ||
+      onboarding.find((c) => c.application_id && c.application_id === offer.application_id) ||
+      null
+    if (existing) {
+      setFocusedOnboardingId(existing.id)
+    }
+    const list = await loadRecruitment(companyId || offer.company_id)
+    const match =
+      list.find((c) => c.offer_id === offer.id) ||
+      list.find((c) => c.application_id && c.application_id === offer.application_id) ||
+      existing
+    if (match) {
+      setFocusedOnboardingId(match.id)
+      toast({
+        title: "Continue onboarding",
+        description: `Checklist for ${getOfferCandidateName(offer)} is ready — complete the next task, then Add to employees.`,
+      })
+      window.setTimeout(() => {
+        document.getElementById(`onboarding-${match.id}`)?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        })
+      }, 150)
+    } else {
+      toast({
+        title: "No onboarding checklist yet",
+        description:
+          "Accept the offer first to auto-start onboarding. If already accepted, run SQL 089 (onboarding pipeline) and refresh.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleManualOfferStatus = async (offer: Offer, status: string) => {
     await runMutation(
       "/api/recruitment/offers",
-      { method: "PATCH", body: JSON.stringify({ id: offer.id, action }) },
-      "Offer updated",
-      `Offer for ${getOfferCandidateName(offer)} was updated.`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          id: offer.id,
+          company_id: companyId || offer.company_id,
+          action: "set_status",
+          status,
+        }),
+      },
+      "Status updated",
+      `Offer status set to ${status}. Application portal synced.`,
     )
+  }
+
+  const copyOfferLink = async (offer: Offer) => {
+    const url =
+      offer.respond_url ||
+      (offer.short_code ? buildOfferRespondUrl(offer.short_code) : "") ||
+      (offer.id ? buildOfferRespondUrl(offer.id) : "")
+    if (!url) {
+      toast({
+        title: "No link yet",
+        description: "Could not build a candidate response link for this offer.",
+        variant: "destructive",
+      })
+      return
+    }
+    const absolute = url.startsWith("http") ? url : `${window.location.origin}${url}`
+    await navigator.clipboard.writeText(absolute)
+    toast({ title: "Link copied", description: absolute })
+  }
+
+  const handleDownloadOfferPdf = (offer: Offer) => {
+    const cid = companyId || offer.company_id || ""
+    const qs = cid ? `?company_id=${encodeURIComponent(cid)}` : ""
+    window.open(`/api/recruitment/offers/${offer.id}/pdf${qs}`, "_blank", "noopener,noreferrer")
+    toast({
+      title: "Opening PDF view",
+      description: "Use your browser Print dialog → Save as PDF.",
+    })
   }
 
   const handleTaskComplete = async (task: OnboardingTask) => {
@@ -839,6 +1469,102 @@ export default function RecruitmentPage() {
       "Onboarding completed",
       `${checklist.candidate_name || "Candidate"} onboarding is complete.`,
     )
+    if (!checklist.employee_id) {
+      void openHireConvert(checklist)
+    }
+  }
+
+  const openHireConvert = async (checklist: OnboardingChecklist) => {
+    setConvertChecklist(checklist)
+    setConvertPreview(null)
+    setConvertDraft(null)
+    setConvertIncludePayroll(false)
+    setConvertLoading(true)
+    try {
+      const res = await fetch("/api/recruitment/onboarding/convert", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          checklist_id: checklist.id,
+          company_id: companyId,
+          preview: true,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Could not load employee preview")
+      setConvertPreview(json)
+      const d = json.draft || {}
+      setConvertDraft({
+        first_name: d.first_name || "",
+        last_name: d.last_name || "",
+        personal_email: d.personal_email || "",
+        corporate_email: d.corporate_email || "",
+        phone: d.phone || "",
+        position: d.position || "",
+        department: d.department || "",
+        date_of_joining: d.date_of_joining || "",
+      })
+    } catch (err) {
+      toast({
+        title: "Convert preview failed",
+        description: err instanceof Error ? err.message : "Could not prepare employee draft",
+        variant: "destructive",
+      })
+      setConvertChecklist(null)
+    } finally {
+      setConvertLoading(false)
+    }
+  }
+
+  const confirmHireConvert = async () => {
+    if (!convertChecklist || !convertDraft) return
+    setConvertSaving(true)
+    try {
+      const res = await fetch("/api/recruitment/onboarding/convert", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          checklist_id: convertChecklist.id,
+          company_id: companyId,
+          confirm: true,
+          include_payroll: convertIncludePayroll,
+          link_existing: true,
+          overrides: {
+            first_name: convertDraft.first_name,
+            last_name: convertDraft.last_name,
+            personal_email: convertDraft.personal_email || null,
+            corporate_email: convertDraft.corporate_email || null,
+            phone: convertDraft.phone || null,
+            position: convertDraft.position || null,
+            department: convertDraft.department || null,
+            date_of_joining: convertDraft.date_of_joining || null,
+          },
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Could not create employee")
+      toast({
+        title: json.action === "linked_existing" ? "Employee linked" : "Employee created",
+        description: json.message || "Hire is now on the employee list. Opening Employees…",
+      })
+      setConvertChecklist(null)
+      setConvertPreview(null)
+      setConvertDraft(null)
+      await loadRecruitment(companyId)
+      window.setTimeout(() => {
+        window.location.assign("/app/employees")
+      }, 600)
+    } catch (err) {
+      toast({
+        title: "Conversion failed",
+        description: err instanceof Error ? err.message : "Could not add employee",
+        variant: "destructive",
+      })
+    } finally {
+      setConvertSaving(false)
+    }
   }
 
   const getApplicationJobTitle = (application: Application) => {
@@ -854,31 +1580,11 @@ export default function RecruitmentPage() {
   }
 
   const getOnboardingJobTitle = (checklist: OnboardingChecklist) => {
-    return applicationsById.get(checklist.application_id || "")?.job_title || "New hire"
-  }
-
-  const handleDownloadOffer = (offer: Offer) => {
-    const candidateName = getOfferCandidateName(offer)
-    const content = [
-      "Offer Letter",
-      "============",
-      "",
-      `Candidate: ${candidateName}`,
-      `Role: ${getOfferJobTitle(offer)}`,
-      `Salary: ${offer.currency || "GHS"} ${(offer.salary ?? 0).toLocaleString()}`,
-      `Start Date: ${formatDate(offer.start_date)}`,
-      `Acceptance Deadline: ${formatDate(offer.acceptance_deadline)}`,
-      "",
-      "Letter Text",
-      "-----------",
-      offer.offer_letter_text || "No offer letter text is available for this offer.",
-      "",
-      "Terms",
-      "-----",
-      offer.terms || "No terms provided.",
-    ].join("\n")
-    downloadBlob(`${candidateName.replace(/\s+/g, "_")}_offer.txt`, content, "text/plain;charset=utf-8")
-    toast({ title: "Offer downloaded", description: "The offer letter text file was generated." })
+    return (
+      checklist.job_title ||
+      applicationsById.get(checklist.application_id || "")?.job_title ||
+      "New hire"
+    )
   }
 
   const handleExportAnalytics = () => {
@@ -908,12 +1614,49 @@ export default function RecruitmentPage() {
   }
 
   const handleShareJob = async (job: JobPosting) => {
-    const url = `${window.location.origin}/careers?job=${encodeURIComponent(job.slug || job.id)}`
+    if (job.status !== "published") {
+      toast({
+        title: "Publish first",
+        description: "Publish the job before sharing the public apply link.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    let shortCode = job.short_code
+    if (!shortCode) {
+      try {
+        const res = await fetch("/api/recruitment/jobs", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: job.id, action: "ensure_short_code", status: "published" }),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || "Could not create share code")
+        shortCode = json.job?.short_code
+        await loadRecruitment(companyId)
+      } catch (err) {
+        toast({
+          title: "Share failed",
+          description: err instanceof Error ? err.message : "Could not create share link",
+          variant: "destructive",
+        })
+        return
+      }
+    }
+
+    const url =
+      buildJobApplyUrl(String(shortCode || ""), window.location.origin) ||
+      `${window.location.origin}/j/${encodeURIComponent(String(shortCode || job.slug || job.id))}`
+
     try {
       await navigator.clipboard.writeText(url)
-      toast({ title: "Job link copied", description: url })
+      toast({
+        title: "Apply link copied",
+        description: `Short link ready: ${url}`,
+      })
     } catch {
-      toast({ title: "Copy failed", description: "Could not copy the job link.", variant: "destructive" })
+      toast({ title: "Copy failed", description: url, variant: "destructive" })
     }
   }
 
@@ -934,11 +1677,14 @@ export default function RecruitmentPage() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Recruitment</h1>
-          <p className="text-muted-foreground">DB-backed applicant tracking for requisitions, jobs, candidates, and hiring workflows.</p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Company: {companyId || "resolving"} · Last synced:{" "}
-            {lastSynced ? lastSynced.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "not yet"}
+          <p className="text-muted-foreground">
+            Recruitment tracking system for requisitions, jobs, candidates and hiring workflows
           </p>
+          {lastSynced ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Last synced {lastSynced.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => void loadRecruitment(companyId)} disabled={loading || saving}>
@@ -968,20 +1714,70 @@ export default function RecruitmentPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="req-department">Department</Label>
-                    <Input
-                      id="req-department"
-                      value={requisitionForm.department}
-                      onChange={(event) => setRequisitionForm((prev) => ({ ...prev, department: event.target.value }))}
-                    />
+                    <Label>Department</Label>
+                    <Select
+                      value={requisitionForm.department || "__none__"}
+                      onValueChange={(value) =>
+                        setRequisitionForm((prev) => ({
+                          ...prev,
+                          department: value === "__none__" ? "" : value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Select department</SelectItem>
+                        {departments.map((dep) => (
+                          <SelectItem key={dep} value={dep}>
+                            {dep}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!departments.length ? (
+                      <Input
+                        placeholder="Type department"
+                        value={requisitionForm.department}
+                        onChange={(event) =>
+                          setRequisitionForm((prev) => ({ ...prev, department: event.target.value }))
+                        }
+                      />
+                    ) : null}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="req-location">Location</Label>
-                    <Input
-                      id="req-location"
-                      value={requisitionForm.location}
-                      onChange={(event) => setRequisitionForm((prev) => ({ ...prev, location: event.target.value }))}
-                    />
+                    <Label>Location</Label>
+                    <Select
+                      value={requisitionForm.location || "__none__"}
+                      onValueChange={(value) =>
+                        setRequisitionForm((prev) => ({
+                          ...prev,
+                          location: value === "__none__" ? "" : value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select location" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Select location</SelectItem>
+                        {locations.map((loc) => (
+                          <SelectItem key={loc} value={loc}>
+                            {loc}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!locations.length ? (
+                      <Input
+                        placeholder="Type location"
+                        value={requisitionForm.location}
+                        onChange={(event) =>
+                          setRequisitionForm((prev) => ({ ...prev, location: event.target.value }))
+                        }
+                      />
+                    ) : null}
                   </div>
                   <div className="space-y-2">
                     <Label>Employment type</Label>
@@ -1047,12 +1843,60 @@ export default function RecruitmentPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="req-requester">Requester</Label>
-                    <Input
-                      id="req-requester"
-                      value={requisitionForm.requester_name}
-                      onChange={(event) => setRequisitionForm((prev) => ({ ...prev, requester_name: event.target.value }))}
-                    />
+                    <Label>Requestor (HOD / Supervisor)</Label>
+                    <Select
+                      value={requisitionForm.requester_mode || "__none__"}
+                      onValueChange={(value) => {
+                        if (value === "__none__") {
+                          setRequisitionForm((prev) => ({
+                            ...prev,
+                            requester_mode: "",
+                            requester_employee_id: "",
+                            requester_name: "",
+                          }))
+                          return
+                        }
+                        if (value === "__manual__") {
+                          setRequisitionForm((prev) => ({
+                            ...prev,
+                            requester_mode: "__manual__",
+                            requester_employee_id: "",
+                          }))
+                          return
+                        }
+                        const person = requestorOptions.find((p) => p.id === value)
+                        setRequisitionForm((prev) => ({
+                          ...prev,
+                          requester_mode: value,
+                          requester_employee_id: value,
+                          requester_name: person?.name || "",
+                        }))
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select requestor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Select requestor</SelectItem>
+                        {requestorOptions.map((person) => (
+                          <SelectItem key={person.id} value={person.id}>
+                            {person.name}
+                            {person.position ? ` · ${person.position}` : ""}
+                            {person.department ? ` · ${person.department}` : ""}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="__manual__">Type name manually…</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {requisitionForm.requester_mode === "__manual__" ? (
+                      <Input
+                        placeholder="Enter requestor name"
+                        value={requisitionForm.requester_name}
+                        onChange={(event) =>
+                          setRequisitionForm((prev) => ({ ...prev, requester_name: event.target.value }))
+                        }
+                      />
+                    ) : null}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="req-deadline">Deadline</Label>
@@ -1121,7 +1965,17 @@ export default function RecruitmentPage() {
                     <Label>Requisition</Label>
                     <Select
                       value={jobForm.requisition_id}
-                      onValueChange={(value) => setJobForm((prev) => ({ ...prev, requisition_id: value }))}
+                      onValueChange={(value) => {
+                        const req = requisitions.find((r) => r.id === value)
+                        setJobForm((prev) => ({
+                          ...prev,
+                          requisition_id: value,
+                          title: prev.title || req?.title || "",
+                          department: req?.department || prev.department,
+                          location: req?.location || prev.location,
+                          employment_type: req?.employment_type || prev.employment_type,
+                        }))
+                      }}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue />
@@ -1137,20 +1991,60 @@ export default function RecruitmentPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="job-department">Department</Label>
-                    <Input
-                      id="job-department"
-                      value={jobForm.department}
-                      onChange={(event) => setJobForm((prev) => ({ ...prev, department: event.target.value }))}
-                    />
+                    <Label>Department</Label>
+                    <Select
+                      value={jobForm.department || "__none__"}
+                      onValueChange={(value) =>
+                        setJobForm((prev) => ({ ...prev, department: value === "__none__" ? "" : value }))
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Select department</SelectItem>
+                        {departments.map((dep) => (
+                          <SelectItem key={dep} value={dep}>
+                            {dep}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!departments.length ? (
+                      <Input
+                        placeholder="Type department"
+                        value={jobForm.department}
+                        onChange={(event) => setJobForm((prev) => ({ ...prev, department: event.target.value }))}
+                      />
+                    ) : null}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="job-location">Location</Label>
-                    <Input
-                      id="job-location"
-                      value={jobForm.location}
-                      onChange={(event) => setJobForm((prev) => ({ ...prev, location: event.target.value }))}
-                    />
+                    <Label>Location</Label>
+                    <Select
+                      value={jobForm.location || "__none__"}
+                      onValueChange={(value) =>
+                        setJobForm((prev) => ({ ...prev, location: value === "__none__" ? "" : value }))
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select location" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Select location</SelectItem>
+                        {locations.map((loc) => (
+                          <SelectItem key={loc} value={loc}>
+                            {loc}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!locations.length ? (
+                      <Input
+                        placeholder="Type location"
+                        value={jobForm.location}
+                        onChange={(event) => setJobForm((prev) => ({ ...prev, location: event.target.value }))}
+                      />
+                    ) : null}
                   </div>
                   <div className="space-y-2">
                     <Label>Employment type</Label>
@@ -1505,6 +2399,11 @@ export default function RecruitmentPage() {
                               <span>{applicationCount} applications</span>
                               <span>{job.views_count ?? 0} views</span>
                               <span>Published {formatDate(job.published_at)}</span>
+                              {job.short_code ? (
+                                <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-700">
+                                  /j/{job.short_code}
+                                </span>
+                              ) : null}
                             </div>
                           </div>
                           <div className="flex flex-wrap gap-2">
@@ -1520,8 +2419,18 @@ export default function RecruitmentPage() {
                               <Copy className="h-4 w-4" />
                               Duplicate
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => void handleShareJob(job)}>
-                              <Copy className="h-4 w-4" />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={saving}
+                              onClick={() => void handleShareJob(job)}
+                              title={
+                                job.short_code
+                                  ? `Share /j/${job.short_code}`
+                                  : "Generate short public apply link"
+                              }
+                            >
+                              <Share2 className="h-4 w-4" />
                               Share
                             </Button>
                             <Button size="sm" variant="destructive" disabled={saving || job.status === "archived"} onClick={() => void handleJobAction(job, "archive")}>
@@ -1668,12 +2577,23 @@ export default function RecruitmentPage() {
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="app-experience">Experience</Label>
+                        <Label htmlFor="app-experience">Experience summary</Label>
                         <Textarea
                           id="app-experience"
                           rows={2}
                           value={applicationForm.experience_text}
                           onChange={(event) => setApplicationForm((prev) => ({ ...prev, experience_text: event.target.value }))}
+                          placeholder="Relevant roles, years, achievements"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="app-linkedin">LinkedIn URL</Label>
+                        <Input
+                          id="app-linkedin"
+                          type="url"
+                          value={applicationForm.linkedin_url}
+                          onChange={(event) => setApplicationForm((prev) => ({ ...prev, linkedin_url: event.target.value }))}
+                          placeholder="https://linkedin.com/in/…"
                         />
                       </div>
                       <div className="grid gap-4 md:grid-cols-2">
@@ -1725,6 +2645,7 @@ export default function RecruitmentPage() {
                     <TableRow>
                       <TableHead>Candidate</TableHead>
                       <TableHead>Role</TableHead>
+                      <TableHead>CV</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Score</TableHead>
                       <TableHead>Source</TableHead>
@@ -1736,7 +2657,13 @@ export default function RecruitmentPage() {
                       <TableRow key={application.id}>
                         <TableCell>
                           <div>
-                            <p className="font-medium">{application.candidate_name || "Candidate"}</p>
+                            <button
+                              type="button"
+                              className="font-medium text-left text-emerald-700 hover:underline"
+                              onClick={() => void openApplicationPreview(application)}
+                            >
+                              {application.candidate_name || "Candidate"}
+                            </button>
                             <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
                               {application.candidate_email ? (
                                 <span className="inline-flex items-center gap-1">
@@ -1749,6 +2676,21 @@ export default function RecruitmentPage() {
                           </div>
                         </TableCell>
                         <TableCell>{getApplicationJobTitle(application)}</TableCell>
+                        <TableCell>
+                          {application.resume_url ? (
+                            <a
+                              href={application.resume_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-sm text-emerald-700 hover:underline"
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                              {application.resume_filename || "View CV"}
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">No CV</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={statusClass(application.status)}>
                             {application.status || "unknown"}
@@ -2002,70 +2944,188 @@ export default function RecruitmentPage() {
         <TabsContent value="offers" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Offers</CardTitle>
-              <CardDescription>Send, accept, reject, withdraw, and download offer letters.</CardDescription>
+              <CardTitle>Offer letters</CardTitle>
             </CardHeader>
             <CardContent>
               {offers.length ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Candidate</TableHead>
-                      <TableHead>Salary</TableHead>
-                      <TableHead>Dates</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {offers.map((offer) => (
-                      <TableRow key={offer.id}>
-                        <TableCell>
-                          <p className="font-medium">{getOfferCandidateName(offer)}</p>
-                          <p className="text-xs text-muted-foreground">{getOfferJobTitle(offer)}</p>
-                        </TableCell>
-                        <TableCell>
-                          {offer.currency || "GHS"} {(offer.salary ?? 0).toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <p>Start {formatDate(offer.start_date)}</p>
-                          <p className="text-xs text-muted-foreground">Deadline {formatDate(offer.acceptance_deadline)}</p>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={statusClass(offer.status)}>
-                            {offer.status || "unknown"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap justify-end gap-2">
-                            <Button size="sm" variant="outline" disabled={saving} onClick={() => void handleOfferAction(offer, "send")}>
-                              <Send className="h-4 w-4" />
-                              Send
-                            </Button>
-                            <Button size="sm" variant="outline" disabled={saving} onClick={() => void handleOfferAction(offer, "accept")}>
-                              Accept
-                            </Button>
-                            <Button size="sm" variant="outline" disabled={saving} onClick={() => void handleOfferAction(offer, "reject")}>
-                              Reject
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleDownloadOffer(offer)}>
-                              <Download className="h-4 w-4" />
-                              TXT
-                            </Button>
-                            <Button size="sm" variant="destructive" disabled={saving} onClick={() => void handleOfferAction(offer, "withdraw")}>
-                              Withdraw
-                            </Button>
+                <div className="grid gap-4">
+                  {offers.map((offer) => {
+                    const benefits = asStringList(offer.benefits)
+                    return (
+                      <div key={offer.id} className="rounded-xl border bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="space-y-2 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-lg font-semibold">{getOfferCandidateName(offer)}</h3>
+                              <Badge variant="outline" className={statusClass(offer.status)}>
+                                {offer.status || "draft"}
+                              </Badge>
+                              {offer.email_status ? (
+                                <Badge variant="secondary">Email {offer.email_status}</Badge>
+                              ) : null}
+                              {offer.response_channel ? (
+                                <Badge variant="outline">via {offer.response_channel}</Badge>
+                              ) : null}
+                              {offer.hr_signature_name || offer.hr_signed_at ? (
+                                <Badge className="bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
+                                  HR signed
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-amber-700 border-amber-300">
+                                  HR signature needed
+                                </Badge>
+                              )}
+                              {offer.candidate_signature_name ? (
+                                <Badge className="bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
+                                  Candidate signed
+                                </Badge>
+                              ) : null}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {getOfferJobTitle(offer)}
+                              {offer.department ? ` · ${offer.department}` : ""}
+                              {offer.candidate_email ? ` · ${offer.candidate_email}` : ""}
+                            </p>
+                            <div className="grid gap-2 sm:grid-cols-3 text-sm">
+                              <div className="rounded-lg border bg-white px-3 py-2">
+                                <p className="text-xs text-muted-foreground">Remuneration</p>
+                                <p className="font-semibold text-emerald-800">
+                                  {offer.currency || "GHS"} {(offer.salary ?? 0).toLocaleString()}
+                                </p>
+                              </div>
+                              <div className="rounded-lg border bg-white px-3 py-2">
+                                <p className="text-xs text-muted-foreground">Start / deadline</p>
+                                <p>Start {formatDate(offer.start_date)}</p>
+                                <p className="text-xs text-muted-foreground">By {formatDate(offer.acceptance_deadline)}</p>
+                              </div>
+                              <div className="rounded-lg border bg-white px-3 py-2">
+                                <p className="text-xs text-muted-foreground">Portal</p>
+                                <p className="truncate text-xs">{offer.short_code || "—"}</p>
+                                <p className="text-xs text-muted-foreground">{offer.public_views ?? 0} views</p>
+                              </div>
+                            </div>
+                            {benefits.length ? (
+                              <p className="text-xs text-muted-foreground line-clamp-2">
+                                Benefits: {benefits.join(" · ")}
+                              </p>
+                            ) : null}
+                            {offer.candidate_response_note ? (
+                              <p className="text-xs rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-amber-900">
+                                Candidate note: {offer.candidate_response_note}
+                              </p>
+                            ) : null}
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                          <div className="flex flex-col gap-2 shrink-0">
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <Button size="sm" variant="outline" onClick={() => openOfferEditor(offer)}>
+                                <Pencil className="h-4 w-4" />
+                                Edit
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => setOfferPreview(offer)}>
+                                <FileText className="h-4 w-4" />
+                                Preview
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => handleDownloadOfferPdf(offer)}>
+                                <Download className="h-4 w-4" />
+                                PDF
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => void copyOfferLink(offer)}>
+                                <Link2 className="h-4 w-4" />
+                                Copy link
+                              </Button>
+                            </div>
+                            {(() => {
+                              const terminal = ["accepted", "rejected", "withdrawn", "expired"].includes(
+                                String(offer.status || ""),
+                              )
+                              const accepted = offer.status === "accepted"
+                              return (
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <Button
+                                size="sm"
+                                className="bg-emerald-600 hover:bg-emerald-700"
+                                disabled={saving || terminal}
+                                onClick={() => void handleOfferAction(offer, "send")}
+                                title={
+                                  offer.hr_signature_name || offer.hr_signed_at || offer.signatory_name
+                                    ? "Send email + response link"
+                                    : "HR Head must sign the letter first"
+                                }
+                              >
+                                <Send className="h-4 w-4" />
+                                {offer.hr_signature_name || offer.hr_signed_at
+                                  ? "Send email + link"
+                                  : "Sign HR Head, then send"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className={accepted ? "opacity-40 pointer-events-none" : ""}
+                                disabled={saving || terminal}
+                                onClick={() => void handleOfferAction(offer, "accept")}
+                              >
+                                {accepted ? "Accepted" : "Accept"}
+                              </Button>
+                              {accepted ? (
+                                <Button
+                                  size="sm"
+                                  className="bg-emerald-600 hover:bg-emerald-700"
+                                  onClick={() => void goToOnboardingForOffer(offer)}
+                                >
+                                  <UserPlus className="h-4 w-4" />
+                                  Go to onboarding
+                                </Button>
+                              ) : null}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={saving || terminal}
+                                className={terminal && !accepted ? "opacity-40" : ""}
+                                onClick={() => void handleOfferAction(offer, "reject")}
+                              >
+                                Decline
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                disabled={saving || terminal}
+                                className={terminal ? "opacity-40" : ""}
+                                onClick={() => void handleOfferAction(offer, "withdraw")}
+                              >
+                                Withdraw
+                              </Button>
+                            </div>
+                              )
+                            })()}
+                            <div className="flex flex-wrap justify-end gap-2 items-center">
+                              <span className="text-xs text-muted-foreground">Manual status</span>
+                              <Select
+                                value={offer.status || "draft"}
+                                onValueChange={(value) => void handleManualOfferStatus(offer, value)}
+                              >
+                                <SelectTrigger className="h-8 w-[140px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {["draft", "sent", "accepted", "rejected", "withdrawn", "expired"].map((s) => (
+                                    <SelectItem key={s} value={s}>
+                                      {s}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               ) : (
                 <EmptyState
                   icon={FileText}
-                  title="No offers"
-                  description="Generate offers from the Applications tab when candidates are ready."
+                  title="No offers yet"
+                  description="Generate an offer from Applications when a candidate is ready. You can then edit salary, benefits, and the letter before sending."
                 />
               )}
             </CardContent>
@@ -2073,96 +3133,310 @@ export default function RecruitmentPage() {
         </TabsContent>
 
         <TabsContent value="onboarding" className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Card>
+              <CardContent className="pt-5">
+                <p className="text-xs text-muted-foreground">Active hires</p>
+                <p className="text-2xl font-semibold text-emerald-700">
+                  {onboarding.filter((c) => c.status === "in_progress" || c.status === "pending").length}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-5">
+                <p className="text-xs text-muted-foreground">Completed</p>
+                <p className="text-2xl font-semibold">
+                  {onboarding.filter((c) => c.status === "completed").length}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-5">
+                <p className="text-xs text-muted-foreground">Avg. progress</p>
+                <p className="text-2xl font-semibold">
+                  {onboarding.length
+                    ? Math.round(
+                        onboarding.reduce((sum, c) => sum + Number(c.progress || 0), 0) / onboarding.length,
+                      )
+                    : 0}
+                  %
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
           <Card>
-            <CardHeader>
-              <CardTitle>Onboarding</CardTitle>
-              <CardDescription>Complete onboarding tasks and close onboarding checklists.</CardDescription>
+            <CardHeader className="pb-3">
+              <CardTitle>New hire onboarding</CardTitle>
             </CardHeader>
             <CardContent>
-              {onboarding.length ? (
-                <div className="grid gap-4">
-                  {onboarding.map((checklist) => (
-                    <div key={checklist.id} className="rounded-lg border p-4">
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-lg font-semibold">{checklist.candidate_name || "Candidate"}</h3>
-                            <Badge variant="outline" className={statusClass(checklist.status)}>
-                              {checklist.status || "unknown"}
-                            </Badge>
+              {orderedOnboarding.length ? (
+                <div className="grid gap-5">
+                  {focusedOnboardingId ? (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-950">
+                      Continue onboarding for the highlighted hire — complete remaining tasks, then{" "}
+                      <strong>Add to employees</strong> to place them on the employee list.
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="ml-2 h-7"
+                        onClick={() => {
+                          setFocusedOnboardingId(null)
+                          setFocusOnboardingLookup(null)
+                        }}
+                      >
+                        Clear focus
+                      </Button>
+                    </div>
+                  ) : null}
+                  {orderedOnboarding.map((checklist) => {
+                    const stages = [
+                      "welcome",
+                      "documents",
+                      "accounts",
+                      "payroll_setup",
+                      "orientation",
+                      "day_one",
+                      "completed",
+                    ]
+                    const stageLabels: Record<string, string> = {
+                      welcome: "Welcome",
+                      documents: "Documents",
+                      accounts: "Accounts",
+                      payroll_setup: "Payroll",
+                      orientation: "Orientation",
+                      day_one: "Day one",
+                      completed: "Done",
+                    }
+                    const currentStage = checklist.stage || "welcome"
+                    const stageIdx = Math.max(0, stages.indexOf(currentStage))
+                    const tasks = [...(checklist.tasks || [])].sort(
+                      (a, b) => Number(a.sort_order ?? 999) - Number(b.sort_order ?? 999),
+                    )
+                    const doneCount = tasks.filter(
+                      (t) => t.status === "completed" || t.status === "skipped",
+                    ).length
+                    const nextTask = tasks.find(
+                      (t) => t.status !== "completed" && t.status !== "skipped",
+                    )
+                    const isFocused = checklist.id === focusedOnboardingId
+                    return (
+                      <div
+                        id={`onboarding-${checklist.id}`}
+                        key={checklist.id}
+                        className={`overflow-hidden rounded-2xl border bg-gradient-to-br from-white via-white to-emerald-50/40 shadow-sm scroll-mt-24 ${
+                          isFocused
+                            ? "border-emerald-500 ring-2 ring-emerald-300"
+                            : "border-slate-200"
+                        }`}
+                      >
+                        {isFocused ? (
+                          <div className="bg-emerald-700 px-5 py-2 text-sm text-white">
+                            Continue here
+                            {nextTask ? ` · Next: ${nextTask.title}` : " · All tasks done — add to employees"}
                           </div>
-                          <p className="text-sm text-muted-foreground">
-                            {getOnboardingJobTitle(checklist)} · Start {formatDate(checklist.start_date)}
-                          </p>
-                          <div className="flex items-center gap-3">
-                            <Progress value={checklist.progress ?? 0} className="w-52" />
-                            <span className="text-sm font-medium">{checklist.progress ?? 0}%</span>
+                        ) : null}
+                        <div className="flex flex-col gap-4 border-b bg-white/80 p-5 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="space-y-2 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-xl font-semibold tracking-tight">
+                                {checklist.candidate_name || "New hire"}
+                              </h3>
+                              <Badge variant="outline" className={statusClass(checklist.status)}>
+                                {checklist.status || "in_progress"}
+                              </Badge>
+                              {checklist.auto_started ? (
+                                <Badge variant="secondary">Auto-started</Badge>
+                              ) : null}
+                              {checklist.employee_id ? (
+                                <Badge className="bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
+                                  On employee list
+                                </Badge>
+                              ) : null}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {checklist.job_title || getOnboardingJobTitle(checklist)}
+                              {checklist.department ? ` · ${checklist.department}` : ""}
+                              {" · "}Start {formatDate(checklist.start_date)}
+                            </p>
+                            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                              {checklist.manager_name ? <span>Manager: {checklist.manager_name}</span> : null}
+                              {checklist.buddy_name ? <span>Buddy: {checklist.buddy_name}</span> : null}
+                              <span>
+                                Tasks {doneCount}/{tasks.length}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-2 shrink-0">
+                            <div className="flex items-center gap-3">
+                              <Progress value={checklist.progress ?? 0} className="h-2 w-40" />
+                              <span className="text-sm font-semibold tabular-nums">
+                                {checklist.progress ?? 0}%
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap justify-end gap-2">
+                              {nextTask ? (
+                                <Button
+                                  size="sm"
+                                  className="bg-emerald-600 hover:bg-emerald-700"
+                                  disabled={saving}
+                                  onClick={() => void handleTaskComplete(nextTask)}
+                                >
+                                  <Check className="h-4 w-4" />
+                                  Complete next task
+                                </Button>
+                              ) : null}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={saving || checklist.status === "completed"}
+                                onClick={() => void handleCompleteOnboarding(checklist)}
+                              >
+                                <CheckCircle2 className="h-4 w-4" />
+                                {checklist.status === "completed" ? "Completed" : "Mark complete"}
+                              </Button>
+                              {checklist.employee_id ? (
+                                <Button size="sm" variant="secondary" asChild>
+                                  <a href="/app/employees">View employee list</a>
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  className="bg-emerald-600 hover:bg-emerald-700"
+                                  disabled={convertLoading}
+                                  onClick={() => void openHireConvert(checklist)}
+                                >
+                                  <UserPlus className="h-4 w-4" />
+                                  Add to employees
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={saving || checklist.status === "completed"}
-                          onClick={() => void handleCompleteOnboarding(checklist)}
-                        >
-                          <CheckCircle2 className="h-4 w-4" />
-                          Complete onboarding
-                        </Button>
+
+                        <div className="space-y-4 p-5">
+                          <div className="flex flex-wrap gap-2">
+                            {stages.map((stage, idx) => {
+                              const active = idx === stageIdx
+                              const done = idx < stageIdx || currentStage === "completed"
+                              return (
+                                <div
+                                  key={stage}
+                                  className={`rounded-full px-3 py-1 text-xs font-medium border ${
+                                    done
+                                      ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                      : active
+                                        ? "bg-slate-900 text-white border-slate-900"
+                                        : "bg-white text-slate-500 border-slate-200"
+                                  }`}
+                                >
+                                  {stageLabels[stage] || stage}
+                                </div>
+                              )
+                            })}
+                          </div>
+
+                          {checklist.progress_notes ? (
+                            <p className="rounded-lg border border-amber-100 bg-amber-50/70 px-3 py-2 text-xs text-amber-950">
+                              Latest note: {checklist.progress_notes}
+                            </p>
+                          ) : null}
+
+                          <div className="grid gap-2">
+                            {tasks.length ? (
+                              tasks.map((task) => {
+                                const done = task.status === "completed" || task.status === "skipped"
+                                const linkedOffer =
+                                  checklist.offer_id
+                                    ? offers.find((o) => o.id === checklist.offer_id)
+                                    : null
+                                return (
+                                  <div
+                                    key={task.id}
+                                    className={`flex flex-col gap-2 rounded-xl border bg-white p-3 ${
+                                      done ? "opacity-80" : ""
+                                    }`}
+                                  >
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                      <div className="min-w-0 space-y-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <p className={`font-medium ${done ? "line-through" : ""}`}>
+                                            {task.title}
+                                          </p>
+                                          {task.stage ? (
+                                            <Badge variant="outline" className="text-[10px] capitalize">
+                                              {String(task.stage).replace(/_/g, " ")}
+                                            </Badge>
+                                          ) : null}
+                                          <Badge variant="outline" className={statusClass(task.status)}>
+                                            {task.status || "pending"}
+                                          </Badge>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                          {task.description || task.task_type || "Onboarding task"}
+                                          {" · "}
+                                          {task.assigned_department ||
+                                            task.assigned_to ||
+                                            task.department ||
+                                            "Unassigned"}
+                                          {" · Due "}
+                                          {formatDate(task.due_date)}
+                                        </p>
+                                      </div>
+                                      <Button
+                                        size="sm"
+                                        variant={done ? "secondary" : "outline"}
+                                        className="shrink-0"
+                                        disabled={saving || done}
+                                        onClick={() => void handleTaskComplete(task)}
+                                      >
+                                        {done ? "Done" : "Mark complete"}
+                                      </Button>
+                                    </div>
+                                    <OnboardingTaskArtifactPanel
+                                      task={task}
+                                      companyId={companyId}
+                                      disabled={saving}
+                                      offerSignatures={{
+                                        candidate: linkedOffer?.candidate_signature_name || null,
+                                        hr:
+                                          linkedOffer?.hr_signature_name ||
+                                          linkedOffer?.signatory_name ||
+                                          null,
+                                        vaultId: linkedOffer?.signed_letter_vault_id || null,
+                                      }}
+                                      onSaved={async () => {
+                                        await loadRecruitment(companyId)
+                                      }}
+                                      onError={(message) =>
+                                        toast({
+                                          title: "Could not save task details",
+                                          description: message,
+                                          variant: "destructive",
+                                        })
+                                      }
+                                    />
+                                  </div>
+                                )
+                              })
+                            ) : (
+                              <EmptyState
+                                icon={ClipboardCheck}
+                                title="No onboarding tasks"
+                                description="Tasks appear when onboarding starts from an accepted offer."
+                              />
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div className="mt-4">
-                        {checklist.tasks?.length ? (
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Task</TableHead>
-                                <TableHead>Owner</TableHead>
-                                <TableHead>Due</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Action</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {checklist.tasks.map((task) => (
-                                <TableRow key={task.id}>
-                                  <TableCell>
-                                    <p className="font-medium">{task.title}</p>
-                                    <p className="text-xs text-muted-foreground">{task.description || task.task_type || "Onboarding task"}</p>
-                                  </TableCell>
-                                  <TableCell>
-                                    {task.assigned_department || task.assigned_to || task.department || "Unassigned"}
-                                  </TableCell>
-                                  <TableCell>{formatDate(task.due_date)}</TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline" className={statusClass(task.status)}>
-                                      {task.status || "pending"}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      disabled={saving || task.status === "completed"}
-                                      onClick={() => void handleTaskComplete(task)}
-                                    >
-                                      Mark completed
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        ) : (
-                          <EmptyState icon={ClipboardCheck} title="No onboarding tasks" description="Tasks will appear after onboarding is started." />
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : (
                 <EmptyState
                   icon={UserPlus}
-                  title="No onboarding checklists"
-                  description="Start onboarding from an accepted or ready application."
+                  title="No active onboarding"
+                  description="When an offer is accepted (portal or admin), the hire appears here automatically."
                 />
               )}
             </CardContent>
@@ -2224,6 +3498,820 @@ export default function RecruitmentPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Application preview */}
+      <Dialog open={Boolean(previewApplication)} onOpenChange={(open) => !open && setPreviewApplication(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Application preview</DialogTitle>
+          </DialogHeader>
+          {previewLoading ? (
+            <div className="flex items-center gap-2 py-10 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading application…
+            </div>
+          ) : previewApplication ? (
+            <div className="space-y-5">
+              <div className="rounded-xl border bg-slate-50 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-xl font-semibold">{previewApplication.candidate_name || "Candidate"}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {previewApplication.job_title || "Role"}
+                      {previewApplication.department ? ` · ${previewApplication.department}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className={statusClass(previewApplication.status)}>
+                      {previewApplication.status || "unknown"}
+                    </Badge>
+                    <Badge variant="secondary">{previewApplication.score ?? 0}% score</Badge>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 text-sm">
+                <p><span className="text-muted-foreground">Email:</span> {previewApplication.candidate_email || "—"}</p>
+                <p><span className="text-muted-foreground">Phone:</span> {previewApplication.candidate_phone || "—"}</p>
+                <p><span className="text-muted-foreground">Location:</span> {previewApplication.location || "—"}</p>
+                <p><span className="text-muted-foreground">Source:</span> {previewApplication.source || "—"}</p>
+                <p><span className="text-muted-foreground">Education:</span> {previewApplication.education || "—"}</p>
+                <p><span className="text-muted-foreground">Previous company:</span> {previewApplication.previous_company || "—"}</p>
+                <p className="sm:col-span-2">
+                  <span className="text-muted-foreground">Skills:</span>{" "}
+                  {asStringList(previewApplication.skills).join(", ") || "—"}
+                </p>
+                <p className="sm:col-span-2">
+                  <span className="text-muted-foreground">LinkedIn:</span>{" "}
+                  {previewApplication.linkedin_url ? (
+                    <a
+                      href={previewApplication.linkedin_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-emerald-700 hover:underline break-all"
+                    >
+                      {previewApplication.linkedin_url}
+                    </a>
+                  ) : (
+                    "—"
+                  )}
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-medium mb-1">Experience summary</h4>
+                <p className="text-sm whitespace-pre-wrap text-muted-foreground">
+                  {previewApplication.experience_text?.trim() || "No experience summary provided."}
+                </p>
+              </div>
+
+              {previewApplication.cover_letter ? (
+                <div>
+                  <h4 className="font-medium mb-1">Cover note</h4>
+                  <p className="text-sm whitespace-pre-wrap text-muted-foreground">{previewApplication.cover_letter}</p>
+                </div>
+              ) : null}
+
+              <div className="rounded-xl border bg-slate-50/80 p-4 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="font-medium">CV / Resume for ATS</h4>
+                  {previewApplication.resume_text_chars && previewApplication.resume_text_chars > 40 ? (
+                    <Badge variant="secondary" className="bg-emerald-100 text-emerald-800">
+                      Readable · {previewApplication.resume_text_chars.toLocaleString()} chars
+                      {previewApplication.resume_text_method ? ` · ${previewApplication.resume_text_method}` : ""}
+                    </Badge>
+                  ) : previewApplication.resume_text?.trim() && previewApplication.resume_text.length > 40 ? (
+                    <Badge variant="secondary" className="bg-emerald-100 text-emerald-800">
+                      Readable · {previewApplication.resume_text.length.toLocaleString()} chars
+                    </Badge>
+                  ) : previewApplication.resume_url || previewApplication.resume_filename ? (
+                    <Badge variant="outline" className="text-amber-800 border-amber-300">
+                      Uploaded — text will extract on screen
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">No CV</Badge>
+                  )}
+                </div>
+                {previewApplication.resume_extract_warning ? (
+                  <p className="text-xs text-amber-700">{previewApplication.resume_extract_warning}</p>
+                ) : null}
+                {previewApplication.resume_url ? (
+                  <Button asChild variant="outline" size="sm">
+                    <a href={previewApplication.resume_url} target="_blank" rel="noreferrer">
+                      <FileText className="h-4 w-4" />
+                      {previewApplication.resume_filename || "View CV"}
+                    </a>
+                  </Button>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No CV uploaded</p>
+                )}
+                {previewApplication.resume_text?.trim() ? (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Extracted text (used by ATS AI)</p>
+                    <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-lg border bg-white p-3 text-xs text-slate-700">
+                      {previewApplication.resume_text.slice(0, 4000)}
+                      {previewApplication.resume_text.length > 4000 ? "…" : ""}
+                    </pre>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setPreviewApplication(null)
+                    void openScreeningWorkspace(previewApplication)
+                  }}
+                >
+                  Run ATS screen
+                </Button>
+              </div>
+
+              {previewApplication.screening_summary ? (
+                <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-3 text-sm">
+                  <p className="font-medium text-emerald-900">Latest screening</p>
+                  <p className="mt-1 text-emerald-900/80">{previewApplication.screening_summary}</p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* ATS screening workspace */}
+      <Dialog
+        open={Boolean(screeningApplication)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setScreeningApplication(null)
+            setScreeningResult(null)
+            setScreeningMeta(null)
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>ATS screening</DialogTitle>
+          </DialogHeader>
+          {screeningApplication ? (
+            <div className="space-y-4">
+              <div>
+                <p className="font-semibold">{screeningApplication.candidate_name || "Candidate"}</p>
+                <p className="text-sm text-muted-foreground">
+                  {screeningApplication.job_title || getApplicationJobTitle(screeningApplication)}
+                </p>
+              </div>
+
+              {screeningLoading ? (
+                <div className="rounded-xl border bg-slate-50 p-6 space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Screening CV / cover letter against role requirements…
+                  </div>
+                  <Progress value={66} className="h-2" />
+                  <p className="text-xs text-muted-foreground">
+                    Status moves to <strong>screening</strong>. AI proposes a score; you can override before saving.
+                  </p>
+                </div>
+              ) : null}
+
+              {screeningResult ? (
+                <div className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-lg border p-3">
+                      <p className="text-xs text-muted-foreground">AI score</p>
+                      <p className="text-2xl font-bold text-emerald-700">{screeningResult.ai_score}/100</p>
+                    </div>
+                    <div className="rounded-lg border p-3 sm:col-span-2">
+                      <p className="text-xs text-muted-foreground">Recommendation</p>
+                      <p className="text-lg font-semibold capitalize">
+                        {String(screeningResult.recommendation || "").replace(/_/g, " ")}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">Model: {screeningResult.model_used}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border bg-slate-50 p-3 text-xs text-muted-foreground space-y-1">
+                    <p>
+                      CV text used:{" "}
+                      <span className="font-medium text-foreground">
+                        {screeningResult.resume_chars_used ?? screeningMeta?.chars ?? 0} chars
+                      </span>
+                      {screeningMeta?.method ? ` (${screeningMeta.method})` : ""}
+                    </p>
+                    {screeningMeta?.warning ? <p className="text-amber-700">{screeningMeta.warning}</p> : null}
+                    {screeningMeta?.groq_configured === false ||
+                    String(screeningResult.model_used || "").includes("heuristic") ? (
+                      <p>
+                        Groq AI key not active — using heuristic scoring. Set{" "}
+                        <code className="rounded bg-white px-1">GROQ_API_KEY</code> in your deployment env
+                        (see docs/GROQ_API_SETUP.md). Get a free key at{" "}
+                        <a
+                          href="https://console.groq.com/keys"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-emerald-700 underline"
+                        >
+                          console.groq.com/keys
+                        </a>
+                        .
+                      </p>
+                    ) : (
+                      <p className="text-emerald-800">Groq AI screening active.</p>
+                    )}
+                  </div>
+
+                  <p className="text-sm whitespace-pre-wrap">{screeningResult.summary}</p>
+
+                  {screeningResult.resume_excerpt ? (
+                    <div>
+                      <h4 className="text-sm font-medium mb-1">CV excerpt used by ATS</h4>
+                      <pre className="max-h-36 overflow-y-auto whitespace-pre-wrap rounded-lg border bg-white p-3 text-xs text-slate-700">
+                        {screeningResult.resume_excerpt}
+                      </pre>
+                    </div>
+                  ) : null}
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <h4 className="text-sm font-medium mb-1">Strengths</h4>
+                      <ul className="list-disc pl-4 text-sm text-muted-foreground space-y-1">
+                        {(screeningResult.strengths || []).map((s: string) => (
+                          <li key={s}>{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium mb-1">Gaps</h4>
+                      <ul className="list-disc pl-4 text-sm text-muted-foreground space-y-1">
+                        {(screeningResult.gaps || []).map((s: string) => (
+                          <li key={s}>{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  {screeningResult.criteria_scores ? (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium">Criteria</h4>
+                      {Object.entries(screeningResult.criteria_scores).map(([key, value]) => (
+                        <div key={key} className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="capitalize">{key.replace(/_/g, " ")}</span>
+                            <span>{Number(value)}%</span>
+                          </div>
+                          <Progress value={Number(value)} className="h-1.5" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : !screeningLoading ? (
+                <p className="text-sm text-muted-foreground">No screening result yet.</p>
+              ) : null}
+
+              <div className="rounded-xl border p-4 space-y-3">
+                <h4 className="text-sm font-semibold">Manual score override</h4>
+                <p className="text-xs text-muted-foreground">
+                  Accept the AI score or set your own. Saving keeps status as screening and updates the queue score.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label>Final score (0–100)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={overrideScore}
+                      onChange={(e) => setOverrideScore(e.target.value)}
+                      disabled={screeningLoading}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Override reason</Label>
+                    <Input
+                      value={overrideReason}
+                      onChange={(e) => setOverrideReason(e.target.value)}
+                      placeholder="Optional"
+                      disabled={screeningLoading}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setScreeningApplication(null)}>
+                    Close
+                  </Button>
+                  <Button disabled={screeningLoading || screeningSaving} onClick={() => void saveScreeningOverride()}>
+                    {screeningSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    Save final score
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Offer editor */}
+      <Dialog
+        open={Boolean(editingOffer && offerEditForm)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingOffer(null)
+            setOfferEditForm(null)
+          }
+        }}
+      >
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              Edit offer — {editingOffer ? getOfferCandidateName(editingOffer) : "Candidate"}
+            </DialogTitle>
+          </DialogHeader>
+          {editingOffer && offerEditForm ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                {getOfferJobTitle(editingOffer)}
+                {editingOffer.candidate_email ? ` · ${editingOffer.candidate_email}` : ""}
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Monthly salary</Label>
+                  <Input
+                    type="number"
+                    value={offerEditForm.salary}
+                    onChange={(e) => setOfferEditForm({ ...offerEditForm, salary: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Currency</Label>
+                  <Input
+                    value={offerEditForm.currency}
+                    onChange={(e) => setOfferEditForm({ ...offerEditForm, currency: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Start date</Label>
+                  <Input
+                    type="date"
+                    value={offerEditForm.start_date}
+                    onChange={(e) => setOfferEditForm({ ...offerEditForm, start_date: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Acceptance deadline</Label>
+                  <Input
+                    type="date"
+                    value={offerEditForm.acceptance_deadline}
+                    onChange={(e) =>
+                      setOfferEditForm({ ...offerEditForm, acceptance_deadline: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Working hours</Label>
+                  <Input
+                    value={offerEditForm.working_hours}
+                    onChange={(e) => setOfferEditForm({ ...offerEditForm, working_hours: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Department</Label>
+                  <Input
+                    value={offerEditForm.department}
+                    onChange={(e) => setOfferEditForm({ ...offerEditForm, department: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Probation (months)</Label>
+                  <Input
+                    type="number"
+                    value={offerEditForm.probation_months}
+                    onChange={(e) =>
+                      setOfferEditForm({ ...offerEditForm, probation_months: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Notice (months)</Label>
+                  <Input
+                    type="number"
+                    value={offerEditForm.notice_months}
+                    onChange={(e) => setOfferEditForm({ ...offerEditForm, notice_months: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Signatory name</Label>
+                  <Input
+                    value={offerEditForm.signatory_name}
+                    onChange={(e) => setOfferEditForm({ ...offerEditForm, signatory_name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Signatory title</Label>
+                  <Input
+                    value={offerEditForm.signatory_title}
+                    onChange={(e) => setOfferEditForm({ ...offerEditForm, signatory_title: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Benefits (one per line)</Label>
+                <Textarea
+                  rows={3}
+                  value={offerEditForm.benefits}
+                  onChange={(e) => setOfferEditForm({ ...offerEditForm, benefits: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Extra remuneration (allowances, transport, etc.)</Label>
+                <Textarea
+                  rows={2}
+                  value={offerEditForm.remuneration_extras}
+                  onChange={(e) =>
+                    setOfferEditForm({ ...offerEditForm, remuneration_extras: e.target.value })
+                  }
+                  placeholder="Housing allowance GHS 500&#10;Transport allowance…"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Additional terms</Label>
+                <Textarea
+                  rows={2}
+                  value={offerEditForm.terms}
+                  onChange={(e) => setOfferEditForm({ ...offerEditForm, terms: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Label>Offer letter</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={offerSaving}
+                      onClick={() => void saveOfferEdits({ regenerate: true })}
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Regenerate
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={offerSaving}
+                      onClick={() => void saveOfferEdits({ polish: true })}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      AI polish
+                    </Button>
+                  </div>
+                </div>
+                <Textarea
+                  rows={14}
+                  value={offerEditForm.offer_letter_text}
+                  onChange={(e) =>
+                    setOfferEditForm({ ...offerEditForm, offer_letter_text: e.target.value })
+                  }
+                  className="font-mono text-xs"
+                />
+                {editingOffer.ai_letter_notes ? (
+                  <p className="text-xs text-muted-foreground">{editingOffer.ai_letter_notes}</p>
+                ) : null}
+
+                {/* Signature section on the offer letter */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-4">
+                  <div>
+                    <p className="text-sm font-semibold">Signatures on this offer letter</p>
+                    <p className="text-xs text-muted-foreground">
+                      HR Head must sign before the letter is sent. The candidate signs on the response portal
+                      when accepting.
+                    </p>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-lg border bg-white p-3 space-y-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        HR Head (sign first)
+                      </p>
+                      {editingOffer.hr_signed_at || editingOffer.hr_signature_name ? (
+                        <div>
+                          <p className="font-serif text-xl italic text-slate-900">
+                            {offerEditForm.hr_signature_name ||
+                              editingOffer.hr_signature_name ||
+                              editingOffer.signatory_name}
+                          </p>
+                          <p className="text-xs text-emerald-700">
+                            Signed
+                            {editingOffer.hr_signed_at
+                              ? ` · ${new Date(editingOffer.hr_signed_at).toLocaleString()}`
+                              : ""}
+                            {offerEditForm.signatory_title
+                              ? ` · ${offerEditForm.signatory_title}`
+                              : ""}
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <Input
+                            value={offerEditForm.hr_signature_name}
+                            onChange={(e) =>
+                              setOfferEditForm({
+                                ...offerEditForm,
+                                hr_signature_name: e.target.value,
+                                signatory_name: e.target.value || offerEditForm.signatory_name,
+                              })
+                            }
+                            placeholder="Type HR Head full name"
+                          />
+                          <Input
+                            value={offerEditForm.signatory_title}
+                            onChange={(e) =>
+                              setOfferEditForm({ ...offerEditForm, signatory_title: e.target.value })
+                            }
+                            placeholder="Title (e.g. Head of HR)"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="bg-emerald-600 hover:bg-emerald-700"
+                            disabled={offerSaving || !offerEditForm.hr_signature_name.trim()}
+                            onClick={() => void saveOfferEdits({ signHr: true })}
+                          >
+                            {offerSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            Sign as HR Head
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                    <div className="rounded-lg border bg-white p-3 space-y-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        Candidate (signs on accept)
+                      </p>
+                      {editingOffer.candidate_signature_name ? (
+                        <div>
+                          <p className="font-serif text-xl italic text-slate-900">
+                            {editingOffer.candidate_signature_name}
+                          </p>
+                          <p className="text-xs text-emerald-700">
+                            Signed
+                            {editingOffer.candidate_signed_at
+                              ? ` · ${new Date(editingOffer.candidate_signed_at).toLocaleString()}`
+                              : ""}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          Awaiting candidate signature on the offer portal after send.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => { setEditingOffer(null); setOfferEditForm(null) }}>
+                  Cancel
+                </Button>
+                <Button disabled={offerSaving} onClick={() => void saveOfferEdits()}>
+                  {offerSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Save changes
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Offer preview */}
+      <Dialog open={Boolean(offerPreview)} onOpenChange={(open) => !open && setOfferPreview(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Offer preview</DialogTitle>
+          </DialogHeader>
+          {offerPreview ? (
+            <div className="space-y-4">
+              <div className="rounded-xl border bg-slate-50 p-4">
+                <p className="font-semibold">{getOfferCandidateName(offerPreview)}</p>
+                <p className="text-sm text-muted-foreground">{getOfferJobTitle(offerPreview)}</p>
+                <p className="mt-2 text-sm">
+                  {offerPreview.currency || "GHS"} {(offerPreview.salary ?? 0).toLocaleString()} · Start{" "}
+                  {formatDate(offerPreview.start_date)}
+                </p>
+              </div>
+              <pre className="max-h-[50vh] overflow-y-auto whitespace-pre-wrap rounded-xl border bg-white p-4 text-xs">
+                {offerPreview.offer_letter_text || "No letter drafted yet."}
+              </pre>
+              <div className="grid gap-4 sm:grid-cols-2 rounded-xl border bg-slate-50 p-4">
+                <div className="space-y-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    HR Head signature
+                  </p>
+                  {offerPreview.hr_signature_name || offerPreview.signatory_name ? (
+                    <>
+                      <p className="font-serif text-xl italic">
+                        {offerPreview.hr_signature_name || offerPreview.signatory_name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {offerPreview.signatory_title || "HR Head"}
+                        {offerPreview.hr_signed_at
+                          ? ` · ${new Date(offerPreview.hr_signed_at).toLocaleString()}`
+                          : ""}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-amber-700">Not signed yet — sign before sending</p>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Candidate signature
+                  </p>
+                  {offerPreview.candidate_signature_name ? (
+                    <>
+                      <p className="font-serif text-xl italic">{offerPreview.candidate_signature_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {offerPreview.candidate_signed_at
+                          ? new Date(offerPreview.candidate_signed_at).toLocaleString()
+                          : "Signed"}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Candidate signs on the portal when accepting
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 justify-end">
+                <Button variant="outline" onClick={() => handleDownloadOfferPdf(offerPreview)}>
+                  <Download className="h-4 w-4" />
+                  PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setOfferPreview(null)
+                    openOfferEditor(offerPreview)
+                  }}
+                >
+                  <Pencil className="h-4 w-4" />
+                  Edit
+                </Button>
+                <Button onClick={() => setOfferPreview(null)}>Close</Button>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Hire → employee convert preview */}
+      <Dialog
+        open={Boolean(convertChecklist)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConvertChecklist(null)
+            setConvertPreview(null)
+            setConvertDraft(null)
+          }
+        }}
+      >
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add hire to employee list</DialogTitle>
+          </DialogHeader>
+          {convertLoading ? (
+            <div className="flex items-center gap-2 py-10 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Preparing employee draft…
+            </div>
+          ) : convertDraft ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Details are prefilled from the offer and candidate profile. Confirm to create (or link) the
+                employee securely — nothing is invented for bank/SSNIT unless you opt in to payroll.
+              </p>
+
+              {convertPreview?.conflicts?.already_converted || convertPreview?.conflicts?.existing_employee ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                  {convertPreview?.conflicts?.already_converted
+                    ? "This onboarding is already linked to an employee."
+                    : `An employee with this email already exists (${convertPreview.conflicts.existing_employee.employee_id}). Confirming will link that record instead of creating a duplicate.`}
+                </div>
+              ) : null}
+
+              {convertPreview?.missing_fields?.length ? (
+                <p className="text-xs text-amber-700">
+                  Review missing fields: {convertPreview.missing_fields.join(", ")}
+                </p>
+              ) : null}
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>First name</Label>
+                  <Input
+                    value={convertDraft.first_name}
+                    onChange={(e) => setConvertDraft({ ...convertDraft, first_name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Last name</Label>
+                  <Input
+                    value={convertDraft.last_name}
+                    onChange={(e) => setConvertDraft({ ...convertDraft, last_name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Personal email</Label>
+                  <Input
+                    type="email"
+                    value={convertDraft.personal_email}
+                    onChange={(e) => setConvertDraft({ ...convertDraft, personal_email: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Corporate email (optional)</Label>
+                  <Input
+                    type="email"
+                    value={convertDraft.corporate_email}
+                    onChange={(e) => setConvertDraft({ ...convertDraft, corporate_email: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Phone</Label>
+                  <Input
+                    value={convertDraft.phone}
+                    onChange={(e) => setConvertDraft({ ...convertDraft, phone: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Start / joining date</Label>
+                  <Input
+                    type="date"
+                    value={convertDraft.date_of_joining}
+                    onChange={(e) => setConvertDraft({ ...convertDraft, date_of_joining: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Position</Label>
+                  <Input
+                    value={convertDraft.position}
+                    onChange={(e) => setConvertDraft({ ...convertDraft, position: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Department</Label>
+                  <Input
+                    value={convertDraft.department}
+                    onChange={(e) => setConvertDraft({ ...convertDraft, department: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {convertPreview?.draft?.suggested_monthly_salary != null ? (
+                <label className="flex items-start gap-2 rounded-lg border bg-slate-50 p-3 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={convertIncludePayroll}
+                    onChange={(e) => setConvertIncludePayroll(e.target.checked)}
+                  />
+                  <span>
+                    Also set suggested monthly salary{" "}
+                    <strong>
+                      {convertPreview.draft.currency || "GHS"}{" "}
+                      {Number(convertPreview.draft.suggested_monthly_salary).toLocaleString()}
+                    </strong>{" "}
+                    (no bank/SSNIT placeholders — HR completes payroll setup later).
+                  </span>
+                </label>
+              ) : null}
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setConvertChecklist(null)
+                    setConvertPreview(null)
+                    setConvertDraft(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  disabled={convertSaving || !convertDraft.first_name || !convertDraft.last_name}
+                  onClick={() => void confirmHireConvert()}
+                >
+                  {convertSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {convertPreview?.conflicts?.existing_employee ? "Link existing employee" : "Create employee"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No draft available.</p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

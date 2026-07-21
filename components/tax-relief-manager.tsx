@@ -37,9 +37,16 @@ import GRAPortalIntegration from './gra-portal-integration';
 interface TaxReliefManagerProps {
   onReliefsChange?: (reliefs: GRATaxRelief[]) => void;
   initialReliefs?: GRATaxRelief[];
+  companyId?: string | null;
+  onSaveReliefs?: (reliefs: GRATaxRelief[]) => Promise<void> | void;
 }
 
-export default function TaxReliefManager({ onReliefsChange, initialReliefs = [] }: TaxReliefManagerProps) {
+export default function TaxReliefManager({
+  onReliefsChange,
+  initialReliefs = [],
+  companyId,
+  onSaveReliefs,
+}: TaxReliefManagerProps) {
   const { toast } = useToast();
   const [reliefs, setReliefs] = useState<GRATaxRelief[]>(initialReliefs);
   const [editingRelief, setEditingRelief] = useState<number | null>(null);
@@ -47,14 +54,19 @@ export default function TaxReliefManager({ onReliefsChange, initialReliefs = [] 
   const [syncStatus, setSyncStatus] = useState<GRASyncStatus>(graApiService.getSyncStatus());
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [apiKey, setApiKey] = useState('');
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(true);
 
   const categories = [
     'Personal', 'Family', 'Age', 'Disability', 'Education', 
     'Medical', 'Housing', 'Investment', 'Other'
   ];
+
+  // Sync from parent when DB load replaces reliefs (by id signature)
+  const initialSignature = (initialReliefs || []).map((r) => r.id || r.name).join("|")
+  useEffect(() => {
+    setReliefs(initialReliefs || [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSignature])
 
   useEffect(() => {
     if (onReliefsChange) {
@@ -62,48 +74,79 @@ export default function TaxReliefManager({ onReliefsChange, initialReliefs = [] 
     }
   }, [reliefs, onReliefsChange]);
 
-  const filteredReliefs = reliefs.filter(relief => {
-    const matchesSearch = relief.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         relief.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         relief.graCode.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = filterCategory === 'all' || relief.category === filterCategory;
-    return matchesSearch && matchesCategory;
+  const filteredReliefs = (reliefs || []).filter((relief) => {
+    const term = searchTerm.toLowerCase()
+    const matchesSearch =
+      String(relief?.name ?? "").toLowerCase().includes(term) ||
+      String(relief?.description ?? "").toLowerCase().includes(term) ||
+      String(relief?.graCode ?? "").toLowerCase().includes(term)
+    const matchesCategory = filterCategory === "all" || relief?.category === filterCategory
+    return matchesSearch && matchesCategory
   });
 
   const handleSyncFromGRA = async () => {
     setIsSyncing(true);
     
     try {
-      // Test connection first
-      if (apiKey) {
-        graApiService.setApiKey(apiKey);
-        const connected = await graApiService.testConnection();
-        setIsConnected(connected);
-        
-        if (!connected) {
+      // Auto-sync from Akwaaba's official GRA catalog (no API key required).
+      const response = await fetch("/api/gra/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "auto_sync" }),
+      });
+      const result = await response.json().catch(() => ({}));
+      const comprehensiveReliefs =
+        result?.data?.taxReliefs || (await graApiService.getComprehensiveTaxReliefs());
+
+      const normalized = (comprehensiveReliefs || []).map((r: any, index: number) => ({
+        ...r,
+        id: undefined,
+        name: r.name || `GRA Relief ${index + 1}`,
+        description: r.description || "",
+        amount: Number(r.amount || 0),
+        currency: r.currency || "GHS",
+        category: r.category || "Personal",
+        graCode: r.graCode || r.code || "",
+        isActive: r.isActive !== false,
+        effectiveDate: r.effectiveDate || new Date().toISOString().slice(0, 10),
+      }));
+
+      setReliefs(normalized as any);
+      setIsConnected(true);
+      setSyncStatus({
+        ...graApiService.getSyncStatus(),
+        isConnected: true,
+        lastSync: result.lastSync || new Date().toISOString(),
+        syncInProgress: false,
+      });
+
+      if (onSaveReliefs) {
+        try {
+          await onSaveReliefs(normalized);
           toast({
-            title: "Connection Failed",
-            description: "Unable to connect to GRA API. Using comprehensive local data instead.",
+            title: "Tax Reliefs Synced & Saved",
+            description: `Synced ${normalized.length} GRA reliefs and saved them to your company catalog.`,
+          });
+        } catch (saveErr) {
+          toast({
+            title: "Synced — save needed",
+            description:
+              (saveErr instanceof Error ? saveErr.message : "Could not auto-save.") +
+              " Reliefs are loaded below — click Save All to persist.",
             variant: "destructive",
           });
         }
+      } else {
+        toast({
+          title: "Tax Reliefs Synced",
+          description: `Synced ${normalized.length} official GRA reliefs. Click Save All to persist them.`,
+        });
       }
-
-      // Get comprehensive tax reliefs (simulated GRA data)
-      const comprehensiveReliefs = await graApiService.getComprehensiveTaxReliefs();
-      
-      setReliefs(comprehensiveReliefs);
-      setSyncStatus(graApiService.getSyncStatus());
-      
-      toast({
-        title: "Tax Reliefs Synced",
-        description: `Successfully synced ${comprehensiveReliefs.length} tax reliefs from GRA portal.`,
-      });
     } catch (error) {
       console.error('Error syncing tax reliefs:', error);
       toast({
         title: "Sync Failed",
-        description: "Failed to sync tax reliefs. Please check your connection and try again.",
+        description: error instanceof Error ? error.message : "Failed to sync tax reliefs. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -157,17 +200,36 @@ export default function TaxReliefManager({ onReliefsChange, initialReliefs = [] 
 
   const handleSaveReliefs = async () => {
     try {
-      // Simulate save operation
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      if (onSaveReliefs) {
+        await onSaveReliefs(reliefs);
+        return;
+      }
+
+      if (!companyId || String(companyId).startsWith("demo-")) {
+        throw new Error("No company identifier available");
+      }
+
+      const res = await fetch("/api/settings/payroll/items", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save_tax_reliefs",
+          company_id: companyId,
+          taxReliefs: reliefs,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to save tax reliefs");
+
       toast({
         title: "Tax Reliefs Saved",
-        description: "Tax reliefs have been saved successfully.",
+        description: "Tax reliefs have been saved to the database.",
       });
     } catch (error) {
       toast({
         title: "Save Failed",
-        description: "Failed to save tax reliefs. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to save tax reliefs. Please try again.",
         variant: "destructive",
       });
     }
@@ -269,75 +331,45 @@ export default function TaxReliefManager({ onReliefsChange, initialReliefs = [] 
         </CardContent>
       </Card>
 
-      {/* API Configuration */}
+      {/* GRA catalog — auto-synced locally (no API key) */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Settings className="w-5 h-5" />
             <span>GRA API Configuration</span>
           </CardTitle>
+          <CardDescription>
+            Auto-synced from Akwaaba&apos;s official GRA personal tax relief catalog. No API key required.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="apiKey">GRA API Key</Label>
-              <Input
-                id="apiKey"
-                type="password"
-                placeholder="Enter your GRA API key"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                className="mt-1"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Get your API key from the GRA developer portal
-              </p>
-            </div>
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Source:{' '}
+                <a
+                  href="https://gra.gov.gh/domestic-tax/personal-tax-relief/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  gra.gov.gh/domestic-tax/personal-tax-relief
+                </a>
+                . Use Sync from GRA above, then Save All to store reliefs for this company.
+              </AlertDescription>
+            </Alert>
             <div className="flex items-center space-x-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-              >
-                <Settings className="w-4 h-4 mr-2" />
-                Advanced Settings
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => graApiService.setApiKey(apiKey)}
-                disabled={!apiKey}
-              >
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Test Connection
+              <Badge className="bg-green-100 text-green-800">Catalog ready</Badge>
+              <Button size="sm" variant="outline" onClick={handleSyncFromGRA} disabled={isSyncing}>
+                {isSyncing ? (
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                )}
+                Refresh catalog
               </Button>
             </div>
-            {showAdvanced && (
-              <div className="space-y-2 p-4 bg-gray-50 rounded-lg">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Sync Frequency</Label>
-                    <Select defaultValue="daily">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="hourly">Every Hour</SelectItem>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="manual">Manual Only</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Auto-sync</Label>
-                    <div className="flex items-center space-x-2 mt-2">
-                      <Switch id="autoSync" />
-                      <Label htmlFor="autoSync">Enable automatic syncing</Label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>
@@ -424,23 +456,23 @@ export default function TaxReliefManager({ onReliefsChange, initialReliefs = [] 
                         <div className="space-y-2">
                           {editingRelief === index ? (
                             <Input
-                              value={relief.name}
+                              value={relief.name ?? ""}
                               onChange={(e) => handleReliefFieldChange(index, 'name', e.target.value)}
                               placeholder="Relief name"
                               className="font-medium"
                             />
                           ) : (
-                            <h3 className="font-medium text-lg">{relief.name}</h3>
+                            <h3 className="font-medium text-lg">{relief.name || "Untitled relief"}</h3>
                           )}
                           {editingRelief === index ? (
                             <Textarea
-                              value={relief.description}
+                              value={relief.description ?? ""}
                               onChange={(e) => handleReliefFieldChange(index, 'description', e.target.value)}
                               placeholder="Description"
                               rows={2}
                             />
                           ) : (
-                            <p className="text-sm text-gray-600">{relief.description}</p>
+                            <p className="text-sm text-gray-600">{relief.description || ""}</p>
                           )}
                         </div>
                       </div>
@@ -464,7 +496,7 @@ export default function TaxReliefManager({ onReliefsChange, initialReliefs = [] 
                           </div>
                           {editingRelief === index ? (
                             <Select
-                              value={relief.category}
+                              value={categories.includes(relief.category) ? relief.category : "Personal"}
                               onValueChange={(value) => handleReliefFieldChange(index, 'category', value)}
                             >
                               <SelectTrigger>
@@ -487,14 +519,14 @@ export default function TaxReliefManager({ onReliefsChange, initialReliefs = [] 
                         <div className="space-y-2">
                           {editingRelief === index ? (
                             <Input
-                              value={relief.graCode}
+                              value={relief.graCode ?? ""}
                               onChange={(e) => handleReliefFieldChange(index, 'graCode', e.target.value)}
                               placeholder="GRA Code"
                             />
                           ) : (
                             <div className="flex items-center space-x-2">
                               <span className="text-sm text-gray-500">GRA Code:</span>
-                              <code className="text-sm bg-gray-100 px-2 py-1 rounded">{relief.graCode}</code>
+                              <code className="text-sm bg-gray-100 px-2 py-1 rounded">{relief.graCode || "—"}</code>
                             </div>
                           )}
                           <div className="flex items-center space-x-2">

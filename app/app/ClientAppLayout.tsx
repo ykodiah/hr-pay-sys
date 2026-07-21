@@ -67,10 +67,16 @@ import {
   AlertCircle,
   Receipt,
 } from "lucide-react"
-import { Suspense, useState, useEffect } from "react"
+import { Suspense, useState, useEffect, useMemo } from "react"
 import { AIChatbox } from "@/components/ai-chatbox"
 import { EmployeeAIChatbox } from "@/components/employee-ai-chatbox"
 import { CurrencyProvider } from "@/lib/currency-context"
+import { NavTree } from "@/components/nav/NavTree"
+import {
+  APP_NAV_TREE,
+  APP_NAV_FLAT_SECTIONS,
+  filterNavTreeByGates,
+} from "@/lib/navigation/app-nav-tree"
 
 // Theme configuration and state management
 const themes = {
@@ -263,80 +269,64 @@ export default function ClientAppLayout({
     setBreadcrumbs(breadcrumbItems)
   }, [])
 
-  // Navigation data structure for better organization
-    const navigationSections = [
-      {
-        title: "Overview",
-        items: [
-          { name: "Dashboard", href: "/app", icon: LayoutDashboard, description: "Overview and key metrics" },
-        ],
-      },
-      {
-        title: "HR Management",
-        items: [
-          { name: "Employees", href: "/app/employees", icon: Users, description: "Manage employee records" },
-          { name: "Recruitment", href: "/app/recruitment", icon: UserPlus, description: "Hire new talent" },
-          { name: "Org Chart", href: "/app/org-chart", icon: Sitemap, description: "Organizational structure" },
-          { name: "Documents", href: "/app/documents", icon: FileText, description: "Document vault" },
-          { name: "Communication", href: "/app/communication", icon: MessageSquare, description: "Team communication" },
-          { name: "Comm. Settings", href: "/app/communication/settings", icon: Cog, description: "Channels, templates & credentials" },
-          { name: "Meetings", href: "/app/meetings", icon: Video, description: "Secure meetings workspace" },
-        ],
-      },
-      {
-        title: "Time & Attendance",
-        items: [
-          { name: "Attendance", href: "/app/attendance", icon: Clock, description: "Track work hours" },
-          { name: "Attendance Alerts", href: "/attendance/alerts", icon: AlertCircle, description: "Alerts & attendance rules" },
-          { name: "Leave Management", href: "/app/leave", icon: Calendar, description: "Manage leave requests" },
-          { name: "Overtime", href: "/app/overtime", icon: Timer, description: "Overtime requests" },
-        ],
-      },
-      {
-        title: "Performance",
-        items: [
-          { name: "Performance", href: "/app/performance", icon: Target, description: "Performance reviews" },
-          { name: "Promotions", href: "/app/promotions", icon: Award, description: "Career advancement" },
-          { name: "Learning", href: "/app/learning", icon: BookOpen, description: "Training & development" },
-        ],
-      },
-      {
-        title: "Payroll",
-        items: [
-          { name: "Pay Inputs", href: "/app/payroll/input", icon: ClipboardList, description: "Period emoluments & adjustments" },
-          { name: "Process Payroll", href: "/app/payroll", icon: Calculator, description: "Run statutory payroll" },
-          { name: "Payslips", href: "/app/payroll/payslips", icon: Receipt, description: "Generate & download payslips" },
-          { name: "Payroll History", href: "/app/payroll/history", icon: History, description: "Past payroll records" },
-          { name: "Approvals", href: "/app/approvals", icon: CheckSquare, description: "Approve payroll, leave & overtime" },
-          { name: "Loans", href: "/app/loans", icon: CreditCard, description: "Employee loans" },
-        ],
-      },
-      {
-        title: "Analytics",
-        items: [
-          { name: "Analytics", href: "/app/analytics", icon: BarChart3, description: "Reports & insights" },
-          { name: "Compliance Reports", href: "/app/reports", icon: FileCheck, description: "PAYE, SSNIT & statutory reports" },
-          { name: "ML Analytics", href: "/app/ml-analytics", icon: Brain, description: "AI-powered HR analytics" },
-        ],
-      },
-      {
-        title: "Employee Hub",
-        items: [
-          { name: "My Portal", href: "/app/self-service", icon: UserCheck, description: "Personalised employee workspace" },
-          { name: "Update My Details", href: "/app/self-service/update-details", icon: FileCheck, description: "Submit change requests" },
-          { name: "Change Requests", href: "/app/hr/change-requests", icon: ClipboardList, description: "Review employee change requests" },
-        ],
-      },
-      {
-        title: "Administration",
-        items: [
-          { name: "Disciplinary", href: "/app/disciplinary", icon: Shield, description: "Disciplinary actions" },
-          { name: "Offboarding", href: "/app/offboarding", icon: LogOut, description: "Employee exit process" },
-          { name: "Integrations", href: "/app/integrations", icon: Plug, description: "Third-party integrations" },
-          { name: "Settings", href: "/app/settings", icon: Settings, description: "System settings" },
-        ],
-      },
-    ]
+  // Flat leftover sections (Payroll / Analytics / Hub / Admin) — icons for sidebar
+  const flatSectionIconMap: Record<string, any> = {
+    payroll_input: ClipboardList,
+    payroll: Calculator,
+    tax_reliefs: Shield,
+    payslips: Receipt,
+    payroll_history: History,
+    approvals: CheckSquare,
+    loans: CreditCard,
+    analytics: BarChart3,
+    compliance_reports: FileCheck,
+    ml_analytics: Brain,
+    self_service: UserCheck,
+    update_details: FileCheck,
+    change_requests: ClipboardList,
+    disciplinary: Shield,
+    offboarding: LogOut,
+    integrations: Plug,
+    settings: Settings,
+  }
+
+  const [enabledModuleCodes, setEnabledModuleCodes] = useState<string[] | null>(null)
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const res = await fetch("/api/settings/modules", { credentials: "include", cache: "no-store" })
+        if (!res.ok) return
+        const data = await res.json()
+        if (Array.isArray(data.enabled_codes) && data.enabled_codes.length) {
+          setEnabledModuleCodes(data.enabled_codes)
+        }
+      } catch {
+        // keep full nav
+      }
+    })()
+  }, [])
+
+  const navTreeModules = useMemo(
+    () => filterNavTreeByGates(APP_NAV_TREE, enabledModuleCodes),
+    [enabledModuleCodes],
+  )
+
+  const flatNavigationSections = useMemo(
+    () =>
+      APP_NAV_FLAT_SECTIONS.map((section) => ({
+        title: section.title,
+        items: section.items
+          .filter((item) => !enabledModuleCodes || enabledModuleCodes.includes(item.code))
+          .map((item) => ({
+            ...item,
+            name: item.name,
+            icon: flatSectionIconMap[item.code] || FileText,
+            description: "",
+          })),
+      })).filter((section) => section.items.length > 0),
+    [enabledModuleCodes],
+  )
 
   // Quick actions for common tasks
   const quickActions = [
@@ -425,9 +415,24 @@ export default function ClientAppLayout({
                       </div>
                     </div>
                     <div className="flex-1 overflow-y-auto p-4">
-                      {navigationSections.map((section, sectionIndex) => (
-                        <div key={sectionIndex} className="mb-6">
-                          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                      <a
+                        href="/app"
+                        className="mb-4 flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 hover:bg-gray-100"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <LayoutDashboard className="h-5 w-5 text-gray-500" />
+                        <span className="font-medium">Dashboard</span>
+                      </a>
+                      <Suspense fallback={null}>
+                        <NavTree
+                          modules={navTreeModules}
+                          themeColor={theme.colors[600]}
+                          onNavigate={() => setIsMobileMenuOpen(false)}
+                        />
+                      </Suspense>
+                      {flatNavigationSections.map((section, sectionIndex) => (
+                        <div key={sectionIndex} className="mb-6 mt-4">
+                          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
                             {section.title}
                           </h3>
                           <div className="space-y-1">
@@ -435,13 +440,12 @@ export default function ClientAppLayout({
                               <a
                                 key={itemIndex}
                                 href={item.href}
-                                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors group"
+                                className="group flex items-center space-x-3 rounded-lg px-3 py-2 text-gray-700 transition-colors hover:bg-gray-100"
                                 onClick={() => setIsMobileMenuOpen(false)}
                               >
-                                <item.icon className="w-5 h-5 text-gray-500 group-hover:text-gray-700" />
+                                <item.icon className="h-5 w-5 text-gray-500 group-hover:text-gray-700" />
                                 <div className="flex-1">
                                   <div className="font-medium">{item.name}</div>
-                                  <div className="text-xs text-gray-500">{item.description}</div>
                                 </div>
                               </a>
                             ))}
@@ -743,48 +747,59 @@ export default function ClientAppLayout({
                   {!sidebarCollapsed && <span>Dashboard</span>}
                 </a>
 
-                {/* Navigation Sections */}
-                {navigationSections.slice(1).map((section, sectionIndex) => (
+                {/* Phase-1 collapsible numbered tree */}
+                <Suspense fallback={null}>
+                  <NavTree
+                    modules={navTreeModules}
+                    collapsed={sidebarCollapsed}
+                    themeColor={theme.colors[600]}
+                  />
+                </Suspense>
+
+                {/* Remaining flat sections (Payroll / Analytics / Hub / Admin) */}
+                {flatNavigationSections.map((section, sectionIndex) => (
                   <div key={sectionIndex} className="pt-4">
                     {!sidebarCollapsed && (
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
                         {section.title}
                       </p>
                     )}
                     <div className="space-y-1">
                       {section.items.map((item, itemIndex) => {
-                        const isActive = currentPath === item.href || currentPath.startsWith(item.href + '/')
+                        const isActive =
+                          currentPath === item.href || currentPath.startsWith(item.href + "/")
                         return (
                           <a
                             key={itemIndex}
                             href={item.href}
-                            className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors group ${
-                              isActive 
-                                ? 'text-white' 
-                                : 'text-gray-700 hover:text-white'
+                            className={`group flex items-center space-x-3 rounded-lg px-3 py-2 transition-colors ${
+                              isActive ? "text-white" : "text-gray-700 hover:text-white"
                             }`}
-                            style={isActive ? {
-                              backgroundColor: theme.colors[600],
-                            } : {}}
+                            style={
+                              isActive
+                                ? {
+                                    backgroundColor: theme.colors[600],
+                                  }
+                                : {}
+                            }
                             onMouseEnter={(e) => {
                               if (!isActive) {
                                 e.currentTarget.style.backgroundColor = theme.colors[600]
-                                e.currentTarget.style.color = 'white'
+                                e.currentTarget.style.color = "white"
                               }
                             }}
                             onMouseLeave={(e) => {
                               if (!isActive) {
-                                e.currentTarget.style.backgroundColor = ''
-                                e.currentTarget.style.color = ''
+                                e.currentTarget.style.backgroundColor = ""
+                                e.currentTarget.style.color = ""
                               }
                             }}
                             title={sidebarCollapsed ? item.name : undefined}
                           >
-                            <item.icon className="w-5 h-5 flex-shrink-0" />
+                            <item.icon className="h-5 w-5 flex-shrink-0" />
                             {!sidebarCollapsed && (
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate">{item.name}</div>
-                                <div className="text-xs opacity-75 truncate">{item.description}</div>
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate font-medium">{item.name}</div>
                               </div>
                             )}
                           </a>

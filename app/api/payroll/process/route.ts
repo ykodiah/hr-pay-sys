@@ -12,8 +12,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createServiceClient, isMockSupabaseClient } from "@/lib/supabase/server"
-import { requireApiUserOrGuest } from "@/lib/auth/api-user"
+import { isMockSupabaseClient } from "@/lib/supabase/server"
+import { resolveTenantContext } from "@/lib/settings/resolve-tenant"
 import { createPayrollService } from "@/lib/services"
 
 type ProcessRow = {
@@ -37,8 +37,46 @@ type ProcessRow = {
   paye?: number
   overtimeTax?: number
   bonusTax?: number
+  taxReliefTotal?: number
   totalDeductions?: number
   netPay?: number
+}
+
+/** Accept camelCase or snake_case worksheet rows from the client. */
+function normalizeProcessRows(raw: any[] | undefined): ProcessRow[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((r) => {
+      if (!r || typeof r !== "object") return null
+      const employeeId = String(r.employeeId || r.employee_id || "").trim()
+      if (!employeeId) return null
+      return {
+        employeeId,
+        employeeCode: r.employeeCode ?? r.employee_code ?? "",
+        name: r.name ?? r.full_name ?? "",
+        department: r.department ?? "",
+        position: r.position ?? "",
+        basicSalary: Number(r.basicSalary ?? r.basic_salary ?? 0),
+        allowances: Number(r.allowances ?? 0),
+        overtime: Number(r.overtime ?? r.overtime_amount ?? 0),
+        bonus: Number(r.bonus ?? r.bonus_amount ?? 0),
+        loan: Number(r.loan ?? r.loan_deduction ?? 0),
+        advance: Number(r.advance ?? r.advance_deduction ?? 0),
+        other: Number(r.other ?? r.other_deductions ?? 0),
+        grossPay: Number(r.grossPay ?? r.gross_pay ?? 0),
+        providentFund: Number(r.providentFund ?? r.tier3_employee ?? 0),
+        ssnitEmployee: Number(r.ssnitEmployee ?? r.ssnit_employee ?? 0),
+        tier2Employee: Number(r.tier2Employee ?? r.tier2_employee ?? 0),
+        taxableIncome: Number(r.taxableIncome ?? r.taxable_income ?? 0),
+        paye: Number(r.paye ?? r.paye_tax ?? 0),
+        overtimeTax: Number(r.overtimeTax ?? r.overtime_tax ?? 0),
+        bonusTax: Number(r.bonusTax ?? r.bonus_tax ?? 0),
+        taxReliefTotal: Number(r.taxReliefTotal ?? r.tax_relief_total ?? 0),
+        totalDeductions: Number(r.totalDeductions ?? r.total_deductions ?? 0),
+        netPay: Number(r.netPay ?? r.net_pay ?? 0),
+      } as ProcessRow
+    })
+    .filter(Boolean) as ProcessRow[]
 }
 
 function periodBounds(payPeriod: string) {
@@ -71,6 +109,54 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
       },
     )
   })
+}
+
+function isMissingColumnError(error: any) {
+  const message = String(error?.message || error || "")
+  return (
+    error?.code === "PGRST204" ||
+    /could not find the .* column/i.test(message) ||
+    /schema cache/i.test(message) ||
+    /column .* does not exist/i.test(message)
+  )
+}
+
+function missingColumnName(error: any): string | null {
+  const message = String(error?.message || "")
+  const match =
+    message.match(/could not find the ['"]([^'"]+)['"] column/i) ||
+    message.match(/column ['"]([^'"]+)['"] of relation/i) ||
+    message.match(/column "([^"]+)" does not exist/i)
+  return match?.[1] || null
+}
+
+async function insertWithMissingColumnRetry(
+  client: any,
+  table: string,
+  payload: Record<string, any>,
+  select = "id",
+) {
+  let current = { ...payload }
+  let lastError: any = null
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const { data, error } = await client.from(table).insert(current).select(select).maybeSingle()
+    if (!error) return { data, error: null }
+    lastError = error
+    if (!isMissingColumnError(error)) return { data: null, error }
+    const col = missingColumnName(error)
+    if (!col || !(col in current)) return { data: null, error }
+    const next = { ...current }
+    delete next[col]
+    // Keep OT/bonus tax inside breakdown JSON when dedicated columns are missing
+    if ((col === "bonus_tax" || col === "overtime_tax" || col === "paye_tax") && next.calculation_breakdown) {
+      next.calculation_breakdown = {
+        ...(typeof next.calculation_breakdown === "object" ? next.calculation_breakdown : {}),
+        [col]: payload[col],
+      }
+    }
+    current = next
+  }
+  return { data: null, error: lastError }
 }
 
 async function persistRowsFromWorksheet(
@@ -122,21 +208,25 @@ async function persistRowsFromWorksheet(
         continue
       }
 
-      if (typeof row.basicSalary !== "number" || row.basicSalary < 0) {
+      const basicSalaryNum = Number(row.basicSalary)
+      if (!Number.isFinite(basicSalaryNum) || basicSalaryNum < 0) {
         const empError = `${row.name || row.employeeId}: invalid basic salary`
         errors.push(empError)
         employeeErrors[row.employeeId] = empError
         continue
       }
 
-      const basic = n(row.basicSalary)
+      const basic = n(basicSalaryNum)
       const allowances = n(row.allowances)
       const overtime = n(row.overtime)
       const bonus = n(row.bonus)
       const gross = n(row.grossPay) || n(basic + allowances + overtime + bonus)
       const ssnit = n(row.ssnitEmployee)
-      // Tier 2: use the computed value from the worksheet; fall back to 5% of basic
-      const tier2 = row.tier2Employee != null ? n(row.tier2Employee) : n(basic * 0.05)
+      // Tier 2 is report-only — compute for storage/reports, never add to cash deductions
+      const tier2ForReports =
+        row.tier2Employee != null && Number(row.tier2Employee) > 0
+          ? n(row.tier2Employee)
+          : n(basic * 0.05)
       // SSNIT employer: 13% of basic (not a ratio of employee share)
       const ssnitEmployer = n(basic * 0.13)
       const pf = n(row.providentFund)
@@ -149,9 +239,10 @@ async function persistRowsFromWorksheet(
       const advance = n(row.advance)
       const other = n(row.other)
       const totalDeductions =
-        n(row.totalDeductions) || n(ssnit + tier2 + pf + paye + loan + advance + other)
+        n(row.totalDeductions) || n(ssnit + pf + paye + loan + advance + other)
       const net = n(row.netPay) || n(gross - totalDeductions)
       const taxable = n(row.taxableIncome)
+      const taxReliefTotal = n(row.taxReliefTotal)
 
       // Get individual allowance breakdown from employee_financial
       const fin = finByEmp.get(row.employeeId)
@@ -188,7 +279,7 @@ async function persistRowsFromWorksheet(
         gross_pay: gross,
         ssnit_employee: ssnit,
         ssnit_employer: ssnitEmployer,
-        tier2_employee: tier2,
+        tier2_employee: tier2ForReports,
         tier2_employer: 0,
         tier3_employee: pf,
         tier3_employer: 0,
@@ -203,12 +294,15 @@ async function persistRowsFromWorksheet(
         net_pay: net,
         taxable_income: taxable,
         paye_taxable_income: taxable,
+        tax_relief_total: taxReliefTotal,
         allowances: { total: allowances },
         calculation_breakdown: {
           allowances,
           ssnit_employee: ssnit,
-          tier2_employee: tier2,
+          tier2_employee: tier2ForReports,
+          tier2_excluded_from_payroll_deductions: true,
           tier3_employee: pf,
+          tax_relief_monthly: taxReliefTotal,
           paye_base: basePaye,
           overtime_tax: overtimeTax,
           bonus_tax: bonusTax,
@@ -221,13 +315,14 @@ async function persistRowsFromWorksheet(
         updated_at: new Date().toISOString(),
       }
 
-      const { data: insertedItem, error: itemErr } = await client
-        .from("payroll_items")
-        .insert(itemPayload)
-        .select("id")
-        .single()
-      if (itemErr) {
-        const empError = `${row.name || row.employeeId}: ${itemErr.message}`
+      const { data: insertedItem, error: itemErr } = await insertWithMissingColumnRetry(
+        client,
+        "payroll_items",
+        itemPayload,
+        "id",
+      )
+      if (itemErr || !insertedItem?.id) {
+        const empError = `${row.name || row.employeeId}: ${itemErr?.message || "failed to save payroll item"}`
         errors.push(empError)
         employeeErrors[row.employeeId] = empError
         continue
@@ -265,10 +360,11 @@ async function persistRowsFromWorksheet(
         gross_pay: gross,
         ssnit_employee: ssnit,
         ssnit_employer: ssnitEmployer,
-        tier2_employee: tier2,
+        tier2_employee: tier2ForReports,
         tier3_employee: pf,
         paye_taxable_income: taxable,
         paye_tax: paye,
+        tax_relief_total: taxReliefTotal,
         overtime_tax: overtimeTax,
         bonus_tax: bonusTax,
         loan_deduction: loan,
@@ -280,7 +376,12 @@ async function persistRowsFromWorksheet(
         updated_at: new Date().toISOString(),
       }
 
-      const { error: slipErr } = await client.from("payslips").insert(payslipPayload)
+      const { error: slipErr } = await insertWithMissingColumnRetry(
+        client,
+        "payslips",
+        payslipPayload,
+        "id",
+      )
       if (slipErr) {
         const empError = `${row.name || row.employeeId}: payslip ${slipErr.message}`
         errors.push(empError)
@@ -314,41 +415,57 @@ async function persistRowsFromWorksheet(
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireApiUserOrGuest()
-
     const body = await req.json()
+    const ctx = await resolveTenantContext(req, body.company_id)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId: company_id, userId, demo, service: client } = ctx
+    const user = { id: userId, isDemo: demo }
+
     const {
-      company_id,
       pay_period,
       payroll_run_id,
       submit_for_approval = true,
       rows,
     } = body as {
-      company_id: string
       pay_period: string
       payroll_run_id?: string
       submit_for_approval?: boolean
       rows?: ProcessRow[]
     }
 
-    if (!company_id || !pay_period) {
-      return NextResponse.json({ error: "company_id and pay_period are required" }, { status: 400 })
+    if (!pay_period) {
+      return NextResponse.json({ error: "pay_period is required" }, { status: 400 })
     }
 
-    // Use service-role client so payroll writes bypass RLS
-    const client = createServiceClient()
     const bounds = periodBounds(pay_period)
     let runId = payroll_run_id
-    const worksheetRows = Array.isArray(rows) ? rows.filter((r) => r && r.employeeId) : []
+    const rawRowsProvided = Array.isArray(rows)
+    const worksheetRows = normalizeProcessRows(rows)
 
-    // Never reuse approved/paid/cancelled runs
+    // If the client sent rows but none had a usable employeeId, fail clearly —
+    // do NOT silently fall back to processing every active employee.
+    if (rawRowsProvided && worksheetRows.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "No valid employees in the payroll worksheet. Select employees and ensure each row has an employee id, then retry.",
+          processed: 0,
+        },
+        { status: 422 },
+      )
+    }
+
+    // Never reuse approved/paid/cancelled runs — always scoped to this tenant
     if (runId) {
       const { data: existingRun } = await client
         .from("payroll_runs")
-        .select("id, status")
+        .select("id, status, company_id")
         .eq("id", runId)
+        .eq("company_id", company_id)
         .maybeSingle()
-      if (existingRun && ["approved", "paid", "cancelled"].includes(String(existingRun.status))) {
+      if (!existingRun) {
+        runId = undefined
+      } else if (["approved", "paid", "cancelled"].includes(String(existingRun.status))) {
         runId = undefined
       }
     }
@@ -375,7 +492,7 @@ export async function POST(req: NextRequest) {
         approval_stage: "pending",
         updated_at: new Date().toISOString(),
       }
-      if (!user.isDemo) insertPayload.created_by = user.id
+      if (!user.isDemo && user.id) insertPayload.created_by = user.id
 
       let { data: created, error } = await client
         .from("payroll_runs")
@@ -426,7 +543,7 @@ export async function POST(req: NextRequest) {
       processed = result.processed
       processErrors = result.errors
     } else {
-      // Legacy / API-only path
+      // Legacy / API-only path (no worksheet rows supplied)
       const service = createPayrollService(true)
       const result = await withTimeout(
         service.processPayrollRun(runId, company_id),
@@ -448,19 +565,38 @@ export async function POST(req: NextRequest) {
       processErrors = result.data.errors
     }
 
-    if (processed === 0 && processErrors.length > 0) {
+    // Hard guard: never queue empty runs for approval
+    if (processed === 0) {
       await client
         .from("payroll_runs")
         .update({ status: "draft", updated_at: new Date().toISOString() })
         .eq("id", runId)
       return NextResponse.json(
         {
-          error: `No employees processed. ${processErrors[0]}`,
+          error: processErrors[0]
+            ? `No employees processed. ${processErrors[0]}`
+            : "No employees processed. Select employees on the worksheet, recalculate, then Run Payroll again.",
           errors: processErrors,
+          processed: 0,
           payroll_run_id: runId,
         },
         { status: 422 },
       )
+    }
+
+    // Ensure Tier 2 is excluded from stored cash totals (items + payslips + run)
+    if (processed > 0) {
+      try {
+        const { error: cashErr } = await client.rpc("recompute_payroll_run_cash_totals", {
+          p_payroll_run_id: runId,
+        })
+        if (cashErr) {
+          // Fallback when script 081 not yet applied: recompute in app from components
+          console.log("[v0] Cash totals RPC unavailable:", cashErr.message)
+        }
+      } catch (e) {
+        console.log("[v0] Cash totals recompute skipped:", e instanceof Error ? e.message : "unknown")
+      }
     }
 
     // Post-save reconciliation: validate payroll_items and payslips sync

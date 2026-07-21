@@ -5,8 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { requireApiUserOrGuest } from "@/lib/auth/api-user"
+import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
 import { generateReport } from "@/lib/services/reports/engine"
 import type { ReportType } from "@/lib/services/reports/types"
 import { loadCompanyBrand, renderBrandedHtmlDocument } from "@/lib/exports/company-branding"
@@ -17,21 +16,22 @@ function money(n: number) {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireApiUserOrGuest()
-
     const body = await req.json()
-    const { company_id, report_type, pay_period, payroll_run_id, tax_year } = body
+    const ctx = await resolveTenantContext(req, body.company_id)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId: company_id, service: client, userId, demo } = ctx
+    const actorId = demo ? null : userId
+
+    const { report_type, pay_period, payroll_run_id, tax_year } = body
     const format = String(body.format || "csv").toLowerCase()
 
-    if (!company_id || !report_type || (!pay_period && !payroll_run_id)) {
+    if (!report_type || (!pay_period && !payroll_run_id)) {
       return NextResponse.json(
-        { error: "company_id, report_type, and pay_period or payroll_run_id are required" },
+        { error: "report_type and pay_period or payroll_run_id are required" },
         { status: 400 },
       )
     }
 
-    // Pre-validate that report data exists before attempting generation
-    const client = await createClient()
     // Only validate if we have a pay_period (if payroll_run_id is provided, the engine will validate)
     if (pay_period) {
       try {
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
                 report_type,
                 report_name: `${report_type} (Validation Failed)`,
                 pay_period: pay_period,
-                generated_by: user.isDemo ? null : user.id,
+                generated_by: actorId,
                 row_count: 0,
                 status: "failed",
                 error_message: validation.error_message,
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
           payroll_run_id,
           tax_year,
         },
-        user.isDemo ? undefined : user.id,
+        actorId || undefined,
       )
     } catch (err) {
       // Enhanced error capture: distinguish between data and processing issues
@@ -103,8 +103,8 @@ export async function POST(req: NextRequest) {
           payroll_run_id: payroll_run_id || null,
           report_type,
           report_name: `${report_type} (Failed)`,
-          pay_period: pay_period || validationPeriod,
-          generated_by: user.isDemo ? null : user.id,
+          pay_period: pay_period || null,
+          generated_by: actorId,
           row_count: 0,
           status: "failed",
           error_message: errorMsg,
@@ -122,7 +122,6 @@ export async function POST(req: NextRequest) {
 
     // Audit (best-effort)
     try {
-      const client = await createClient()
       const { data: saved } = await client
         .from("compliance_reports")
         .select("id")
@@ -137,8 +136,8 @@ export async function POST(req: NextRequest) {
         await client.rpc("log_report_action", {
           p_report_id: saved.id,
           p_action: "downloaded",
-          p_actor_id: user.isDemo ? null : user.id,
-          p_actor_name: user.isDemo ? "Demo User" : null,
+          p_actor_id: actorId,
+          p_actor_name: demo ? "Demo User" : null,
           p_notes: `format=${format}`,
         })
       }
@@ -147,7 +146,6 @@ export async function POST(req: NextRequest) {
     }
 
     if (format === "pdf" || format === "html") {
-      const client = await createClient()
       const company = await loadCompanyBrand(client, company_id)
       const cols = report.columns || []
       const header = cols.map((c) => `<th>${c.label}</th>`).join("")

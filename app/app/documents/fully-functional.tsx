@@ -2,6 +2,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -211,26 +212,47 @@ import {
   FolderKey,
   FolderEye,
   FolderEyeOff,
+  Receipt,
 } from "lucide-react"
 import { AdvancedDocumentService, AdvancedDocument } from "@/lib/storage/advancedDocumentService"
 
 // Enhanced document type labels
-const documentTypeLabels = {
+const documentTypeLabels: Record<string, string> = {
+  "ghana-card": "Ghana Card / ID",
+  "bank-details": "Bank Details",
+  "employment-contract": "Employment Contract",
+  "onboarding-document": "Onboarding Document",
+  "onboarding-form": "Onboarding Form",
+  "tax-relief": "Tax Relief",
+  other: "Other Documents",
+  cv: "CV / Resume",
+  certificate: "Certificate",
+  contract: "Employment Contract",
+  id: "ID Document",
+  passport: "Passport Copy",
+  ssnit: "SSNIT",
+  tin: "TIN",
   academic: "Academic Certificate",
   "passport-picture": "Passport Picture",
   resume: "Resume & Application",
-  passport: "Passport Copy",
   "national-id": "National ID",
   medical: "Medical Report",
   police: "Police Report",
-  other: "Other Documents",
-  contract: "Employment Contract",
   policy: "Company Policy",
   training: "Training Material",
   compliance: "Compliance Document",
   financial: "Financial Document",
   legal: "Legal Document",
   confidential: "Confidential Document",
+}
+
+function humanizeDocType(type: string) {
+  return (
+    documentTypeLabels[type] ||
+    String(type || "Other")
+      .replace(/[-_]/g, " ")
+      .replace(/\b\w/g, (l) => l.toUpperCase())
+  )
 }
 
 // Access level labels and colors
@@ -296,6 +318,7 @@ const signatureApps = [
 
 export default function FullyFunctionalDocumentVaultPage() {
   const [documents, setDocuments] = useState<AdvancedDocument[]>([])
+  const [vaultEmployees, setVaultEmployees] = useState<{ id: string; name: string; code?: string }[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedEmployee, setSelectedEmployee] = useState("all")
   const [selectedDocumentType, setSelectedDocumentType] = useState("all")
@@ -320,6 +343,14 @@ export default function FullyFunctionalDocumentVaultPage() {
   const [isArchiveOpen, setIsArchiveOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
   const [isUploadOpen, setIsUploadOpen] = useState(false)
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    if (searchParams.get("action") === "upload") {
+      setIsUploadOpen(true)
+    }
+  }, [searchParams])
+
   const [isAddPolicyOpen, setIsAddPolicyOpen] = useState(false)
   const [isAddWorkflowOpen, setIsAddWorkflowOpen] = useState(false)
   const [isAddIntegrationOpen, setIsAddIntegrationOpen] = useState(false)
@@ -329,6 +360,12 @@ export default function FullyFunctionalDocumentVaultPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("list")
   const [showArchived, setShowArchived] = useState(false)
   const [showDeleted, setShowDeleted] = useState(false)
+  const [commentText, setCommentText] = useState("")
+  const [shareEmail, setShareEmail] = useState("")
+  const [sharePermission, setSharePermission] = useState("view")
+  const [auditLogs, setAuditLogs] = useState<any[]>([])
+  const [workflowData, setWorkflowData] = useState<any>(null)
+  const [actionBusy, setActionBusy] = useState(false)
   
   // Bulk operations
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([])
@@ -371,6 +408,168 @@ export default function FullyFunctionalDocumentVaultPage() {
 
   const documentService = AdvancedDocumentService.getInstance()
 
+  const patchDocument = async (documentId: string, action: string, notes?: string) => {
+    setActionBusy(true)
+    try {
+      const res = await fetch(`/api/documents/${documentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action, notes }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || `Failed to ${action} document`)
+      await loadData()
+      return json.document
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  const handleViewDocument = (document: AdvancedDocument) => {
+    setSelectedDocument(document)
+    setIsPreviewOpen(true)
+    if (document.id) {
+      void fetch(`/api/documents/${document.id}`, { credentials: "include" }).catch(() => null)
+    }
+  }
+
+  const handleDownloadDocument = async (document: AdvancedDocument) => {
+    if (!document.fileUrl) {
+      toast({
+        title: "No file available",
+        description: "This document has no downloadable file URL.",
+        variant: "destructive",
+      })
+      return
+    }
+    try {
+      const a = window.document.createElement("a")
+      a.href = document.fileUrl
+      a.download = document.fileName || "document"
+      a.target = "_blank"
+      a.rel = "noopener noreferrer"
+      window.document.body.appendChild(a)
+      a.click()
+      a.remove()
+      if (document.id) {
+        await fetch(`/api/documents/${document.id}?log=download`, { credentials: "include" }).catch(() => null)
+      }
+      toast({ title: "Download started", description: document.fileName })
+    } catch (err: any) {
+      toast({
+        title: "Download failed",
+        description: err?.message || "Could not download file",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const openComments = async (document: AdvancedDocument) => {
+    setSelectedDocument(document)
+    setCommentText("")
+    setIsCommentOpen(true)
+  }
+
+  const submitComment = async () => {
+    if (!selectedDocument?.id || !commentText.trim()) return
+    setActionBusy(true)
+    try {
+      const res = await fetch(`/api/documents/${selectedDocument.id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ comment: commentText.trim() }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Failed to add comment")
+      toast({ title: "Comment added", description: "Your comment was saved." })
+      setIsCommentOpen(false)
+      setCommentText("")
+    } catch (err: any) {
+      toast({ title: "Comment failed", description: err.message, variant: "destructive" })
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  const openShare = (document: AdvancedDocument) => {
+    setSelectedDocument(document)
+    setShareEmail("")
+    setSharePermission("view")
+    setIsShareOpen(true)
+  }
+
+  const submitShare = async () => {
+    if (!selectedDocument?.id || !shareEmail.trim()) return
+    setActionBusy(true)
+    try {
+      const res = await fetch(`/api/documents/${selectedDocument.id}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email: shareEmail.trim(), permission: sharePermission }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Failed to share")
+      toast({ title: "Document shared", description: json.message || `Shared with ${shareEmail}` })
+      setIsShareOpen(false)
+    } catch (err: any) {
+      toast({ title: "Share failed", description: err.message, variant: "destructive" })
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  const openAudit = async (document: AdvancedDocument) => {
+    setSelectedDocument(document)
+    setIsAuditOpen(true)
+    setAuditLogs([])
+    try {
+      const res = await fetch(`/api/documents/${document.id}/audit`, { credentials: "include" })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Failed to load audit trail")
+      setAuditLogs(json.logs || [])
+    } catch (err: any) {
+      toast({ title: "Audit trail", description: err.message, variant: "destructive" })
+    }
+  }
+
+  const openWorkflow = async (document: AdvancedDocument) => {
+    setSelectedDocument(document)
+    setIsWorkflowOpen(true)
+    setWorkflowData(null)
+    try {
+      const res = await fetch(`/api/documents/${document.id}/workflow`, { credentials: "include" })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Failed to load workflow")
+      setWorkflowData(json)
+    } catch (err: any) {
+      toast({ title: "Workflow", description: err.message, variant: "destructive" })
+    }
+  }
+
+  const startWorkflow = async () => {
+    if (!selectedDocument?.id) return
+    setActionBusy(true)
+    try {
+      const res = await fetch(`/api/documents/${selectedDocument.id}/workflow`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: "Document approval" }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Failed to start workflow")
+      toast({ title: "Workflow started", description: "Approval workflow created." })
+      await openWorkflow(selectedDocument)
+    } catch (err: any) {
+      toast({ title: "Workflow failed", description: err.message, variant: "destructive" })
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
   useEffect(() => {
     loadData()
   }, [])
@@ -386,7 +585,9 @@ export default function FullyFunctionalDocumentVaultPage() {
       const fromDb: AdvancedDocument[] = (json.documents || []).map((d: any) => ({
         id: d.id,
         employeeId: d.employeeId,
+        employeeCode: d.employeeCode,
         employeeName: d.employeeName,
+        documentCode: d.documentCode,
         documentType: d.documentType || "other",
         fileName: d.fileName || "Document",
         fileSize: Number(d.fileSize || 0),
@@ -409,11 +610,32 @@ export default function FullyFunctionalDocumentVaultPage() {
         encryptionStatus: "unencrypted",
         versionNumber: 1,
         isLatestVersion: true,
-        metadata: {},
+        metadata: { documentCode: d.documentCode, employeeCode: d.employeeCode },
         tags: ["employee-module"],
         createdAt: new Date(d.uploadDate || Date.now()),
         updatedAt: new Date(d.uploadDate || Date.now()),
       }))
+
+      // Prefer API-deduped employee list when present
+      if (Array.isArray(json.employees) && json.employees.length) {
+        setVaultEmployees(json.employees)
+      } else {
+        const map = new Map<string, { id: string; name: string; code?: string }>()
+        for (const doc of fromDb) {
+          const key =
+            doc.employeeId ||
+            (doc.employeeName ? `name:${String(doc.employeeName).toLowerCase().trim()}` : "")
+          if (!key) continue
+          if (!map.has(key)) {
+            map.set(key, {
+              id: doc.employeeId || key,
+              name: doc.employeeName || "Employee",
+              code: (doc as any).employeeCode,
+            })
+          }
+        }
+        setVaultEmployees([...map.values()])
+      }
 
       // Merge any in-session local uploads that are not yet in DB
       const local = documentService.getAllDocuments()
@@ -708,17 +930,56 @@ export default function FullyFunctionalDocumentVaultPage() {
   }
 
   // Helper functions
+  const employees = (() => {
+    const map = new Map<string, { id: string; name: string; code?: string }>()
+    for (const emp of vaultEmployees) {
+      if (!emp?.id) continue
+      map.set(emp.id, emp)
+    }
+    for (const doc of documents) {
+      const key =
+        doc.employeeId ||
+        (doc.employeeName ? `name:${String(doc.employeeName).toLowerCase().trim()}` : "")
+      if (!key) continue
+      if (!map.has(key)) {
+        map.set(key, {
+          id: doc.employeeId || key,
+          name: doc.employeeName || "Employee",
+          code: (doc as any).employeeCode || doc.metadata?.employeeCode,
+        })
+      }
+    }
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
+  })()
+
   const getFilteredDocuments = () => {
+    const selectedEmpName = employees.find((e) => e.id === selectedEmployee)?.name
     return documents.filter((doc) => {
       const matchesSearch =
         doc.employeeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         doc.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         doc.employeeId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String((doc as any).employeeCode || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String((doc as any).documentCode || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
         doc.fileType.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (doc.tags || []).some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
       
-      const matchesEmployee = selectedEmployee === "all" || doc.employeeId === selectedEmployee
-      const matchesDocumentType = selectedDocumentType === "all" || doc.documentType === selectedDocumentType
+      const matchesEmployee =
+        selectedEmployee === "all" ||
+        doc.employeeId === selectedEmployee ||
+        (!!doc.employeeName &&
+          !!selectedEmpName &&
+          doc.employeeName.toLowerCase().trim() === selectedEmpName.toLowerCase().trim())
+      const matchesDocumentType =
+        selectedDocumentType === "all" ||
+        doc.documentType === selectedDocumentType ||
+        (selectedDocumentType === "tax-relief" &&
+          (doc.category === "tax-relief" || doc.source === "payroll-tax-reliefs"))
+      const matchesCategory =
+        selectedCategory === "all" ||
+        doc.category === selectedCategory ||
+        (selectedCategory === "tax-relief" &&
+          (doc.documentType === "tax-relief" || doc.source === "payroll-tax-reliefs"))
       const matchesStatus = selectedStatus === "all" || doc.status === selectedStatus
       const matchesAccessLevel = selectedAccessLevel === "all" || doc.accessLevel === selectedAccessLevel
       const matchesSignatureStatus = selectedSignatureStatus === "all" || doc.signatureStatus === selectedSignatureStatus
@@ -726,7 +987,7 @@ export default function FullyFunctionalDocumentVaultPage() {
       const matchesArchived = showArchived ? doc.isArchived : !doc.isArchived
       const matchesDeleted = showDeleted ? doc.status === "deleted" : doc.status !== "deleted"
       
-      return matchesSearch && matchesEmployee && matchesDocumentType && matchesStatus && 
+      return matchesSearch && matchesEmployee && matchesDocumentType && matchesCategory && matchesStatus && 
              matchesTab && matchesArchived && matchesDeleted && matchesAccessLevel && matchesSignatureStatus
     })
   }
@@ -736,7 +997,7 @@ export default function FullyFunctionalDocumentVaultPage() {
     const rows = docs.map(doc => [
       doc.fileName,
       doc.employeeName || "System",
-      documentTypeLabels[doc.documentType as keyof typeof documentTypeLabels] || doc.documentType,
+      humanizeDocType(doc.documentType),
       doc.status,
       new Date(doc.uploadDate).toLocaleDateString(),
       formatFileSize(doc.fileSize),
@@ -815,13 +1076,29 @@ export default function FullyFunctionalDocumentVaultPage() {
     const signed = documents.filter((doc) => doc.signatureStatus === "signed").length
     const confidential = documents.filter((doc) => doc.accessLevel === "confidential").length
     const restricted = documents.filter((doc) => doc.accessLevel === "restricted").length
-    
-    return { total, approved, pending, rejected, archived, requiresSignature, signed, confidential, restricted }
+    const taxRelief = documents.filter(
+      (doc) =>
+        doc.category === "tax-relief" ||
+        doc.documentType === "tax-relief" ||
+        doc.source === "payroll-tax-reliefs",
+    ).length
+
+    return {
+      total,
+      approved,
+      pending,
+      rejected,
+      archived,
+      requiresSignature,
+      signed,
+      confidential,
+      restricted,
+      taxRelief,
+    }
   }
 
   const stats = getDocumentStats()
   const filteredDocuments = getFilteredDocuments()
-  const employees = [...new Set(documents.map((doc) => ({ id: doc.employeeId, name: doc.employeeName })))]
   const documentTypes = [...new Set(documents.map((doc) => doc.documentType))]
 
   return (
@@ -875,15 +1152,34 @@ export default function FullyFunctionalDocumentVaultPage() {
       </div>
 
       {/* Enhanced Stats Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2">
         <Card>
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xl font-bold text-gray-900">{stats.total}</div>
+                <p className="text-xs text-gray-600">Total Documents</p>
+              </div>
+              <FolderOpen className="w-6 h-6 text-gray-400" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card
+          className="cursor-pointer hover:border-emerald-400 transition-colors"
+          onClick={() => {
+            setSelectedCategory("tax-relief")
+            setSelectedDocumentType("tax-relief")
+            setSelectedSource("payroll-tax-reliefs")
+            setActiveTab("all")
+          }}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
-                <p className="text-sm text-gray-600">Total Documents</p>
+                <div className="text-2xl font-bold text-emerald-700">{stats.taxRelief}</div>
+                <p className="text-sm text-gray-600">Tax Relief</p>
               </div>
-              <FolderOpen className="w-8 h-8 text-gray-400" />
+              <Receipt className="w-8 h-8 text-emerald-400" />
             </div>
           </CardContent>
         </Card>
@@ -946,8 +1242,8 @@ export default function FullyFunctionalDocumentVaultPage() {
 
       {/* Enhanced Filters and Search */}
       <Card>
-        <CardContent className="p-6">
-          <div className="space-y-4">
+        <CardContent className="p-3">
+          <div className="space-y-2">
             {/* Search Bar */}
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -955,42 +1251,42 @@ export default function FullyFunctionalDocumentVaultPage() {
                 placeholder="Search documents, employees, tags, or content..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 h-9"
               />
             </div>
             
-            {/* Filter Row 1 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            {/* Filters + controls on one compact row */}
+            <div className="flex flex-wrap items-center gap-2">
               <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by employee" />
+                <SelectTrigger className="h-8 w-[140px]">
+                  <SelectValue placeholder="Employee" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Employees</SelectItem>
                   {employees.map((emp) => (
                     <SelectItem key={emp.id} value={emp.id}>
-                      {emp.name}
+                      {emp.name}{emp.code ? ` (${emp.code})` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               
               <Select value={selectedDocumentType} onValueChange={setSelectedDocumentType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Document type" />
+                <SelectTrigger className="h-8 w-[120px]">
+                  <SelectValue placeholder="Type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
                   {documentTypes.map((type) => (
                     <SelectItem key={type} value={type}>
-                      {documentTypeLabels[type as keyof typeof documentTypeLabels]}
+                      {humanizeDocType(type)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               
               <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger>
+                <SelectTrigger className="h-8 w-[110px]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1003,8 +1299,8 @@ export default function FullyFunctionalDocumentVaultPage() {
               </Select>
               
               <Select value={selectedAccessLevel} onValueChange={setSelectedAccessLevel}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Access Level" />
+                <SelectTrigger className="h-8 w-[120px]">
+                  <SelectValue placeholder="Access" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Access Levels</SelectItem>
@@ -1016,8 +1312,8 @@ export default function FullyFunctionalDocumentVaultPage() {
               </Select>
               
               <Select value={selectedSignatureStatus} onValueChange={setSelectedSignatureStatus}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Signature Status" />
+                <SelectTrigger className="h-8 w-[130px]">
+                  <SelectValue placeholder="Signature" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Signature Status</SelectItem>
@@ -1028,30 +1324,27 @@ export default function FullyFunctionalDocumentVaultPage() {
                   <SelectItem value="declined">Declined</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            
-            {/* Additional Controls */}
-            <div className="flex flex-wrap gap-4 items-center">
-              <div className="flex items-center space-x-2">
+
+              <div className="flex items-center gap-1.5">
                 <Switch
                   id="show-archived"
                   checked={showArchived}
                   onCheckedChange={setShowArchived}
                 />
-                <Label htmlFor="show-archived">Show Archived</Label>
+                <Label htmlFor="show-archived" className="text-xs whitespace-nowrap">Archived</Label>
               </div>
               
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-1.5">
                 <Switch
                   id="show-deleted"
                   checked={showDeleted}
                   onCheckedChange={setShowDeleted}
                 />
-                <Label htmlFor="show-deleted">Show Deleted</Label>
+                <Label htmlFor="show-deleted" className="text-xs whitespace-nowrap">Deleted</Label>
               </div>
               
               <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="h-8 w-[120px]">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1066,6 +1359,7 @@ export default function FullyFunctionalDocumentVaultPage() {
               <Button
                 variant="outline"
                 size="sm"
+                className="h-8 w-8 p-0"
                 onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
               >
                 {sortOrder === "asc" ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
@@ -1074,6 +1368,7 @@ export default function FullyFunctionalDocumentVaultPage() {
               <Button
                 variant="outline"
                 size="sm"
+                className="h-8 w-8 p-0"
                 onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
               >
                 {viewMode === "grid" ? <List className="w-4 h-4" /> : <Grid className="w-4 h-4" />}
@@ -1174,12 +1469,18 @@ export default function FullyFunctionalDocumentVaultPage() {
                                       : "SYS"}
                                   </AvatarFallback>
                                 </Avatar>
-                                {document.employeeName || "System"} {document.employeeId && `(${document.employeeId})`}
+                                {document.employeeName || "System"}
+                                {(document as any).employeeCode || document.metadata?.employeeCode
+                                  ? ` (${(document as any).employeeCode || document.metadata?.employeeCode})`
+                                  : ""}
+                                {(document as any).documentCode || document.metadata?.documentCode
+                                  ? ` · Doc ${(document as any).documentCode || document.metadata?.documentCode}`
+                                  : ""}
                               </div>
                               <div className="flex items-center text-sm text-gray-500">
                                 <FileText className="w-4 h-4 mr-1" />
                                 {documentTypeLabels[document.documentType as keyof typeof documentTypeLabels] ||
-                                  document.documentType}
+                                  humanizeDocType(document.documentType)}
                               </div>
                               <div className="flex items-center text-sm text-gray-500">
                                 <Calendar className="w-4 h-4 mr-1" />
@@ -1213,19 +1514,11 @@ export default function FullyFunctionalDocumentVaultPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => {
-                                setSelectedDocument(document)
-                                setIsPreviewOpen(true)
-                              }}>
+                              <DropdownMenuItem onClick={() => handleViewDocument(document)}>
                                 <Eye className="w-4 h-4 mr-2" />
                                 View
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => {
-                                toast({
-                                  title: "Download Started",
-                                  description: "Document is being downloaded...",
-                                })
-                              }}>
+                              <DropdownMenuItem onClick={() => handleDownloadDocument(document)}>
                                 <Download className="w-4 h-4 mr-2" />
                                 Download
                               </DropdownMenuItem>
@@ -1238,81 +1531,117 @@ export default function FullyFunctionalDocumentVaultPage() {
                                   Sign Document
                                 </DropdownMenuItem>
                               )}
-                              <DropdownMenuItem onClick={() => {
-                                setSelectedDocument(document)
-                                setIsCommentOpen(true)
-                              }}>
+                              <DropdownMenuItem onClick={() => openComments(document)}>
                                 <MessageSquare className="w-4 h-4 mr-2" />
                                 Add Comment
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => {
-                                setSelectedDocument(document)
-                                setIsShareOpen(true)
-                              }}>
+                              <DropdownMenuItem onClick={() => openShare(document)}>
                                 <Share2 className="w-4 h-4 mr-2" />
                                 Share
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => {
-                                setSelectedDocument(document)
-                                setIsAuditOpen(true)
-                              }}>
+                              <DropdownMenuItem onClick={() => openAudit(document)}>
                                 <History className="w-4 h-4 mr-2" />
                                 View Audit Trail
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => {
-                                setSelectedDocument(document)
-                                setIsWorkflowOpen(true)
-                              }}>
+                              <DropdownMenuItem onClick={() => openWorkflow(document)}>
                                 <Activity className="w-4 h-4 mr-2" />
                                 View Workflow
                               </DropdownMenuItem>
                               {document.status === "pending" && (
                                 <>
-                                  <DropdownMenuItem onClick={() => {
-                                    documentService.updateDocumentStatus(document.id, "approved", "Approved by user")
-                                    loadData()
-                                    toast({
-                                      title: "Document Approved",
-                                      description: "Document has been approved successfully.",
-                                    })
-                                  }}>
+                                  <DropdownMenuItem
+                                    disabled={actionBusy}
+                                    onClick={async () => {
+                                      try {
+                                        await patchDocument(document.id, "approve")
+                                        toast({
+                                          title: "Document Approved",
+                                          description: "Document has been approved successfully.",
+                                        })
+                                      } catch (err: any) {
+                                        toast({
+                                          title: "Approve failed",
+                                          description: err.message,
+                                          variant: "destructive",
+                                        })
+                                      }
+                                    }}
+                                  >
                                     <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
                                     Approve
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => {
-                                    documentService.updateDocumentStatus(document.id, "rejected", "Rejected by user")
-                                    loadData()
-                                    toast({
-                                      title: "Document Rejected",
-                                      description: "Document has been rejected.",
-                                    })
-                                  }}>
+                                  <DropdownMenuItem
+                                    disabled={actionBusy}
+                                    onClick={async () => {
+                                      try {
+                                        await patchDocument(document.id, "reject")
+                                        toast({
+                                          title: "Document Rejected",
+                                          description: "Document has been rejected.",
+                                        })
+                                      } catch (err: any) {
+                                        toast({
+                                          title: "Reject failed",
+                                          description: err.message,
+                                          variant: "destructive",
+                                        })
+                                      }
+                                    }}
+                                  >
                                     <XCircle className="w-4 h-4 mr-2 text-red-600" />
                                     Reject
                                   </DropdownMenuItem>
                                 </>
                               )}
-                              {!document.isArchived && (
-                                <DropdownMenuItem onClick={() => {
-                                  documentService.archiveDocument(document.id, "Manual archive")
-                                  loadData()
-                                  toast({
-                                    title: "Document Archived",
-                                    description: "Document has been archived successfully.",
-                                  })
-                                }}>
+                              {!document.isArchived && document.status !== "archived" && (
+                                <DropdownMenuItem
+                                  disabled={actionBusy}
+                                  onClick={async () => {
+                                    try {
+                                      await patchDocument(document.id, "archive")
+                                      toast({
+                                        title: "Document Archived",
+                                        description: "Document has been archived successfully.",
+                                      })
+                                    } catch (err: any) {
+                                      toast({
+                                        title: "Archive failed",
+                                        description: err.message,
+                                        variant: "destructive",
+                                      })
+                                    }
+                                  }}
+                                >
                                   <Archive className="w-4 h-4 mr-2" />
                                   Archive
                                 </DropdownMenuItem>
                               )}
-                              <DropdownMenuItem className="text-red-600" onClick={() => {
-                                documentService.deleteDocument(document.id, "Manual delete")
-                                loadData()
-                                toast({
-                                  title: "Document Deleted",
-                                  description: "Document has been deleted successfully.",
-                                })
-                              }}>
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                disabled={actionBusy}
+                                onClick={async () => {
+                                  if (!window.confirm(`Delete “${document.fileName}”?`)) return
+                                  try {
+                                    const res = await fetch(`/api/documents/${document.id}`, {
+                                      method: "DELETE",
+                                      credentials: "include",
+                                    })
+                                    const json = await res.json().catch(() => ({}))
+                                    if (!res.ok) throw new Error(json.error || "Delete failed")
+                                    await loadData()
+                                    toast({
+                                      title: "Document Deleted",
+                                      description: "Document has been deleted successfully.",
+                                    })
+                                  } catch (err: any) {
+                                    toast({
+                                      title: "Delete failed",
+                                      description: err.message,
+                                      variant: "destructive",
+                                    })
+                                  }
+                                }}
+                              >
                                 <TrashIcon className="w-4 h-4 mr-2" />
                                 Delete
                               </DropdownMenuItem>
@@ -2132,6 +2461,206 @@ export default function FullyFunctionalDocumentVaultPage() {
               <CloudCheckIcon className="w-4 h-4 mr-2" />
               Connect Integration
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview */}
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5" />
+              {selectedDocument?.fileName || "Document preview"}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedDocument && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div><span className="text-muted-foreground">Employee:</span> {selectedDocument.employeeName || "—"}</div>
+                <div><span className="text-muted-foreground">Status:</span> {selectedDocument.status}</div>
+                <div><span className="text-muted-foreground">Category:</span> {selectedDocument.category || "—"}</div>
+                <div><span className="text-muted-foreground">Type:</span> {selectedDocument.fileType || "—"}</div>
+              </div>
+              {selectedDocument.notes && (
+                <p className="text-sm text-muted-foreground italic">{selectedDocument.notes}</p>
+              )}
+              {selectedDocument.fileUrl ? (
+                selectedDocument.fileType?.startsWith("image/") || /\.(png|jpe?g|gif|webp)$/i.test(selectedDocument.fileName || "") ? (
+                  <img src={selectedDocument.fileUrl} alt={selectedDocument.fileName} className="max-h-[60vh] w-auto mx-auto rounded border" />
+                ) : (
+                  <iframe
+                    src={selectedDocument.fileUrl}
+                    title={selectedDocument.fileName}
+                    className="w-full h-[60vh] rounded border"
+                  />
+                )
+              ) : (
+                <p className="text-sm text-muted-foreground">No file URL available for preview.</p>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>Close</Button>
+            {selectedDocument?.fileUrl && (
+              <Button onClick={() => selectedDocument && handleDownloadDocument(selectedDocument)}>
+                <Download className="w-4 h-4 mr-2" />
+                Download
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Comment */}
+      <Dialog open={isCommentOpen} onOpenChange={setIsCommentOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5" />
+              Add comment
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Comment on {selectedDocument?.fileName}</Label>
+            <Textarea
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder="Write your comment…"
+              rows={4}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCommentOpen(false)}>Cancel</Button>
+            <Button disabled={actionBusy || !commentText.trim()} onClick={submitComment}>
+              Save comment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Share */}
+      <Dialog open={isShareOpen} onOpenChange={setIsShareOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Share2 className="w-5 h-5" />
+              Share document
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={shareEmail}
+                onChange={(e) => setShareEmail(e.target.value)}
+                placeholder="colleague@company.com"
+              />
+            </div>
+            <div>
+              <Label>Permission</Label>
+              <Select value={sharePermission} onValueChange={setSharePermission}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="view">View</SelectItem>
+                  <SelectItem value="download">Download</SelectItem>
+                  <SelectItem value="comment">Comment</SelectItem>
+                  <SelectItem value="edit">Edit</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsShareOpen(false)}>Cancel</Button>
+            <Button disabled={actionBusy || !shareEmail.trim()} onClick={submitShare}>
+              Share
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Audit trail */}
+      <Dialog open={isAuditOpen} onOpenChange={setIsAuditOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-5 h-5" />
+              Audit trail — {selectedDocument?.fileName}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {auditLogs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No audit events yet.</p>
+            ) : (
+              auditLogs.map((log) => (
+                <div key={log.id} className="rounded border p-2 text-sm">
+                  <div className="flex justify-between gap-2">
+                    <span className="font-medium capitalize">{log.action}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {log.created_at ? new Date(log.created_at).toLocaleString() : ""}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">{log.user_name || "System"}</div>
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAuditOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Workflow */}
+      <Dialog open={isWorkflowOpen} onOpenChange={setIsWorkflowOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Activity className="w-5 h-5" />
+              Workflow — {selectedDocument?.fileName}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Document status: <strong>{workflowData?.document?.status || selectedDocument?.status}</strong>
+            </p>
+            {(workflowData?.workflows || []).length === 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">No workflow started for this document.</p>
+                <Button disabled={actionBusy} onClick={startWorkflow}>
+                  Start approval workflow
+                </Button>
+              </div>
+            ) : (
+              (workflowData.workflows || []).map((wf: any) => (
+                <div key={wf.id} className="rounded border p-3 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium">{wf.name || "Workflow"}</span>
+                    <Badge variant="outline">{wf.status}</Badge>
+                  </div>
+                  {(wf.workflow_steps || []).length > 0 ? (
+                    <ol className="list-decimal pl-5 text-sm space-y-1">
+                      {(wf.workflow_steps || [])
+                        .slice()
+                        .sort((a: any, b: any) => (a.step_order || 0) - (b.step_order || 0))
+                        .map((step: any) => (
+                          <li key={step.id}>
+                            {step.step_name} — <span className="text-muted-foreground">{step.status}</span>
+                          </li>
+                        ))}
+                    </ol>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Steps will appear after reload.</p>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsWorkflowOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

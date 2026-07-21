@@ -118,15 +118,19 @@ export async function getEmployeeTaxReliefs(
 ): Promise<TaxReliefItem[]> {
   const supabase = await createClient()
 
+  // Prefer joined catalog fields; fall back to flat columns for schema drift.
   const { data, error } = await supabase
     .from("employee_tax_reliefs")
     .select(
       `
       override_amount,
       tax_relief:tax_reliefs (
+        name,
+        amount,
+        annual_amount,
+        gra_code,
         relief_code,
-        relief_name,
-        annual_amount
+        code
       )
     `
     )
@@ -136,11 +140,16 @@ export async function getEmployeeTaxReliefs(
 
   if (error || !data) return []
 
-  return data.map((row: any) => ({
-    relief_code: row.tax_relief?.relief_code ?? "",
-    relief_name: row.tax_relief?.relief_name ?? "",
-    annual_amount: Number(row.override_amount ?? row.tax_relief?.annual_amount ?? 0),
-  }))
+  return data.map((row: any) => {
+    const relief = Array.isArray(row.tax_relief) ? row.tax_relief[0] : row.tax_relief
+    return {
+      relief_code: relief?.gra_code || relief?.relief_code || relief?.code || relief?.name || "",
+      relief_name: relief?.name || "Tax relief",
+      annual_amount: Number(
+        row.override_amount ?? relief?.annual_amount ?? relief?.amount ?? 0,
+      ),
+    }
+  })
 }
 
 // ---------------------------------------------------------------------------

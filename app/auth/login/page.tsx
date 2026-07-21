@@ -159,26 +159,47 @@ export default function LoginPage() {
         return
       }
 
-      const { data: employee, error: employeeError } = await supabase
-        .from("employees")
-        .select("*")
-        .eq("corporate_email", data.user?.email)
-        .single()
+      const authUser = data.user
+      let employee: any = null
 
-      if (employeeError && data.user?.email?.includes("@akwaabahrpay.com")) {
+      if (authUser?.email) {
+        const byEmail = await supabase
+          .from("employees")
+          .select("*")
+          .or(`corporate_email.eq.${authUser.email},personal_email.eq.${authUser.email},email.eq.${authUser.email}`)
+          .limit(1)
+          .maybeSingle()
+        employee = byEmail.data
+
+        if (!employee) {
+          const { data: profile } = await supabase
+            .from("employee_profiles")
+            .select("employee_id")
+            .eq("id", authUser.id)
+            .maybeSingle()
+          if (profile?.employee_id) {
+            const { data: byProfile } = await supabase
+              .from("employees")
+              .select("*")
+              .eq("id", profile.employee_id)
+              .maybeSingle()
+            employee = byProfile
+          }
+        }
+      }
+
+      if (!employee && authUser?.email?.includes("@akwaabahrpay.com")) {
         router.push("/auth/setup-profile")
         return
       }
 
-      if (
-        employee &&
-        (employee.position?.toLowerCase().includes("administrator") ||
-          employee.department?.toLowerCase().includes("administration"))
-      ) {
-        router.push("/app")
-      } else {
-        router.push("/self-service")
-      }
+      const { resolvePostLoginPath } = await import("@/lib/auth/resolve-portal")
+      const dest = resolvePostLoginPath({
+        userMetadata: (authUser?.user_metadata as any) || null,
+        appMetadata: (authUser?.app_metadata as any) || null,
+        employee,
+      })
+      router.push(dest)
     } catch (error: any) {
       console.error("[v0] Login error:", error)
       setError(error.message || "An error occurred during sign in")

@@ -35,6 +35,7 @@ import {
   Info,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { normalizePayrollCashRows } from "@/lib/payroll/cash-deductions"
 import {
   Bar,
   BarChart,
@@ -120,9 +121,27 @@ export default function PayrollHistoryPage() {
     setIsLoading(true)
 
     try {
+      const { resolveClientCompanyId } = await import("@/lib/tenant/resolve-company-client")
+      const companyId = await resolveClientCompanyId()
+
+      // Backfill stale totals that still include Tier 2 in total_deductions / net_pay
+      try {
+        await fetch("/api/payroll/recalculate-cash-totals", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ company_id: companyId }),
+        })
+      } catch {
+        // non-blocking — UI still normalizes item-level rows
+      }
+
       const [{ data: subsidiariesData }, runsRes] = await Promise.all([
-        supabase.from("subsidiaries").select("id, name").eq("status", "active"),
-        fetch("/api/payroll/runs?limit=200", { cache: "no-store" }),
+        supabase.from("subsidiaries").select("id, name").eq("company_id", companyId).eq("status", "active"),
+        fetch(`/api/payroll/runs?company_id=${encodeURIComponent(companyId)}&limit=200`, {
+          cache: "no-store",
+          credentials: "include",
+        }),
       ])
 
       if (subsidiariesData) {
@@ -149,7 +168,8 @@ export default function PayrollHistoryPage() {
         const totals = (slips ?? []).reduce(
           (acc, s: any) => ({
             paye: acc.paye + Number(s.paye_tax ?? 0),
-            ssnit: acc.ssnit + Number(s.ssnit_employee ?? 0) + Number(s.tier2_employee ?? 0),
+            // Tier 2 is report-only — do not include in payroll deduction charts
+            ssnit: acc.ssnit + Number(s.ssnit_employee ?? 0),
             tier3: acc.tier3 + Number(s.tier3_employee ?? 0),
             other:
               acc.other +
@@ -265,7 +285,7 @@ export default function PayrollHistoryPage() {
     deductionTotals.paye + deductionTotals.ssnit + deductionTotals.tier3 + deductionTotals.other > 0
       ? [
           { name: "PAYE Tax", value: Math.round(deductionTotals.paye), color: "#ef4444" },
-          { name: "SSNIT / Tier 2", value: Math.round(deductionTotals.ssnit), color: "#3b82f6" },
+          { name: "SSNIT", value: Math.round(deductionTotals.ssnit), color: "#3b82f6" },
           { name: "Tier 3", value: Math.round(deductionTotals.tier3), color: "#8b5cf6" },
           { name: "Other", value: Math.round(deductionTotals.other), color: "#6b7280" },
         ]
@@ -500,7 +520,7 @@ export default function PayrollHistoryPage() {
         })
         setPayrollItems([])
       } else {
-        setPayrollItems(data || [])
+        setPayrollItems(normalizePayrollCashRows(data || []))
       }
     } catch (err) {
       console.error("Unexpected error:", err)

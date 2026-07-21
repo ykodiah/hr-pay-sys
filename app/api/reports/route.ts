@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { requireApiUserOrGuest } from "@/lib/auth/api-user"
+import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
 import {
   generateReport,
   generateAllReports,
@@ -16,17 +16,14 @@ import type { ReportType } from "@/lib/services/reports/types"
 
 export async function GET(req: NextRequest) {
   try {
-    await requireApiUserOrGuest()
+    const ctx = await resolveTenantContext(req)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId } = ctx
 
     const { searchParams } = new URL(req.url)
-    const companyId = searchParams.get("company_id")
     const reportType = searchParams.get("report_type") as ReportType | null
     const payPeriod = searchParams.get("pay_period")
     const limit = Number(searchParams.get("limit") ?? 50)
-
-    if (!companyId) {
-      return NextResponse.json({ error: "company_id is required" }, { status: 400 })
-    }
 
     const records = await listComplianceReports(companyId, {
       report_type: reportType ?? undefined,
@@ -34,10 +31,9 @@ export async function GET(req: NextRequest) {
       limit,
     })
 
-    return NextResponse.json({ success: true, data: records })
+    return NextResponse.json({ success: true, data: records, company_id: companyId })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Internal server error"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return jsonError(err, "Failed to list reports")
   }
 }
 
@@ -45,11 +41,12 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireApiUserOrGuest()
-    const actorId = user.isDemo ? undefined : user.id
     const body = await req.json()
+    const ctx = await resolveTenantContext(req, body.company_id)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId: company_id, userId, demo } = ctx
+    const actorId = demo ? undefined : userId || undefined
     const {
-      company_id,
       report_type,
       pay_period,
       payroll_run_id,

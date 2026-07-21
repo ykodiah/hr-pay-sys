@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect } from "react"
 import useSWR, { mutate } from "swr"
-import { createClient } from "@/lib/supabase/client"
 import { CUSTOM_FIELD_CATALOG } from "@/lib/services/reports/field-catalog"
 import type { ReportColumn } from "@/lib/services/reports/types"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -312,17 +311,12 @@ export default function ComplianceReportsPage() {
   const [submissionRef, setSubmissionRef] = useState("")
 
   useEffect(() => {
-    if (typeof document !== "undefined" && !document.cookie.includes("demo-session=active")) {
-      document.cookie = "demo-session=active; path=/; max-age=86400; SameSite=Lax"
-    }
-    const supabase = createClient()
-    void supabase
-      .from("companies")
-      .select("id, name")
-      .limit(5)
-      .then(({ data }) => {
-        if (data?.[0]?.id) setCompanyId((prev) => prev || data[0].id)
-      })
+    // Never force demo-session — that bypasses real tenant isolation.
+    void import("@/lib/tenant/resolve-company-client").then(({ resolveClientCompanyId }) =>
+      resolveClientCompanyId()
+        .then((id) => setCompanyId(id))
+        .catch(() => setCompanyId("")),
+    )
   }, [])
 
   // ── Fetch company list (to populate the company selector) ────────────────

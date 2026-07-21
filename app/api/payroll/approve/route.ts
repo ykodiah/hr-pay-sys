@@ -1,24 +1,54 @@
-import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { requireApiUserOrGuest } from "@/lib/auth/api-user"
+import { NextRequest, NextResponse } from "next/server"
+import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
 import { issuePayrollRunPayslips } from "@/lib/services/payslip-service"
+import { resolveEmployeeForUser } from "@/lib/employees/resolve-employee"
+
+/**
+ * Resolve an actor id that satisfies legacy payroll_runs.*_by → employees(id) FKs.
+ * Prefer the linked employee row; fall back to auth user id (after script 079 drops the FK).
+ */
+async function resolveActorEmployeeId(
+  supabase: any,
+  opts: { userId: string | null; companyId: string; demo?: boolean },
+): Promise<string | null> {
+  if (opts.demo || !opts.userId) return null
+  try {
+    const emp = await resolveEmployeeForUser(supabase, {
+      userId: opts.userId,
+      companyId: opts.companyId,
+    })
+    if (emp?.id) return emp.id
+  } catch {
+    // ignore
+  }
+  // Last resort: some installs use employees.id = auth.uid()
+  try {
+    const { data } = await supabase
+      .from("employees")
+      .select("id")
+      .eq("id", opts.userId)
+      .eq("company_id", opts.companyId)
+      .maybeSingle()
+    if (data?.id) return data.id
+  } catch {
+    // ignore
+  }
+  return opts.userId
+}
 
 /**
  * POST /api/payroll/approve
  * Body: { payroll_run_id, action: "hr_review" | "finance_review" | "approve" | "reject", notes?, rejection_reason? }
  *
- * On approve:
- *  - marks run approved + history_locked
- *  - issues payslips (status=issued)
- *  - applies loan installment payments for the period
- *  - marks pay inputs as posted
+ * Tenant-scoped: run must belong to the authenticated user's company.
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const user = await requireApiUserOrGuest()
-
-    const supabase = await createClient()
     const body = await request.json()
+    const ctx = await resolveTenantContext(request, body.company_id)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId, userId, demo, service: supabase } = ctx
+
     const { payroll_run_id, action, notes, rejection_reason } = body
     const reason = rejection_reason ?? notes ?? null
 
@@ -30,13 +60,38 @@ export async function POST(request: Request) {
       .from("payroll_runs")
       .select("*")
       .eq("id", payroll_run_id)
-      .single()
+      .eq("company_id", companyId)
+      .maybeSingle()
     if (runErr || !run) {
-      return NextResponse.json({ error: runErr?.message || "Payroll run not found" }, { status: 404 })
+      return NextResponse.json(
+        { error: runErr?.message || "Payroll run not found for this company" },
+        { status: 404 },
+      )
+    }
+
+    // Count employees on this run — never approve empty runs
+    const { count: itemCount } = await supabase
+      .from("payroll_items")
+      .select("id", { count: "exact", head: true })
+      .eq("payroll_run_id", payroll_run_id)
+      .eq("company_id", companyId)
+
+    if (action === "approve" && (!itemCount || itemCount < 1)) {
+      return NextResponse.json(
+        {
+          error:
+            "Cannot approve a payroll run with 0 employees. Re-run Payroll Processing with selected employees, then approve.",
+        },
+        { status: 422 },
+      )
     }
 
     const now = new Date().toISOString()
-    const actorId = user.isDemo ? null : user.id
+    const actorId = await resolveActorEmployeeId(supabase, {
+      userId: demo ? null : userId,
+      companyId,
+      demo,
+    })
 
     let updatePayload: Record<string, any> = { updated_at: now }
     let auditAction = action
@@ -76,14 +131,13 @@ export async function POST(request: Request) {
         }
         auditAction = "approved"
 
-        // Issue payslips so they appear in history / self-service
         issueResult = await issuePayrollRunPayslips(payroll_run_id)
         if (issueResult.error) {
-          // Fallback if RPC missing: direct update
           const { error: slipErr, count } = await supabase
             .from("payslips")
             .update({ status: "issued", issued_at: now, updated_at: now }, { count: "exact" })
             .eq("payroll_run_id", payroll_run_id)
+            .eq("company_id", companyId)
             .eq("status", "draft")
           if (slipErr) {
             console.warn("[payroll-approve] payslip issue failed:", issueResult.error, slipErr.message)
@@ -92,7 +146,6 @@ export async function POST(request: Request) {
           }
         }
 
-        // Post loan deductions for this run
         const { data: items } = await supabase
           .from("payroll_items")
           .select("employee_id, loan_deduction")
@@ -105,6 +158,7 @@ export async function POST(request: Request) {
             .from("employee_loans")
             .select("id, amount_paid, remaining_balance, monthly_payment, status")
             .eq("employee_id", item.employee_id)
+            .eq("company_id", companyId)
             .in("status", ["active", "approved"])
             .order("created_at", { ascending: true })
 
@@ -123,17 +177,17 @@ export async function POST(request: Request) {
                 updated_at: now,
               })
               .eq("id", loan.id)
+              .eq("company_id", companyId)
             remaining -= pay
           }
         }
 
-        // Mark period inputs as posted
         if (run.pay_period_start) {
           const period = String(run.pay_period_start).slice(0, 7)
           await supabase
             .from("payroll_pay_inputs")
             .update({ status: "posted", updated_at: now })
-            .eq("company_id", run.company_id)
+            .eq("company_id", companyId)
             .eq("pay_period", period)
         }
         break
@@ -158,41 +212,101 @@ export async function POST(request: Request) {
         )
     }
 
-    const { data: updated, error: updateError } = await supabase
+    // Strip null actor fields so we don't overwrite with null when unresolved
+    for (const key of [
+      "approved_by",
+      "rejected_by",
+      "hr_reviewed_by",
+      "finance_reviewed_by",
+    ]) {
+      if (key in updatePayload && updatePayload[key] == null) {
+        delete updatePayload[key]
+      }
+    }
+
+    let { data: updated, error: updateError } = await supabase
       .from("payroll_runs")
       .update(updatePayload)
       .eq("id", payroll_run_id)
+      .eq("company_id", companyId)
       .select("*")
-      .single()
+      .maybeSingle()
+
+    // Legacy FK still pointing at employees(id): retry without actor columns
+    if (
+      updateError &&
+      /approved_by_fkey|rejected_by_fkey|reviewed_by_fkey|foreign key/i.test(
+        String(updateError.message || ""),
+      )
+    ) {
+      const retryPayload = { ...updatePayload }
+      delete retryPayload.approved_by
+      delete retryPayload.rejected_by
+      delete retryPayload.hr_reviewed_by
+      delete retryPayload.finance_reviewed_by
+      const retry = await supabase
+        .from("payroll_runs")
+        .update(retryPayload)
+        .eq("id", payroll_run_id)
+        .eq("company_id", companyId)
+        .select("*")
+        .maybeSingle()
+      updated = retry.data
+      updateError = retry.error
+      if (!updateError) {
+        console.warn(
+          "[payroll-approve] Actor FK blocked write — approved without actor id. Run scripts/079_payroll_runs_actor_fk_fix.sql",
+        )
+      }
+    }
 
     if (updateError) throw new Error(updateError.message)
 
-    await supabase.from("payroll_approval_audit").insert({
-      payroll_run_id,
-      action: auditAction,
-      actor_id: actorId,
-      notes: notes ?? reason ?? null,
-    })
+    try {
+      await supabase.from("payroll_approval_audit").insert({
+        payroll_run_id,
+        action: auditAction,
+        actor_id: actorId || userId || null,
+        notes: notes ?? reason ?? null,
+      })
+    } catch {
+      // optional audit table
+    }
 
     return NextResponse.json({
       success: true,
       action: auditAction,
       run: updated,
+      company_id: companyId,
       payslips_issued: issueResult?.issued ?? 0,
       history: action === "approve",
     })
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 })
+    return jsonError(err, "Failed to approve payroll run")
   }
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    await requireApiUserOrGuest()
+    const ctx = await resolveTenantContext(request)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId, service: supabase } = ctx
 
-    const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     const payroll_run_id = searchParams.get("payroll_run_id")
+
+    // Only return audit for runs belonging to this tenant
+    if (payroll_run_id) {
+      const { data: run } = await supabase
+        .from("payroll_runs")
+        .select("id")
+        .eq("id", payroll_run_id)
+        .eq("company_id", companyId)
+        .maybeSingle()
+      if (!run) {
+        return NextResponse.json({ audit: [], company_id: companyId })
+      }
+    }
 
     let query = supabase
       .from("payroll_approval_audit")
@@ -204,8 +318,8 @@ export async function GET(request: Request) {
     const { data, error } = await query
     if (error) throw new Error(error.message)
 
-    return NextResponse.json({ audit: data ?? [] })
+    return NextResponse.json({ audit: data ?? [], company_id: companyId })
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 })
+    return jsonError(err, "Failed to load approval audit")
   }
 }

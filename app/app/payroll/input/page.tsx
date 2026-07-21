@@ -9,11 +9,13 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { toast } from "@/hooks/use-toast"
-import { createClient } from "@/lib/supabase/client"
+import { resolveClientCompanyId } from "@/lib/tenant/resolve-company-client"
 import {
   calculateGhanaTax,
   DEFAULT_TAX_RATES,
   round2,
+  type TaxRates,
+  type TaxReliefItem,
 } from "@/lib/ghana-tax/engine"
 import {
   RefreshCw,
@@ -39,8 +41,11 @@ type PayInputRow = {
     communication_allowance: number
     uniform_allowance: number
     other_allowances: number
+    card_allowances?: number
+    card_deductions?: number
     tier2_applicable: boolean
     tier3_applicable: boolean
+    provident_fund_rate?: number
   }
   input: {
     id: string | null
@@ -74,6 +79,7 @@ function effectiveBasic(row: PayInputRow) {
   return row.input.basic_salary ?? row.master.basic_salary
 }
 
+/** Matches Process Payroll worksheet: master/input allowances + employee card allowances. */
 function effectiveAllowances(row: PayInputRow) {
   return (
     (row.input.transport_allowance ?? row.master.transport_allowance) +
@@ -82,8 +88,14 @@ function effectiveAllowances(row: PayInputRow) {
     (row.input.meal_allowance ?? row.master.meal_allowance) +
     (row.input.communication_allowance ?? row.master.communication_allowance) +
     (row.input.uniform_allowance ?? row.master.uniform_allowance) +
-    (row.input.other_allowances ?? row.master.other_allowances)
+    (row.input.other_allowances ?? row.master.other_allowances) +
+    Number(row.master.card_allowances ?? 0)
   )
+}
+
+/** Period other deductions + employee card deductions (same as Process Payroll). */
+function effectiveOtherDeductions(row: PayInputRow) {
+  return Number(row.input.other_deductions ?? 0) + Number(row.master.card_deductions ?? 0)
 }
 
 export default function PayInputsPage() {
@@ -95,12 +107,53 @@ export default function PayInputsPage() {
   const [search, setSearch] = useState("")
   const [isPending, startTransition] = useTransition()
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null)
+  const [taxRates, setTaxRates] = useState<TaxRates>(DEFAULT_TAX_RATES)
+  const [reliefsByEmployee, setReliefsByEmployee] = useState<Record<string, TaxReliefItem[]>>({})
 
   const resolveCompany = useCallback(async () => {
-    const supabase = createClient()
-    const { data } = await supabase.from("companies").select("id").limit(1).maybeSingle()
-    if (data?.id) setCompanyId(data.id)
-    return data?.id ?? ""
+    const id = await resolveClientCompanyId()
+    setCompanyId(id)
+    return id
+  }, [])
+
+  const loadTaxRates = useCallback(async (cid: string, period: string) => {
+    try {
+      const year = Number(period.slice(0, 4)) || new Date().getFullYear()
+      const res = await fetch(
+        `/api/settings/tax?company_id=${encodeURIComponent(cid)}&tax_year=${year}`,
+        { cache: "no-store", credentials: "include" },
+      )
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) return
+      setTaxRates({
+        ...DEFAULT_TAX_RATES,
+        ssnit: json.ssnit ?? DEFAULT_TAX_RATES.ssnit,
+        tier2: json.tier2 ?? DEFAULT_TAX_RATES.tier2,
+        tier3: json.tier3 ?? DEFAULT_TAX_RATES.tier3,
+        paye_bands: json.paye_bands ?? DEFAULT_TAX_RATES.paye_bands,
+        paye_bands_are_monthly: json.paye_bands_are_monthly ?? true,
+      })
+    } catch {
+      // keep defaults
+    }
+  }, [])
+
+  const loadReliefs = useCallback(async (cid: string, period: string) => {
+    try {
+      const year = Number(period.slice(0, 4)) || new Date().getFullYear()
+      const res = await fetch(
+        `/api/payroll/tax-reliefs?company_id=${encodeURIComponent(cid)}&tax_year=${year}&mode=payroll_map`,
+        { cache: "no-store", credentials: "include" },
+      )
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setReliefsByEmployee({})
+        return
+      }
+      setReliefsByEmployee(json.by_employee || {})
+    } catch {
+      setReliefsByEmployee({})
+    }
   }, [])
 
   const loadRows = useCallback(async (cid: string, period: string) => {
@@ -130,10 +183,15 @@ export default function PayInputsPage() {
   useEffect(() => {
     void (async () => {
       const cid = companyId || (await resolveCompany())
-      if (cid) await loadRows(cid, payPeriod)
-      else setLoading(false)
+      if (cid) {
+        await Promise.all([
+          loadRows(cid, payPeriod),
+          loadTaxRates(cid, payPeriod),
+          loadReliefs(cid, payPeriod),
+        ])
+      } else setLoading(false)
     })()
-  }, [companyId, payPeriod, resolveCompany, loadRows])
+  }, [companyId, payPeriod, resolveCompany, loadRows, loadTaxRates, loadReliefs])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -154,6 +212,7 @@ export default function PayInputsPage() {
     )
   }
 
+  /** Same calculation path as Process Payroll worksheet (Tier 2 excluded from cash). */
   const previewNet = (row: PayInputRow) => {
     const tax = calculateGhanaTax(
       {
@@ -163,17 +222,19 @@ export default function PayInputsPage() {
         monthly_bonus: row.input.bonus_amount,
         tier2_applicable: row.input.tier2_applicable,
         tier3_applicable: row.input.tier3_applicable,
+        tier3_employee_rate: row.input.tier3_employee_rate || undefined,
+        annual_tax_reliefs: reliefsByEmployee[row.employee_id] || [],
         other_deductions: {
           loan: row.input.loan_deduction,
           advance: row.input.advance_deduction,
-          other: row.input.other_deductions,
+          other: effectiveOtherDeductions(row),
         },
       },
       {
-        ...DEFAULT_TAX_RATES,
+        ...taxRates,
         tier3: {
-          employee_rate: row.input.tier3_employee_rate || 0,
-          employer_rate: 0,
+          employee_rate: row.input.tier3_employee_rate || taxRates.tier3?.employee_rate || 0,
+          employer_rate: taxRates.tier3?.employer_rate || 0,
         },
       },
     )
@@ -238,63 +299,83 @@ export default function PayInputsPage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <ClipboardList className="h-6 w-6 text-emerald-700" />
-            <h1 className="text-2xl font-bold text-gray-900">Pay Inputs</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Pay Inputs</h1>
           </div>
-          <p className="text-gray-600 max-w-2xl">
-            Capture period emoluments and adjustments (overtime, bonus, loans, advances).
-            Values feed Process Payroll, and can optionally update the employee master record.
+          <p className="text-sm text-muted-foreground">
+            Period overrides feed Process Payroll. Preview PAYE/net now includes tax reliefs, Tier 3/PF,
+            and card deductions — Tier 2 is report-only.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
             <Link href="/app/payroll">
-              Process Payroll
-              <ArrowRight className="w-4 h-4 ml-2" />
+              Process Payroll <ArrowRight className="ml-1 h-4 w-4" />
             </Link>
           </Button>
-          <Button variant="outline" onClick={() => companyId && loadRows(companyId, payPeriod)} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading || isPending ? "animate-spin" : ""}`} />
+          <Button
+            variant="outline"
+            disabled={loading || isPending || !companyId}
+            onClick={() =>
+              companyId &&
+              Promise.all([
+                loadRows(companyId, payPeriod),
+                loadTaxRates(companyId, payPeriod),
+                loadReliefs(companyId, payPeriod),
+              ])
+            }
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
-          <Button onClick={() => handleSave(false)} disabled={saving || loading} className="bg-emerald-600 hover:bg-emerald-700">
-            <Save className="w-4 h-4 mr-2" />
+          <Button
+            className="bg-emerald-700 hover:bg-emerald-800"
+            disabled={saving || !companyId || !rows.length}
+            onClick={() => handleSave(false)}
+          >
+            <Save className="mr-2 h-4 w-4" />
             {saving ? "Saving…" : "Save period inputs"}
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Pay period</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Input type="month" value={payPeriod} onChange={(e) => setPayPeriod(e.target.value)} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Employees</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-bold">{rows.length}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Database className="w-4 h-4" /> DB sync
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {lastSyncedAt ? new Date(lastSyncedAt).toLocaleString() : "Not loaded"}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Search</CardTitle>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Pay period</p>
             <Input
-              placeholder="Name, ID, department…"
+              type="month"
+              className="mt-1"
+              value={payPeriod}
+              onChange={(e) => setPayPeriod(e.target.value)}
+            />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 flex items-center gap-3">
+            <Database className="h-5 w-5 text-emerald-700" />
+            <div>
+              <p className="text-xs text-muted-foreground">Employees</p>
+              <p className="text-lg font-semibold">{rows.length}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 flex items-center gap-3">
+            <Calculator className="h-5 w-5 text-emerald-700" />
+            <div>
+              <p className="text-xs text-muted-foreground">DB sync</p>
+              <p className="text-sm font-medium">
+                {lastSyncedAt ? new Date(lastSyncedAt).toLocaleString() : "—"}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <Label className="text-xs text-muted-foreground">Search</Label>
+            <Input
+              className="mt-1"
+              placeholder="Name, ID, or department"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -304,147 +385,161 @@ export default function PayInputsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calculator className="w-5 h-5" />
-            Period worksheet
-          </CardTitle>
+          <CardTitle>Period worksheet</CardTitle>
           <CardDescription>
-            Leave salary/allowance fields blank to use the employee master (`employee_financial`).
-            Overtime tax is computed at the marginal PAYE rate and remitted with PAYE.
-            Loans, advances, and other deductions reduce net after statutory tax.
+            Leave salary/allowance fields blank to use the employee master. Preview includes assigned tax
+            reliefs and employee-module card deductions. Overtime tax is remitted with PAYE. Tier 2 (5%)
+            is not deducted here.
           </CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent>
           {loading ? (
-            <div className="py-12 text-center text-muted-foreground">Loading from database…</div>
+            <div className="py-12 text-center text-muted-foreground">Loading pay inputs…</div>
           ) : filtered.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
-              No active employees found. Add employees and financial records first.
-            </div>
+            <div className="py-12 text-center text-muted-foreground">No employees for this company.</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Basic (override)</TableHead>
-                  <TableHead>OT amount</TableHead>
-                  <TableHead>Bonus</TableHead>
-                  <TableHead>Loan</TableHead>
-                  <TableHead>Advance</TableHead>
-                  <TableHead>Other ded.</TableHead>
-                  <TableHead>Preview PAYE</TableHead>
-                  <TableHead>Preview net</TableHead>
-                  <TableHead>Sync master</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((row) => {
-                  const preview = previewNet(row)
-                  return (
-                    <TableRow key={row.employee_id}>
-                      <TableCell>
-                        <div className="font-medium">{row.full_name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {row.employee_code} · {row.department || "—"}
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          Master basic: GHS {row.master.basic_salary.toLocaleString()}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          className="w-28"
-                          placeholder={String(row.master.basic_salary)}
-                          value={row.input.basic_salary ?? ""}
-                          onChange={(e) =>
-                            updateRow(row.employee_id, {
-                              basic_salary: e.target.value === "" ? null : Number(e.target.value),
-                            })
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          className="w-24"
-                          value={row.input.overtime_amount}
-                          onChange={(e) =>
-                            updateRow(row.employee_id, { overtime_amount: Number(e.target.value) || 0 })
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          className="w-24"
-                          value={row.input.bonus_amount}
-                          onChange={(e) =>
-                            updateRow(row.employee_id, { bonus_amount: Number(e.target.value) || 0 })
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          className="w-24"
-                          value={row.input.loan_deduction}
-                          onChange={(e) =>
-                            updateRow(row.employee_id, { loan_deduction: Number(e.target.value) || 0 })
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          className="w-24"
-                          value={row.input.advance_deduction}
-                          onChange={(e) =>
-                            updateRow(row.employee_id, { advance_deduction: Number(e.target.value) || 0 })
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          className="w-24"
-                          value={row.input.other_deductions}
-                          onChange={(e) =>
-                            updateRow(row.employee_id, { other_deductions: Number(e.target.value) || 0 })
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm font-medium text-red-600">
-                          {round2(preview.monthly_total_paye_withheld).toLocaleString()}
-                        </div>
-                        {preview.monthly_overtime_tax > 0 && (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Basic (override)</TableHead>
+                    <TableHead>OT amount</TableHead>
+                    <TableHead>Bonus</TableHead>
+                    <TableHead>Loan</TableHead>
+                    <TableHead>Advance</TableHead>
+                    <TableHead>Other ded.</TableHead>
+                    <TableHead className="text-right">Tax Relief</TableHead>
+                    <TableHead className="text-right">Preview PAYE</TableHead>
+                    <TableHead className="text-right">Preview net</TableHead>
+                    <TableHead>Sync master</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((row) => {
+                    const preview = previewNet(row)
+                    const monthlyRelief = round2((preview.annual_tax_reliefs || 0) / 12)
+                    const cardDed = Number(row.master.card_deductions ?? 0)
+                    return (
+                      <TableRow key={row.employee_id}>
+                        <TableCell>
+                          <div className="font-medium">{row.full_name}</div>
                           <div className="text-xs text-muted-foreground">
-                            incl. OT tax {preview.monthly_overtime_tax.toLocaleString()}
+                            {row.employee_code} · {row.department || "—"}
                           </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="font-semibold text-emerald-700">
-                          {round2(preview.monthly_net_pay).toLocaleString()}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            checked={row.input.apply_to_master}
-                            onCheckedChange={(checked) =>
-                              updateRow(row.employee_id, { apply_to_master: Boolean(checked) })
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Master basic: GHS {row.master.basic_salary.toLocaleString()}
+                          </div>
+                          {row.input.tier3_applicable && (
+                            <div className="text-xs text-emerald-700 mt-0.5">
+                              Tier 3/PF {row.input.tier3_employee_rate || 0}%
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            className="w-28"
+                            placeholder={String(row.master.basic_salary)}
+                            value={row.input.basic_salary ?? ""}
+                            onChange={(e) =>
+                              updateRow(row.employee_id, {
+                                basic_salary: e.target.value === "" ? null : Number(e.target.value),
+                              })
                             }
                           />
-                          <Label className="text-xs text-muted-foreground">Update master</Label>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            className="w-24"
+                            value={row.input.overtime_amount}
+                            onChange={(e) =>
+                              updateRow(row.employee_id, { overtime_amount: Number(e.target.value) || 0 })
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            className="w-24"
+                            value={row.input.bonus_amount}
+                            onChange={(e) =>
+                              updateRow(row.employee_id, { bonus_amount: Number(e.target.value) || 0 })
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            className="w-24"
+                            value={row.input.loan_deduction}
+                            onChange={(e) =>
+                              updateRow(row.employee_id, { loan_deduction: Number(e.target.value) || 0 })
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            className="w-24"
+                            value={row.input.advance_deduction}
+                            onChange={(e) =>
+                              updateRow(row.employee_id, { advance_deduction: Number(e.target.value) || 0 })
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            className="w-24"
+                            value={row.input.other_deductions}
+                            onChange={(e) =>
+                              updateRow(row.employee_id, { other_deductions: Number(e.target.value) || 0 })
+                            }
+                          />
+                          {cardDed > 0 && (
+                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                              + card {cardDed.toFixed(2)}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="text-sm font-medium">{monthlyRelief.toLocaleString()}</div>
+                          <div className="text-[10px] text-muted-foreground">monthly</div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="text-sm font-medium text-red-600">
+                            {round2(preview.monthly_total_paye_withheld).toLocaleString()}
+                          </div>
+                          {preview.monthly_overtime_tax > 0 && (
+                            <div className="text-xs text-muted-foreground">
+                              incl. OT tax {preview.monthly_overtime_tax.toLocaleString()}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant="outline" className="font-semibold text-emerald-700">
+                            {round2(preview.monthly_net_pay).toLocaleString()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              checked={row.input.apply_to_master}
+                              onCheckedChange={(checked) =>
+                                updateRow(row.employee_id, { apply_to_master: Boolean(checked) })
+                              }
+                            />
+                            <Label className="text-xs text-muted-foreground">Update master</Label>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

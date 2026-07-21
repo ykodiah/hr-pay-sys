@@ -4,35 +4,23 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { requireApiUser } from "@/lib/auth/api-user"
-import { resolveCompanyId } from "@/lib/employees/resolve-company"
+import { resolveTenantContext } from "@/lib/settings/resolve-tenant"
 import { ACTIVE_EMPLOYEE_STATUSES, normalizeEmployeeStatus } from "@/lib/employees/status"
 import { mapEmployeeRow, toEmployeeOption } from "@/lib/employees/dto"
 import { persistVaultDocument } from "@/lib/employees/persist-vault-document"
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await requireApiUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const ctx = await resolveTenantContext(req)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId, service: client } = ctx
 
-    const client = await createClient()
     const { searchParams } = new URL(req.url)
-    let companyId = searchParams.get("company_id")
     const status = searchParams.get("status")
     const q = searchParams.get("q")?.trim()
     const includeFinancial = searchParams.get("include_financial") === "true"
     const optionsOnly = searchParams.get("options") === "true"
     const limit = Math.min(Number(searchParams.get("limit") ?? 500), 2000)
-
-    if (!companyId) {
-      const resolved = await resolveCompanyId(client, user.isDemo ? null : user.id)
-      companyId = resolved?.companyId ?? null
-    }
-
-    if (!companyId) {
-      return NextResponse.json({ error: "company_id is required" }, { status: 400 })
-    }
 
     const select = includeFinancial
       ? `*, financial:employee_financial(*), subsidiaries:subsidiary_id(id, name)`
@@ -116,19 +104,27 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requireApiUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-    const client = await createClient()
     const body = await req.json()
+    const ctx = await resolveTenantContext(req, body.company_id)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId, service: client } = ctx
 
-    let companyId = body.company_id as string | undefined
-    if (!companyId) {
-      const resolved = await resolveCompanyId(client, user.isDemo ? null : user.id)
-      companyId = resolved?.companyId
-    }
-    if (!companyId) {
-      return NextResponse.json({ error: "company_id is required" }, { status: 400 })
+    // Prevent attaching another tenant's subsidiary to this company
+    if (body.subsidiary_id) {
+      const { data: subsidiary, error: subErr } = await client
+        .from("subsidiaries")
+        .select("id, company_id")
+        .eq("id", body.subsidiary_id)
+        .maybeSingle()
+      if (subErr) {
+        return NextResponse.json({ error: subErr.message }, { status: 500 })
+      }
+      if (!subsidiary || subsidiary.company_id !== companyId) {
+        return NextResponse.json(
+          { error: "subsidiary_id does not belong to this company" },
+          { status: 400 },
+        )
+      }
     }
 
     if (!body.first_name || !body.last_name) {
@@ -140,19 +136,70 @@ export async function POST(req: NextRequest) {
       body.display_name ||
       `${body.first_name} ${body.last_name}`.trim()
 
-    // Ensure sequential employee_id: use provided code if unique, else allocate next
-    let employeeCode = body.employee_id ? String(body.employee_id).trim() : ""
+    // Reject near-duplicates (same emails) — common when the UI double-submits
+    const corporateEmail = body.corporate_email ? String(body.corporate_email).trim() : ""
+    const personalEmail = body.personal_email ? String(body.personal_email).trim() : ""
+    if (corporateEmail || personalEmail) {
+      const checks: PromiseLike<{ data: any[] | null }>[] = []
+      if (corporateEmail) {
+        checks.push(
+          client
+            .from("employees")
+            .select("id, employee_id, corporate_email, personal_email")
+            .eq("company_id", companyId)
+            .ilike("corporate_email", corporateEmail)
+            .limit(1),
+        )
+      }
+      if (personalEmail) {
+        checks.push(
+          client
+            .from("employees")
+            .select("id, employee_id, corporate_email, personal_email")
+            .eq("company_id", companyId)
+            .ilike("personal_email", personalEmail)
+            .limit(1),
+        )
+      }
+      const results = await Promise.all(checks)
+      const hit = results.flatMap((r) => r.data || [])[0]
+      if (hit) {
+        return NextResponse.json(
+          {
+            error: `An employee with this email already exists (${hit.employee_id || hit.id}).`,
+            existing_employee_id: hit.id,
+            existing_employee_code: hit.employee_id,
+          },
+          { status: 409 },
+        )
+      }
+    }
+
+    // Ensure sequential employee_id: use provided code if unique, else allocate next.
+    // If the client explicitly sent a code that already exists, return 409 instead of
+    // silently minting a second employee with a different code (double-submit case).
+    const providedCode = body.employee_id ? String(body.employee_id).trim() : ""
+    let employeeCode = providedCode
     if (employeeCode) {
       const { data: clash } = await client
         .from("employees")
-        .select("id")
+        .select("id, employee_id")
         .eq("company_id", companyId)
         .eq("employee_id", employeeCode)
         .maybeSingle()
-      if (clash) employeeCode = ""
+      if (clash) {
+        return NextResponse.json(
+          {
+            error: `Employee ID ${employeeCode} already exists.`,
+            existing_employee_id: clash.id,
+            existing_employee_code: clash.employee_id,
+          },
+          { status: 409 },
+        )
+      }
     }
     if (!employeeCode) {
-      const prefix = String(body.prefix || employeeCode || "EMP")
+      const prefix = String(body.prefix || "EMP")
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, "")
         .slice(0, 4)
@@ -225,7 +272,19 @@ export async function POST(req: NextRequest) {
       .select()
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      // Unique index on (company_id, employee_id) — race from double-submit
+      if (String(error.message || "").toLowerCase().includes("duplicate") || error.code === "23505") {
+        return NextResponse.json(
+          {
+            error: `Employee ID ${employeeCode} already exists (or a concurrent create raced).`,
+            code: error.code,
+          },
+          { status: 409 },
+        )
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
 
     const financial = body.financial ?? null
     if (financial || body.monthly_salary != null || body.salary != null) {

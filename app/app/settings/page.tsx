@@ -9,7 +9,12 @@ import { useToast } from "@/hooks/use-toast"
 import TaxReliefManager from "@/components/tax-relief-manager"
 import GhanaTaxSettings from "@/components/ghana-tax-settings"
 import { createClient } from "@/lib/supabase/client"
-import { calculateMonthlyPaye, round2 as roundMoney } from "@/lib/ghana-tax/engine"
+import {
+  calculateMonthlyPaye,
+  normalizePayeBands,
+  GRA_MONTHLY_PAYE_BANDS,
+  round2 as roundMoney,
+} from "@/lib/ghana-tax/engine"
 import {
   Building2,
   Users,
@@ -142,6 +147,99 @@ interface Role {
   description: string
   permissions: string[]
   user_count: number
+  code?: string | null
+  level?: number
+  is_system_role?: boolean
+  is_active?: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Role permission model (module x access-level matrix)
+// Permissions are persisted as a flat JSONB array of `module:action` strings,
+// e.g. ["employees:view", "employees:edit"]. "*:all" grants everything.
+// ---------------------------------------------------------------------------
+const ROLE_MODULES: { key: string; label: string; description: string }[] = [
+  { key: "dashboard", label: "Dashboard", description: "Overview metrics and insights" },
+  { key: "employees", label: "Employees", description: "Employee records and profiles" },
+  { key: "payroll", label: "Payroll", description: "Payroll runs and payslips" },
+  { key: "leave", label: "Leave", description: "Leave requests and policies" },
+  { key: "attendance", label: "Attendance", description: "Time and attendance tracking" },
+  { key: "performance", label: "Performance", description: "Appraisals and goals" },
+  { key: "documents", label: "Documents", description: "Document vault and files" },
+  { key: "reports", label: "Reports", description: "Analytics and exports" },
+  { key: "multi_company", label: "Multi-Company", description: "Subsidiary management" },
+  { key: "notifications", label: "Notifications", description: "Templates and preferences" },
+  { key: "settings", label: "Settings", description: "Company configuration" },
+  { key: "roles", label: "Roles & Access", description: "Roles, permissions and security" },
+]
+
+const ROLE_ACTIONS: { key: string; label: string }[] = [
+  { key: "view", label: "View" },
+  { key: "create", label: "Create" },
+  { key: "edit", label: "Edit" },
+  { key: "delete", label: "Delete" },
+  { key: "approve", label: "Approve" },
+  { key: "export", label: "Export" },
+]
+
+type PermissionMatrix = Record<string, string[]>
+
+const emptyPermissionMatrix = (): PermissionMatrix =>
+  ROLE_MODULES.reduce<PermissionMatrix>((acc, m) => {
+    acc[m.key] = []
+    return acc
+  }, {})
+
+/** Expand stored permission strings into a module x action matrix. */
+const permissionsToMatrix = (permissions: string[] | undefined | null): PermissionMatrix => {
+  const matrix = emptyPermissionMatrix()
+  const list = Array.isArray(permissions) ? permissions : []
+  const grantAll = list.includes("all") || list.includes("*") || list.includes("*:all")
+  for (const module of ROLE_MODULES) {
+    if (grantAll) {
+      matrix[module.key] = ROLE_ACTIONS.map((a) => a.key)
+    }
+  }
+  for (const raw of list) {
+    if (!raw || raw === "all" || raw === "*" || raw === "*:all") continue
+    const [moduleKey, actionKey] = String(raw).includes(":")
+      ? String(raw).split(":")
+      : [String(raw), "view"]
+    if (!matrix[moduleKey]) continue
+    if (actionKey === "all") {
+      matrix[moduleKey] = ROLE_ACTIONS.map((a) => a.key)
+    } else if (ROLE_ACTIONS.some((a) => a.key === actionKey) && !matrix[moduleKey].includes(actionKey)) {
+      matrix[moduleKey].push(actionKey)
+    }
+  }
+  return matrix
+}
+
+/** Flatten a matrix back to `module:action` strings for persistence. */
+const matrixToPermissions = (matrix: PermissionMatrix): string[] => {
+  const result: string[] = []
+  for (const module of ROLE_MODULES) {
+    const actions = matrix[module.key] || []
+    if (actions.length === ROLE_ACTIONS.length) {
+      result.push(`${module.key}:all`)
+    } else {
+      for (const action of actions) result.push(`${module.key}:${action}`)
+    }
+  }
+  return result
+}
+
+const countMatrixGrants = (matrix: PermissionMatrix): number =>
+  Object.values(matrix).reduce((sum, actions) => sum + (actions?.length || 0), 0)
+
+const summarizeRolePermissions = (permissions: string[] | undefined | null): string => {
+  const matrix = permissionsToMatrix(permissions)
+  const modules = ROLE_MODULES.filter((m) => (matrix[m.key] || []).length > 0)
+  if (!modules.length) return "No module access"
+  if (modules.length === ROLE_MODULES.length && modules.every((m) => matrix[m.key].length === ROLE_ACTIONS.length)) {
+    return "Full access (all modules)"
+  }
+  return modules.map((m) => m.label).join(", ")
 }
 
 // Added for Access Control and Security
@@ -149,9 +247,15 @@ interface AccessSettings {
   twoFactorEnabled: boolean
   ssoEnabled: boolean
   passwordExpiryEnabled: boolean
+  passwordExpiryDays: number
   sessionTimeout: number
   maxLoginAttempts: number
+  lockoutDuration: number
   passwordMinLength: number
+  passwordRequireUppercase: boolean
+  passwordRequireLowercase: boolean
+  passwordRequireNumbers: boolean
+  passwordRequireSpecial: boolean
   ipRestrictionsEnabled: boolean
   allowedIPs: string[]
 }
@@ -161,7 +265,19 @@ interface SecuritySettings {
   auditLoggingEnabled: boolean
   autoBackupEnabled: boolean
   backupFrequency: string
+  backupRetentionDays: number
   dataRetentionDays: number
+  gdprComplianceEnabled: boolean
+  dataAnonymizationEnabled: boolean
+}
+
+interface BackupHistoryItem {
+  id: string
+  backup_status: string
+  backup_size: number | null
+  backup_type: string
+  started_at: string
+  completed_at: string | null
 }
 
 interface HrConfig {
@@ -184,6 +300,9 @@ interface HrDocumentItem {
   visibleToAll: boolean
   fileUrl: string | null
   uploadedAt: string
+  content?: string
+  vaultDocumentId?: string | null
+  fileType?: string | null
 }
 
 interface StructuredSalaryGrade {
@@ -217,7 +336,10 @@ interface ActiveSession {
   user_email: string
   ip_address: string
   device: string
+  browser?: string
+  os?: string
   last_activity: string
+  is_current?: boolean
 }
 
 const isDemoMode = () => {
@@ -227,6 +349,22 @@ const isDemoMode = () => {
     return demoSession || !!demoProfile
   }
   return false
+}
+
+const clearClientDemoSession = () => {
+  if (typeof window === "undefined") return
+  document.cookie = "demo-session=; path=/; max-age=0"
+  try {
+    localStorage.removeItem("demo_profile")
+  } catch {
+    // ignore
+  }
+}
+
+const isPlaceholderLogo = (url?: string | null) => {
+  if (!url) return true
+  const value = url.trim()
+  return !value || value.includes("/placeholder") || value === "null" || value === "undefined"
 }
 
 const formatBytes = (bytes?: number | null) => {
@@ -240,6 +378,41 @@ const toTitleCase = (value: string) =>
     .replace(/[_-]+/g, " ")
     .toLowerCase()
     .replace(/\b\w/g, (char) => char.toUpperCase())
+
+type NotificationPreference = {
+  key: string
+  label: string
+  description: string
+  enabled: boolean
+  channels: string[]
+}
+
+async function settingsFetch(url: string, init?: RequestInit) {
+  const res = await fetch(url, {
+    credentials: "include",
+    ...init,
+    headers: {
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.headers || {}),
+    },
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const detail =
+      (typeof data.error === "string" && data.error) ||
+      (typeof data.message === "string" && data.message) ||
+      (Array.isArray(data.errors) && data.errors.filter(Boolean).join("; ")) ||
+      `Request failed (${res.status})`
+    throw new Error(detail)
+  }
+  return data
+}
+
+function settingsErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message?.trim()) return error.message.trim()
+  if (typeof error === "string" && error.trim()) return error.trim()
+  return fallback
+}
 
 const ensureStringArray = (value: unknown): string[] => {
   if (Array.isArray(value)) {
@@ -265,6 +438,7 @@ export default function SettingsPage() {
 
   const { toast } = useToast()
   const supabase = createClient()
+  const [activeSettingsTab, setActiveSettingsTab] = useState("company")
 
   const [companyData, setCompanyData] = useState<Company>({
     id: "",
@@ -303,35 +477,7 @@ export default function SettingsPage() {
   const [documentPreviewContent, setDocumentPreviewContent] = useState("")
   const [isParsingFile, setIsParsingFile] = useState(false)
 
-  const [hrDocuments, setHrDocuments] = useState<HrDocumentItem[]>([
-    {
-      id: "1",
-      name: "Employee Handbook",
-      type: "PDF",
-      size: "1.2MB",
-      visibleToAll: true,
-      fileUrl: "/placeholder-document.pdf",
-      uploadedAt: new Date().toISOString()
-    },
-    {
-      id: "2",
-      name: "Code of Conduct",
-      type: "DOC",
-      size: "0.5MB",
-      visibleToAll: true,
-      fileUrl: "/placeholder-document.pdf",
-      uploadedAt: new Date().toISOString()
-    },
-    {
-      id: "3",
-      name: "Safety Manual",
-      type: "PDF",
-      size: "0.8MB",
-      visibleToAll: false,
-      fileUrl: "/placeholder-document.pdf",
-      uploadedAt: new Date().toISOString()
-    },
-  ])
+  const [hrDocuments, setHrDocuments] = useState<HrDocumentItem[]>([])
 
   const [documentZoom, setDocumentZoom] = useState(100)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -346,11 +492,7 @@ export default function SettingsPage() {
   const [selectedDocument, setSelectedDocument] = useState(null)
   const [uploadedFile, setUploadedFile] = useState(null)
   const [documentName, setDocumentName] = useState("")
-  const [currentPolicies, setCurrentPolicies] = useState([
-    { name: "Annual Leave", days: 21, usage: "68%", trend: "up", description: "Annual vacation leave" },
-    { name: "Sick Leave", days: 10, usage: "23%", trend: "down", description: "Medical leave for illness" },
-    { name: "Maternity Leave", days: 84, usage: "12%", trend: "stable", description: "Maternity and paternity leave" },
-  ])
+  const [currentPolicies, setCurrentPolicies] = useState<any[]>([])
 
   const [divisions, setDivisions] = useState<string[]>([])
   const [departments, setDepartments] = useState<string[]>([])
@@ -359,12 +501,43 @@ export default function SettingsPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([])
   const [roles, setRoles] = useState<Role[]>([])
+  const [showRoleModal, setShowRoleModal] = useState(false)
+  const [roleModalType, setRoleModalType] = useState<"add" | "edit" | "view">("add")
+  const [editingRole, setEditingRole] = useState<Role | null>(null)
+  const [roleForm, setRoleForm] = useState({ name: "", description: "" })
+  const [rolePermissionMatrix, setRolePermissionMatrix] = useState<PermissionMatrix>(emptyPermissionMatrix())
+  const [isSavingRole, setIsSavingRole] = useState(false)
+  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
+  const [isDeletingRole, setIsDeletingRole] = useState(false)
+  const [syncPrefs, setSyncPrefs] = useState({
+    sync_hr_policies: true,
+    sync_payroll_config: true,
+    sync_leave_types: true,
+    sync_roles_permissions: false,
+  })
+  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreference[]>([])
   const [isBackingUp, setIsBackingUp] = useState<boolean>(false)
   const [lastBackupTime, setLastBackupTime] = useState<string | null>(null)
   const [showAddSubsidiary, setShowAddSubsidiary] = useState<boolean>(false)
   const [showEditSubsidiary, setShowEditSubsidiary] = useState(false)
   const [showSubsidiaryDetails, setShowSubsidiaryDetails] = useState(false)
   const [selectedSubsidiary, setSelectedSubsidiary] = useState<Subsidiary | null>(null)
+  const emptySubsidiaryForm = {
+    name: "",
+    industry: "",
+    tax_id: "",
+    ssnit_number: "",
+    email_address: "",
+    phone_number: "",
+    address: "",
+    divisions: [] as string[],
+    departments: [] as string[],
+    locations: [] as string[],
+  }
+  const [newSubsidiary, setNewSubsidiary] = useState(emptySubsidiaryForm)
+  const [newSubsidiaryDivision, setNewSubsidiaryDivision] = useState("")
+  const [newSubsidiaryDepartment, setNewSubsidiaryDepartment] = useState("")
+  const [newSubsidiaryLocation, setNewSubsidiaryLocation] = useState("")
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState<boolean>(false)
   const [showReactivateConfirm, setShowReactivateConfirm] = useState<boolean>(false)
   const [subsidiaryToToggle, setSubsidiaryToToggle] = useState<Subsidiary | null>(null)
@@ -388,7 +561,7 @@ export default function SettingsPage() {
   const [isSavingSubsidiaries, setIsSavingSubsidiaries] = useState(false)
 
   const [isManagingLeaveTypes, setIsManagingLeaveTypes] = useState(false)
-  const [selectedPolicy, setSelectedPolicy] = useState<string | null>(null)
+  const [selectedPolicy, setSelectedPolicy] = useState<any>(null)
 
   useEffect(() => {
     if (selectedSubsidiary) {
@@ -424,45 +597,13 @@ export default function SettingsPage() {
   const [editingAllowance, setEditingAllowance] = useState<number | null>(null)
   const [editingDeduction, setEditingDeduction] = useState<number | null>(null)
 
-  const [allowances, setAllowances] = useState([
-    {
-      code: "TRANS",
-      description: "Transport Allowance",
-      taxable: true,
-      recurring: true,
-      amount: 0,
-      percentage: 0,
-      type: "FIXED",
-    },
-    {
-      code: "HOUSE",
-      description: "Housing Allowance",
-      taxable: true,
-      recurring: true,
-      amount: 0,
-      percentage: 0,
-      type: "FIXED",
-    },
-    {
-      code: "MED",
-      description: "Medical Allowance",
-      taxable: false,
-      recurring: true,
-      amount: 0,
-      percentage: 0,
-      type: "FIXED",
-    },
-  ])
+  const [allowances, setAllowances] = useState<any[]>([])
 
-  const [deductions, setDeductions] = useState([
-    { code: "TAX", description: "Tax Deduction", recurring: true, amount: 0, percentage: 0, type: "VARIABLE" },
-    { code: "SSNIT", description: "SSNIT Deduction", recurring: true, amount: 0, percentage: 5.5, type: "VARIABLE" },
-    { code: "LOAN", description: "Loan Deduction", recurring: true, amount: 0, percentage: 0, type: "FIXED" },
-  ])
+  const [deductions, setDeductions] = useState<any[]>([])
 
   // Act 766: Tier 1 (SSNIT) 0.5% ee / 13% er — Tier 2 is separate (5% ee / 0% er)
   const [ssnitRates, setSsnitRates] = useState({
-    employee: 0.5,
+    employee: 5.5,
     employer: 13,
     total: 13.5,
   })
@@ -497,42 +638,8 @@ export default function SettingsPage() {
   const [isOverviewExpanded, setIsOverviewExpanded] = useState(false)
   const [isOverviewRefreshing, setIsOverviewRefreshing] = useState(false)
 
-  // Tax Relief State
-  const [taxReliefs, setTaxReliefs] = useState([
-    {
-      id: 1,
-      name: "Personal Relief",
-      description: "Basic personal tax relief",
-      amount: 402,
-      currency: "GHS",
-      isActive: true,
-      category: "Personal",
-      effectiveDate: "2024-01-01",
-      lastUpdated: "2024-01-01T00:00:00Z"
-    },
-    {
-      id: 2,
-      name: "Child Relief",
-      description: "Tax relief for dependent children",
-      amount: 150,
-      currency: "GHS",
-      isActive: true,
-      category: "Family",
-      effectiveDate: "2024-01-01",
-      lastUpdated: "2024-01-01T00:00:00Z"
-    },
-    {
-      id: 3,
-      name: "Old Age Relief",
-      description: "Tax relief for elderly citizens",
-      amount: 200,
-      currency: "GHS",
-      isActive: true,
-      category: "Age",
-      effectiveDate: "2024-01-01",
-      lastUpdated: "2024-01-01T00:00:00Z"
-    }
-  ])
+  // Tax Relief State — loaded from tax_reliefs via /api/settings/payroll/items
+  const [taxReliefs, setTaxReliefs] = useState<any[]>([])
   const [isSyncingReliefs, setIsSyncingReliefs] = useState(false)
   const [reliefsLastSync, setReliefsLastSync] = useState<string | null>("2024-01-01T00:00:00Z")
   const [editingRelief, setEditingRelief] = useState<number | null>(null)
@@ -557,10 +664,10 @@ export default function SettingsPage() {
         { rate: 35, from: 50416.67, to: Number.POSITIVE_INFINITY, cumulativeTax: 13728.67 },
       ],
       socialSecurity: {
-        // Act 766 Tier 1 (SSNIT) portion — employee total pension is 5.5% with Tier 2
-        employee: 0.5,
+        // Act 766 Tier 1 (SSNIT): employee 5.5%, employer 13%
+        employee: 5.5,
         employer: 13.0,
-        total: 13.5,
+        total: 18.5,
         cap: 2000000, // Annual cap in GHS
       },
       tier2: {
@@ -661,59 +768,23 @@ export default function SettingsPage() {
   const [selectedCurrency, setSelectedCurrency] = useState("ghs")
   const [payeTaxBands, setPayeTaxBands] = useState(currencyConfig.ghs.taxBands)
 
-  const [notificationTemplates, setNotificationTemplates] = useState([
-    {
-      id: "1",
-      name: "Employee Welcome",
-      category: "HR",
-      type: "Email",
-      status: "Active",
-      lastModified: "2024-01-15",
-      description: "Welcome email sent to new employees",
-    },
-    {
-      id: "2",
-      name: "Payroll Processed",
-      category: "Payroll",
-      type: "Email",
-      status: "Active",
-      lastModified: "2024-01-10",
-      description: "Notification when payroll is processed",
-    },
-    {
-      id: "3",
-      name: "Leave Request Approved",
-      category: "Leave",
-      type: "Email",
-      status: "Active",
-      lastModified: "2024-01-08",
-      description: "Notification when leave is approved",
-    },
-    {
-      id: "4",
-      name: "Attendance Alert",
-      category: "Attendance",
-      type: "SMS",
-      status: "Draft",
-      lastModified: "2024-01-05",
-      description: "Alert for attendance issues",
-    },
-  ])
+  const [notificationTemplates, setNotificationTemplates] = useState<any[]>([])
 
   const [emailConfig, setEmailConfig] = useState({
     provider: "smtp",
-    smtpHost: "smtp.gmail.com",
+    smtpHost: "",
     smtpPort: 587,
     smtpUsername: "",
     smtpPassword: "",
-    fromEmail: "hr@company.com",
-    fromName: "HR Department",
-    replyTo: "noreply@company.com",
+    fromEmail: "",
+    fromName: "",
+    replyTo: "",
     enableTLS: true,
     enableSSL: false,
   })
 
   const [notificationSettings, setNotificationSettings] = useState({
+    welcomeNotifications: true,
     payrollNotifications: true,
     leaveNotifications: true,
     attendanceAlerts: true,
@@ -753,28 +824,42 @@ export default function SettingsPage() {
     twoFactorEnabled: false,
     ssoEnabled: false,
     passwordExpiryEnabled: true,
+    passwordExpiryDays: 90,
     sessionTimeout: 30,
     maxLoginAttempts: 5,
+    lockoutDuration: 15,
     passwordMinLength: 8,
+    passwordRequireUppercase: true,
+    passwordRequireLowercase: true,
+    passwordRequireNumbers: true,
+    passwordRequireSpecial: false,
     ipRestrictionsEnabled: false,
     allowedIPs: [],
   })
   const [isSavingAccessSettings, setIsSavingAccessSettings] = useState(false)
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([])
   const [isRefreshingSessions, setIsRefreshingSessions] = useState(false)
+  const [sessionToTerminate, setSessionToTerminate] = useState<ActiveSession | null>(null)
+  const [isTerminatingSession, setIsTerminatingSession] = useState(false)
 
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
     dataEncryptionEnabled: true,
     auditLoggingEnabled: true,
     autoBackupEnabled: true,
     backupFrequency: "daily",
+    backupRetentionDays: 30,
     dataRetentionDays: 90,
+    gdprComplianceEnabled: false,
+    dataAnonymizationEnabled: false,
   })
   const [isSavingSecuritySettings, setIsSavingSecuritySettings] = useState(false)
   const [backupSize, setBackupSize] = useState<string | null>(null)
   const [backupStatus, setBackupStatus] = useState<string | null>(null)
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
+  const [backupHistory, setBackupHistory] = useState<BackupHistoryItem[]>([])
   const [isExportingReport, setIsExportingReport] = useState(false)
+  const [showAllLogsModal, setShowAllLogsModal] = useState(false)
+  const [isLoadingAllLogs, setIsLoadingAllLogs] = useState(false)
 
   const [showPassword, setShowPassword] = useState(false)
   const [testConnectionStatus, setTestConnectionStatus] = useState<"idle" | "testing" | "success" | "error">("idle")
@@ -829,24 +914,7 @@ export default function SettingsPage() {
   ])
 
   // Structured Salary Grades
-  const [salaryGrades, setSalaryGrades] = useState<StructuredSalaryGrade[]>([
-    {
-      id: 1,
-      name: "Grade 1",
-      description: "Entry Level",
-      minSalary: 2500,
-      maxSalary: 4000,
-      notches: [
-        { step: 1, amount: 2500 },
-        { step: 2, amount: 2750 },
-        { step: 3, amount: 3000 },
-        { step: 4, amount: 3250 },
-        { step: 5, amount: 3500 },
-        { step: 6, amount: 3750 },
-        { step: 7, amount: 4000 },
-      ],
-    },
-  ])
+  const [salaryGrades, setSalaryGrades] = useState<StructuredSalaryGrade[]>([])
   const [showSalaryGradeModal, setShowSalaryGradeModal] = useState(false)
   const [editingGrade, setEditingGrade] = useState(null)
   const [newGrade, setNewGrade] = useState({
@@ -865,15 +933,7 @@ export default function SettingsPage() {
   const [isExporting, setIsExporting] = useState(false)
 
   const [salaryGradeTab, setSalaryGradeTab] = useState("structured")
-  const [unstructuredGrades, setUnstructuredGrades] = useState<UnstructuredSalaryGrade[]>([
-    {
-      id: 1,
-      name: "Management Level",
-      description: "Senior management positions",
-      generalIncrement: { type: "percentage", value: 5 },
-      performanceIncrement: { type: "percentage", value: 10 },
-    },
-  ])
+  const [unstructuredGrades, setUnstructuredGrades] = useState<UnstructuredSalaryGrade[]>([])
   const [showUnstructuredModal, setShowUnstructuredModal] = useState(false)
   const [editingUnstructured, setEditingUnstructured] = useState(null)
   const [newUnstructured, setNewUnstructured] = useState({
@@ -1042,9 +1102,25 @@ export default function SettingsPage() {
     const config = getCurrencyConfig(currency)
     if (!config) return 0
 
-    // Ghana PAYE: use the shared GRA monthly engine so Settings matches Payroll
+    // Ghana PAYE: use configured bands (normalized to GRA widths) so the live
+    // calculator matches payroll after save/load.
     if (currency === "ghs") {
-      return roundMoney(calculateMonthlyPaye(Math.max(0, income)).monthlyTax)
+      const uiBands = (payeTaxBands?.length ? payeTaxBands : config.taxBands) || []
+      const asEngineBands = uiBands.map((b: any, i: number) => {
+        const from = Number(b.from || 0)
+        const to =
+          b.to == null || !Number.isFinite(b.to) ? Number.POSITIVE_INFINITY : Number(b.to)
+        const width = Number.isFinite(to) ? Math.max(0, to - from) : 0
+        return {
+          band_order: i + 1,
+          rate: Number(b.rate || 0),
+          threshold_amount: Number.isFinite(to) ? width : 0,
+          is_remaining_amount: !Number.isFinite(to),
+          description: `${b.rate}%`,
+        }
+      })
+      const { bands } = normalizePayeBands(asEngineBands.length ? asEngineBands : GRA_MONTHLY_PAYE_BANDS)
+      return roundMoney(calculateMonthlyPaye(Math.max(0, income), bands).monthlyTax)
     }
 
     let tax = 0
@@ -1096,10 +1172,35 @@ export default function SettingsPage() {
     console.log(`[v0] Syncing ${currency} tax rates with government API...`)
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      const selectedConfig = getCurrencyConfig(currency)
+      const nextBands = selectedConfig?.taxBands || payeTaxBands
+      const nextSsnit = selectedConfig?.socialSecurity
+        ? {
+            employee: selectedConfig.socialSecurity.employee,
+            employer: selectedConfig.socialSecurity.employer,
+            total: selectedConfig.socialSecurity.total,
+          }
+        : ssnitRates
+      const nextTier2 = selectedConfig?.tier2
+        ? {
+            employee: selectedConfig.tier2.employee,
+            employer: selectedConfig.tier2.employer,
+            total: selectedConfig.tier2.total,
+          }
+        : tier2Rates
+      const nextTier3 = selectedConfig?.tier3
+        ? {
+            employee: selectedConfig.tier3.employee,
+            employer: selectedConfig.tier3.employer,
+            total: selectedConfig.tier3.total,
+          }
+        : tier3Rates
 
-      // Update API status
+      setPayeTaxBands(nextBands)
+      setSsnitRates(nextSsnit)
+      setTier2Rates(nextTier2)
+      setTier3Rates(nextTier3)
+
       setApiStatus((prev) => ({
         ...prev,
         [currency]: {
@@ -1110,15 +1211,42 @@ export default function SettingsPage() {
         },
       }))
 
+      // Persist using the synced values (avoid stale React state)
+      const companyId = await resolveHrCompanyId()
+      const taxYear = new Date().getFullYear()
+      const payeBands = nextBands.map((b: any, i: number) => {
+        const from = Number(b.from || 0)
+        const isRemaining = b.to === Number.POSITIVE_INFINITY || b.to == null || !Number.isFinite(b.to)
+        const to = isRemaining ? from : Number(b.to || 0)
+        return {
+          band_order: i + 1,
+          rate: Number(b.rate || 0),
+          threshold_amount: isRemaining ? 0 : Math.max(0, to - from),
+          is_remaining_amount: isRemaining,
+          description: `${b.rate}% band`,
+        }
+      })
+      await settingsFetch("/api/settings/tax", {
+        method: "POST",
+        body: JSON.stringify({
+          company_id: companyId,
+          tax_year: taxYear,
+          ssnit: { employee: nextSsnit.employee, employer: nextSsnit.employer },
+          tier2: { employee: nextTier2.employee, employer: nextTier2.employer },
+          tier3: { employee: nextTier3.employee, employer: nextTier3.employer },
+          paye_bands: payeBands,
+        }),
+      })
+
       toast({
         title: "Success",
-        description: `${currency.toUpperCase()} tax rates synced successfully`,
+        description: `${currency.toUpperCase()} tax rates synced and saved`,
       })
     } catch (error) {
       console.error(`[v0] Error syncing ${currency} tax rates:`, error)
       toast({
         title: "Error",
-        description: "Failed to sync tax rates",
+        description: error instanceof Error ? error.message : "Failed to sync tax rates",
         variant: "destructive",
       })
     } finally {
@@ -1239,52 +1367,150 @@ export default function SettingsPage() {
   }
 
   // Logo upload function
+  const applyCompanyPayload = (data: any) => {
+    // Allow empty id during first-time company bootstrap (needs_bootstrap).
+    if (!data || (data.id === undefined && data.name === undefined && !data.email_address)) {
+      return null
+    }
+    const nextDivisions = ensureStringArray(data.divisions)
+    const nextDepartments = ensureStringArray(data.departments)
+    const nextLocations = ensureStringArray(data.locations)
+    const resolvedLogoUrl = isPlaceholderLogo(data.logo_url) ? "" : String(data.logo_url || "")
+    const id = typeof data.id === "string" ? data.id : ""
+
+    setCompanyData({
+      id,
+      name: data.name || "",
+      email_address: data.email_address || "",
+      tax_id: data.tax_id || "",
+      ssnit_number: data.ssnit_number || "",
+      industry: data.industry || "",
+      status: "active",
+      address: data.address || "",
+      phone_number: data.phone_number || "",
+      divisions: nextDivisions,
+      departments: nextDepartments,
+      locations: nextLocations,
+      logo_url: resolvedLogoUrl || null,
+    })
+    setDivisions(nextDivisions)
+    setDepartments(nextDepartments)
+    setLocations(nextLocations)
+    setCompanyLogoPreview(resolvedLogoUrl)
+    setLogoPreview(resolvedLogoUrl)
+    return id || null
+  }
+
+  const persistCompanySettings = async (overrides: Record<string, unknown> = {}) => {
+    // Allow empty company_id — API creates the company and binds the user on first save.
+    const rawCompanyId = String(
+      (overrides.company_id as string) || companyData.id || "",
+    ).trim()
+    const usableCompanyId =
+      rawCompanyId && !rawCompanyId.startsWith("demo-") ? rawCompanyId : undefined
+
+    const logoCandidate =
+      (overrides.logo_url as string | null | undefined) ??
+      (isPlaceholderLogo(companyLogoPreview) ? null : companyLogoPreview) ??
+      (isPlaceholderLogo(companyData.logo_url) ? null : companyData.logo_url)
+
+    const { company_id: _ignoredCompanyId, ...safeOverrides } = overrides
+
+    const payload: Record<string, unknown> = {
+      name: companyData.name,
+      industry: companyData.industry,
+      tax_id: companyData.tax_id,
+      ssnit_number: companyData.ssnit_number,
+      email_address: companyData.email_address,
+      phone_number: companyData.phone_number,
+      address: companyData.address,
+      divisions,
+      departments,
+      locations,
+      logo_url: logoCandidate,
+      ...safeOverrides,
+    }
+    if (usableCompanyId) {
+      payload.company_id = usableCompanyId
+    }
+
+    const result = await settingsFetch("/api/settings/company", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    })
+
+    if (result.company) {
+      applyCompanyPayload(result.company)
+      clearClientDemoSession()
+      try {
+        const savedId = result.company.id || result.company_id
+        if (savedId && typeof window !== "undefined") {
+          window.localStorage.setItem("hrpay.company_id", String(savedId))
+        }
+      } catch {
+        // ignore storage errors
+      }
+    }
+    return result
+  }
+
   const handleLogoUpload = async (file: File, type: "company" | "subsidiary") => {
     if (!file) return
 
     setIsUploadingLogo(true)
     try {
-      // Create form data for blob upload
       const formData = new FormData()
       formData.append("file", file)
 
-      // Upload to Vercel Blob
       const response = await fetch("/api/upload", {
         method: "POST",
         body: formData,
+        credentials: "include",
       })
 
-      if (!response.ok) {
-        throw new Error("Upload failed")
+      const uploaded = await response.json().catch(() => ({}))
+      if (!response.ok || !uploaded.url) {
+        throw new Error(uploaded.error || "Upload failed")
       }
 
-      const { url } = await response.json()
+      const url = uploaded.url as string
 
-      // Set preview based on type
       if (type === "company") {
         setCompanyLogoPreview(url)
-        setCompanyData({ ...companyData, logo_url: url })
+        setCompanyData((prev) => ({ ...prev, logo_url: url }))
+
+        // Persist immediately so navigating away cannot lose the new logo.
+        if (companyData.id && !String(companyData.id).startsWith("demo-")) {
+          await persistCompanySettings({ logo_url: url })
+          toast({
+            title: "Logo saved",
+            description: "Company logo uploaded and saved to the database.",
+          })
+        } else {
+          toast({
+            title: "Logo uploaded",
+            description: "Logo ready. Click Save Company Settings to persist it.",
+          })
+        }
       } else {
         setSubsidiaryLogoPreview(url)
         if (selectedSubsidiary) {
           const updatedSubsidiary = { ...selectedSubsidiary, logo_url: url }
           setSelectedSubsidiary(updatedSubsidiary)
-          // Also update the subsidiary in the main list
           setSubsidiaries((prev) =>
             prev.map((sub) => (sub.id === selectedSubsidiary.id ? { ...sub, logo_url: url } : sub)),
           )
         }
+        toast({
+          title: "Logo uploaded successfully",
+          description: "Your logo has been uploaded and is ready to use.",
+        })
       }
-
-      toast({
-        title: "Logo uploaded successfully",
-        description: "Your logo has been uploaded and is ready to use.",
-      })
     } catch (error) {
       console.error("Logo upload error:", error)
       toast({
         title: "Upload failed",
-        description: "Failed to upload logo. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to upload logo. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -1294,33 +1520,86 @@ export default function SettingsPage() {
 
   // Load functions
   const fetchCurrentCompanyId = async (): Promise<string | null> => {
-    if (isDemoMode()) return "demo-company-001"
-
     if (companyData.id) {
       const trimmed = companyData.id.trim()
-      if (trimmed.length > 0) return trimmed
+      if (trimmed.length > 0 && !trimmed.startsWith("demo-")) return trimmed
+    }
+
+    try {
+      if (typeof window !== "undefined") {
+        const cached = window.localStorage.getItem("hrpay.company_id")?.trim()
+        if (cached && !cached.startsWith("demo-")) return cached
+      }
+    } catch {
+      // ignore
     }
 
     try {
       const { data, error } = await supabase.rpc("get_current_user_company_id")
+      // Accept any non-demo UUID — including seed UUID if that company row exists
+      // (server-side resolveTenantContext verifies existence before using it).
+      if (!error && typeof data === "string" && data.trim().length > 0 && !data.startsWith("demo-")) {
+        return data.trim()
+      }
       if (error) {
         console.warn("[v0] get_current_user_company_id RPC failed", error)
-        return null
-      }
-      if (typeof data === "string" && data.trim().length > 0) {
-        return data
       }
     } catch (error) {
       console.warn("[v0] RPC get_current_user_company_id threw", error)
     }
+
+    // Only fall back to the synthetic demo id when no real tenant id exists.
+    if (isDemoMode()) return "demo-company-001"
     return null
   }
 
   const loadCompanyData = async (): Promise<string | null> => {
     console.log("[v0] Loading company data...")
 
+    // Always try the service-role API first. A stale demo-session cookie must not
+    // block reading real tenant company rows (that was causing logo/settings reverts).
+    try {
+      const currentCompanyId = await fetchCurrentCompanyId()
+      const qs =
+        currentCompanyId && !String(currentCompanyId).startsWith("demo-")
+          ? `?company_id=${encodeURIComponent(currentCompanyId)}`
+          : ""
+      const payload = await settingsFetch(`/api/settings/company${qs}`)
+      if (payload.company?.id) {
+        clearClientDemoSession()
+        try {
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem("hrpay.company_id", String(payload.company.id))
+          }
+        } catch {
+          // ignore
+        }
+        return applyCompanyPayload(payload.company)
+      }
+
+      // Bootstrap: company API returned empty shell — keep form usable for first save.
+      if (payload.needs_bootstrap || payload.company) {
+        if (payload.company) {
+          applyCompanyPayload({
+            ...payload.company,
+            id: payload.company.id || "",
+          })
+        }
+        return null
+      }
+    } catch (error) {
+      console.error("[v0] Error loading company data:", error)
+      if (!isDemoMode()) {
+        toast({
+          title: "Company settings error",
+          description: settingsErrorMessage(error, "Failed to load company data"),
+          variant: "destructive",
+        })
+      }
+    }
+
     if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock company data")
+      console.log("[v0] Demo mode fallback for company data")
       setCompanyData({
         id: "demo-company-001",
         name: "Akwaaba Technologies Ltd",
@@ -1334,104 +1613,16 @@ export default function SettingsPage() {
         divisions: ["Head Office", "Regional Office"],
         departments: ["Technology", "Human Resources", "Finance"],
         locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
+        logo_url: null,
       })
       setDivisions(["Head Office", "Regional Office"])
       setDepartments(["Technology", "Human Resources", "Finance"])
       setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-      setCompanyLogoPreview("/placeholder.svg")
-      setLogoPreview("/placeholder.svg")
+      setCompanyLogoPreview("")
+      setLogoPreview("")
       return "demo-company-001"
     }
 
-    try {
-      const currentCompanyId = await fetchCurrentCompanyId()
-
-      const companyBaseQuery = supabase.from("companies").select("*")
-
-      const companyRequest = currentCompanyId
-        ? companyBaseQuery.eq("id", currentCompanyId).maybeSingle()
-        : companyBaseQuery.order("created_at", { ascending: false }).limit(1).maybeSingle()
-
-      const { data, error } = await companyRequest
-
-      if (error) throw error
-
-      if (data) {
-        const { data: rawCompanySettings, error: companySettingsError } = await supabase
-          .from("company_settings")
-          .select("settings_data, fiscal_year_start, default_currency, timezone, language")
-          .eq("company_id", data.id)
-          .maybeSingle()
-
-        if (companySettingsError) {
-          console.warn("[v0] Unable to load company_settings entry", companySettingsError)
-        }
-
-        const settingsPayload = rawCompanySettings?.settings_data || {}
-        const divisions = ensureStringArray(settingsPayload.divisions ?? data.divisions)
-        const departments = ensureStringArray(settingsPayload.departments ?? data.departments)
-        const locations = ensureStringArray(settingsPayload.locations ?? data.locations)
-        const logoFromSettings = typeof settingsPayload.logo_url === "string" ? settingsPayload.logo_url : undefined
-        const resolvedLogoUrl = (data.logo_url as string | undefined) || logoFromSettings || ""
-
-        setCompanyData({
-          id: data.id,
-          name: data.name || "",
-          email_address: data.email_address || "",
-          tax_id: data.tax_id || "",
-          ssnit_number: data.ssnit_number || "",
-          industry: data.industry || "",
-          status: "active",
-          address: data.address || "",
-          phone_number: data.phone_number || "",
-          divisions,
-          departments,
-          locations,
-          logo_url: resolvedLogoUrl || null,
-        })
-
-        setDivisions(divisions)
-        setDepartments(departments)
-        setLocations(locations)
-        setCompanyLogoPreview(resolvedLogoUrl || "/placeholder.svg")
-        setLogoPreview(resolvedLogoUrl || "/placeholder.svg")
-        return data.id
-      }
-    } catch (error) {
-      console.error("[v0] Error loading company data:", error)
-      if (error.message && error.message.includes("infinite recursion detected in policy")) {
-        console.log("[v0] Database policy error detected, falling back to demo mode")
-        // Set demo session cookie to prevent future database calls
-        document.cookie = "demo-session=active; path=/; max-age=86400"
-        // Load demo data
-        setCompanyData({
-          id: "demo-company-001",
-          name: "Akwaaba Technologies Ltd",
-          email_address: "ykodiah@gmail.com",
-          tax_id: "C0012345678",
-          ssnit_number: "1234567890",
-          industry: "Technology",
-          status: "active",
-          address: "123 Liberation Road, Labone, Accra, Ghana",
-          phone_number: "0249397960",
-          divisions: ["Head Office", "Regional Office"],
-          departments: ["Technology", "Human Resources", "Finance"],
-          locations: ["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"],
-          logo_url: "/placeholder.svg",
-        })
-        setDivisions(["Head Office", "Regional Office"])
-        setDepartments(["Technology", "Human Resources", "Finance"])
-        setLocations(["Accra", "Kumasi", "Takoradi", "Tamale", "Cape Coast"])
-        setCompanyLogoPreview("/placeholder.svg")
-        setLogoPreview("/placeholder.svg")
-        return "demo-company-001"
-      }
-      toast({
-        title: "Error",
-        description: "Failed to load company data",
-        variant: "destructive",
-      })
-    }
     return companyData.id || null
   }
 
@@ -1468,543 +1659,268 @@ export default function SettingsPage() {
     }
 
     try {
-      const targetCompanyId = companyId || companyData.id
-      let query = supabase.from("employees").select("*").order("created_at", { ascending: false })
-
-      if (targetCompanyId) {
-        query = query.eq("company_id", targetCompanyId)
+      // Never run an unscoped client query — that leaks other tenants' headcount.
+      let targetCompanyId = companyId || companyData.id
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        targetCompanyId = (await loadCompanyData()) || targetCompanyId
+      }
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        setEmployees([])
+        return
       }
 
-      const { data, error } = await query
+      const empRes = await fetch(
+        `/api/employees?company_id=${encodeURIComponent(targetCompanyId)}&limit=500`,
+        { credentials: "include", cache: "no-store" },
+      )
+      if (empRes.ok) {
+        const payload = await empRes.json()
+        setEmployees(payload.employees || payload.data || [])
+        return
+      }
 
-      if (error) throw error
-      setEmployees(data || [])
+      // Fallback: dashboard summary headcount only (still tenant-scoped)
+      const dashRes = await fetch("/api/dashboard/summary", {
+        credentials: "include",
+        cache: "no-store",
+      })
+      if (dashRes.ok) {
+        const dash = await dashRes.json()
+        const count = Number(dash.totalEmployees || 0)
+        setEmployees(
+          Array.from({ length: count }, (_, i) => ({
+            id: `hc-${i}`,
+            first_name: "",
+            last_name: "",
+            status: "active",
+          })),
+        )
+        return
+      }
+
+      setEmployees([])
     } catch (error) {
       console.error("Error loading employees:", error)
-      if (error.message && error.message.includes("infinite recursion detected in policy")) {
-        console.log("[v0] Database policy error detected, falling back to demo mode for employees")
-        document.cookie = "demo-session=active; path=/; max-age=86400"
-        setEmployees([
-          {
-            id: "emp-001",
-            first_name: "John",
-            last_name: "Doe",
-            full_name: "John Doe",
-            corporate_email: "john.doe@akwaaba.com",
-            personal_email: "john.doe@gmail.com",
-            position: "Software Engineer",
-            department: "Technology",
-            status: "active",
-          },
-          {
-            id: "emp-002",
-            first_name: "Jane",
-            last_name: "Smith",
-            full_name: "Jane Smith",
-            corporate_email: "jane.smith@akwaaba.com",
-            personal_email: "jane.smith@gmail.com",
-            position: "HR Manager",
-            department: "Human Resources",
-            status: "active",
-          },
-        ])
-        return
-      }
-      toast({
-        title: "Error",
-        description: "Failed to load employees",
-        variant: "destructive",
-      })
+      setEmployees([])
     }
   }
 
-  const loadSubsidiaries = async (companyId?: string) => {
+  const loadSubsidiaries = async (companyId?: string, opts?: { silent?: boolean }) => {
     console.log("[v0] Loading subsidiaries...")
 
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock subsidiaries data")
-      setSubsidiaries([
-        {
-          id: "sub-001",
-          company_id: "comp-001",
-          name: "Akwaaba Digital Solutions",
-          email_address: "info@akwaabadigital.com",
-          phone_number: "+233 30 276 5432",
-          tax_id: "TIN-ADS-2023-001",
-          ssnit_number: "SSNIT-ADS-789012",
-          address: "15 Liberation Road, Ridge, Accra, Ghana",
-          status: "active",
-          industry: "Digital Marketing & Web Development",
-          divisions: ["Digital Marketing", "Web Development", "Mobile Apps"],
-          departments: ["Marketing", "Development", "Design", "Sales"],
-          locations: ["Accra - Ridge", "Kumasi Branch"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 2,
-          employee_count: 45,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-002",
-          company_id: "comp-001",
-          name: "Akwaaba Consulting Group",
-          email_address: "consulting@akwaaba.com",
-          phone_number: "+233 30 276 5433",
-          tax_id: "TIN-ACG-2023-002",
-          ssnit_number: "SSNIT-ACG-789013",
-          address: "8 Airport Residential Area, Accra, Ghana",
-          status: "active",
-          industry: "Business Consulting & Strategy",
-          divisions: ["Strategy Consulting", "Digital Transformation", "Process Optimization"],
-          departments: ["Consulting", "Strategy", "Operations", "Client Relations"],
-          locations: ["Accra - Airport", "Tema Office"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 2,
-          employee_count: 32,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-003",
-          company_id: "comp-001",
-          name: "Akwaaba Financial Services",
-          email_address: "finance@akwaabafs.com",
-          phone_number: "+233 30 276 5434",
-          tax_id: "TIN-AFS-2023-003",
-          ssnit_number: "SSNIT-AFS-789014",
-          address: "25 Independence Avenue, Accra, Ghana",
-          status: "active",
-          industry: "Financial Technology & Services",
-          divisions: ["Fintech Solutions", "Payment Processing", "Financial Advisory"],
-          departments: ["Finance", "Technology", "Compliance", "Customer Service"],
-          locations: ["Accra - Independence Ave", "Ho Regional Office"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 2,
-          employee_count: 28,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-004",
-          company_id: "comp-001",
-          name: "Akwaaba Logistics Ltd",
-          email_address: "logistics@akwaabalog.com",
-          phone_number: "+233 30 276 5435",
-          tax_id: "TIN-ALL-2023-004",
-          ssnit_number: "SSNIT-ALL-789015",
-          address: "12 Spintex Road, Accra, Ghana",
-          status: "active",
-          industry: "Supply Chain & Logistics",
-          divisions: ["Transportation", "Warehousing", "Supply Chain Management"],
-          departments: ["Operations", "Fleet Management", "Warehousing", "Customer Service"],
-          locations: ["Accra - Spintex", "Takoradi Port", "Tamale Hub"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 3,
-          employee_count: 67,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: "sub-005",
-          company_id: "comp-001",
-          name: "Akwaaba Training Institute",
-          email_address: "training@akwaabainstitute.com",
-          phone_number: "+233 30 276 5436",
-          tax_id: "TIN-ATI-2023-005",
-          ssnit_number: "SSNIT-ATI-789016",
-          address: "5 Cantonments Road, Accra, Ghana",
-          status: "active",
-          industry: "Education & Professional Training",
-          divisions: ["Corporate Training", "IT Certification", "Professional Development"],
-          departments: ["Training", "Curriculum Development", "Student Services", "Administration"],
-          locations: ["Accra - Cantonments", "Kumasi Campus", "Online Platform"],
-          divisions_count: 3,
-          departments_count: 4,
-          locations_count: 3,
-          employee_count: 23,
-          created_at: new Date().toISOString(),
-        },
-      ])
-      return
-    }
-
     try {
-      const targetCompanyId = companyId || companyData.id
-
-      let subsidiariesQuery = supabase.from("subsidiaries").select("*").order("created_at", { ascending: false })
-
-      if (targetCompanyId) {
-        subsidiariesQuery = subsidiariesQuery.eq("company_id", targetCompanyId)
+      let targetCompanyId = companyId || companyData.id
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        targetCompanyId = (await loadCompanyData()) || targetCompanyId
       }
-
-      const employeeQuery = targetCompanyId
-        ? supabase.from("employees").select("id, subsidiary_id").eq("company_id", targetCompanyId)
-        : supabase.from("employees").select("id, subsidiary_id")
-
-      const [{ data: subsidiariesData, error: subsidiariesError }, { data: employeesData, error: employeesError }] = await Promise.all([
-        subsidiariesQuery,
-        employeeQuery,
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        throw new Error("No company id available. Save Company settings first.")
+      }
+      const qs = `?company_id=${encodeURIComponent(targetCompanyId)}`
+      const [listPayload, prefsPayload] = await Promise.all([
+        settingsFetch(`/api/settings/subsidiaries${qs}`),
+        settingsFetch(`/api/settings/subsidiaries${qs}&action=sync_preferences`).catch(() => null),
       ])
-
-      if (subsidiariesError) throw subsidiariesError
-      if (employeesError) throw employeesError
-
-      const employeeCounts = (employeesData || []).reduce<Record<string, number>>((acc, employee) => {
-        if (employee.subsidiary_id) {
-          acc[employee.subsidiary_id] = (acc[employee.subsidiary_id] || 0) + 1
-        }
-        return acc
-      }, {})
-
-      const processedSubsidiaries = (subsidiariesData || []).map((sub: any) => {
-        const divisions = ensureStringArray(sub.divisions)
-        const departments = ensureStringArray(sub.departments)
-        const locations = ensureStringArray(sub.locations)
-
-        return {
-          ...sub,
-          divisions,
-          departments,
-          locations,
-          divisions_count: divisions.length,
-          departments_count: departments.length,
-          locations_count: locations.length,
-          employee_count: employeeCounts[sub.id] ?? sub.employee_count ?? 0,
-          logo_url: sub.logo_url || null,
-        }
-      })
-
-      setSubsidiaries(processedSubsidiaries)
-      console.log("[v0] Loaded subsidiaries:", processedSubsidiaries.length)
+      setSubsidiaries(listPayload.subsidiaries || [])
+      clearClientDemoSession()
+      if (prefsPayload?.preferences) {
+        setSyncPrefs({
+          sync_hr_policies: !!prefsPayload.preferences.sync_hr_policies,
+          sync_payroll_config: !!prefsPayload.preferences.sync_payroll_config,
+          sync_leave_types: !!prefsPayload.preferences.sync_leave_types,
+          sync_roles_permissions: !!prefsPayload.preferences.sync_roles_permissions,
+        })
+      }
+      console.log("[v0] Loaded subsidiaries:", (listPayload.subsidiaries || []).length)
     } catch (error) {
       console.error("Subsidiaries loading error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load subsidiaries",
-        variant: "destructive",
-      })
+      if (!opts?.silent) {
+        toast({
+          title: "Multi-Company error",
+          description: settingsErrorMessage(error, "Failed to load subsidiaries"),
+          variant: "destructive",
+        })
+      }
+      throw error
     }
   }
 
-  const loadRoles = async (companyId?: string) => {
+  const loadRoles = async (companyId?: string, opts?: { silent?: boolean }) => {
     console.log("[v0] Loading roles...")
-
-    if (isDemoMode()) {
-      console.log("[v0] Demo mode detected, using mock roles data")
-      setRoles([
-        {
-          id: "role-001",
-          name: "Administrator",
-          description: "Full system access and management capabilities",
-          permissions: ["all"],
-          user_count: 2,
-        },
-        {
-          id: "role-002",
-          name: "HR Manager",
-          description: "Human resources management and employee oversight",
-          permissions: ["hr", "employees", "reports"],
-          user_count: 3,
-        },
-        {
-          id: "role-003",
-          name: "Employee",
-          description: "Standard employee access to personal information",
-          permissions: ["profile", "payslip", "leave"],
-          user_count: 45,
-        },
-      ])
-      return
-    }
-
     try {
-      const targetCompanyId = companyId || companyData.id
-      let query = supabase.from("roles").select("*").order("created_at", { ascending: false })
-
-      if (targetCompanyId) {
-        query = query.eq("company_id", targetCompanyId)
+      let targetCompanyId = companyId || companyData.id
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        targetCompanyId = (await loadCompanyData()) || targetCompanyId
       }
-
-      const { data, error } = await query
-
-      if (error) throw error
-      setRoles(data || [])
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        throw new Error("No company id available. Save Company settings first.")
+      }
+      const qs = `?company_id=${encodeURIComponent(targetCompanyId)}`
+      const { roles: roleRows } = await settingsFetch(`/api/settings/roles${qs}`)
+      clearClientDemoSession()
+      setRoles(Array.isArray(roleRows) ? roleRows : [])
     } catch (error) {
       console.error("Error loading roles:", error)
-      if (error.message && error.message.includes("infinite recursion detected in policy")) {
-        console.log("[v0] Database policy error detected, falling back to demo mode for roles")
-        document.cookie = "demo-session=active; path=/; max-age=86400"
-        setRoles([
-          {
-            id: "role-001",
-            name: "Administrator",
-            description: "Full system access",
-            permissions: ["read", "write", "delete", "admin"],
-            status: "active",
-          },
-          {
-            id: "role-002",
-            name: "HR Manager",
-            description: "Human Resources management",
-            permissions: ["read", "write"],
-            status: "active",
-          },
-        ])
-        return
+      if (!opts?.silent) {
+        toast({
+          title: "Roles error",
+          description: settingsErrorMessage(error, "Failed to load roles"),
+          variant: "destructive",
+        })
       }
-      toast({
-        title: "Error",
-        description: "Failed to load roles",
-        variant: "destructive",
-      })
+      throw error
     }
   }
 
   // Added for Access Control and Security
-  const loadAccessAndSecurityData = async (companyId?: string) => {
+  const loadAccessAndSecurityData = async (companyId?: string, opts?: { silent?: boolean }) => {
     console.log("[v0] Loading access and security data...")
 
-    if (isDemoMode()) {
-      // Retain enriched demo experience in offline mode
-      setAccessSettings({
-        twoFactorEnabled: true,
-        ssoEnabled: false,
-        passwordExpiryEnabled: true,
-        sessionTimeout: 30,
-        maxLoginAttempts: 5,
-        passwordMinLength: 10,
-        ipRestrictionsEnabled: true,
-        allowedIPs: ["192.168.1.0/24", "10.0.0.1"],
-      })
-      setSecuritySettings({
-        dataEncryptionEnabled: true,
-        auditLoggingEnabled: true,
-        autoBackupEnabled: true,
-        backupFrequency: "daily",
-        dataRetentionDays: 180,
-      })
-      setLastBackupTime(new Date("2024-03-10T10:00:00Z").toISOString())
-      setBackupSize("50 MB")
-      setBackupStatus("Completed")
-      setAuditLogs([
-        {
-          id: "log-001",
-          user_email: "admin@example.com",
-          action: "User logged in",
-          timestamp: new Date("2024-03-11T09:00:00Z").toISOString(),
-          ip_address: "192.168.1.10",
-          severity: "low",
-        },
-        {
-          id: "log-002",
-          user_email: "hr@example.com",
-          action: "Updated employee record",
-          timestamp: new Date("2024-03-11T09:05:00Z").toISOString(),
-          ip_address: "192.168.1.11",
-          severity: "medium",
-        },
-        {
-          id: "log-003",
-          user_email: "admin@example.com",
-          action: "Security settings modified",
-          timestamp: new Date("2024-03-11T09:10:00Z").toISOString(),
-          ip_address: "192.168.1.10",
-          severity: "high",
-        },
-      ])
-      setActiveSessions([
-        {
-          id: "session-001",
-          user_email: "admin@example.com",
-          ip_address: "192.168.1.10",
-          device: "Desktop",
-          last_activity: new Date("2024-03-11T09:10:00Z").toISOString(),
-        },
-        {
-          id: "session-002",
-          user_email: "user@example.com",
-          ip_address: "10.0.0.5",
-          device: "Mobile",
-          last_activity: new Date("2024-03-11T08:30:00Z").toISOString(),
-        },
-      ])
-      console.log("[v0] Access and security data loaded in demo mode.")
-      return
+    let targetCompanyId = companyId || companyData.id
+    if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+      targetCompanyId = (await loadCompanyData()) || targetCompanyId
     }
 
-    const targetCompanyId = companyId || companyData.id
-
-    if (!targetCompanyId) {
-      console.warn("[v0] Unable to load access/security data without a company id")
-      return
+    if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+      const err = new Error("No company id available. Save Company settings first.")
+      if (!opts?.silent) {
+        toast({
+          title: "Access / Security error",
+          description: err.message,
+          variant: "destructive",
+        })
+      }
+      throw err
     }
 
     try {
-      const [
-        { data: accessData, error: accessError },
-        { data: securityData, error: securityError },
-        { data: backupRows, error: backupError },
-        { data: sessionsData, error: sessionsError },
-        { data: auditData, error: auditError },
-      ] = await Promise.all([
-        supabase.from("access_control_settings").select("*").eq("company_id", targetCompanyId).maybeSingle(),
-        supabase.from("security_settings").select("*").eq("company_id", targetCompanyId).maybeSingle(),
-        supabase
-          .from("backup_history")
-          .select("id, backup_status, backup_size, started_at, completed_at")
-          .eq("company_id", targetCompanyId)
-          .order("started_at", { ascending: false })
-          .limit(1),
-        supabase
-          .from("active_sessions")
-          .select("id, user_email, ip_address, device, last_activity, is_active")
-          .order("last_activity", { ascending: false })
-          .limit(12),
-        supabase
-          .from("access_logs")
-          .select(
-            `id, action, ip_address, created_at, success, failure_reason, employees:employee_id (full_name, corporate_email)`
-          )
-          .eq("company_id", targetCompanyId)
-          .order("created_at", { ascending: false })
-          .limit(12),
+      const qs = `?company_id=${encodeURIComponent(targetCompanyId)}`
+      const [accessPayload, securityPayload] = await Promise.all([
+        settingsFetch(`/api/settings/access${qs}`),
+        settingsFetch(`/api/settings/security${qs}`),
       ])
+      clearClientDemoSession()
 
-      if (accessError) throw accessError
-      if (securityError) throw securityError
-      if (backupError) throw backupError
-      if (sessionsError) throw sessionsError
-      if (auditError) throw auditError
-
-      if (accessData) {
-        setAccessSettings({
-          twoFactorEnabled: !!accessData.two_factor_enabled,
-          ssoEnabled: !!accessData.sso_enabled,
-          passwordExpiryEnabled: !!accessData.password_expiry_enabled,
-          sessionTimeout: accessData.session_timeout ?? 30,
-          maxLoginAttempts: accessData.max_login_attempts ?? 5,
-          passwordMinLength: accessData.password_min_length ?? 8,
-          ipRestrictionsEnabled: !!accessData.ip_restrictions_enabled,
-          allowedIPs: ensureStringArray(accessData.allowed_ips),
-        })
-      }
-
-      if (securityData) {
-        setSecuritySettings({
-          dataEncryptionEnabled: !!securityData.data_encryption_enabled,
-          auditLoggingEnabled: !!securityData.audit_logging_enabled,
-          autoBackupEnabled: !!securityData.auto_backup_enabled,
-          backupFrequency: securityData.backup_frequency || "daily",
-          dataRetentionDays: securityData.data_retention_days ?? 90,
-        })
-      }
-
-      const latestBackup = backupRows?.[0]
-      setLastBackupTime(latestBackup?.completed_at || latestBackup?.started_at || null)
-      setBackupStatus(latestBackup?.backup_status ? toTitleCase(latestBackup.backup_status) : null)
-      setBackupSize(formatBytes(latestBackup?.backup_size))
-
-      if (sessionsData) {
-        const active = sessionsData.filter((session) => session.is_active !== false)
-        setActiveSessions(
-          active.map((session) => ({
-            id: session.id,
-            user_email: session.user_email || "Unknown",
-            ip_address: session.ip_address || "—",
-            device: session.device || "Unspecified",
-            last_activity: session.last_activity || new Date().toISOString(),
-          }))
-        )
-      }
-
-      if (auditData) {
-        setAuditLogs(
-          auditData.map((log) => ({
-            id: log.id,
-            user_email: log.employees?.corporate_email || log.employees?.full_name || "Unknown user",
-            action: log.action || log.failure_reason || "Access event",
-            timestamp: log.created_at,
-            ip_address: log.ip_address || "—",
-            severity: log.success === false ? "high" : "low",
-          }))
-        )
-      }
+      if (accessPayload.accessSettings) setAccessSettings((prev) => ({ ...prev, ...accessPayload.accessSettings }))
+      setActiveSessions(Array.isArray(accessPayload.activeSessions) ? accessPayload.activeSessions : [])
+      if (securityPayload.securitySettings)
+        setSecuritySettings((prev) => ({ ...prev, ...securityPayload.securitySettings }))
+      setLastBackupTime(securityPayload.lastBackupTime || null)
+      setBackupStatus(securityPayload.backupStatus || null)
+      setBackupSize(securityPayload.backupSize || "0 MB")
+      setAuditLogs(Array.isArray(securityPayload.auditLogs) ? securityPayload.auditLogs : [])
+      setBackupHistory(Array.isArray(securityPayload.backupHistory) ? securityPayload.backupHistory : [])
 
       console.log("[v0] Access and security data loaded from database.")
     } catch (error) {
       console.error("[v0] Failed to load access and security data", error)
-      toast({
-        title: "Error",
-        description: "Unable to load access and security insights.",
-        variant: "destructive",
-      })
+      if (!opts?.silent) {
+        toast({
+          title: "Access / Security error",
+          description: settingsErrorMessage(error, "Unable to load access and security settings."),
+          variant: "destructive",
+        })
+      }
+      throw error
     }
   }
 
-  const loadHrData = async (companyId?: string) => {
-    if (isDemoMode()) {
-      return
+  const resolveHrCompanyId = async (companyId?: string) => {
+    let targetCompanyId = companyId || companyData.id
+    if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+      targetCompanyId = (await loadCompanyData()) || targetCompanyId
     }
-
-    const targetCompanyId = companyId || companyData.id
-
-    if (!targetCompanyId) {
-      console.warn("[v0] Unable to load HR data without a company id")
-      return
+    // Last resort: let the server resolve tenant (no client company_id query param).
+    if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+      try {
+        const payload = await settingsFetch("/api/settings/company")
+        if (payload.company?.id) {
+          applyCompanyPayload(payload.company)
+          targetCompanyId = payload.company.id
+        }
+      } catch {
+        // fall through
+      }
     }
+    if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+      throw new Error(
+        "No company identifier available. Open the Company tab and click Save Company Settings first.",
+      )
+    }
+    return targetCompanyId
+  }
 
+  const loadHrData = async (companyId?: string, opts?: { silent?: boolean }) => {
     try {
-      const [{ data: configuration, error: configError }, { data: documents, error: documentsError }] = await Promise.all([
-        supabase.from("hr_configuration").select("*").eq("company_id", targetCompanyId).maybeSingle(),
-        supabase
-          .from("hr_documents")
-          .select("id, document_name, document_type, file_path, file_size, visible_to_all, created_at")
-          .eq("company_id", targetCompanyId)
-          .order("created_at", { ascending: false }),
-      ])
-
-      if (configError) throw configError
-      if (documentsError) throw documentsError
-
-      if (configuration) {
-        setHrConfig({
-          leaveYearStart: configuration.leave_year_start || "January",
-          probationPeriod: configuration.probation_period ?? 3,
-          workingHoursPerDay: configuration.working_hours_per_day ?? 8,
-          workingDaysPerWeek: configuration.working_days_per_week ?? 5,
-          autoApproveLeave: !!configuration.auto_approve_leave,
-          emailNotifications: !!configuration.email_notifications,
-          aiRecommendations: !!configuration.ai_recommendations,
-          smartScheduling: !!configuration.smart_scheduling,
-          performanceTracking: !!configuration.performance_tracking,
-        })
+      let targetCompanyId = companyId || companyData.id
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        targetCompanyId = (await loadCompanyData()) || targetCompanyId
+      }
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        throw new Error("No company id available. Save Company settings first.")
       }
 
-      if (documents) {
-        setHrDocuments(
-          documents.map((doc) => ({
-            id: String(doc.id),
-            name: doc.document_name,
-            type: doc.document_type,
-            size: formatBytes(doc.file_size),
-            visibleToAll: !!doc.visible_to_all,
-            fileUrl: doc.file_path,
-            uploadedAt: doc.created_at || new Date().toISOString(),
-          }))
-        )
-      }
+      const qs = `?company_id=${encodeURIComponent(targetCompanyId)}`
+      const payload = await settingsFetch(`/api/settings/hr${qs}`)
+      clearClientDemoSession()
+
+      if (payload.hrConfig) setHrConfig(payload.hrConfig)
+      setHrDocuments(Array.isArray(payload.hrDocuments) ? payload.hrDocuments : [])
+      setCurrentPolicies(Array.isArray(payload.leavePolicies) ? payload.leavePolicies : [])
+      setSalaryGrades(Array.isArray(payload.salaryGrades) ? payload.salaryGrades : [])
+      setUnstructuredGrades(Array.isArray(payload.unstructuredGrades) ? payload.unstructuredGrades : [])
     } catch (error) {
       console.error("[v0] Failed to load HR configuration/documents", error)
-      toast({
-        title: "Error",
-        description: "Unable to load HR configuration.",
-        variant: "destructive",
-      })
+      if (!opts?.silent) {
+        toast({
+          title: "HR settings error",
+          description: settingsErrorMessage(error, "Unable to load HR configuration."),
+          variant: "destructive",
+        })
+      }
+      throw error
     }
+  }
+
+  const mapDbBandsToUi = (bands: any[]) => {
+    // DB stores GRA width thresholds; rebuild cumulative from/to for the UI table.
+    const { bands: normalized } = normalizePayeBands(
+      (bands || []).map((band: any, i: number) => ({
+        band_order: Number(band.band_order || i + 1),
+        rate: Number(band.rate || 0),
+        threshold_amount: Number(band.threshold_amount || 0),
+        is_remaining_amount: Boolean(band.is_remaining_amount),
+        description: band.description || "",
+      })),
+    )
+    let previousTo = 0
+    let runningTax = 0
+    return normalized.map((band) => {
+      const from = previousTo
+      if (band.is_remaining_amount) {
+        return {
+          rate: Number(band.rate || 0),
+          from,
+          to: Number.POSITIVE_INFINITY,
+          cumulativeTax: roundMoney(runningTax),
+        }
+      }
+      const width = Number(band.threshold_amount || 0)
+      const to = previousTo + width
+      // cumulative tax at top of this band (for display)
+      runningTax += (width * Number(band.rate || 0)) / 100
+      previousTo = to
+      return {
+        rate: Number(band.rate || 0),
+        from,
+        to,
+        cumulativeTax: roundMoney(runningTax - (width * Number(band.rate || 0)) / 100),
+      }
+    })
   }
 
   const loadPayrollSettings = async (cid: string) => {
-    if (isDemoMode() || !cid || cid.startsWith("demo-")) return
+    if (!cid || String(cid).startsWith("demo-")) return
     try {
       const [configRes, taxRes] = await Promise.all([
         fetch(`/api/settings/payroll?company_id=${encodeURIComponent(cid)}`, { credentials: "include" }),
@@ -2013,8 +1929,21 @@ export default function SettingsPage() {
       if (configRes.ok) {
         const { config } = await configRes.json()
         if (config) {
-          if (config.pay_frequency) setPayFrequency(config.pay_frequency)
-          if (config.currency) setCurrencyPref(config.currency)
+          clearClientDemoSession()
+          if (config.pay_frequency) {
+            const freq = String(config.pay_frequency).toLowerCase()
+            setPayFrequency(
+              ["weekly", "biweekly", "monthly"].includes(freq) ? freq : "monthly",
+            )
+          }
+          if (config.currency) {
+            const currency = String(config.currency).toLowerCase()
+            const normalized = ["ghs", "usd", "eur", "ngn"].includes(currency)
+              ? currency
+              : "ghs"
+            setCurrencyPref(normalized)
+            setSelectedCurrency(normalized)
+          }
           if (typeof config.minimum_wage === "number") setMinimumWage(config.minimum_wage)
           if (typeof config.overtime_weekday_multiplier === "number") setOvertimeWeekdayRate(config.overtime_weekday_multiplier)
           if (typeof config.overtime_weekend_multiplier === "number") setOvertimeWeekendRate(config.overtime_weekend_multiplier)
@@ -2027,13 +1956,31 @@ export default function SettingsPage() {
       if (taxRes.ok) {
         const tax = await taxRes.json()
         if (tax.ssnit) {
-          setSsnitRates({ employee: tax.ssnit.employee_rate, employer: tax.ssnit.employer_rate, total: tax.ssnit.employee_rate + tax.ssnit.employer_rate })
+          let emp = Number(tax.ssnit.employee_rate)
+          if (emp > 0 && emp < 1) emp = 5.5
+          const er = Number(tax.ssnit.employer_rate)
+          setSsnitRates({
+            employee: emp,
+            employer: er,
+            total: emp + er,
+          })
         }
         if (tax.tier2) {
-          setTier2Rates({ employee: tax.tier2.employee_rate, employer: tax.tier2.employer_rate, total: tax.tier2.employee_rate + tax.tier2.employer_rate })
+          setTier2Rates({
+            employee: tax.tier2.employee_rate,
+            employer: tax.tier2.employer_rate,
+            total: tax.tier2.employee_rate + tax.tier2.employer_rate,
+          })
         }
         if (tax.tier3) {
-          setTier3Rates({ employee: tax.tier3.employee_rate, employer: tax.tier3.employer_rate, total: tax.tier3.employee_rate + tax.tier3.employer_rate })
+          setTier3Rates({
+            employee: tax.tier3.employee_rate,
+            employer: tax.tier3.employer_rate,
+            total: tax.tier3.employee_rate + tax.tier3.employer_rate,
+          })
+        }
+        if (Array.isArray(tax.paye_bands) && tax.paye_bands.length) {
+          setPayeTaxBands(mapDbBandsToUi(tax.paye_bands))
         }
       }
     } catch (err) {
@@ -2041,193 +1988,112 @@ export default function SettingsPage() {
     }
   }
 
-  const loadPayrollData = async (companyId?: string) => {
-    if (isDemoMode()) {
-      return
-    }
-
-    const targetCompanyId = companyId || companyData.id
-
-    if (!targetCompanyId) {
-      console.warn("[v0] Unable to load payroll data without a company id")
-      return
-    }
-
-    // Load payroll config + tax rates from DB
-    void loadPayrollSettings(targetCompanyId)
-
+  const loadPayrollData = async (companyId?: string, opts?: { silent?: boolean }) => {
     try {
-      const [
-        { data: structuredGrades, error: structuredError },
-        { data: unstructured, error: unstructuredError },
-        { data: allowanceRows },
-        { data: deductionRows },
-      ] = await Promise.all([
-        supabase
-          .from("salary_grades")
-          .select("id, grade_name, grade_level, step_1, step_2, step_3, step_4, step_5")
-          .eq("company_id", targetCompanyId)
-          .order("grade_level", { ascending: true }),
-        supabase
-          .from("unstructured_salary_grades")
-          .select(
-            "id, grade_name, description, general_increment_type, general_increment_value, performance_increment_type, performance_increment_value"
-          )
-          .eq("company_id", targetCompanyId)
-          .order("created_at", { ascending: true }),
-        supabase
-          .from("payroll_allowances")
-          .select("code, description, taxable, recurring, amount, percentage, type, is_active")
-          .eq("company_id", targetCompanyId)
-          .eq("is_active", true)
-          .order("code"),
-        supabase
-          .from("payroll_deductions")
-          .select("code, description, taxable, recurring, amount, percentage, type, is_active")
-          .eq("company_id", targetCompanyId)
-          .eq("is_active", true)
-          .order("code"),
-      ])
-
-      if (structuredError) throw structuredError
-      if (unstructuredError) throw unstructuredError
-
-      if (allowanceRows?.length) {
-        setAllowances(
-          allowanceRows.map((a) => ({
-            code: a.code,
-            description: a.description,
-            taxable: Boolean(a.taxable),
-            recurring: a.recurring !== false,
-            amount: Number(a.amount || 0),
-            percentage: Number(a.percentage || 0),
-            type: a.type || "FIXED",
-          })),
-        )
+      let targetCompanyId = companyId || companyData.id
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        targetCompanyId = (await loadCompanyData()) || targetCompanyId
       }
-      if (deductionRows?.length) {
-        setDeductions(
-          deductionRows.map((d) => ({
-            code: d.code,
-            description: d.description,
-            recurring: d.recurring !== false,
-            amount: Number(d.amount || 0),
-            percentage: Number(d.percentage || 0),
-            type: d.type || "FIXED",
-          })),
-        )
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        throw new Error("No company id available. Save Company settings first.")
       }
 
-      if (structuredGrades) {
-        setSalaryGrades(
-          structuredGrades.map((grade) => {
-            const stepValues = [grade.step_1, grade.step_2, grade.step_3, grade.step_4, grade.step_5].filter(
-              (value) => typeof value === "number",
-            ) as number[]
+      await loadPayrollSettings(targetCompanyId)
 
-            const notches = stepValues.map((amount, index) => ({ step: index + 1, amount: Number(amount) }))
-
-            return {
-              id: grade.id,
-              name: grade.grade_name || `Grade ${grade.grade_level}`,
-              description: grade.grade_name,
-              minSalary: notches[0]?.amount ?? 0,
-              maxSalary: notches[notches.length - 1]?.amount ?? notches[0]?.amount ?? 0,
-              notches,
-            }
-          })
-        )
+      const items = await settingsFetch(
+        `/api/settings/payroll/items?company_id=${encodeURIComponent(targetCompanyId)}`,
+      )
+      clearClientDemoSession()
+      const normalizeItemType = (type: unknown) => {
+        const t = String(type || "FIXED").toUpperCase()
+        return t === "VARIABLE" || t === "PERCENTAGE" ? "VARIABLE" : "FIXED"
       }
-
-      if (unstructured) {
-        setUnstructuredGrades(
-          unstructured.map((grade) => ({
-            id: grade.id,
-            name: grade.grade_name,
-            description: grade.description || "",
-            generalIncrement: {
-              type: (grade.general_increment_type || "percentage") as "percentage" | "fixed",
-              value: Number(grade.general_increment_value ?? 0),
-            },
-            performanceIncrement: {
-              type: (grade.performance_increment_type || "percentage") as "percentage" | "fixed",
-              value: Number(grade.performance_increment_value ?? 0),
-            },
-          }))
-        )
-      }
+      setAllowances(
+        Array.isArray(items.allowances)
+          ? items.allowances.map((a: any) => ({
+              ...a,
+              code: a?.code || "",
+              description: a?.description || "",
+              type: normalizeItemType(a?.type),
+              amount: Number(a?.amount || 0),
+              percentage: Number(a?.percentage || 0),
+              taxable: Boolean(a?.taxable),
+              recurring: a?.recurring !== false,
+            }))
+          : [],
+      )
+      setDeductions(
+        Array.isArray(items.deductions)
+          ? items.deductions.map((d: any) => ({
+              ...d,
+              code: d?.code || "",
+              description: d?.description || "",
+              type: normalizeItemType(d?.type),
+              amount: Number(d?.amount || 0),
+              percentage: Number(d?.percentage || 0),
+              taxable: Boolean(d?.taxable),
+              recurring: d?.recurring !== false,
+            }))
+          : [],
+      )
+      setTaxReliefs(
+        Array.isArray(items.taxReliefs)
+          ? items.taxReliefs.map((r: any) => ({
+              ...r,
+              name: r?.name || r?.description || r?.graCode || "Untitled relief",
+              description: r?.description || "",
+              graCode: r?.graCode || "",
+              category: r?.category || "Personal",
+              currency: r?.currency || "GHS",
+              amount: Number(r?.amount || 0),
+              isActive: r?.isActive !== false,
+            }))
+          : [],
+      )
     } catch (error) {
       console.error("[v0] Failed to load payroll configuration", error)
-      toast({
-        title: "Error",
-        description: "Unable to load salary grades.",
-        variant: "destructive",
-      })
+      if (!opts?.silent) {
+        toast({
+          title: "Payroll settings error",
+          description: settingsErrorMessage(error, "Unable to load payroll settings."),
+          variant: "destructive",
+        })
+      }
+      throw error
     }
   }
 
-  const loadNotificationSettings = async (companyId?: string) => {
-    if (isDemoMode()) {
-      return
-    }
-
-    const targetCompanyId = companyId || companyData.id
-
-    if (!targetCompanyId) {
-      console.warn("[v0] Unable to load notification settings without a company id")
-      return
-    }
-
+  const loadNotificationSettings = async (companyId?: string, opts?: { silent?: boolean }) => {
     try {
-      const { data, error } = await supabase
-        .from("notification_settings")
-        .select("id, category, notification_type, is_enabled, delivery_method")
-        .eq("company_id", targetCompanyId)
-        .limit(200)
-
-      if (error) throw error
-
-      if (!data || data.length === 0) {
-        return
+      let targetCompanyId = companyId || companyData.id
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        targetCompanyId = (await loadCompanyData()) || targetCompanyId
+      }
+      if (!targetCompanyId || String(targetCompanyId).startsWith("demo-")) {
+        throw new Error("No company id available. Save Company settings first.")
       }
 
-      const aggregated = new Map<string, NotificationPreference>()
+      const qs = `?company_id=${encodeURIComponent(targetCompanyId)}`
+      const payload = await settingsFetch(`/api/settings/notifications${qs}`)
+      clearClientDemoSession()
 
-      data.forEach((row) => {
-        const key = `${row.category}:${row.notification_type}`
-        const channels = ensureStringArray(row.delivery_method)
-        const label = toTitleCase(row.notification_type || row.category)
-        const description = `Control delivery for ${toTitleCase(row.category)} notifications`
-
-        if (aggregated.has(key)) {
-          const existing = aggregated.get(key)!
-          existing.enabled = existing.enabled || row.is_enabled
-          channels.forEach((channel) => {
-            if (!existing.channels.includes(channel)) {
-              existing.channels.push(channel)
-            }
-          })
-        } else {
-          aggregated.set(key, {
-            key,
-            label,
-            description,
-            enabled: row.is_enabled,
-            channels,
-          })
-        }
-      })
-
-      if (aggregated.size > 0) {
-        setNotificationPreferences(Array.from(aggregated.values()))
+      setNotificationTemplates(Array.isArray(payload.templates) ? payload.templates : [])
+      if (payload.emailConfig) {
+        setEmailConfig((prev) => ({ ...prev, ...payload.emailConfig }))
+      }
+      if (payload.preferences) {
+        setNotificationSettings((prev) => ({ ...prev, ...payload.preferences }))
       }
     } catch (error) {
       console.error("[v0] Failed to load notification settings", error)
-      toast({
-        title: "Error",
-        description: "Unable to load notification preferences.",
-        variant: "destructive",
-      })
+      if (!opts?.silent) {
+        toast({
+          title: "Notifications error",
+          description: settingsErrorMessage(error, "Unable to load notification preferences."),
+          variant: "destructive",
+        })
+      }
+      throw error
     }
   }
 
@@ -2238,12 +2104,12 @@ export default function SettingsPage() {
         await Promise.all([
           loadCompanyData(),
           loadEmployees(),
-          loadSubsidiaries(),
-          loadRoles(),
-          loadHrData(),
-          loadPayrollData(),
-          loadNotificationSettings(),
-          loadAccessAndSecurityData(),
+          loadSubsidiaries(undefined, { silent: true }).catch(() => null),
+          loadRoles(undefined, { silent: true }).catch(() => null),
+          loadHrData(undefined, { silent: true }).catch(() => null),
+          loadPayrollData(undefined, { silent: true }).catch(() => null),
+          loadNotificationSettings(undefined, { silent: true }).catch(() => null),
+          loadAccessAndSecurityData(undefined, { silent: true }).catch(() => null),
         ])
         console.log("[v0] All settings data loaded successfully in demo mode")
         return
@@ -2251,24 +2117,49 @@ export default function SettingsPage() {
 
       const companyId = await loadCompanyData()
 
-      if (!companyId) {
-        console.warn("[v0] No company id available after loading company data")
+      if (!companyId || String(companyId).startsWith("demo-")) {
+        toast({
+          title: "Company required",
+          description:
+            "Could not resolve your company. Open the Company tab, save your company details, then reload Settings.",
+          variant: "destructive",
+        })
         return
       }
 
-      await Promise.all([
+      const results = await Promise.allSettled([
         loadEmployees(companyId),
-        loadSubsidiaries(companyId),
-        loadRoles(companyId),
-        loadHrData(companyId),
-        loadPayrollData(companyId),
-        loadNotificationSettings(companyId),
-        loadAccessAndSecurityData(companyId),
+        loadSubsidiaries(companyId, { silent: true }),
+        loadRoles(companyId, { silent: true }),
+        loadHrData(companyId, { silent: true }),
+        loadPayrollData(companyId, { silent: true }),
+        loadNotificationSettings(companyId, { silent: true }),
+        loadAccessAndSecurityData(companyId, { silent: true }),
       ])
+
+      const failed = results
+        .map((r, i) => ({ r, label: ["Employees", "Multi-Company", "Roles", "HR", "Payroll", "Notifications", "Access/Security"][i] }))
+        .filter(({ r }) => r.status === "rejected") as Array<{ r: PromiseRejectedResult; label: string }>
+
+      if (failed.length) {
+        const details = failed
+          .map(({ r, label }) => `${label}: ${settingsErrorMessage(r.reason, "failed")}`)
+          .join(" · ")
+        toast({
+          title: `Settings load issues (${failed.length})`,
+          description: details.slice(0, 400),
+          variant: "destructive",
+        })
+      }
 
       console.log("[v0] All settings data loaded successfully")
     } catch (error) {
       console.error("[v0] Error loading settings data:", error)
+      toast({
+        title: "Settings error",
+        description: settingsErrorMessage(error, "Failed to load settings"),
+        variant: "destructive",
+      })
     }
   }
 
@@ -2279,36 +2170,32 @@ export default function SettingsPage() {
   // Subsidiary Management Functions
   const syncSubsidiarySettings = async (subsidiaryId: string) => {
     console.log("[v0] Syncing settings for subsidiary:", subsidiaryId)
-
-    if (isDemoMode()) {
-      toast({
-        title: "Settings Synced",
-        description: "Subsidiary settings synchronized successfully (Demo Mode)",
-      })
-      return
-    }
-
     try {
-      // Simulate settings sync process
-      const { error } = await supabase
-        .from("subsidiaries")
-        .update({
-          settings_synced_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", subsidiaryId)
-
-      if (error) throw error
-
+      const companyId = companyData.id || (await loadCompanyData())
+      const result = await settingsFetch("/api/settings/subsidiaries", {
+        method: "POST",
+        body: JSON.stringify({
+          company_id: companyId,
+          action: "sync",
+          subsidiary_id: subsidiaryId,
+          sync_types: [
+            syncPrefs.sync_hr_policies ? "hr_policies" : null,
+            syncPrefs.sync_payroll_config ? "payroll_config" : null,
+            syncPrefs.sync_leave_types ? "leave_types" : null,
+            syncPrefs.sync_roles_permissions ? "roles" : null,
+          ].filter(Boolean),
+        }),
+      })
+      await loadSubsidiaries(companyId || undefined)
       toast({
         title: "Settings Synced",
-        description: "Subsidiary settings synchronized successfully",
+        description: `Synced ${(result.sync_types || []).join(", ") || "selected settings"} to subsidiary.`,
       })
     } catch (error) {
       console.error("Sync settings error:", error)
       toast({
         title: "Error",
-        description: "Failed to sync subsidiary settings",
+        description: error instanceof Error ? error.message : "Failed to sync subsidiary settings",
         variant: "destructive",
       })
     }
@@ -2316,32 +2203,27 @@ export default function SettingsPage() {
 
   const refreshEmployeeCount = async (subsidiaryId: string) => {
     console.log("[v0] Refreshing employee count for subsidiary:", subsidiaryId)
-
-    if (isDemoMode()) {
-      // Simulate employee count refresh in demo mode
-      const mockCount = Math.floor(Math.random() * 100) + 10 // Random count between 10-110
-      const updatedSubsidiaries = subsidiaries.map((sub) =>
-        sub.id === subsidiaryId ? { ...sub, employee_count: mockCount } : sub,
-      )
-      setSubsidiaries(updatedSubsidiaries)
-
-      if (selectedSubsidiary?.id === subsidiaryId) {
-        setSelectedSubsidiary({ ...selectedSubsidiary, employee_count: mockCount })
-      }
-      return mockCount
-    }
-
     try {
-      const { count, error } = await supabase
-        .from("employees")
-        .select("*", { count: "exact", head: true })
-        .eq("subsidiary_id", subsidiaryId)
-
-      if (error) throw error
-
-      const employeeCount = count || 0
-      await updateSubsidiary(subsidiaryId, { employee_count: employeeCount })
-
+      const companyId = companyData.id || (await loadCompanyData())
+      const payload = await settingsFetch(
+        `/api/settings/subsidiaries?action=employees&company_id=${encodeURIComponent(companyId || "")}&subsidiary_id=${encodeURIComponent(subsidiaryId)}`,
+      )
+      const employeeCount = (payload.employees || []).length
+      await settingsFetch("/api/settings/subsidiaries", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "update",
+          company_id: companyId,
+          id: subsidiaryId,
+          employee_count: employeeCount,
+        }),
+      })
+      setSubsidiaries((prev) =>
+        prev.map((sub) => (sub.id === subsidiaryId ? { ...sub, employee_count: employeeCount } : sub)),
+      )
+      if (selectedSubsidiary?.id === subsidiaryId) {
+        setSelectedSubsidiary({ ...selectedSubsidiary, employee_count: employeeCount })
+      }
       return employeeCount
     } catch (error) {
       console.error("Refresh employee count error:", error)
@@ -2351,43 +2233,25 @@ export default function SettingsPage() {
 
   const viewSubsidiaryEmployees = async (subsidiaryId: string) => {
     console.log("[v0] Viewing employees for subsidiary:", subsidiaryId)
-
-    const currentCount = await refreshEmployeeCount(subsidiaryId)
-
-    if (isDemoMode()) {
-      const mockEmployees = Array.from({ length: currentCount }, (_, i) => ({
-        id: `emp-${i + 1}`,
-        name: `Employee ${i + 1}`,
-        position: ["Software Engineer", "Marketing Manager", "HR Specialist", "Sales Representative", "Accountant"][
-          i % 5
-        ],
-        department: ["Technology", "Marketing", "Human Resources", "Sales", "Finance"][i % 5],
-        email: `employee${i + 1}@company.com`,
-      }))
-
-      setViewEmployeesModal({
-        isOpen: true,
-        subsidiaryId,
-        employees: mockEmployees,
-      })
-      return
-    }
-
     try {
-      const { data: employees, error } = await supabase.from("employees").select("*").eq("subsidiary_id", subsidiaryId)
-
-      if (error) throw error
-
+      const companyId = companyData.id || (await loadCompanyData())
+      const payload = await settingsFetch(
+        `/api/settings/subsidiaries?action=employees&company_id=${encodeURIComponent(companyId || "")}&subsidiary_id=${encodeURIComponent(subsidiaryId)}`,
+      )
+      const employees = payload.employees || []
+      setSubsidiaries((prev) =>
+        prev.map((sub) => (sub.id === subsidiaryId ? { ...sub, employee_count: employees.length } : sub)),
+      )
       setViewEmployeesModal({
         isOpen: true,
         subsidiaryId,
-        employees: employees || [],
+        employees,
       })
     } catch (error) {
       console.error("View employees error:", error)
       toast({
         title: "Error",
-        description: "Failed to load employees",
+        description: error instanceof Error ? error.message : "Failed to load employees",
         variant: "destructive",
       })
     }
@@ -2395,142 +2259,114 @@ export default function SettingsPage() {
 
   const addNewSubsidiary = async (subsidiaryData: Partial<Subsidiary>) => {
     console.log("[v0] Adding new subsidiary:", subsidiaryData)
-
-    if (isDemoMode()) {
-      const newSubsidiary: Subsidiary = {
-        id: `sub-${Date.now()}`,
-        company_id: "comp-001",
-        name: subsidiaryData.name || "New Subsidiary",
-        tax_id: subsidiaryData.tax_id || `TIN-${Date.now()}`,
-        ssnit_number: subsidiaryData.ssnit_number || `SSNIT-${Date.now()}`,
-        address: subsidiaryData.address || "",
-        phone_number: subsidiaryData.phone_number || "",
-        email_address: subsidiaryData.email_address || "",
-        status: "active",
-        industry: subsidiaryData.industry || "",
-        divisions: subsidiaryData.divisions || [],
-        departments: subsidiaryData.departments || [],
-        locations: subsidiaryData.locations || [],
-        divisions_count: 0,
-        departments_count: 0,
-        locations_count: 0,
-        employee_count: 0,
-        created_at: new Date().toISOString(),
-        logo_url: subsidiaryLogoPreview || "", // Include uploaded logo URL
-      }
-      setSubsidiaries((prev) => [newSubsidiary, ...prev])
-
-      setSubsidiaryLogoPreview("")
-
-      toast({
-        title: "Subsidiary Added",
-        description: "New subsidiary created successfully (Demo Mode)",
-      })
-      return
-    }
-
+    setIsSavingSubsidiary(true)
     try {
-      const { data, error } = await supabase
-        .from("subsidiaries")
-        .insert([
-          {
-            company_id: companyData?.id,
-            name: subsidiaryData.name,
-            tax_id: subsidiaryData.tax_id,
-            ssnit_number: subsidiaryData.ssnit_number,
-            address: subsidiaryData.address,
-            phone_number: subsidiaryData.phone_number,
-            email_address: subsidiaryData.email_address,
-            industry: subsidiaryData.industry,
-            status: "active",
-            divisions: subsidiaryData.divisions || [],
-            departments: subsidiaryData.departments || [],
-            locations: subsidiaryData.locations || [],
-            logo_url: subsidiaryLogoPreview || "", // Include uploaded logo URL
-          },
-        ])
-        .select()
+      const companyId = companyData.id || (await loadCompanyData())
+      if (!companyId || String(companyId).startsWith("demo-")) {
+        throw new Error("No company identifier available")
+      }
 
-      if (error) throw error
+      await settingsFetch("/api/settings/subsidiaries", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "create",
+          company_id: companyId,
+          name: subsidiaryData.name,
+          tax_id: subsidiaryData.tax_id,
+          ssnit_number: subsidiaryData.ssnit_number,
+          address: subsidiaryData.address,
+          phone_number: subsidiaryData.phone_number,
+          email_address: subsidiaryData.email_address,
+          industry: subsidiaryData.industry,
+          status: "active",
+          divisions: subsidiaryData.divisions || [],
+          departments: subsidiaryData.departments || [],
+          locations: subsidiaryData.locations || [],
+          logo_url: subsidiaryLogoPreview || subsidiaryData.logo_url || "",
+        }),
+      })
 
-      await loadSubsidiaries() // Reload the list
-
+      await loadSubsidiaries(companyId)
       setSubsidiaryLogoPreview("")
-
+      setNewSubsidiary(emptySubsidiaryForm)
+      setNewSubsidiaryDivision("")
+      setNewSubsidiaryDepartment("")
+      setNewSubsidiaryLocation("")
+      setShowAddSubsidiary(false)
       toast({
         title: "Subsidiary Added",
-        description: "New subsidiary created successfully",
+        description: "New subsidiary created and saved to the database.",
       })
     } catch (error) {
       console.error("Add subsidiary error:", error)
       toast({
         title: "Error",
-        description: "Failed to add subsidiary",
+        description: error instanceof Error ? error.message : "Failed to add subsidiary",
         variant: "destructive",
       })
+    } finally {
+      setIsSavingSubsidiary(false)
     }
+  }
+
+  const openAddSubsidiary = () => {
+    setNewSubsidiary(emptySubsidiaryForm)
+    setNewSubsidiaryDivision("")
+    setNewSubsidiaryDepartment("")
+    setNewSubsidiaryLocation("")
+    setSubsidiaryLogoPreview("")
+    setShowAddSubsidiary(true)
+  }
+
+  const handleCreateSubsidiary = async () => {
+    const name = newSubsidiary.name.trim()
+    if (!name) {
+      toast({
+        title: "Validation Error",
+        description: "Subsidiary name is required.",
+        variant: "destructive",
+      })
+      return
+    }
+    await addNewSubsidiary({
+      ...newSubsidiary,
+      name,
+      industry: newSubsidiary.industry.trim(),
+      tax_id: newSubsidiary.tax_id.trim(),
+      ssnit_number: newSubsidiary.ssnit_number.trim(),
+      email_address: newSubsidiary.email_address.trim(),
+      phone_number: newSubsidiary.phone_number.trim(),
+      address: newSubsidiary.address.trim(),
+      logo_url: subsidiaryLogoPreview || null,
+    })
   }
 
   const updateSubsidiary = async (subsidiaryId: string, updates: Partial<Subsidiary>) => {
     console.log("[v0] Updating subsidiary:", subsidiaryId, updates)
-
-    if (isDemoMode()) {
-      // Update in local state for demo mode
-      const updatedSubsidiaries = subsidiaries.map((sub) => {
-        if (sub.id === subsidiaryId) {
-          const updatedSub = {
-            ...sub,
-            ...updates,
-            // Recalculate counts based on arrays
-            divisions_count: Array.isArray(updates.divisions) ? updates.divisions.length : sub.divisions_count,
-            departments_count: Array.isArray(updates.departments) ? updates.departments.length : sub.departments_count,
-            locations_count: Array.isArray(updates.locations) ? updates.locations.length : sub.locations_count,
-            updated_at: new Date().toISOString(),
-          }
-          return updatedSub
-        }
-        return sub
-      })
-      setSubsidiaries(updatedSubsidiaries)
-
-      // Update selectedSubsidiary if it matches
-      if (selectedSubsidiary?.id === subsidiaryId) {
-        const updatedSelected = updatedSubsidiaries.find((sub) => sub.id === subsidiaryId)
-        if (updatedSelected) {
-          setSelectedSubsidiary(updatedSelected)
-        }
-      }
-
-      toast({
-        title: "Success",
-        description: "Subsidiary updated successfully (Demo Mode)",
-      })
-      return
-    }
-
     try {
-      const { error } = await supabase
-        .from("subsidiaries")
-        .update({
+      const companyId = companyData.id || (await loadCompanyData())
+      const result = await settingsFetch("/api/settings/subsidiaries", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "update",
+          company_id: companyId,
+          id: subsidiaryId,
           ...updates,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", subsidiaryId)
-
-      if (error) throw error
-
-      // Reload subsidiaries to get fresh data
-      await loadSubsidiaries()
-
+        }),
+      })
+      await loadSubsidiaries(companyId || undefined)
+      if (result.subsidiary && selectedSubsidiary?.id === subsidiaryId) {
+        setSelectedSubsidiary(result.subsidiary)
+      }
       toast({
         title: "Success",
-        description: "Subsidiary updated successfully",
+        description: "Subsidiary updated in the database.",
       })
     } catch (error) {
       console.error("Update subsidiary error:", error)
       toast({
         title: "Error",
-        description: "Failed to update subsidiary",
+        description: error instanceof Error ? error.message : "Failed to update subsidiary",
         variant: "destructive",
       })
     }
@@ -2563,30 +2399,22 @@ export default function SettingsPage() {
       return
     }
 
-    if (isDemoMode()) {
-      setSubsidiaries((prev) => prev.filter((s) => s.id !== subsidiaryId))
-      toast({
-        title: "Subsidiary Deleted",
-        description: "Subsidiary has been deleted successfully (Demo Mode)",
-      })
-      return
-    }
-
     try {
-      const { error } = await supabase.from("subsidiaries").delete().eq("id", subsidiaryId)
-
-      if (error) throw error
-
+      const companyId = companyData.id || (await loadCompanyData())
+      await settingsFetch("/api/settings/subsidiaries", {
+        method: "POST",
+        body: JSON.stringify({ action: "delete", company_id: companyId, id: subsidiaryId }),
+      })
       setSubsidiaries((prev) => prev.filter((s) => s.id !== subsidiaryId))
       toast({
         title: "Subsidiary Deleted",
-        description: "Subsidiary has been deleted successfully",
+        description: "Subsidiary has been deleted from the database.",
       })
     } catch (error) {
       console.error("Subsidiary deletion error:", error)
       toast({
         title: "Error",
-        description: "Failed to delete subsidiary",
+        description: error instanceof Error ? error.message : "Failed to delete subsidiary",
         variant: "destructive",
       })
     }
@@ -2653,72 +2481,167 @@ export default function SettingsPage() {
   }
 
   const handleAddRoleInner = () => {
-    toast({
-      title: "Add Role",
-      description: "Opening role creation form...",
-    })
+    setRoleModalType("add")
+    setEditingRole(null)
+    setRoleForm({ name: "", description: "" })
+    setRolePermissionMatrix(emptyPermissionMatrix())
+    setShowRoleModal(true)
+  }
+
+  const openRoleModal = (role: Role, mode: "edit" | "view") => {
+    setRoleModalType(mode)
+    setEditingRole(role)
+    setRoleForm({ name: role?.name || "", description: role?.description || "" })
+    setRolePermissionMatrix(permissionsToMatrix(role?.permissions))
+    setShowRoleModal(true)
   }
 
   const handleEditRoleInner = (roleName: string) => {
-    toast({
-      title: "Edit Role",
-      description: `Editing ${roleName} role...`,
+    const role = roles.find((r) => r.name === roleName)
+    if (role) openRoleModal(role, "edit")
+  }
+
+  const toggleRolePermission = (moduleKey: string, actionKey: string) => {
+    setRolePermissionMatrix((prev) => {
+      const current = prev[moduleKey] || []
+      const next = current.includes(actionKey)
+        ? current.filter((a) => a !== actionKey)
+        : [...current, actionKey]
+      return { ...prev, [moduleKey]: next }
     })
   }
 
-  const handleBackupNowInner = async () => {
-    setIsBackingUp(true)
-    try {
-      // Simulate backup process
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-      setLastBackupTime(new Date().toISOString())
-      setBackupSize("55 MB") // Simulate updated size
-      setBackupStatus("Completed")
+  const toggleRoleModuleAll = (moduleKey: string) => {
+    setRolePermissionMatrix((prev) => {
+      const current = prev[moduleKey] || []
+      const allKeys = ROLE_ACTIONS.map((a) => a.key)
+      const next = current.length === allKeys.length ? [] : allKeys
+      return { ...prev, [moduleKey]: next }
+    })
+  }
+
+  const setAllRolePermissions = (grant: boolean) => {
+    setRolePermissionMatrix(() => {
+      const matrix = emptyPermissionMatrix()
+      if (grant) {
+        for (const module of ROLE_MODULES) matrix[module.key] = ROLE_ACTIONS.map((a) => a.key)
+      }
+      return matrix
+    })
+  }
+
+  const handleSaveRole = async () => {
+    if (!roleForm.name.trim()) {
+      toast({ title: "Validation Error", description: "Role name is required", variant: "destructive" })
+      return
+    }
+    const permissions = matrixToPermissions(rolePermissionMatrix)
+    if (!permissions.length) {
       toast({
-        title: "Backup Successful",
-        description: "Manual backup completed.",
+        title: "Validation Error",
+        description: "Select at least one module permission for this role.",
+        variant: "destructive",
+      })
+      return
+    }
+    setIsSavingRole(true)
+    try {
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/roles", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save",
+          company_id: companyId,
+          role: {
+            id: editingRole?.id,
+            name: roleForm.name.trim(),
+            description: roleForm.description.trim(),
+            permissions,
+            level: editingRole?.level,
+            is_system_role: editingRole?.is_system_role,
+          },
+        }),
+      })
+      await loadRoles(companyId)
+      setShowRoleModal(false)
+      toast({
+        title: roleModalType === "edit" ? "Role Updated" : "Role Created",
+        description: `${roleForm.name} has been saved successfully`,
       })
     } catch (error) {
       toast({
-        title: "Backup Failed",
-        description: "Failed to complete system backup.",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save role",
+        variant: "destructive",
       })
     } finally {
-      setIsBackingUp(false)
+      setIsSavingRole(false)
     }
+  }
+
+  const handleConfirmDeleteRole = async () => {
+    if (!roleToDelete) return
+    setIsDeletingRole(true)
+    try {
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/roles", {
+        method: "POST",
+        body: JSON.stringify({ action: "delete", company_id: companyId, id: roleToDelete.id }),
+      })
+      await loadRoles(companyId)
+      toast({ title: "Role Deleted", description: `${roleToDelete.name} was removed successfully` })
+      setRoleToDelete(null)
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete role",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDeletingRole(false)
+    }
+  }
+
+  const handleBackupNowInner = async () => {
+    await handleBackupNow()
   }
 
   const handleSyncAllSettings = async () => {
     console.log("[v0] Syncing all subsidiary settings")
-
-    if (isDemoMode()) {
-      toast({
-        title: "Syncing All Settings",
-        description: "Synchronizing settings across all subsidiaries... (Demo Mode)",
-      })
-      return
-    }
-
     try {
-      const { error } = await supabase
-        .from("subsidiaries")
-        .update({
-          settings_synced_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .neq("id", "00000000-0000-0000-0000-000000000000")
-
-      if (error) throw error
-
+      const companyId = companyData.id || (await loadCompanyData())
+      // Persist sync option checkboxes first, then sync all subsidiaries.
+      await settingsFetch("/api/settings/subsidiaries", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_sync_preferences",
+          company_id: companyId,
+          ...syncPrefs,
+        }),
+      })
+      const result = await settingsFetch("/api/settings/subsidiaries", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "sync",
+          company_id: companyId,
+          sync_types: [
+            syncPrefs.sync_hr_policies ? "hr_policies" : null,
+            syncPrefs.sync_payroll_config ? "payroll_config" : null,
+            syncPrefs.sync_leave_types ? "leave_types" : null,
+            syncPrefs.sync_roles_permissions ? "roles" : null,
+          ].filter(Boolean),
+        }),
+      })
+      await loadSubsidiaries(companyId || undefined)
       toast({
         title: "Settings Synchronized",
-        description: "All subsidiary settings have been synchronized successfully",
+        description: `Synced ${result.synced || 0} subsidiaries (${(result.sync_types || []).join(", ") || "selected"}).`,
       })
     } catch (error) {
       console.error("Sync all settings error:", error)
       toast({
         title: "Error",
-        description: "Failed to sync all subsidiary settings",
+        description: error instanceof Error ? error.message : "Failed to sync all subsidiary settings",
         variant: "destructive",
       })
     }
@@ -2728,7 +2651,11 @@ export default function SettingsPage() {
     console.log("[v0] Exporting settings template")
 
     try {
-      const response = await fetch("/api/subsidiaries/export")
+      const companyId = companyData.id || (await loadCompanyData())
+      const response = await fetch(
+        `/api/settings/subsidiaries?action=export&company_id=${encodeURIComponent(companyId || "")}`,
+        { credentials: "include" },
+      )
 
       if (!response.ok) throw new Error("Export failed")
 
@@ -2760,25 +2687,39 @@ export default function SettingsPage() {
     console.log("[v0] Importing settings from file:", file.name)
 
     try {
-      const formData = new FormData()
-      formData.append("file", file)
+      const text = await file.text()
+      const lines = text.split("\n").filter((line) => line.trim())
+      if (lines.length < 2) throw new Error("Invalid file format")
+      const rows = lines.slice(1).map((line) => {
+        const fields = line.split(",").map((field) => field.replace(/"/g, "").trim())
+        return {
+          name: fields[0],
+          tax_id: fields[1],
+          ssnit_number: fields[2],
+          address: fields[3],
+          phone_number: fields[4],
+          email_address: fields[5],
+          industry: fields[6],
+          status: fields[7] || "active",
+          divisions: fields[8] ? fields[8].split(";").map((d) => d.trim()) : [],
+          departments: fields[9] ? fields[9].split(";").map((d) => d.trim()) : [],
+          locations: fields[10] ? fields[10].split(";").map((l) => l.trim()) : [],
+        }
+      }).filter((r) => r.name)
 
-      const response = await fetch("/api/subsidiaries/import", {
+      const companyId = companyData.id || (await loadCompanyData())
+      const result = await settingsFetch("/api/settings/subsidiaries", {
         method: "POST",
-        body: formData,
+        body: JSON.stringify({ action: "import", company_id: companyId, rows }),
       })
-
-      const result = await response.json()
-
-      if (!response.ok) throw new Error(result.error)
 
       toast({
         title: "Import Successful",
-        description: result.message,
+        description: `Successfully imported ${result.count || rows.length} subsidiaries`,
       })
 
-      // Refresh subsidiaries list
-      await loadSubsidiaries()
+      await loadSubsidiaries(companyId || undefined)
+      setImportModal(false)
     } catch (error) {
       console.error("Import error:", error)
       toast({
@@ -2790,106 +2731,71 @@ export default function SettingsPage() {
   }
 
   const handleSaveSettings = async () => {
-    console.log("[v0] Saving all settings changes")
+    console.log("[v0] Saving company settings changes")
     setIsSavingSettings(true)
 
-    if (isDemoMode()) {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      toast({
-        title: "Settings Saved",
-        description: "All settings changes have been saved successfully (Demo Mode)",
-      })
-      setIsSavingSettings(false)
-      return
-    }
-
     try {
-      const companyId = companyData.id || (await loadCompanyData())
-
+      // Prefer an existing id, but do not block first-time save — the API creates
+      // the companies row and binds users.company_id when company_id is omitted.
+      let companyId =
+        companyData.id && !String(companyData.id).startsWith("demo-") ? companyData.id : ""
       if (!companyId) {
-        throw new Error("No company identifier available")
+        companyId = (await loadCompanyData()) || ""
+        if (companyId && String(companyId).startsWith("demo-")) companyId = ""
       }
 
-      const normalizedCompanyLogo = (() => {
-        const preview = companyLogoPreview?.trim() || ""
-        const current = companyData.logo_url ? companyData.logo_url.toString().trim() : ""
-        const preferred = preview && !preview.includes("/placeholder") ? preview : ""
-        const fallback = current && !current.includes("/placeholder") ? current : ""
-        const value = preferred || fallback
-        return value || null
-      })()
+      const normalizedCompanyLogo = isPlaceholderLogo(companyLogoPreview)
+        ? isPlaceholderLogo(companyData.logo_url)
+          ? null
+          : companyData.logo_url
+        : companyLogoPreview.trim()
 
-      const { error: companyError } = await supabase
-        .from("companies")
-        .update({
-          name: companyData.name,
-          industry: companyData.industry,
-          tax_id: companyData.tax_id,
-          ssnit_number: companyData.ssnit_number,
-          email_address: companyData.email_address,
-          phone_number: companyData.phone_number,
-          address: companyData.address,
-          divisions,
-          departments,
-          locations,
-          logo_url: normalizedCompanyLogo,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", companyId)
+      const saved = await persistCompanySettings({
+        ...(companyId ? { company_id: companyId } : {}),
+        logo_url: normalizedCompanyLogo,
+        divisions,
+        departments,
+        locations,
+      })
 
-      if (companyError) throw companyError
+      const savedCompanyId = saved.company?.id || saved.company_id || companyId
+      if (!savedCompanyId) {
+        throw new Error("Company was saved but no company id was returned. Please refresh and try again.")
+      }
 
-      const { error: companySettingsError } = await supabase
-        .from("company_settings")
-        .upsert(
-          {
-            company_id: companyId,
-            settings_data: {
-              divisions,
-              departments,
-              locations,
-              logo_url: normalizedCompanyLogo,
-            },
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "company_id" },
-        )
+      // Keep related settings in sync, but never let these wipe a successful company save.
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_config",
+          company_id: savedCompanyId,
+          config: hrConfig,
+        }),
+      }).catch((err) => console.warn("[v0] HR config save skipped:", err))
 
-      if (companySettingsError) throw companySettingsError
+      await settingsFetch("/api/settings/subsidiaries", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_sync_preferences",
+          company_id: savedCompanyId,
+          ...syncPrefs,
+        }),
+      }).catch(() => null)
 
-      const { error: hrConfigError } = await supabase
-        .from("hr_configuration")
-        .upsert(
-          {
-            company_id: companyId,
-            leave_year_start: hrConfig.leaveYearStart,
-            probation_period: hrConfig.probationPeriod,
-            working_hours_per_day: hrConfig.workingHoursPerDay,
-            working_days_per_week: hrConfig.workingDaysPerWeek,
-            auto_approve_leave: hrConfig.autoApproveLeave,
-            email_notifications: hrConfig.emailNotifications,
-            ai_recommendations: hrConfig.aiRecommendations,
-            smart_scheduling: hrConfig.smartScheduling,
-            performance_tracking: hrConfig.performanceTracking,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "company_id" },
-        )
-
-      if (hrConfigError) throw hrConfigError
-
-      await loadAllData()
+      // Re-read company from API to prove persistence (same path used on module return).
+      await loadCompanyData()
 
       toast({
-        title: "Settings Saved",
-        description: "All settings changes have been saved and updated successfully",
+        title: "Company Settings Saved",
+        description: saved?.warnings?.length
+          ? `Saved successfully. Note: ${saved.warnings[0]}`
+          : "Company details and logo were saved to the database.",
       })
     } catch (error) {
       console.error("Save settings error:", error)
       toast({
         title: "Error",
-        description: "Failed to save settings changes",
+        description: error instanceof Error ? error.message : "Failed to save settings changes",
         variant: "destructive",
       })
     } finally {
@@ -2899,34 +2805,33 @@ export default function SettingsPage() {
 
   // Enhanced Save button with loading state and better feedback
   const handleSaveSubsidiaryChanges = async () => {
-    console.log("[v0] Saving subsidiary changes")
+    console.log("[v0] Saving subsidiary sync preferences")
     setIsSavingSubsidiary(true)
 
     try {
-      if (isDemoMode()) {
-        // Simulate saving delay for demo
-        await new Promise((resolve) => setTimeout(resolve, 1500))
+      const companyId = companyData.id || (await loadCompanyData())
+      if (!companyId) throw new Error("No company identifier available")
 
-        toast({
-          title: "Changes Saved",
-          description: "Subsidiary changes have been saved successfully (Demo Mode)",
-        })
-        setIsSavingSubsidiary(false)
-        return
-      }
+      await settingsFetch("/api/settings/subsidiaries", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_sync_preferences",
+          company_id: companyId,
+          ...syncPrefs,
+        }),
+      })
 
-      // Save any pending subsidiary changes
-      await loadSubsidiaries()
+      await loadSubsidiaries(companyId)
 
       toast({
-        title: "Changes Saved",
-        description: "Subsidiary changes have been saved and updated successfully",
+        title: "Sync Settings Saved",
+        description: "Sync options were saved to the database for this tenant.",
       })
     } catch (error) {
       console.error("Save subsidiary changes error:", error)
       toast({
         title: "Error",
-        description: "Failed to save subsidiary changes. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to save subsidiary sync settings",
         variant: "destructive",
       })
     } finally {
@@ -2958,9 +2863,17 @@ export default function SettingsPage() {
 
     setIsSavingPolicy(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      setCurrentPolicies((prev) => prev.filter((policy) => policy.name !== selectedPolicy.name))
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "delete_leave_policy",
+          company_id: companyId,
+          id: selectedPolicy.id,
+          name: selectedPolicy.name,
+        }),
+      })
+      await loadHrData(companyId)
       setShowPolicyModal(false)
 
       toast({
@@ -2970,7 +2883,7 @@ export default function SettingsPage() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to delete policy. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to delete policy. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -2978,14 +2891,39 @@ export default function SettingsPage() {
     }
   }
 
-  const handleToggleDocumentVisibility = (docId: number) => {
-    setHrDocuments((prev) => prev.map((doc) => (doc.id === docId ? { ...doc, visibleToAll: !doc.visibleToAll } : doc)))
-
-    const doc = hrDocuments.find((d) => d.id === docId)
-    toast({
-      title: "Visibility Updated",
-      description: `${doc?.name} is now ${doc?.visibleToAll ? "hidden from" : "visible to"} all employees.`,
-    })
+  const handleToggleDocumentVisibility = async (docId: number | string) => {
+    const doc = hrDocuments.find((d) => String(d.id) === String(docId))
+    if (!doc) return
+    const nextVisible = !doc.visibleToAll
+    const previous = doc.visibleToAll
+    setHrDocuments((prev) =>
+      prev.map((d) => (String(d.id) === String(docId) ? { ...d, visibleToAll: nextVisible } : d)),
+    )
+    try {
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "toggle_document_visibility",
+          company_id: companyId,
+          id: doc.id,
+          visible_to_all: nextVisible,
+        }),
+      })
+      toast({
+        title: "Visibility Updated",
+        description: `${doc.name} is now ${nextVisible ? "visible to" : "hidden from"} all employees.`,
+      })
+    } catch (error) {
+      setHrDocuments((prev) =>
+        prev.map((d) => (String(d.id) === String(docId) ? { ...d, visibleToAll: previous } : d)),
+      )
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update document visibility",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleEditDocument = async () => {
@@ -3000,29 +2938,57 @@ export default function SettingsPage() {
 
     setIsSavingDocument(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const companyId = await resolveHrCompanyId()
+      let fileUrl = selectedDocument?.fileUrl || null
+      let content = selectedDocument?.content || documentPreviewContent || ""
+      let fileType = selectedDocument?.type || "FILE"
+      let fileSize = undefined as number | undefined
 
-      setHrDocuments((prev) =>
-        prev.map((doc) => {
-          if (doc.id === selectedDocument.id) {
-            const updates: any = { name: documentName }
+      if (uploadedFile) {
+        const formData = new FormData()
+        formData.append("file", uploadedFile)
+        const uploadRes = await fetch("/api/upload/document", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        })
+        const uploaded = await uploadRes.json().catch(() => ({}))
+        if (!uploadRes.ok) {
+          throw new Error(uploaded.error || "Document upload failed")
+        }
+        fileUrl = uploaded.url
+        if (!content || content.includes("File uploaded successfully")) {
+          content = await parseFileContent(uploadedFile)
+        }
+        fileSize = uploadedFile.size
+        const fileName = uploadedFile.name.toLowerCase()
+        if (uploadedFile.type.includes("pdf") || fileName.endsWith(".pdf")) fileType = "PDF"
+        else if (uploadedFile.type.includes("word") || fileName.endsWith(".docx")) fileType = "DOCX"
+        else if (fileName.endsWith(".doc")) fileType = "DOC"
+      }
 
-            // If a new file was uploaded, update the file URL
-            if (uploadedFile) {
-              updates.fileUrl = URL.createObjectURL(uploadedFile)
-              updates.type = uploadedFile.type.includes("pdf") ? "PDF" : uploadedFile.type.includes("word") ? "DOC" : "FILE"
-              updates.size = `${(uploadedFile.size / (1024 * 1024)).toFixed(1)}MB`
-            }
-
-            return { ...doc, ...updates }
-          }
-          return doc
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_document",
+          company_id: companyId,
+          document: {
+            id: selectedDocument?.id,
+            name: documentName,
+            type: fileType,
+            fileUrl,
+            visibleToAll: selectedDocument?.visibleToAll,
+            file_size: fileSize,
+            content,
+          },
         }),
-      )
+      })
+      await loadHrData(companyId)
 
       setShowDocumentModal(false)
       setDocumentName("")
       setUploadedFile(null)
+      setDocumentPreviewContent("")
 
       toast({
         title: "Document Updated",
@@ -3031,7 +2997,7 @@ export default function SettingsPage() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update document. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update document. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -3100,17 +3066,25 @@ export default function SettingsPage() {
 
     setIsSavingPolicy(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
+      const companyId = await resolveHrCompanyId()
       const newPolicy = {
         name: newLeaveType.name,
         days: newLeaveType.days,
         usage: "0%",
         trend: "new",
         description: newLeaveType.description,
+        carryOver: !!newLeaveType.carryOver,
       }
 
-      setCurrentPolicies((prev) => [...prev, newPolicy])
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_leave_policy",
+          company_id: companyId,
+          policy: newPolicy,
+        }),
+      })
+      await loadHrData(companyId)
       setNewLeaveType({ name: "", days: 0, description: "", carryOver: false })
       setShowAddLeaveTypeModal(false)
 
@@ -3121,7 +3095,7 @@ export default function SettingsPage() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to add leave type. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to add leave type. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -3131,6 +3105,7 @@ export default function SettingsPage() {
 
   const handlePolicyAction = (action, policyName) => {
     const policy = currentPolicies.find((p) => p.name === policyName)
+    if (!policy) return
 
     setSelectedPolicy(policy)
     setPolicyModalType(action)
@@ -3139,7 +3114,7 @@ export default function SettingsPage() {
       setEditingPolicy({
         name: policy.name,
         days: policy.days,
-        description: policy.description,
+        description: policy.description || "",
       })
     }
 
@@ -3149,16 +3124,26 @@ export default function SettingsPage() {
   const handleSavePolicyChanges = async () => {
     setIsSavingPolicy(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const companyId = await resolveHrCompanyId()
+      const updated = {
+        id: selectedPolicy.id,
+        name: editingPolicy.name,
+        days: editingPolicy.days,
+        description: editingPolicy.description,
+        usage: selectedPolicy.usage,
+        trend: selectedPolicy.trend,
+        carryOver: !!selectedPolicy.carryOver,
+      }
 
-      // Update the policy in current policies
-      setCurrentPolicies((prev) =>
-        prev.map((policy) =>
-          policy.name === selectedPolicy.name
-            ? { ...policy, name: editingPolicy.name, days: editingPolicy.days, description: editingPolicy.description }
-            : policy,
-        ),
-      )
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_leave_policy",
+          company_id: companyId,
+          policy: updated,
+        }),
+      })
+      await loadHrData(companyId)
 
       setShowPolicyModal(false)
       toast({
@@ -3168,7 +3153,7 @@ export default function SettingsPage() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update policy. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update policy. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -3343,10 +3328,27 @@ This document contains important information about ${document.name.toLowerCase()
 
 
   // Parse document content based on document type and name
+  const isPdfDocument = (document: any) => {
+    const type = String(document?.type || document?.fileType || "").toLowerCase()
+    const url = String(document?.fileUrl || "")
+    return type.includes("pdf") || url.toLowerCase().includes(".pdf") || url.startsWith("data:application/pdf")
+  }
+
+  const isImageDocument = (document: any) => {
+    const type = String(document?.type || document?.fileType || "").toLowerCase()
+    const url = String(document?.fileUrl || "")
+    return type.startsWith("image/") || /\.(png|jpe?g|gif|webp)(\?|$)/i.test(url) || url.startsWith("data:image/")
+  }
+
   const parseDocumentContent = (document: any) => {
-    // If document has stored content from uploaded file, use that
-    if (document.content) {
+    // Prefer stored extracted content from the uploaded file
+    if (document.content && String(document.content).trim()) {
       return document.content
+    }
+
+    // If we have a file URL, don't invent fake handbook text — viewer will embed the file
+    if (document.fileUrl) {
+      return ""
     }
 
     // Document templates with realistic content for default documents
@@ -3616,16 +3618,16 @@ This document contains important information about ${document.name.toLowerCase()
     setSelectedDocument(document)
     setDocumentModalType("view")
     setShowDocumentModal(true)
-    setShowDocumentPreview(false) // Reset preview state
+    setShowDocumentPreview(false)
+    setDocumentZoom(100)
+    setDocumentRotation(0)
+    setCurrentPage(1)
+    setSearchTerm("")
 
-    // Immediately parse and set the document content
     const parsedContent = parseDocumentContent(document)
     setDocumentPreviewContent(parsedContent)
-    
-    // In a real PDF viewer, you'd set totalPages here based on loaded PDF
     setTotalPages(1)
-    
-    // Show preview after a brief delay to ensure smooth transition
+
     setTimeout(() => {
       setShowDocumentPreview(true)
     }, 100)
@@ -3647,6 +3649,16 @@ This document contains important information about ${document.name.toLowerCase()
     if (docId) {
       const doc = hrDocuments.find((d) => d.id === docId)
       setSelectedDocument(doc)
+      if (action === "edit" && doc) {
+        setDocumentName(doc.name || "")
+        setUploadedFile(null)
+        setDocumentPreviewContent(doc.content || "")
+      }
+    } else if (action === "add") {
+      setSelectedDocument(null)
+      setDocumentName("")
+      setUploadedFile(null)
+      setDocumentPreviewContent("")
     }
     setDocumentModalType(action)
     setShowDocumentModal(true)
@@ -3840,49 +3852,54 @@ This document contains important information about ${document.name.toLowerCase()
 
     setIsSavingDocument(true)
     try {
+      const companyId = await resolveHrCompanyId()
+
       // Parse file content if not already parsed
       let content = documentPreviewContent
       if (!content || content.includes("File uploaded successfully")) {
         content = await parseFileContent(uploadedFile)
       }
 
-      // Upload file to Vercel Blob storage
       const formData = new FormData()
-      formData.append('file', uploadedFile)
+      formData.append("file", uploadedFile)
+      const uploadRes = await fetch("/api/upload/document", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      })
+      const uploaded = await uploadRes.json().catch(() => ({}))
+      if (!uploadRes.ok || !uploaded.url) {
+        throw new Error(uploaded.error || "Document upload failed")
+      }
+      const fileUrl = uploaded.url
 
-      // Simulate file upload - in production, this would upload to Blob storage
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      // Create a temporary URL for the uploaded file
-      const fileUrl = URL.createObjectURL(uploadedFile)
-
-      // Determine file type more accurately
       let fileType = "FILE"
       const fileName = uploadedFile.name.toLowerCase()
-      if (uploadedFile.type.includes("pdf") || fileName.endsWith('.pdf')) {
-        fileType = "PDF"
-      } else if (uploadedFile.type.includes("word") || fileName.endsWith('.docx')) {
-        fileType = "DOCX"
-      } else if (fileName.endsWith('.doc')) {
-        fileType = "DOC"
-      }
+      if (uploadedFile.type.includes("pdf") || fileName.endsWith(".pdf")) fileType = "PDF"
+      else if (uploadedFile.type.includes("word") || fileName.endsWith(".docx")) fileType = "DOCX"
+      else if (fileName.endsWith(".doc")) fileType = "DOC"
 
-      const newDoc = {
-        id: Date.now(),
-        name: documentName,
-        type: fileType,
-        size: `${(uploadedFile.size / (1024 * 1024)).toFixed(1)}MB`,
-        visibleToAll: false,
-        fileUrl: fileUrl,
-        uploadedAt: new Date().toISOString(),
-        content: content // Store the parsed content
-      }
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_document",
+          company_id: companyId,
+          document: {
+            name: documentName,
+            type: fileType,
+            fileUrl,
+            visibleToAll: false,
+            file_size: uploadedFile.size,
+            content,
+          },
+        }),
+      })
+      await loadHrData(companyId)
 
-      setHrDocuments((prev) => [...prev, newDoc])
       setShowDocumentModal(false)
       setDocumentName("")
       setUploadedFile(null)
-      setDocumentPreviewContent("") // Clear preview content
+      setDocumentPreviewContent("")
 
       toast({
         title: "Document Added",
@@ -3892,7 +3909,7 @@ This document contains important information about ${document.name.toLowerCase()
       console.error("Error saving document:", error)
       toast({
         title: "Error",
-        description: "Failed to upload document. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to upload document. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -3901,9 +3918,14 @@ This document contains important information about ${document.name.toLowerCase()
   }
 
   const handleDeleteDocument = async (docId) => {
+    setIsSavingDocument(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      setHrDocuments((prev) => prev.filter((doc) => doc.id !== docId))
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({ action: "delete_document", company_id: companyId, id: docId }),
+      })
+      await loadHrData(companyId)
       setShowDocumentModal(false)
       toast({
         title: "Document Deleted",
@@ -3912,7 +3934,7 @@ This document contains important information about ${document.name.toLowerCase()
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to delete document. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to delete document. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -3962,24 +3984,20 @@ This document contains important information about ${document.name.toLowerCase()
   const handleSaveHRConfig = async () => {
     setIsSaving(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      if (isDemoMode) {
-        toast({
-          title: "HR Configuration Saved",
-          description: "HR settings updated successfully (Demo Mode)",
-        })
-      } else {
-        // Real database update would go here
-        toast({
-          title: "HR Configuration Saved",
-          description: "HR settings updated successfully",
-        })
-      }
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({ action: "save_config", company_id: companyId, config: hrConfig }),
+      })
+      await loadHrData(companyId)
+      toast({
+        title: "HR Configuration Saved",
+        description: "HR settings updated successfully",
+      })
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to save HR configuration",
+        description: error instanceof Error ? error.message : "Failed to save HR configuration",
         variant: "destructive",
       })
     } finally {
@@ -4037,64 +4055,28 @@ This document contains important information about ${document.name.toLowerCase()
   }
 
   const handleAddRole = () => {
-    toast({
-      title: "Add Role",
-      description: "Opening role creation form...",
-    })
+    handleAddRoleInner()
   }
 
   const handleEditRole = (roleName: string) => {
-    toast({
-      title: "Edit Role",
-      description: `Editing ${roleName} role...`,
-    })
+    handleEditRoleInner(roleName)
   }
 
   const handleBackupNow = async () => {
     setIsBackingUp(true)
     console.log("[v0] Initiating manual backup...")
     try {
-      if (isDemoMode()) {
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-        setLastBackupTime(new Date().toISOString())
-        setBackupSize("55 MB")
-        setBackupStatus("Completed")
-        toast({
-          title: "Backup Successful",
-          description: "Manual backup completed successfully.",
-        })
-        return
-      }
+      const companyId = await resolveHrCompanyId()
 
-      const companyId = companyData.id || (await loadCompanyData())
+      const result = await settingsFetch("/api/settings/security", {
+        method: "POST",
+        body: JSON.stringify({ action: "backup_now", company_id: companyId }),
+      })
 
-      if (!companyId) {
-        throw new Error("No company identifier available")
-      }
-
-      const backupSizeBytes = Math.round((Math.random() * 40 + 10) * 1024 * 1024) // 10MB - 50MB
-      const timestamp = new Date().toISOString()
-
-      const { data, error } = await supabase
-        .from("backup_history")
-        .insert({
-          company_id: companyId,
-          backup_type: "manual",
-          backup_status: "completed",
-          backup_size: backupSizeBytes,
-          backup_location: "supabase",
-          started_at: timestamp,
-          completed_at: timestamp,
-          triggered_by: "manual",
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      setLastBackupTime(data.completed_at || data.started_at || timestamp)
-      setBackupSize(formatBytes(data.backup_size))
-      setBackupStatus(toTitleCase(data.backup_status || "completed"))
+      setLastBackupTime(result.backup?.lastBackupTime || new Date().toISOString())
+      setBackupSize(result.backup?.backupSize || "0 MB")
+      setBackupStatus(result.backup?.backupStatus || "Completed")
+      await loadAccessAndSecurityData(companyId)
 
       toast({
         title: "Backup Successful",
@@ -4104,7 +4086,7 @@ This document contains important information about ${document.name.toLowerCase()
       console.error("[v0] Backup failed", error)
       toast({
         title: "Backup Failed",
-        description: "Failed to complete system backup.",
+        description: error instanceof Error ? error.message : "Failed to complete system backup.",
         variant: "destructive",
       })
     } finally {
@@ -4230,21 +4212,36 @@ Format the response in a professional, actionable manner for HR decision-makers.
   const [aiInsightsLoading, setAiInsightsLoading] = useState(false)
 
   const handleAddTaxBand = () => {
-    console.log("[v0] Adding new tax band...")
-    const currentConfig = getCurrencyConfig(selectedCurrency)
-    const newBand = {
-      rate: 0,
-      from: 0,
-      to: 0,
-      cumulativeTax: 0,
-    }
-
-    // Update the currency config with new band
-    const updatedBands = [...currentConfig.taxBands, newBand]
-    // This would typically update the state or database
+    const last = payeTaxBands[payeTaxBands.length - 1]
+    const from = last && Number.isFinite(last.to) ? Number(last.to) : Number(last?.from || 0)
+    setPayeTaxBands([
+      ...payeTaxBands.map((b) =>
+        b.to === Number.POSITIVE_INFINITY ? { ...b, to: from || b.from || 0 } : b,
+      ),
+      {
+        rate: 0,
+        from: from || 0,
+        to: Number.POSITIVE_INFINITY,
+        cumulativeTax: 0,
+      },
+    ])
     toast({
-      title: "Success",
-      description: "New tax band added successfully",
+      title: "Tax Band Added",
+      description: "Edit the new band values, then click Save Tax Configuration.",
+    })
+  }
+
+  const handleUpdateTaxBand = (index: number, field: string, value: number) => {
+    setPayeTaxBands((prev) =>
+      prev.map((band, i) => (i === index ? { ...band, [field]: value } : band)),
+    )
+  }
+
+  const handleDeleteTaxBand = (index: number) => {
+    setPayeTaxBands((prev) => prev.filter((_, i) => i !== index))
+    toast({
+      title: "Tax Band Removed",
+      description: "Save Tax Configuration to persist this change.",
     })
   }
 
@@ -4252,63 +4249,25 @@ Format the response in a professional, actionable manner for HR decision-makers.
     setIsSavingPayroll(true)
 
     try {
-      const supabase = createClient()
-      const companyId = companyData?.id
-      if (!companyId || String(companyId).startsWith("demo-")) {
-        await new Promise((resolve) => setTimeout(resolve, 400))
-        toast({ title: "Success", description: "Payroll configuration saved (demo)." })
-        return
-      }
+      const companyId = await resolveHrCompanyId()
 
-      // 1. Save allowances & deductions to their dedicated tables
-      const allowanceRows = allowances.map((a) => ({
-        company_id: companyId,
-        code: a.code,
-        description: a.description,
-        taxable: Boolean(a.taxable),
-        recurring: a.recurring !== false,
-        amount: Number(a.amount || 0),
-        percentage: Number(a.percentage || 0),
-        type: a.type || "FIXED",
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      }))
-      const deductionRows = deductions.map((d) => ({
-        company_id: companyId,
-        code: d.code,
-        description: d.description,
-        taxable: Boolean((d as any).taxable),
-        recurring: d.recurring !== false,
-        amount: Number(d.amount || 0),
-        percentage: Number(d.percentage || 0),
-        type: d.type || "FIXED",
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      }))
-
-      if (allowanceRows.length) {
-        const { error } = await supabase
-          .from("payroll_allowances")
-          .upsert(allowanceRows, { onConflict: "company_id,code" })
-        if (error) throw error
-      }
-      if (deductionRows.length) {
-        const { error } = await supabase
-          .from("payroll_deductions")
-          .upsert(deductionRows, { onConflict: "company_id,code" })
-        if (error) throw error
-      }
-
-      // 2. Save payroll configuration fields to system_settings via API route
-      const configRes = await fetch("/api/settings/payroll", {
+      await settingsFetch("/api/settings/payroll/items", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        body: JSON.stringify({
+          action: "save_allowances_deductions",
+          company_id: companyId,
+          allowances,
+          deductions,
+        }),
+      })
+
+      await settingsFetch("/api/settings/payroll", {
+        method: "POST",
         body: JSON.stringify({
           company_id: companyId,
           config: {
             pay_frequency: payFrequency,
-            currency,
+            currency: selectedCurrency || currency,
             minimum_wage: minimumWage,
             overtime_weekday_multiplier: overtimeWeekdayRate,
             overtime_weekend_multiplier: overtimeWeekendRate,
@@ -4320,10 +4279,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
         }),
       })
 
-      if (!configRes.ok) {
-        const body = await configRes.json().catch(() => ({}))
-        throw new Error(body.error ?? "Failed to save payroll config")
-      }
+      await loadPayrollData(companyId)
 
       toast({
         title: "Payroll configuration saved",
@@ -4345,29 +4301,26 @@ Format the response in a professional, actionable manner for HR decision-makers.
     setIsSavingTax(true)
 
     try {
-      const companyId = companyData?.id
-      if (!companyId || String(companyId).startsWith("demo-")) {
-        await new Promise((resolve) => setTimeout(resolve, 400))
-        toast({ title: "Success", description: "Tax configuration saved (demo)." })
-        return
-      }
-
+      const companyId = await resolveHrCompanyId()
       const taxYear = new Date().getFullYear()
 
-      // Build PAYE bands from the current currency config (editable in UI)
-      const currentConfig = getCurrencyConfig(selectedCurrency)
-      const payeBands = currentConfig.taxBands.map((b: any, i: number) => ({
-        band_order: i + 1,
-        rate: b.rate,
-        threshold_amount: b.to === Number.POSITIVE_INFINITY ? 999999999 : b.to,
-        is_remaining_amount: b.to === Number.POSITIVE_INFINITY,
-        description: `${b.rate}% — ${b.from.toLocaleString()} to ${b.to === Number.POSITIVE_INFINITY ? "∞" : b.to.toLocaleString()}`,
-      }))
+      // Persist GRA width thresholds (to − from), not absolute ceilings.
+      const payeBands = payeTaxBands.map((b: any, i: number) => {
+        const from = Number(b.from || 0)
+        const isRemaining = b.to === Number.POSITIVE_INFINITY || b.to == null || !Number.isFinite(b.to)
+        const to = isRemaining ? from : Number(b.to || 0)
+        const width = isRemaining ? 0 : Math.max(0, to - from)
+        return {
+          band_order: i + 1,
+          rate: Number(b.rate || 0),
+          threshold_amount: width,
+          is_remaining_amount: isRemaining,
+          description: `${b.rate}% — ${from.toLocaleString()} to ${isRemaining ? "∞" : to.toLocaleString()}`,
+        }
+      })
 
-      const res = await fetch("/api/settings/tax", {
+      const data = await settingsFetch("/api/settings/tax", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({
           company_id: companyId,
           tax_year: taxYear,
@@ -4378,12 +4331,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
         }),
       })
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? "Failed to save tax configuration")
-
       toast({
         title: "Tax configuration saved",
-        description: `SSNIT/Tier rates and ${data.saved_bands ?? 0} PAYE bands saved to database.`,
+        description: `SSNIT/Tier rates and ${data.saved_bands ?? payeBands.length} PAYE bands saved to database.`,
       })
     } catch (error) {
       console.error("Error saving tax config:", error)
@@ -4443,69 +4393,41 @@ Format the response in a professional, actionable manner for HR decision-makers.
     console.log("[v0] Syncing tax reliefs from GRA...")
 
     try {
-      // Simulate API call to GRA
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // Simulate updated data from GRA
-      const graReliefs = [
-        {
-          id: 1,
-          name: "Personal Relief",
-          description: "Basic personal tax relief",
-          amount: 402,
-          currency: "GHS",
-          isActive: true,
-          category: "Personal",
-          effectiveDate: "2024-01-01",
-          lastUpdated: new Date().toISOString()
-        },
-        {
-          id: 2,
-          name: "Child Relief",
-          description: "Tax relief for dependent children",
-          amount: 150,
-          currency: "GHS",
-          isActive: true,
-          category: "Family",
-          effectiveDate: "2024-01-01",
-          lastUpdated: new Date().toISOString()
-        },
-        {
-          id: 3,
-          name: "Old Age Relief",
-          description: "Tax relief for elderly citizens",
-          amount: 200,
-          currency: "GHS",
-          isActive: true,
-          category: "Age",
-          effectiveDate: "2024-01-01",
-          lastUpdated: new Date().toISOString()
-        },
-        {
-          id: 4,
-          name: "Disability Relief",
-          description: "Tax relief for persons with disabilities",
-          amount: 100,
-          currency: "GHS",
-          isActive: true,
-          category: "Disability",
-          effectiveDate: "2024-01-01",
-          lastUpdated: new Date().toISOString()
-        }
-      ]
+      // Official GRA figures: https://gra.gov.gh/domestic-tax/personal-tax-relief/
+      const { graApiService } = await import("@/lib/gra-api")
+      const comprehensive = await graApiService.getComprehensiveTaxReliefs()
+      const graReliefs = comprehensive.map((r) => ({
+        // Drop non-UUID ids so save inserts fresh rows
+        name: r.name,
+        description: r.description,
+        amount: Number(r.amount || 0),
+        currency: r.currency || "GHS",
+        isActive: r.isActive !== false,
+        category: r.category,
+        effectiveDate: r.effectiveDate,
+        lastUpdated: r.lastUpdated || new Date().toISOString(),
+        graCode: r.graCode,
+        maxAmount: r.maxAmount,
+        conditions: r.conditions,
+        eligibilityCriteria: r.eligibilityCriteria,
+        requiredDocuments: r.requiredDocuments,
+      }))
 
       setTaxReliefs(graReliefs)
       setReliefsLastSync(new Date().toISOString())
 
+      // Persist to tenant catalog so Payroll Tax Reliefs uses the same figures
+      await handleSaveReliefs(graReliefs)
+
       toast({
         title: "Tax Reliefs Synced",
-        description: "Successfully synced tax reliefs from GRA. 4 reliefs updated.",
+        description: `Synced ${graReliefs.length} official GRA personal tax reliefs and saved to company settings.`,
       })
     } catch (error) {
       console.error("[v0] Error syncing tax reliefs:", error)
       toast({
         title: "Sync Failed",
-        description: "Failed to sync tax reliefs from GRA. Please try again.",
+        description: settingsErrorMessage(error, "Failed to sync tax reliefs from GRA. Please try again."),
         variant: "destructive",
       })
     } finally {
@@ -4513,23 +4435,51 @@ Format the response in a professional, actionable manner for HR decision-makers.
     }
   }
 
-  const handleSaveReliefs = async () => {
+  const handleSaveReliefs = async (reliefsOverride?: any[]) => {
     setIsSavingReliefs(true)
     console.log("[v0] Saving tax reliefs...")
 
     try {
-      // Simulate save operation
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const companyId = await resolveHrCompanyId()
+      const payload = (Array.isArray(reliefsOverride) ? reliefsOverride : taxReliefs).map(
+        (r: any) => ({
+          ...r,
+          // Drop GRA/local numeric ids — API inserts fresh UUID rows
+          id: typeof r.id === "string" && r.id.includes("-") ? r.id : undefined,
+          name: r.name || "Untitled relief",
+          amount: Number(r.amount || 0),
+          graCode: r.graCode || r.gra_code || "",
+        }),
+      )
+      const saveResult = await settingsFetch("/api/settings/payroll/items", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_tax_reliefs",
+          company_id: companyId,
+          taxReliefs: payload,
+        }),
+      })
+      // Prefer server-normalized catalog; never blank the UI after a successful save.
+      const savedList = Array.isArray(saveResult?.taxReliefs) ? saveResult.taxReliefs : payload
+      setTaxReliefs(savedList as any)
+      await loadPayrollData(companyId, { silent: true }).catch(() => null)
 
+      const tableSaved = Number(saveResult?.table_saved || 0)
       toast({
         title: "Tax Reliefs Saved",
-        description: "Tax reliefs have been saved successfully.",
+        description:
+          tableSaved > 0 && !saveResult?.warning
+            ? `${savedList.length} tax reliefs saved and ready to assign in Payroll.`
+            : saveResult?.warning
+              ? `Saved ${savedList.length} reliefs. Note: ${saveResult.warning}`
+              : `${savedList.length} tax reliefs saved successfully.`,
       })
     } catch (error) {
       console.error("[v0] Error saving tax reliefs:", error)
+      // Do not clear taxReliefs on failure — synced rows stay visible for retry.
       toast({
         title: "Save Failed",
-        description: "Failed to save tax reliefs. Please try again.",
+        description: settingsErrorMessage(error, "Failed to save tax reliefs. Please try again."),
         variant: "destructive",
       })
     } finally {
@@ -4628,53 +4578,30 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
     setIsSaving(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      if (templateModalType === "edit" && editingTemplate) {
-        // Update existing template
-        const updatedTemplates = notificationTemplates.map((template) =>
-          template.id === editingTemplate.id
-            ? {
-                ...template,
-                name: newTemplate.name,
-                category: newTemplate.category,
-                type: newTemplate.type,
-                description: newTemplate.subject,
-                subject: newTemplate.subject,
-                body: newTemplate.body,
-                variables: newTemplate.variables,
-                lastModified: new Date().toLocaleDateString(),
-              }
-            : template
-        )
-        setNotificationTemplates(updatedTemplates)
-        
-        toast({
-          title: "Template Updated",
-          description: `${newTemplate.name} has been updated successfully`,
-        })
-      } else {
-        // Create new template
-        const template = {
-          id: Date.now().toString(),
-          name: newTemplate.name,
-          category: newTemplate.category,
-          type: newTemplate.type,
-          description: newTemplate.subject,
-          status: "Active",
-          lastModified: new Date().toLocaleDateString(),
-          subject: newTemplate.subject,
-          body: newTemplate.body,
-          variables: newTemplate.variables,
-        }
-
-        setNotificationTemplates([...notificationTemplates, template])
-        
-        toast({
-          title: "Template Created",
-          description: `${newTemplate.name} has been created successfully`,
-        })
-      }
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/notifications", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_template",
+          company_id: companyId,
+          template: {
+            id: templateModalType === "edit" ? editingTemplate?.id || selectedTemplate?.id : undefined,
+            name: newTemplate.name,
+            category: newTemplate.category,
+            type: newTemplate.type,
+            subject: newTemplate.subject,
+            description: newTemplate.subject,
+            body: newTemplate.body,
+            variables: newTemplate.variables,
+            status: "Active",
+          },
+        }),
+      })
+      await loadNotificationSettings(companyId)
+      toast({
+        title: templateModalType === "edit" ? "Template Updated" : "Template Created",
+        description: `${newTemplate.name} has been saved successfully`,
+      })
 
       // Close modal and reset state
       setShowTemplateModal(false)
@@ -4693,7 +4620,6 @@ Format the response in a professional, actionable manner for HR decision-makers.
       setCurrentAIModel(null)
       setShowModelUpgrade(false)
 
-      // Reset form
       setNewTemplate({
         name: "",
         category: "HR",
@@ -4705,7 +4631,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to save template. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to save template. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -4729,10 +4655,14 @@ Format the response in a professional, actionable manner for HR decision-makers.
   }
 
   const handleDeleteTemplate = async (templateId) => {
-    setIsSaving(true) // Use the general saving state
+    setIsSaving(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      setNotificationTemplates(notificationTemplates.filter((t) => t.id !== templateId))
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/notifications", {
+        method: "POST",
+        body: JSON.stringify({ action: "delete_template", company_id: companyId, id: templateId }),
+      })
+      await loadNotificationSettings(companyId)
       toast({
         title: "Template Deleted",
         description: "Template has been deleted successfully",
@@ -4740,7 +4670,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to delete template",
+        description: error instanceof Error ? error.message : "Failed to delete template",
         variant: "destructive",
       })
     } finally {
@@ -4954,38 +4884,45 @@ Format the response in a professional, actionable manner for HR decision-makers.
   const handleTestEmail = async () => {
     setTestConnectionStatus("testing")
     try {
-      // Simulate API call to test SMTP connection
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-
-      // Simulate random success/failure for demo
-      const isSuccess = Math.random() > 0.3
-
-      if (isSuccess) {
-        setTestConnectionStatus("success")
-        toast({
-          title: "Connection Successful! ✅",
-          description: "SMTP connection established successfully. Email configuration is working properly.",
-        })
-      } else {
-        throw new Error("Connection failed")
-      }
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/notifications", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "test_email",
+          company_id: companyId,
+          config: emailConfig,
+        }),
+      })
+      setTestConnectionStatus("success")
+      toast({
+        title: "Connection Test Passed",
+        description: "Email configuration validated. Save settings to persist SMTP credentials.",
+      })
     } catch (error) {
       setTestConnectionStatus("error")
       toast({
-        title: "Connection Failed ❌",
-        description: "Unable to connect to SMTP server. Please check your credentials and settings.",
+        title: "Connection Failed",
+        description: error instanceof Error ? error.message : "Unable to validate email configuration.",
         variant: "destructive",
       })
     }
 
-    // Reset status after 5 seconds
     setTimeout(() => setTestConnectionStatus("idle"), 5000)
   }
 
   const handleSaveEmailConfig = async () => {
-    setIsSaving(true) // Use the general saving state
+    setIsSaving(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/notifications", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_email_config",
+          company_id: companyId,
+          config: emailConfig,
+        }),
+      })
+      await loadNotificationSettings(companyId)
       toast({
         title: "Email Configuration Saved",
         description: "Email settings have been updated successfully",
@@ -4993,7 +4930,35 @@ Format the response in a professional, actionable manner for HR decision-makers.
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to save email configuration",
+        description: error instanceof Error ? error.message : "Failed to save email configuration",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleSaveNotificationPreferences = async () => {
+    setIsSaving(true)
+    try {
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/notifications", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_preferences",
+          company_id: companyId,
+          preferences: notificationSettings,
+        }),
+      })
+      await loadNotificationSettings(companyId)
+      toast({
+        title: "Preferences Saved",
+        description: "Notification preferences have been updated successfully",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save preferences",
         variant: "destructive",
       })
     } finally {
@@ -5023,34 +4988,14 @@ Format the response in a professional, actionable manner for HR decision-makers.
     setIsRefreshingSessions(true)
     console.log("[v0] Refreshing active sessions...")
     try {
-      if (isDemoMode()) {
-        await new Promise((resolve) => setTimeout(resolve, 800))
-        setActiveSessions([
-          {
-            id: "session-001",
-            user_email: "admin@example.com",
-            ip_address: "192.168.1.10",
-            device: "Desktop",
-            last_activity: new Date().toISOString(),
-          },
-          {
-            id: "session-003",
-            user_email: "newuser@example.com",
-            ip_address: "192.168.1.15",
-            device: "Laptop",
-            last_activity: new Date().toISOString(),
-          },
-        ])
-      } else {
-        const companyId = companyData.id || (await loadCompanyData())
-        await loadAccessAndSecurityData(companyId || undefined)
-      }
+      const companyId = await resolveHrCompanyId()
+      await loadAccessAndSecurityData(companyId)
       toast({ title: "Sessions Refreshed", description: "Active sessions have been updated." })
     } catch (error) {
       console.error("[v0] Failed to refresh sessions", error)
       toast({
         title: "Error",
-        description: "Unable to refresh active sessions.",
+        description: error instanceof Error ? error.message : "Unable to refresh active sessions.",
         variant: "destructive",
       })
     } finally {
@@ -5058,29 +5003,47 @@ Format the response in a professional, actionable manner for HR decision-makers.
     }
   }
 
-  const handleTerminateSession = async (sessionId: string) => {
-    console.log(`[v0] Terminating session: ${sessionId}`)
-    if (!confirm("Are you sure you want to terminate this session?")) return
+  const handleConfirmTerminateSession = async () => {
+    if (!sessionToTerminate) return
+    setIsTerminatingSession(true)
     try {
-      if (isDemoMode()) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        setActiveSessions((prev) => prev.filter((session) => session.id !== sessionId))
-      } else {
-        const { error } = await supabase
-          .from("active_sessions")
-          .update({ is_active: false, expires_at: new Date().toISOString() })
-          .eq("id", sessionId)
-
-        if (error) throw error
-
-        setActiveSessions((prev) => prev.filter((session) => session.id !== sessionId))
-      }
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/access", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "terminate_session",
+          company_id: companyId,
+          session_id: sessionToTerminate.id,
+        }),
+      })
+      setActiveSessions((prev) => prev.filter((session) => session.id !== sessionToTerminate.id))
       toast({ title: "Session Terminated", description: "The selected session has been terminated." })
+      setSessionToTerminate(null)
     } catch (error) {
       console.error("[v0] Failed to terminate session", error)
       toast({
         title: "Error",
-        description: "Unable to terminate the selected session.",
+        description: error instanceof Error ? error.message : "Unable to terminate the selected session.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsTerminatingSession(false)
+    }
+  }
+
+  const handleTerminateAllSessions = async () => {
+    try {
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/access", {
+        method: "POST",
+        body: JSON.stringify({ action: "terminate_all_sessions", company_id: companyId }),
+      })
+      setActiveSessions([])
+      toast({ title: "Sessions Terminated", description: "All active sessions have been terminated." })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Unable to terminate sessions.",
         variant: "destructive",
       })
     }
@@ -5091,44 +5054,22 @@ Format the response in a professional, actionable manner for HR decision-makers.
     console.log("[v0] Saving access settings...")
 
     try {
-      if (isDemoMode()) {
-        await new Promise((resolve) => setTimeout(resolve, 700))
-        toast({ title: "Access Settings Saved", description: "Access control settings have been updated." })
-        return
-      }
-
-      const companyId = companyData.id || (await loadCompanyData())
-
-      if (!companyId) {
-        throw new Error("No company identifier available")
-      }
-
-      const { error } = await supabase
-        .from("access_control_settings")
-        .upsert(
-          {
-            company_id: companyId,
-            two_factor_enabled: accessSettings.twoFactorEnabled,
-            sso_enabled: accessSettings.ssoEnabled,
-            password_expiry_enabled: accessSettings.passwordExpiryEnabled,
-            session_timeout: accessSettings.sessionTimeout,
-            max_login_attempts: accessSettings.maxLoginAttempts,
-            password_min_length: accessSettings.passwordMinLength,
-            ip_restrictions_enabled: accessSettings.ipRestrictionsEnabled,
-            allowed_ips: accessSettings.allowedIPs,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "company_id" },
-        )
-
-      if (error) throw error
-
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/access", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save",
+          company_id: companyId,
+          settings: accessSettings,
+        }),
+      })
+      await loadAccessAndSecurityData(companyId)
       toast({ title: "Access Settings Saved", description: "Access control settings have been updated." })
     } catch (error) {
       console.error("[v0] Failed to save access settings", error)
       toast({
         title: "Error",
-        description: "Unable to save access control settings.",
+        description: error instanceof Error ? error.message : "Unable to save access control settings.",
         variant: "destructive",
       })
     } finally {
@@ -5152,41 +5093,24 @@ Format the response in a professional, actionable manner for HR decision-makers.
     setIsSavingSecuritySettings(true)
     console.log("[v0] Saving security settings...")
     try {
-      if (isDemoMode()) {
-        await new Promise((resolve) => setTimeout(resolve, 800))
-        toast({ title: "Security Settings Saved", description: "Security configurations have been updated." })
-        return
-      }
+      const companyId = await resolveHrCompanyId()
 
-      const companyId = companyData.id || (await loadCompanyData())
-
-      if (!companyId) {
-        throw new Error("No company identifier available")
-      }
-
-      const { error } = await supabase
-        .from("security_settings")
-        .upsert(
-          {
-            company_id: companyId,
-            data_encryption_enabled: securitySettings.dataEncryptionEnabled,
-            audit_logging_enabled: securitySettings.auditLoggingEnabled,
-            auto_backup_enabled: securitySettings.autoBackupEnabled,
-            backup_frequency: securitySettings.backupFrequency,
-            data_retention_days: securitySettings.dataRetentionDays,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "company_id" },
-        )
-
-      if (error) throw error
+      await settingsFetch("/api/settings/security", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save",
+          company_id: companyId,
+          settings: securitySettings,
+        }),
+      })
+      await loadAccessAndSecurityData(companyId)
 
       toast({ title: "Security Settings Saved", description: "Security configurations have been updated." })
     } catch (error) {
       console.error("[v0] Failed to save security settings", error)
       toast({
         title: "Error",
-        description: "Unable to save security configurations.",
+        description: error instanceof Error ? error.message : "Unable to save security configurations.",
         variant: "destructive",
       })
     } finally {
@@ -5194,18 +5118,56 @@ Format the response in a professional, actionable manner for HR decision-makers.
     }
   }
 
-  const handleViewAllLogs = () => {
-    console.log("[v0] Navigating to Audit Logs page...")
-    // In a real app, this would navigate to a dedicated audit logs page
-    toast({ title: "View All Logs", description: "Navigating to the full audit log history." })
+  const handleViewAllLogs = async () => {
+    setShowAllLogsModal(true)
+    setIsLoadingAllLogs(true)
+    try {
+      const companyId = await resolveHrCompanyId()
+      const payload = await settingsFetch(
+        `/api/settings/security?company_id=${encodeURIComponent(companyId)}&limit=200`,
+      )
+      if (Array.isArray(payload.auditLogs)) setAuditLogs(payload.auditLogs)
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Unable to load full audit log history.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoadingAllLogs(false)
+    }
   }
 
   const handleExportSecurityReport = async () => {
     setIsExportingReport(true)
-    console.log("[v0] Exporting security report...")
-    await new Promise((resolve) => setTimeout(resolve, 2000)) // Simulate export process
-    setIsExportingReport(false)
-    toast({ title: "Report Exported", description: "Security report generated and downloaded." })
+    try {
+      const companyId = await resolveHrCompanyId()
+      const res = await fetch("/api/settings/security", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "export_report", company_id: companyId }),
+      })
+      if (!res.ok) throw new Error("Export failed")
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `security-report-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      toast({ title: "Report Exported", description: "Security report generated and downloaded." })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to export security report.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsExportingReport(false)
+    }
   }
 
   const handleAddSalaryGrade = () => {
@@ -5272,7 +5234,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     })
   }
 
-  const handleSaveSalaryGrade = () => {
+  const handleSaveSalaryGrade = async () => {
     if (!newGrade.name || !newGrade.minSalary || !newGrade.maxSalary) {
       toast({
         title: "Missing Information",
@@ -5283,7 +5245,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     }
 
     const gradeToAdd = {
-      id: editingGrade ? editingGrade.id : Date.now(),
+      id: editingGrade ? editingGrade.id : undefined,
       name: newGrade.name,
       description: newGrade.description,
       minSalary: Number.parseFloat(newGrade.minSalary),
@@ -5291,38 +5253,62 @@ Format the response in a professional, actionable manner for HR decision-makers.
       notches: newGrade.notches,
     }
 
-    if (editingGrade) {
-      setSalaryGrades((prev) => prev.map((grade) => (grade.id === editingGrade.id ? gradeToAdd : grade)))
-      toast({
-        title: "Grade Updated",
-        description: "Salary grade has been updated successfully.",
+    try {
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_salary_grade",
+          company_id: companyId,
+          grade: gradeToAdd,
+        }),
       })
-    } else {
-      setSalaryGrades((prev) => [...prev, gradeToAdd])
+      await loadHrData(companyId)
+
       toast({
-        title: "Grade Added",
-        description: "New salary grade has been added successfully.",
+        title: editingGrade ? "Grade Updated" : "Grade Added",
+        description: editingGrade
+          ? "Salary grade has been updated successfully."
+          : "New salary grade has been added successfully.",
+      })
+      setShowSalaryGradeModal(false)
+      setEditingGrade(null)
+      setNewGrade({
+        name: "",
+        description: "",
+        minSalary: "",
+        maxSalary: "",
+        numberOfNotches: 5,
+        notches: [],
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save salary grade",
+        variant: "destructive",
       })
     }
-
-    setShowSalaryGradeModal(false)
-    setEditingGrade(null)
-    setNewGrade({
-      name: "",
-      description: "",
-      minSalary: "",
-      maxSalary: "",
-      numberOfNotches: 5,
-      notches: [],
-    })
   }
 
-  const handleDeleteSalaryGrade = (gradeId) => {
-    setSalaryGrades((prev) => prev.filter((grade) => grade.id !== gradeId))
-    toast({
-      title: "Grade Deleted",
-      description: "Salary grade has been deleted successfully.",
-    })
+  const handleDeleteSalaryGrade = async (gradeId) => {
+    try {
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({ action: "delete_salary_grade", company_id: companyId, id: gradeId }),
+      })
+      await loadHrData(companyId)
+      toast({
+        title: "Grade Deleted",
+        description: "Salary grade has been deleted successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete salary grade",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleAddDivision = () => {
@@ -5419,7 +5405,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
     setShowUnstructuredModal(true)
   }
 
-  const handleSaveUnstructuredGrade = () => {
+  const handleSaveUnstructuredGrade = async () => {
     if (!newUnstructured.name) {
       toast({
         title: "Missing Information",
@@ -5430,43 +5416,71 @@ Format the response in a professional, actionable manner for HR decision-makers.
     }
 
     const gradeToAdd = {
-      id: editingUnstructured ? editingUnstructured.id : Date.now(),
+      id: editingUnstructured ? editingUnstructured.id : undefined,
       name: newUnstructured.name,
       description: newUnstructured.description,
       generalIncrement: newUnstructured.generalIncrement,
       performanceIncrement: newUnstructured.performanceIncrement,
     }
 
-    if (editingUnstructured) {
-      setUnstructuredGrades((prev) => prev.map((grade) => (grade.id === editingUnstructured.id ? gradeToAdd : grade)))
-      toast({
-        title: "Grade Updated",
-        description: "Unstructured salary grade has been updated successfully.",
+    try {
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save_unstructured_grade",
+          company_id: companyId,
+          grade: gradeToAdd,
+        }),
       })
-    } else {
-      setUnstructuredGrades((prev) => [...prev, gradeToAdd])
+      await loadHrData(companyId)
+
       toast({
-        title: "Grade Added",
-        description: "New unstructured salary grade has been added successfully.",
+        title: editingUnstructured ? "Grade Updated" : "Grade Added",
+        description: editingUnstructured
+          ? "Unstructured salary grade has been updated successfully."
+          : "New unstructured salary grade has been added successfully.",
+      })
+      setShowUnstructuredModal(false)
+      setEditingUnstructured(null)
+      setNewUnstructured({
+        name: "",
+        description: "",
+        generalIncrement: { type: "percentage", value: 0 },
+        performanceIncrement: { type: "percentage", value: 0 },
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save unstructured grade",
+        variant: "destructive",
       })
     }
-
-    setShowUnstructuredModal(false)
-    setEditingUnstructured(null)
-    setNewUnstructured({
-      name: "",
-      description: "",
-      generalIncrement: { type: "percentage", value: 0 },
-      performanceIncrement: { type: "percentage", value: 0 },
-    })
   }
 
-  const handleDeleteUnstructuredGrade = (gradeId) => {
-    setUnstructuredGrades((prev) => prev.filter((grade) => grade.id !== gradeId))
-    toast({
-      title: "Grade Deleted",
-      description: "Unstructured salary grade has been deleted successfully.",
-    })
+  const handleDeleteUnstructuredGrade = async (gradeId) => {
+    try {
+      const companyId = await resolveHrCompanyId()
+      await settingsFetch("/api/settings/hr", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "delete_unstructured_grade",
+          company_id: companyId,
+          id: gradeId,
+        }),
+      })
+      await loadHrData(companyId)
+      toast({
+        title: "Grade Deleted",
+        description: "Unstructured salary grade has been deleted successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete unstructured grade",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
@@ -5595,7 +5609,21 @@ Format the response in a professional, actionable manner for HR decision-makers.
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="company" className="space-y-6">
+      <Tabs
+        value={activeSettingsTab}
+        onValueChange={(value) => {
+          setActiveSettingsTab(value)
+          const cid = companyData.id && !String(companyData.id).startsWith("demo-") ? companyData.id : undefined
+          if (value === "subsidiaries") void loadSubsidiaries(cid)
+          if (value === "hr") void loadHrData(cid)
+          if (value === "payroll") void loadPayrollData(cid)
+          if (value === "notifications") void loadNotificationSettings(cid)
+          if (value === "roles") void loadRoles(cid)
+          if (value === "access") void loadAccessAndSecurityData(cid)
+          if (value === "security") void loadAccessAndSecurityData(cid)
+        }}
+        className="space-y-6"
+      >
         <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="company">Company</TabsTrigger>
           <TabsTrigger value="subsidiaries">Multi-Company</TabsTrigger>
@@ -5621,7 +5649,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
               <div className="space-y-4">
                 <Label>Company Logo</Label>
                 <div className="flex items-center space-x-4">
-                  {companyLogoPreview || companyData.logo_url ? (
+                  {!isPlaceholderLogo(companyLogoPreview || companyData.logo_url) ? (
                     <div className="relative">
                       <img
                         src={companyLogoPreview || companyData.logo_url}
@@ -5632,9 +5660,25 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         variant="ghost"
                         size="sm"
                         className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white"
-                        onClick={() => {
+                        onClick={async () => {
                           setCompanyLogoPreview("")
-                          setCompanyData({ ...companyData, logo_url: "" })
+                          setCompanyData((prev) => ({ ...prev, logo_url: null }))
+                          if (companyData.id && !String(companyData.id).startsWith("demo-")) {
+                            try {
+                              await persistCompanySettings({ logo_url: null })
+                              toast({
+                                title: "Logo removed",
+                                description: "Company logo cleared in the database.",
+                              })
+                            } catch (error) {
+                              toast({
+                                title: "Error",
+                                description:
+                                  error instanceof Error ? error.message : "Failed to clear logo",
+                                variant: "destructive",
+                              })
+                            }
+                          }
                         }}
                       >
                         <X className="h-3 w-3" />
@@ -5890,7 +5934,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   <span>Multi-Company Management</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Button onClick={() => setShowAddSubsidiary(true)}>
+                  <Button onClick={openAddSubsidiary}>
                     <Plus className="w-4 h-4 mr-2" />
                     Add Subsidiary
                   </Button>
@@ -6163,7 +6207,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <p className="text-gray-600 mb-4">
                           Get started by adding your first subsidiary company to manage multiple entities.
                         </p>
-                        <Button onClick={() => setShowAddSubsidiary(true)}>
+                        <Button onClick={openAddSubsidiary}>
                           <Plus className="w-4 h-4 mr-2" />
                           Add First Subsidiary
                         </Button>
@@ -6187,21 +6231,52 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         <h4 className="font-medium mb-2">Sync Options</h4>
                         <div className="space-y-2">
                           <label className="flex items-center space-x-2">
-                            <input type="checkbox" className="rounded" defaultChecked />
+                            <input
+                              type="checkbox"
+                              className="rounded"
+                              checked={syncPrefs.sync_hr_policies}
+                              onChange={(e) => setSyncPrefs((p) => ({ ...p, sync_hr_policies: e.target.checked }))}
+                            />
                             <span className="text-sm">HR Policies</span>
                           </label>
                           <label className="flex items-center space-x-2">
-                            <input type="checkbox" className="rounded" defaultChecked />
+                            <input
+                              type="checkbox"
+                              className="rounded"
+                              checked={syncPrefs.sync_payroll_config}
+                              onChange={(e) => setSyncPrefs((p) => ({ ...p, sync_payroll_config: e.target.checked }))}
+                            />
                             <span className="text-sm">Payroll Configuration</span>
                           </label>
                           <label className="flex items-center space-x-2">
-                            <input type="checkbox" className="rounded" />
+                            <input
+                              type="checkbox"
+                              className="rounded"
+                              checked={syncPrefs.sync_leave_types}
+                              onChange={(e) => setSyncPrefs((p) => ({ ...p, sync_leave_types: e.target.checked }))}
+                            />
                             <span className="text-sm">Leave Types</span>
                           </label>
                           <label className="flex items-center space-x-2">
-                            <input type="checkbox" className="rounded" />
+                            <input
+                              type="checkbox"
+                              className="rounded"
+                              checked={syncPrefs.sync_roles_permissions}
+                              onChange={(e) =>
+                                setSyncPrefs((p) => ({ ...p, sync_roles_permissions: e.target.checked }))
+                              }
+                            />
                             <span className="text-sm">Roles & Permissions</span>
                           </label>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start bg-transparent"
+                            onClick={handleSyncAllSettings}
+                          >
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Sync Selected Settings
+                          </Button>
                         </div>
                       </div>
                       <div>
@@ -6212,10 +6287,10 @@ Format the response in a professional, actionable manner for HR decision-makers.
                             variant="outline"
                             size="sm"
                             className="w-full justify-start bg-transparent"
-                            onClick={handleSaveSettings}
-                            disabled={isSavingSettings}
+                            onClick={handleSaveSubsidiaryChanges}
+                            disabled={isSavingSubsidiary}
                           >
-                            {isSavingSettings ? (
+                            {isSavingSubsidiary ? (
                               <>
                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                 Saving...
@@ -6445,9 +6520,12 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 <CardDescription>Manage leave policies and generate AI insights</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {currentPolicies.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No leave policies yet. Add a leave type to get started.</p>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {currentPolicies.map((policy) => (
-                    <Card key={policy.name} className="border-l-4 border-l-blue-500">
+                    <Card key={policy.id || policy.name} className="border-l-4 border-l-blue-500">
                       <CardHeader>
                         <CardTitle className="text-lg font-semibold">{policy.name}</CardTitle>
                         <CardDescription>{policy.description}</CardDescription>
@@ -6530,6 +6608,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 <CardDescription>Manage HR documents and visibility settings</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {hrDocuments.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No HR documents yet. Upload a PDF or Word file to get started.</p>
+                )}
                 <div className="space-y-3">
                   {hrDocuments.map((doc) => (
                     <Card key={doc.id} className="border-l-4 border-l-green-500">
@@ -6578,11 +6659,26 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <TrendingUp className="w-5 h-5" />
-                  <span>Salary Grades & Notches</span>
-                </CardTitle>
-                <CardDescription>Manage salary grades and compensation structure for employees</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center space-x-2">
+                      <TrendingUp className="w-5 h-5" />
+                      <span>Salary Grades & Notches</span>
+                    </CardTitle>
+                    <CardDescription>Manage salary grades and compensation structure for employees</CardDescription>
+                  </div>
+                  {salaryGradeTab === "structured" ? (
+                    <Button variant="outline" onClick={handleAddSalaryGrade}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Grade
+                    </Button>
+                  ) : (
+                    <Button variant="outline" onClick={handleAddUnstructuredGrade}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Grade
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Tab Navigation */}
@@ -6611,100 +6707,110 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
                 {/* Structured Salary Grades */}
                 {salaryGradeTab === "structured" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {salaryGrades.map((grade) => (
-                      <Card key={grade.id} className="border-l-4 border-l-purple-500">
-                        <CardHeader>
-                          <CardTitle className="text-lg font-semibold">{grade.name}</CardTitle>
-                          <CardDescription>{grade.description}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="space-y-2">
-                            <p className="text-sm">
-                              <span className="font-medium">Range:</span> ₵{grade.minSalary.toLocaleString()} - ₵
-                              {grade.maxSalary.toLocaleString()}
-                            </p>
-                            <p className="text-sm">
-                              <span className="font-medium">Notches:</span> {grade.notches.length} steps
-                            </p>
-                          </div>
-
-                          <div className="border-t pt-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-medium text-muted-foreground">Salary Steps</span>
+                  <>
+                    {salaryGrades.length === 0 && (
+                      <p className="text-sm text-muted-foreground">No structured grades yet. Click Add Grade to create one.</p>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {salaryGrades.map((grade) => (
+                        <Card key={grade.id} className="border-l-4 border-l-purple-500">
+                          <CardHeader>
+                            <CardTitle className="text-lg font-semibold">{grade.name}</CardTitle>
+                            <CardDescription>{grade.description}</CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                              <p className="text-sm">
+                                <span className="font-medium">Range:</span> ₵{Number(grade.minSalary || 0).toLocaleString()} - ₵
+                                {Number(grade.maxSalary || 0).toLocaleString()}
+                              </p>
+                              <p className="text-sm">
+                                <span className="font-medium">Notches:</span> {(grade.notches || []).length} steps
+                              </p>
                             </div>
-                            <div className="bg-gray-50 border border-gray-200 rounded-md p-3 max-h-32 overflow-y-auto">
-                              <div className="space-y-1">
-                                {grade.notches.map((notch) => (
-                                  <div key={notch.step} className="flex justify-between text-xs">
-                                    <span>Step {notch.step}</span>
-                                    <span className="font-medium">₵{notch.amount.toLocaleString()}</span>
-                                  </div>
-                                ))}
+
+                            <div className="border-t pt-3">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-muted-foreground">Salary Steps</span>
+                              </div>
+                              <div className="bg-gray-50 border border-gray-200 rounded-md p-3 max-h-32 overflow-y-auto">
+                                <div className="space-y-1">
+                                  {(grade.notches || []).map((notch) => (
+                                    <div key={notch.step} className="flex justify-between text-xs">
+                                      <span>Step {notch.step}</span>
+                                      <span className="font-medium">₵{Number(notch.amount || 0).toLocaleString()}</span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div className="flex justify-end space-x-2 pt-2">
-                            <Button variant="outline" size="sm" onClick={() => handleEditSalaryGrade(grade)}>
-                              Edit
-                            </Button>
-                            <Button variant="destructive" size="sm" onClick={() => handleDeleteSalaryGrade(grade.id)}>
-                              Delete
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+                            <div className="flex justify-end space-x-2 pt-2">
+                              <Button variant="outline" size="sm" onClick={() => handleEditSalaryGrade(grade)}>
+                                Edit
+                              </Button>
+                              <Button variant="destructive" size="sm" onClick={() => handleDeleteSalaryGrade(grade.id)}>
+                                Delete
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </>
                 )}
 
                 {/* Unstructured Salary Grades */}
                 {salaryGradeTab === "unstructured" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {unstructuredGrades.map((grade) => (
-                      <Card key={grade.id} className="border-l-4 border-l-blue-500">
-                        <CardHeader>
-                          <CardTitle className="text-lg font-semibold">{grade.name}</CardTitle>
-                          <CardDescription>{grade.description}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="space-y-3">
-                            <div className="bg-green-50 border border-green-200 rounded-md p-3">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium text-green-800">General Increment</span>
-                                <span className="text-sm font-semibold text-green-900">
-                                  {grade.generalIncrement.type === "percentage"
-                                    ? `${grade.generalIncrement.value}%`
-                                    : `₵${grade.generalIncrement.value.toLocaleString()}`}
-                                </span>
+                  <>
+                    {unstructuredGrades.length === 0 && (
+                      <p className="text-sm text-muted-foreground">No unstructured grades yet. Click Add Grade to create one.</p>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {unstructuredGrades.map((grade) => (
+                        <Card key={grade.id} className="border-l-4 border-l-blue-500">
+                          <CardHeader>
+                            <CardTitle className="text-lg font-semibold">{grade.name}</CardTitle>
+                            <CardDescription>{grade.description}</CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="space-y-3">
+                              <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium text-green-800">General Increment</span>
+                                  <span className="text-sm font-semibold text-green-900">
+                                    {grade.generalIncrement.type === "percentage"
+                                      ? `${grade.generalIncrement.value}%`
+                                      : `₵${Number(grade.generalIncrement.value || 0).toLocaleString()}`}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium text-blue-800">Performance Increment</span>
+                                  <span className="text-sm font-semibold text-blue-900">
+                                    {grade.performanceIncrement.type === "percentage"
+                                      ? `${grade.performanceIncrement.value}%`
+                                      : `₵${Number(grade.performanceIncrement.value || 0).toLocaleString()}`}
+                                  </span>
+                                </div>
                               </div>
                             </div>
 
-                            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium text-blue-800">Performance Increment</span>
-                                <span className="text-sm font-semibold text-blue-900">
-                                  {grade.performanceIncrement.type === "percentage"
-                                    ? `${grade.performanceIncrement.value}%`
-                                    : `₵${grade.performanceIncrement.value.toLocaleString()}`}
-                                </span>
-                              </div>
+                            <div className="flex justify-end space-x-2 pt-2">
+                              <Button variant="outline" size="sm" onClick={() => handleEditUnstructuredGrade(grade)}>
+                                Edit
+                              </Button>
+                              <Button variant="destructive" size="sm" onClick={() => handleDeleteUnstructuredGrade(grade.id)}>
+                                Delete
+                              </Button>
                             </div>
-                          </div>
-
-                          <div className="flex justify-end space-x-2 pt-2">
-                            <Button variant="outline" size="sm" onClick={() => handleEditUnstructuredGrade(grade)}>
-                              Edit
-                            </Button>
-                            <Button variant="destructive" size="sm" onClick={() => handleDeleteUnstructuredGrade(grade.id)}>
-                              Delete
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -6726,7 +6832,10 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   <div>
                     <Label htmlFor="payFrequency">Pay Frequency</Label>
-                    <Select value={payFrequency} onValueChange={setPayFrequency}>
+                    <Select
+                      value={["weekly", "biweekly", "monthly"].includes(payFrequency) ? payFrequency : "monthly"}
+                      onValueChange={setPayFrequency}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -6740,7 +6849,10 @@ Format the response in a professional, actionable manner for HR decision-makers.
 
                   <div>
                     <Label htmlFor="currency">Currency</Label>
-                    <Select value={selectedCurrency} onValueChange={(v) => { handleCurrencyChange(v); setCurrencyPref(v) }}>
+                    <Select
+                      value={["ghs", "usd", "eur", "ngn"].includes(selectedCurrency) ? selectedCurrency : "ghs"}
+                      onValueChange={(v) => { handleCurrencyChange(v); setCurrencyPref(v) }}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -6886,32 +6998,56 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         </tr>
                       </thead>
                       <tbody>
-                        {getCurrencyConfig(selectedCurrency)?.taxBands.map((band, index) => (
+                        {payeTaxBands.map((band, index) => (
                           <tr key={index} className="hover:bg-gray-50">
-                            <td className="border border-gray-200 px-4 py-3 font-medium">{band.rate}</td>
+                            <td className="border border-gray-200 px-4 py-3 font-medium">{index + 1}</td>
                             <td className="border border-gray-200 px-4 py-3">
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                {band.rate}%
-                              </span>
+                              <Input
+                                type="number"
+                                step="0.1"
+                                className="w-24"
+                                value={band.rate}
+                                onChange={(e) =>
+                                  handleUpdateTaxBand(index, "rate", Number.parseFloat(e.target.value) || 0)
+                                }
+                              />
                             </td>
                             <td className="border border-gray-200 px-4 py-3">
-                              {band.from ? band.from.toLocaleString() : "0"}
+                              <Input
+                                type="number"
+                                className="w-32"
+                                value={band.from ?? 0}
+                                onChange={(e) =>
+                                  handleUpdateTaxBand(index, "from", Number.parseFloat(e.target.value) || 0)
+                                }
+                              />
                             </td>
                             <td className="border border-gray-200 px-4 py-3">
-                              {band.to ? band.to.toLocaleString() : "∞"}
+                              <Input
+                                type="number"
+                                className="w-32"
+                                value={band.to === Number.POSITIVE_INFINITY ? "" : band.to ?? ""}
+                                placeholder="∞"
+                                onChange={(e) => {
+                                  const raw = e.target.value
+                                  handleUpdateTaxBand(
+                                    index,
+                                    "to",
+                                    raw === "" ? Number.POSITIVE_INFINITY : Number.parseFloat(raw) || 0,
+                                  )
+                                }}
+                              />
                             </td>
                             <td className="border border-gray-200 px-4 py-3 font-medium text-green-600">
-                              {band.cumulativeTax ? band.cumulativeTax.toLocaleString() : "0"}
+                              {band.cumulativeTax ? Number(band.cumulativeTax).toLocaleString() : "0"}
                             </td>
                             <td className="border border-gray-200 px-4 py-3 text-center">
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => {
-                                  console.log("[v0] Editing tax band:", band)
-                                }}
+                                onClick={() => handleDeleteTaxBand(index)}
                               >
-                                Edit
+                                <Trash2 className="w-4 h-4" />
                               </Button>
                             </td>
                           </tr>
@@ -7190,7 +7326,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                           </td>
                           <td className="border border-gray-200 px-4 py-3 text-center">
                             <Select
-                              value={allowance.type}
+                              value={allowance.type === "VARIABLE" ? "VARIABLE" : "FIXED"}
                               onValueChange={(value) => handleAllowanceFieldChange(index, "type", value)}
                             >
                               <SelectTrigger className="border-0 bg-transparent p-0 h-auto">
@@ -7304,7 +7440,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                           </td>
                           <td className="border border-gray-200 px-4 py-3 text-center">
                             <Select
-                              value={deduction.type}
+                              value={deduction.type === "VARIABLE" ? "VARIABLE" : "FIXED"}
                               onValueChange={(value) => handleDeductionFieldChange(index, "type", value)}
                             >
                               <SelectTrigger className="border-0 bg-transparent p-0 h-auto">
@@ -7366,10 +7502,21 @@ Format the response in a professional, actionable manner for HR decision-makers.
               <GhanaTaxSettings companyId={companyData.id} taxYear={new Date().getFullYear()} />
             )}
 
-            {/* Enhanced Tax Reliefs Section */}
-            <TaxReliefManager 
+            {/* Enhanced Tax Reliefs Section — catalog only; assign per employee under Payroll */}
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">
+                Catalog of company tax reliefs. Assign them to employees by tax year in{" "}
+                <a href="/app/payroll/tax-reliefs" className="text-blue-600 underline">
+                  Payroll → Tax Reliefs
+                </a>
+                .
+              </p>
+            </div>
+            <TaxReliefManager
               onReliefsChange={setTaxReliefs}
               initialReliefs={taxReliefs}
+              companyId={companyData.id}
+              onSaveReliefs={handleSaveReliefs}
             />
           </div>
         </TabsContent>
@@ -7398,6 +7545,11 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     </div>
                   </div>
 
+                  {notificationTemplates.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      No notification templates yet. Click Add Template to create one.
+                    </p>
+                  )}
                   <div className="border rounded-lg">
                     <Table>
                       <TableHeader>
@@ -7548,9 +7700,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         }}>
                           Close
                         </Button>
-                        <Button onClick={() => {
-                          setTemplateModalType("edit")
-                        }}>
+                        <Button onClick={() => handleEditTemplate(selectedTemplate)}>
                           Edit Template
                         </Button>
                       </div>
@@ -8331,9 +8481,9 @@ Format the response in a professional, actionable manner for HR decision-makers.
                             <p className="text-sm text-muted-foreground">Send welcome email to new employees</p>
                           </div>
                           <Switch
-                            checked={notificationSettings.payrollNotifications} // Corrected to use a relevant setting
+                            checked={notificationSettings.welcomeNotifications}
                             onCheckedChange={(checked) =>
-                              setNotificationSettings({ ...notificationSettings, payrollNotifications: checked })
+                              setNotificationSettings({ ...notificationSettings, welcomeNotifications: checked })
                             }
                           />
                         </div>
@@ -8460,19 +8610,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   </div>
 
                   <div className="flex justify-end">
-                    <Button
-                      onClick={() => {
-                        setIsSaving(true) // Use the general saving state
-                        setTimeout(() => {
-                          setIsSaving(false)
-                          toast({
-                            title: "Preferences Saved",
-                            description: "Notification preferences have been updated successfully",
-                          })
-                        }, 1500)
-                      }}
-                      disabled={isSaving}
-                    >
+                    <Button onClick={handleSaveNotificationPreferences} disabled={isSaving}>
                       {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                       Save Preferences
                     </Button>
@@ -8492,214 +8630,320 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   <span>Roles & Permissions</span>
                 </CardTitle>
                 <div className="flex items-center space-x-2">
-                  <Button variant="outline" onClick={handleAddRoleInner}>
+                  <Button variant="outline" onClick={() => loadRoles()}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
+                  </Button>
+                  <Button onClick={handleAddRoleInner}>
+                    <Plus className="w-4 h-4 mr-2" />
                     Add Role
                   </Button>
                 </div>
               </div>
-              <CardDescription>Manage user roles and permissions</CardDescription>
+              <CardDescription>
+                Define roles and grant module-level access (view, create, edit, delete, approve, export)
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-3">
-                {roles.map((role) => (
-                  <Card key={role.id} className="border-l-4 border-l-indigo-500">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-base font-semibold">{role.name}</h3>
-                          <p className="text-xs text-gray-600">{role.description}</p>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                          <span className="text-sm text-gray-500">{role.user_count} Users</span>
-                          <Button variant="outline" size="sm" onClick={() => handleEditRoleInner(role.name)}>
-                            Edit
-                          </Button>
-                        </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <Shield className="w-5 h-5 text-indigo-600" />
+                      <div>
+                        <p className="text-sm font-medium">Total Roles</p>
+                        <p className="text-2xl font-bold">{roles.length}</p>
                       </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <Users className="w-5 h-5 text-green-600" />
+                      <div>
+                        <p className="text-sm font-medium">Assigned Users</p>
+                        <p className="text-2xl font-bold">
+                          {roles.reduce((sum, r) => sum + (r.user_count || 0), 0)}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <Settings className="w-5 h-5 text-purple-600" />
+                      <div>
+                        <p className="text-sm font-medium">Managed Modules</p>
+                        <p className="text-2xl font-bold">{ROLE_MODULES.length}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="space-y-3">
+                {roles.map((role) => {
+                  const matrix = permissionsToMatrix(role.permissions)
+                  const grantedModules = ROLE_MODULES.filter((m) => (matrix[m.key] || []).length > 0)
+                  return (
+                    <Card key={role.id} className="border-l-4 border-l-indigo-500">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="text-base font-semibold">{role.name}</h3>
+                              {role.is_system_role && (
+                                <Badge variant="secondary" className="text-xs">
+                                  System
+                                </Badge>
+                              )}
+                              <Badge variant="outline" className="text-xs">
+                                {role.user_count || 0} Users
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-gray-600 mt-1">{role.description || "No description"}</p>
+                            <div className="flex flex-wrap gap-1.5 mt-3">
+                              {grantedModules.length === 0 && (
+                                <span className="text-xs text-muted-foreground">No module access granted</span>
+                              )}
+                              {grantedModules.map((m) => (
+                                <Badge key={m.key} variant="secondary" className="text-xs font-normal">
+                                  {m.label}
+                                  <span className="ml-1 text-muted-foreground">
+                                    ({(matrix[m.key] || []).length === ROLE_ACTIONS.length
+                                      ? "Full"
+                                      : (matrix[m.key] || []).length})
+                                  </span>
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Button variant="outline" size="sm" onClick={() => openRoleModal(role, "view")}>
+                              <Eye className="w-4 h-4 mr-1" />
+                              View
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => openRoleModal(role, "edit")}>
+                              <Edit className="w-4 h-4 mr-1" />
+                              Edit
+                            </Button>
+                            <Button variant="destructive" size="sm" onClick={() => setRoleToDelete(role)}>
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+                {roles.length === 0 && (
+                  <Card>
+                    <CardContent className="p-8 text-center">
+                      <Shield className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No Roles Yet</h3>
+                      <p className="text-gray-600 mb-4">
+                        Create your first role and grant module-level permissions.
+                      </p>
+                      <Button onClick={handleAddRoleInner}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add First Role
+                      </Button>
                     </CardContent>
                   </Card>
-                ))}
+                )}
               </div>
             </CardContent>
           </Card>
+
+          {showRoleModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>
+                        {roleModalType === "edit"
+                          ? "Edit Role"
+                          : roleModalType === "view"
+                            ? `Role: ${roleForm.name}`
+                            : "Add Role"}
+                      </CardTitle>
+                      <CardDescription>
+                        {roleModalType === "view"
+                          ? "Review this role's module-level access"
+                          : "Define the role and grant module-level access"}
+                      </CardDescription>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => setShowRoleModal(false)}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="roleName">Role Name</Label>
+                      <Input
+                        id="roleName"
+                        value={roleForm.name}
+                        disabled={roleModalType === "view"}
+                        onChange={(e) => setRoleForm((f) => ({ ...f, name: e.target.value }))}
+                        placeholder="HR Manager"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="roleDescription">Description</Label>
+                      <Input
+                        id="roleDescription"
+                        value={roleForm.description}
+                        disabled={roleModalType === "view"}
+                        onChange={(e) => setRoleForm((f) => ({ ...f, description: e.target.value }))}
+                        placeholder="What this role can manage"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Module Permissions</Label>
+                      {roleModalType !== "view" && (
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={() => setAllRolePermissions(true)}>
+                            Grant All
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => setAllRolePermissions(false)}>
+                            Clear All
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="border rounded-lg overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-muted/50 border-b">
+                            <th className="text-left font-medium px-3 py-2 min-w-[180px]">Module</th>
+                            {ROLE_ACTIONS.map((action) => (
+                              <th key={action.key} className="text-center font-medium px-3 py-2">
+                                {action.label}
+                              </th>
+                            ))}
+                            <th className="text-center font-medium px-3 py-2">Full</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ROLE_MODULES.map((module) => {
+                            const actions = rolePermissionMatrix[module.key] || []
+                            const allChecked = actions.length === ROLE_ACTIONS.length
+                            return (
+                              <tr key={module.key} className="border-b last:border-0 hover:bg-muted/30">
+                                <td className="px-3 py-2">
+                                  <div className="font-medium">{module.label}</div>
+                                  <div className="text-xs text-muted-foreground">{module.description}</div>
+                                </td>
+                                {ROLE_ACTIONS.map((action) => (
+                                  <td key={action.key} className="text-center px-3 py-2">
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 rounded border-gray-300"
+                                      disabled={roleModalType === "view"}
+                                      checked={actions.includes(action.key)}
+                                      onChange={() => toggleRolePermission(module.key, action.key)}
+                                    />
+                                  </td>
+                                ))}
+                                <td className="text-center px-3 py-2">
+                                  <input
+                                    type="checkbox"
+                                    className="h-4 w-4 rounded border-gray-300"
+                                    disabled={roleModalType === "view"}
+                                    checked={allChecked}
+                                    onChange={() => toggleRoleModuleAll(module.key)}
+                                  />
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {countMatrixGrants(rolePermissionMatrix)} permission(s) selected across{" "}
+                      {ROLE_MODULES.filter((m) => (rolePermissionMatrix[m.key] || []).length > 0).length} module(s)
+                    </p>
+                  </div>
+
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="ghost" onClick={() => setShowRoleModal(false)}>
+                      {roleModalType === "view" ? "Close" : "Cancel"}
+                    </Button>
+                    {roleModalType === "view" ? (
+                      <Button onClick={() => setRoleModalType("edit")}>
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit Role
+                      </Button>
+                    ) : (
+                      <Button onClick={handleSaveRole} disabled={isSavingRole}>
+                        {isSavingRole ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="w-4 h-4 mr-2" />
+                        )}
+                        {roleModalType === "edit" ? "Save Changes" : "Create Role"}
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {roleToDelete && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <Card className="w-full max-w-md">
+                <CardHeader>
+                  <CardTitle className="text-xl">Delete Role</CardTitle>
+                  <CardDescription>
+                    Are you sure you want to delete <span className="font-medium">{roleToDelete.name}</span>? This
+                    action cannot be undone.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="ghost" onClick={() => setRoleToDelete(null)} disabled={isDeletingRole}>
+                      Cancel
+                    </Button>
+                    <Button variant="destructive" onClick={handleConfirmDeleteRole} disabled={isDeletingRole}>
+                      {isDeletingRole ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete Role
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
 
         {/* Access Control Tab Content */}
         <TabsContent value="access">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Shield className="w-5 h-5" />
-                <span>Access Control</span>
-              </CardTitle>
-              <CardDescription>Manage user access and authentication settings</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Authentication Settings */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Authentication Settings</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="twoFactor">Two-Factor Authentication</Label>
-                      <Switch
-                        id="twoFactor"
-                        checked={accessSettings.twoFactorEnabled}
-                        onCheckedChange={(checked) =>
-                          setAccessSettings({ ...accessSettings, twoFactorEnabled: checked })
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="ssoEnabled">Single Sign-On (SSO)</Label>
-                      <Switch
-                        id="ssoEnabled"
-                        checked={accessSettings.ssoEnabled}
-                        onCheckedChange={(checked) => setAccessSettings({ ...accessSettings, ssoEnabled: checked })}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="passwordExpiry">Password Expiry</Label>
-                      <Switch
-                        id="passwordExpiry"
-                        checked={accessSettings.passwordExpiryEnabled}
-                        onCheckedChange={(checked) =>
-                          setAccessSettings({ ...accessSettings, passwordExpiryEnabled: checked })
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
-                      <Input
-                        id="sessionTimeout"
-                        type="number"
-                        value={accessSettings.sessionTimeout}
-                        onChange={(e) =>
-                          setAccessSettings({ ...accessSettings, sessionTimeout: Number.parseInt(e.target.value) })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="maxLoginAttempts">Max Login Attempts</Label>
-                      <Input
-                        id="maxLoginAttempts"
-                        type="number"
-                        value={accessSettings.maxLoginAttempts}
-                        onChange={(e) =>
-                          setAccessSettings({ ...accessSettings, maxLoginAttempts: Number.parseInt(e.target.value) })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="passwordMinLength">Minimum Password Length</Label>
-                      <Input
-                        id="passwordMinLength"
-                        type="number"
-                        value={accessSettings.passwordMinLength}
-                        onChange={(e) =>
-                          setAccessSettings({ ...accessSettings, passwordMinLength: Number.parseInt(e.target.value) })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* IP Restrictions */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">IP Access Control</h3>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="ipRestrictions">Enable IP Restrictions</Label>
-                    <Switch
-                      id="ipRestrictions"
-                      checked={accessSettings.ipRestrictionsEnabled}
-                      onCheckedChange={(checked) =>
-                        setAccessSettings({ ...accessSettings, ipRestrictionsEnabled: checked })
-                      }
-                    />
-                  </div>
-                  {accessSettings.ipRestrictionsEnabled && (
-                    <div className="space-y-2">
-                      <Label>Allowed IP Addresses</Label>
-                      {accessSettings.allowedIPs.map((ip, index) => (
-                        <div key={index} className="flex items-center space-x-2">
-                          <Input
-                            value={ip}
-                            onChange={(e) => {
-                              const newIPs = [...accessSettings.allowedIPs]
-                              newIPs[index] = e.target.value
-                              setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
-                            }}
-                            placeholder="192.168.1.0/24"
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const newIPs = accessSettings.allowedIPs.filter((_, i) => i !== index)
-                              setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setAccessSettings({
-                            ...accessSettings,
-                            allowedIPs: [...accessSettings.allowedIPs, ""],
-                          })
-                        }
-                      >
-                        Add IP Range
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Active Sessions */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Active Sessions</h3>
-                  <Button variant="outline" onClick={handleRefreshSessions} disabled={isRefreshingSessions}>
-                    {isRefreshingSessions ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                    )}
-                    Refresh
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  {activeSessions.map((session) => (
-                    <Card key={session.id}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{session.user_email}</p>
-                            <p className="text-sm text-gray-600">
-                              {session.ip_address} • {session.device} • Last active:{" "}
-                              {new Date(session.last_activity).toLocaleString()}
-                            </p>
-                          </div>
-                          <Button variant="outline" size="sm" onClick={() => handleTerminateSession(session.id)}>
-                            Terminate
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex justify-end">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center space-x-2">
+                  <Shield className="w-5 h-5" />
+                  <span>Access Control</span>
+                </CardTitle>
                 <Button
                   className="bg-emerald-600 hover:bg-emerald-700"
                   onClick={handleSaveAccessSettings}
@@ -8718,8 +8962,386 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   )}
                 </Button>
               </div>
+              <CardDescription>Manage authentication, password policy, IP access and active sessions</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              {/* Overview stats */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Shield className="w-5 h-5 text-emerald-600" />
+                        <p className="text-sm font-medium">Two-Factor</p>
+                      </div>
+                      <Badge variant={accessSettings.twoFactorEnabled ? "default" : "secondary"}>
+                        {accessSettings.twoFactorEnabled ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Wifi className="w-5 h-5 text-blue-600" />
+                        <p className="text-sm font-medium">IP Restrictions</p>
+                      </div>
+                      <Badge variant={accessSettings.ipRestrictionsEnabled ? "default" : "secondary"}>
+                        {accessSettings.ipRestrictionsEnabled
+                          ? `${accessSettings.allowedIPs.filter((ip) => ip.trim()).length} allowed`
+                          : "Off"}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Users className="w-5 h-5 text-purple-600" />
+                        <p className="text-sm font-medium">Active Sessions</p>
+                      </div>
+                      <Badge variant="outline">{activeSessions.length}</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Authentication Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Authentication</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <Label htmlFor="twoFactor">Two-Factor Authentication</Label>
+                        <p className="text-xs text-muted-foreground">Require a second factor at sign-in</p>
+                      </div>
+                      <Switch
+                        id="twoFactor"
+                        checked={accessSettings.twoFactorEnabled}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, twoFactorEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <Label htmlFor="ssoEnabled">Single Sign-On (SSO)</Label>
+                        <p className="text-xs text-muted-foreground">Allow identity-provider login</p>
+                      </div>
+                      <Switch
+                        id="ssoEnabled"
+                        checked={accessSettings.ssoEnabled}
+                        onCheckedChange={(checked) => setAccessSettings({ ...accessSettings, ssoEnabled: checked })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
+                      <Input
+                        id="sessionTimeout"
+                        type="number"
+                        min="1"
+                        value={accessSettings.sessionTimeout}
+                        onChange={(e) =>
+                          setAccessSettings({ ...accessSettings, sessionTimeout: Number.parseInt(e.target.value) || 0 })
+                        }
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="maxLoginAttempts">Max Login Attempts</Label>
+                        <Input
+                          id="maxLoginAttempts"
+                          type="number"
+                          min="1"
+                          value={accessSettings.maxLoginAttempts}
+                          onChange={(e) =>
+                            setAccessSettings({
+                              ...accessSettings,
+                              maxLoginAttempts: Number.parseInt(e.target.value) || 0,
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="lockoutDuration">Lockout (minutes)</Label>
+                        <Input
+                          id="lockoutDuration"
+                          type="number"
+                          min="1"
+                          value={accessSettings.lockoutDuration}
+                          onChange={(e) =>
+                            setAccessSettings({
+                              ...accessSettings,
+                              lockoutDuration: Number.parseInt(e.target.value) || 0,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Password Policy */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Password Policy</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="passwordMinLength">Minimum Password Length</Label>
+                      <Input
+                        id="passwordMinLength"
+                        type="number"
+                        min="4"
+                        value={accessSettings.passwordMinLength}
+                        onChange={(e) =>
+                          setAccessSettings({
+                            ...accessSettings,
+                            passwordMinLength: Number.parseInt(e.target.value) || 0,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <Label htmlFor="passwordExpiry">Password Expiry</Label>
+                        <p className="text-xs text-muted-foreground">Force periodic password changes</p>
+                      </div>
+                      <Switch
+                        id="passwordExpiry"
+                        checked={accessSettings.passwordExpiryEnabled}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, passwordExpiryEnabled: checked })
+                        }
+                      />
+                    </div>
+                    {accessSettings.passwordExpiryEnabled && (
+                      <div>
+                        <Label htmlFor="passwordExpiryDays">Expiry Period (days)</Label>
+                        <Input
+                          id="passwordExpiryDays"
+                          type="number"
+                          min="1"
+                          value={accessSettings.passwordExpiryDays}
+                          onChange={(e) =>
+                            setAccessSettings({
+                              ...accessSettings,
+                              passwordExpiryDays: Number.parseInt(e.target.value) || 0,
+                            })
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    <Label>Complexity Requirements</Label>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <span className="text-sm">Require uppercase letter</span>
+                      <Switch
+                        checked={accessSettings.passwordRequireUppercase}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, passwordRequireUppercase: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <span className="text-sm">Require lowercase letter</span>
+                      <Switch
+                        checked={accessSettings.passwordRequireLowercase}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, passwordRequireLowercase: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <span className="text-sm">Require number</span>
+                      <Switch
+                        checked={accessSettings.passwordRequireNumbers}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, passwordRequireNumbers: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <span className="text-sm">Require special character</span>
+                      <Switch
+                        checked={accessSettings.passwordRequireSpecial}
+                        onCheckedChange={(checked) =>
+                          setAccessSettings({ ...accessSettings, passwordRequireSpecial: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* IP Restrictions */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">IP Access Control</h3>
+                  <Switch
+                    id="ipRestrictions"
+                    checked={accessSettings.ipRestrictionsEnabled}
+                    onCheckedChange={(checked) =>
+                      setAccessSettings({ ...accessSettings, ipRestrictionsEnabled: checked })
+                    }
+                  />
+                </div>
+                {accessSettings.ipRestrictionsEnabled ? (
+                  <div className="space-y-2">
+                    <Label>Allowed IP Addresses / Ranges</Label>
+                    {accessSettings.allowedIPs.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        No IP ranges yet. Add one below to restrict access.
+                      </p>
+                    )}
+                    {accessSettings.allowedIPs.map((ip, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <Input
+                          value={ip}
+                          onChange={(e) => {
+                            const newIPs = [...accessSettings.allowedIPs]
+                            newIPs[index] = e.target.value
+                            setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
+                          }}
+                          placeholder="192.168.1.0/24"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const newIPs = accessSettings.allowedIPs.filter((_, i) => i !== index)
+                            setAccessSettings({ ...accessSettings, allowedIPs: newIPs })
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setAccessSettings({
+                          ...accessSettings,
+                          allowedIPs: [...accessSettings.allowedIPs, ""],
+                        })
+                      }
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add IP Range
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    IP restrictions are disabled. Enable to limit access to specific networks.
+                  </p>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Active Sessions */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Active Sessions</h3>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={handleRefreshSessions} disabled={isRefreshingSessions}>
+                      {isRefreshingSessions ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                      )}
+                      Refresh
+                    </Button>
+                    {activeSessions.length > 0 && (
+                      <Button variant="destructive" size="sm" onClick={handleTerminateAllSessions}>
+                        <X className="w-4 h-4 mr-2" />
+                        Terminate All
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {activeSessions.length === 0 && (
+                    <Card>
+                      <CardContent className="p-6 text-center text-sm text-muted-foreground">
+                        No active sessions recorded.
+                      </CardContent>
+                    </Card>
+                  )}
+                  {activeSessions.map((session) => (
+                    <Card key={session.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">{session.user_email}</p>
+                            <p className="text-sm text-gray-600">
+                              {session.ip_address} • {session.device}
+                              {session.browser ? ` • ${session.browser}` : ""} • Last active:{" "}
+                              {new Date(session.last_activity).toLocaleString()}
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSessionToTerminate(session)}
+                          >
+                            <X className="w-4 h-4 mr-1" />
+                            Terminate
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
             </CardContent>
           </Card>
+
+          {sessionToTerminate && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <Card className="w-full max-w-md">
+                <CardHeader>
+                  <CardTitle className="text-xl">Terminate Session</CardTitle>
+                  <CardDescription>
+                    End the session for <span className="font-medium">{sessionToTerminate.user_email}</span> (
+                    {sessionToTerminate.ip_address})? The user will need to sign in again.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="ghost" onClick={() => setSessionToTerminate(null)} disabled={isTerminatingSession}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={handleConfirmTerminateSession}
+                      disabled={isTerminatingSession}
+                    >
+                      {isTerminatingSession ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Terminating...
+                        </>
+                      ) : (
+                        "Terminate Session"
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
 
         {/* Security Tab Content */}
@@ -8752,9 +9374,12 @@ Format the response in a professional, actionable manner for HR decision-makers.
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Security Policies</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="dataEncryption">Data Encryption at Rest</Label>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <Label htmlFor="dataEncryption">Data Encryption at Rest</Label>
+                        <p className="text-xs text-muted-foreground">Encrypt stored tenant data</p>
+                      </div>
                       <Switch
                         id="dataEncryption"
                         checked={securitySettings.dataEncryptionEnabled}
@@ -8763,8 +9388,11 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         }
                       />
                     </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="auditLogging">Audit Logging</Label>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <Label htmlFor="auditLogging">Audit Logging</Label>
+                        <p className="text-xs text-muted-foreground">Record security-relevant events</p>
+                      </div>
                       <Switch
                         id="auditLogging"
                         checked={securitySettings.auditLoggingEnabled}
@@ -8773,13 +9401,42 @@ Format the response in a professional, actionable manner for HR decision-makers.
                         }
                       />
                     </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="autoBackup">Automatic Backups</Label>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <Label htmlFor="autoBackup">Automatic Backups</Label>
+                        <p className="text-xs text-muted-foreground">Schedule recurring backups</p>
+                      </div>
                       <Switch
                         id="autoBackup"
                         checked={securitySettings.autoBackupEnabled}
                         onCheckedChange={(checked) =>
                           setSecuritySettings({ ...securitySettings, autoBackupEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <Label htmlFor="gdprCompliance">GDPR Compliance Mode</Label>
+                        <p className="text-xs text-muted-foreground">Enforce data-subject protections</p>
+                      </div>
+                      <Switch
+                        id="gdprCompliance"
+                        checked={securitySettings.gdprComplianceEnabled}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, gdprComplianceEnabled: checked })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <Label htmlFor="dataAnonymization">Data Anonymization</Label>
+                        <p className="text-xs text-muted-foreground">Mask PII in exports and logs</p>
+                      </div>
+                      <Switch
+                        id="dataAnonymization"
+                        checked={securitySettings.dataAnonymizationEnabled}
+                        onCheckedChange={(checked) =>
+                          setSecuritySettings({ ...securitySettings, dataAnonymizationEnabled: checked })
                         }
                       />
                     </div>
@@ -8795,6 +9452,7 @@ Format the response in a professional, actionable manner for HR decision-makers.
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="hourly">Hourly</SelectItem>
                           <SelectItem value="daily">Daily</SelectItem>
                           <SelectItem value="weekly">Weekly</SelectItem>
                           <SelectItem value="monthly">Monthly</SelectItem>
@@ -8802,15 +9460,31 @@ Format the response in a professional, actionable manner for HR decision-makers.
                       </Select>
                     </div>
                     <div>
+                      <Label htmlFor="backupRetention">Backup Retention (days)</Label>
+                      <Input
+                        id="backupRetention"
+                        type="number"
+                        min="1"
+                        value={securitySettings.backupRetentionDays}
+                        onChange={(e) =>
+                          setSecuritySettings({
+                            ...securitySettings,
+                            backupRetentionDays: Number.parseInt(e.target.value) || 0,
+                          })
+                        }
+                      />
+                    </div>
+                    <div>
                       <Label htmlFor="retentionPeriod">Data Retention Period (days)</Label>
                       <Input
                         id="retentionPeriod"
                         type="number"
+                        min="1"
                         value={securitySettings.dataRetentionDays}
                         onChange={(e) =>
                           setSecuritySettings({
                             ...securitySettings,
-                            dataRetentionDays: Number.parseInt(e.target.value),
+                            dataRetentionDays: Number.parseInt(e.target.value) || 0,
                           })
                         }
                       />
@@ -8859,6 +9533,46 @@ Format the response in a professional, actionable manner for HR decision-makers.
                     </CardContent>
                   </Card>
                 </div>
+
+                {backupHistory.length > 0 && (
+                  <div className="border rounded-lg overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-muted/50 border-b">
+                          <th className="text-left font-medium px-3 py-2">Type</th>
+                          <th className="text-left font-medium px-3 py-2">Status</th>
+                          <th className="text-left font-medium px-3 py-2">Size</th>
+                          <th className="text-left font-medium px-3 py-2">Completed</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {backupHistory.slice(0, 8).map((b) => (
+                          <tr key={b.id} className="border-b last:border-0">
+                            <td className="px-3 py-2 capitalize">{b.backup_type || "manual"}</td>
+                            <td className="px-3 py-2">
+                              <Badge
+                                variant={
+                                  String(b.backup_status).toLowerCase() === "completed" ? "default" : "secondary"
+                                }
+                                className="capitalize"
+                              >
+                                {b.backup_status || "unknown"}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-2">
+                              {b.backup_size ? `${(b.backup_size / (1024 * 1024)).toFixed(1)} MB` : "—"}
+                            </td>
+                            <td className="px-3 py-2">
+                              {b.completed_at || b.started_at
+                                ? new Date(b.completed_at || b.started_at).toLocaleString()
+                                : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
 
               {/* Audit Logs */}
@@ -8923,6 +9637,54 @@ Format the response in a professional, actionable manner for HR decision-makers.
               </div>
             </CardContent>
           </Card>
+
+          {showAllLogsModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <Card className="w-full max-w-3xl max-h-[85vh] overflow-y-auto">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Audit Logs</CardTitle>
+                      <CardDescription>Latest security and access events for this tenant</CardDescription>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => setShowAllLogsModal(false)}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingAllLogs ? (
+                    <div className="flex items-center justify-center py-10">
+                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : auditLogs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-6 text-center">No audit events recorded yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {auditLogs.map((log) => (
+                        <div key={log.id} className="flex items-center justify-between border rounded-md p-3">
+                          <div>
+                            <p className="font-medium text-sm">{log.action}</p>
+                            <p className="text-xs text-gray-600">
+                              {log.user_email} • {log.ip_address} • {new Date(log.timestamp).toLocaleString()}
+                            </p>
+                          </div>
+                          <Badge variant={log.severity === "high" ? "destructive" : "secondary"}>
+                            {log.severity}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex justify-end mt-4">
+                    <Button variant="outline" onClick={() => setShowAllLogsModal(false)}>
+                      Close
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
@@ -9167,50 +9929,77 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   </div>
                 </div>
 
-                {/* Document Preview Area */}
+                {/* Document Preview Area — prefer real file embed when available */}
                 <div className={`border border-gray-300 rounded-md bg-gray-50 ${isFullscreen ? 'h-[calc(100vh-200px)]' : 'h-[600px]'} overflow-auto`}>
-                  <div
-                    className="bg-white shadow-lg min-h-full"
-                    style={{
-                      transform: `scale(${documentZoom / 100}) rotate(${documentRotation}deg)`,
-                      transition: 'transform 0.3s ease',
-                    }}
-                  >
-                    {documentPreviewContent ? (
-                      <div className="p-8 max-w-4xl mx-auto">
-                        <div className="prose prose-lg max-w-none">
-                          <div 
-                            className="whitespace-pre-wrap text-gray-800 leading-relaxed"
-                            dangerouslySetInnerHTML={{
-                              __html: documentPreviewContent
-                                .replace(/# (.*)/g, '<h1 class="text-3xl font-bold text-gray-900 mb-6 border-b-2 border-gray-200 pb-2">$1</h1>')
-                                .replace(/## (.*)/g, '<h2 class="text-2xl font-semibold text-gray-800 mb-4 mt-8">$1</h2>')
-                                .replace(/### (.*)/g, '<h3 class="text-xl font-medium text-gray-700 mb-3 mt-6">$1</h3>')
-                                .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
-                                .replace(/- (.*)/g, '<li class="mb-2 text-gray-700">$1</li>')
-                                .replace(/(\d+)\. (.*)/g, '<li class="mb-2 text-gray-700"><span class="font-medium">$1.</span> $2</li>')
-                                .replace(/\n\n/g, '</p><p class="mb-4 text-gray-700">')
-                                .replace(/^(?!<[h|l])/gm, '<p class="mb-4 text-gray-700">')
-                                .replace(/<li/g, '<ul class="list-disc list-inside mb-4"><li')
-                                .replace(/<\/li>/g, '</li></ul>')
-                                .replace(/<ul class="list-disc list-inside mb-4"><ul class="list-disc list-inside mb-4">/g, '<ul class="list-disc list-inside mb-4">')
-                                .replace(/<\/ul><\/ul>/g, '</ul>')
-                            }}
-                          />
-                        </div>
+                  {selectedDocument.fileUrl && isPdfDocument(selectedDocument) ? (
+                    <iframe
+                      title={selectedDocument.name}
+                      src={selectedDocument.fileUrl}
+                      className="w-full h-full min-h-[560px] bg-white"
+                      style={{
+                        transform: `scale(${documentZoom / 100})`,
+                        transformOrigin: "top left",
+                        width: `${10000 / documentZoom}%`,
+                        height: `${10000 / documentZoom}%`,
+                      }}
+                    />
+                  ) : selectedDocument.fileUrl && isImageDocument(selectedDocument) ? (
+                    <div className="w-full h-full flex items-center justify-center p-4">
+                      <img
+                        src={selectedDocument.fileUrl}
+                        alt={selectedDocument.name}
+                        className="max-w-full max-h-full object-contain"
+                        style={{
+                          transform: `scale(${documentZoom / 100}) rotate(${documentRotation}deg)`,
+                          transition: "transform 0.3s ease",
+                        }}
+                      />
+                    </div>
+                  ) : selectedDocument.fileUrl && !documentPreviewContent ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-4 p-6">
+                      <FileText className="w-16 h-16 text-gray-400" />
+                      <div className="text-center">
+                        <p className="text-lg font-semibold text-gray-700">{selectedDocument.name}</p>
+                        <p className="text-sm text-gray-500 mb-4">
+                          Preview is not available for this file type. Open or download the original file.
+                        </p>
+                        <Button asChild variant="outline">
+                          <a href={selectedDocument.fileUrl} target="_blank" rel="noreferrer">
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            Open Document
+                          </a>
+                        </Button>
                       </div>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <div className="text-center space-y-4">
-                          <FileText className="w-16 h-16 mx-auto text-gray-400" />
-                          <div>
-                            <p className="text-lg font-semibold text-gray-700">{selectedDocument.name}</p>
-                            <p className="text-sm text-gray-500">Loading document preview...</p>
+                    </div>
+                  ) : (
+                    <div
+                      className="bg-white shadow-lg min-h-full"
+                      style={{
+                        transform: `scale(${documentZoom / 100}) rotate(${documentRotation}deg)`,
+                        transition: "transform 0.3s ease",
+                      }}
+                    >
+                      {documentPreviewContent ? (
+                        <div className="p-8 max-w-4xl mx-auto">
+                          <div className="prose prose-lg max-w-none">
+                            <div className="whitespace-pre-wrap text-gray-800 leading-relaxed">
+                              {documentPreviewContent}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center min-h-[400px]">
+                          <div className="text-center space-y-4">
+                            <FileText className="w-16 h-16 mx-auto text-gray-400" />
+                            <div>
+                              <p className="text-lg font-semibold text-gray-700">{selectedDocument.name}</p>
+                              <p className="text-sm text-gray-500">No preview content available for this document.</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Viewer Info */}
@@ -9218,13 +10007,27 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   <div className="flex items-center space-x-2">
                     <Shield className="w-5 h-5 text-blue-600" />
                     <p className="text-sm text-blue-800">
-                      This document is protected. Downloading is disabled for security purposes.
+                      {selectedDocument.vaultDocumentId
+                        ? "A copy of this document is stored in Document Vault."
+                        : selectedDocument.fileUrl
+                          ? "Showing the uploaded file contents."
+                          : "Showing available document content."}
                     </p>
                   </div>
-                  <Button variant="outline" size="sm" onClick={handleResetViewer}>
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Reset View
-                  </Button>
+                  <div className="flex items-center space-x-2">
+                    {selectedDocument.fileUrl && (
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={selectedDocument.fileUrl} target="_blank" rel="noreferrer">
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Open File
+                        </a>
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" onClick={handleResetViewer}>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Reset View
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="flex justify-end space-x-3 mt-4">
@@ -9353,70 +10156,292 @@ Format the response in a professional, actionable manner for HR decision-makers.
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <Label htmlFor="subsidiaryName">Subsidiary Name</Label>
-                      <Input id="subsidiaryName" placeholder="Enter subsidiary name" />
+                      <Input
+                        id="subsidiaryName"
+                        placeholder="Enter subsidiary name"
+                        value={newSubsidiary.name}
+                        onChange={(e) => setNewSubsidiary({ ...newSubsidiary, name: e.target.value })}
+                      />
                     </div>
                     <div>
                       <Label htmlFor="subsidiaryIndustry">Industry</Label>
-                      <Input id="subsidiaryIndustry" placeholder="Enter industry" />
+                      <Input
+                        id="subsidiaryIndustry"
+                        placeholder="Enter industry"
+                        value={newSubsidiary.industry}
+                        onChange={(e) => setNewSubsidiary({ ...newSubsidiary, industry: e.target.value })}
+                      />
                     </div>
                     <div>
                       <Label htmlFor="subsidiaryTaxId">Tax ID</Label>
-                      <Input id="subsidiaryTaxId" placeholder="Enter tax ID" />
+                      <Input
+                        id="subsidiaryTaxId"
+                        placeholder="Enter tax ID"
+                        value={newSubsidiary.tax_id}
+                        onChange={(e) => setNewSubsidiary({ ...newSubsidiary, tax_id: e.target.value })}
+                      />
                     </div>
                     <div>
                       <Label htmlFor="subsidiarySsnit">SSNIT Number</Label>
-                      <Input id="subsidiarySsnit" placeholder="Enter SSNIT number" />
+                      <Input
+                        id="subsidiarySsnit"
+                        placeholder="Enter SSNIT number"
+                        value={newSubsidiary.ssnit_number}
+                        onChange={(e) => setNewSubsidiary({ ...newSubsidiary, ssnit_number: e.target.value })}
+                      />
                     </div>
                     <div>
                       <Label htmlFor="subsidiaryEmail">Email Address</Label>
-                      <Input id="subsidiaryEmail" type="email" placeholder="Enter email address" />
+                      <Input
+                        id="subsidiaryEmail"
+                        type="email"
+                        placeholder="Enter email address"
+                        value={newSubsidiary.email_address}
+                        onChange={(e) => setNewSubsidiary({ ...newSubsidiary, email_address: e.target.value })}
+                      />
                     </div>
                     <div>
                       <Label htmlFor="subsidiaryPhone">Phone Number</Label>
-                      <Input id="subsidiaryPhone" placeholder="Enter phone number" />
+                      <Input
+                        id="subsidiaryPhone"
+                        placeholder="Enter phone number"
+                        value={newSubsidiary.phone_number}
+                        onChange={(e) => setNewSubsidiary({ ...newSubsidiary, phone_number: e.target.value })}
+                      />
                     </div>
                   </div>
 
                   <div>
                     <Label htmlFor="subsidiaryAddress">Address</Label>
-                    <Textarea id="subsidiaryAddress" placeholder="Enter address" />
+                    <Textarea
+                      id="subsidiaryAddress"
+                      placeholder="Enter address"
+                      value={newSubsidiary.address}
+                      onChange={(e) => setNewSubsidiary({ ...newSubsidiary, address: e.target.value })}
+                    />
                   </div>
 
                   <div className="space-y-2">
                     <Label>Divisions</Label>
                     <div className="space-y-2">
-                      <Input placeholder="Enter division" />
-                      <Button variant="outline" size="sm">
+                      {newSubsidiary.divisions.map((division, index) => (
+                        <div key={`${division}-${index}`} className="flex items-center gap-2">
+                          <Input
+                            value={division}
+                            onChange={(e) =>
+                              setNewSubsidiary({
+                                ...newSubsidiary,
+                                divisions: newSubsidiary.divisions.map((item, i) =>
+                                  i === index ? e.target.value : item,
+                                ),
+                              })
+                            }
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setNewSubsidiary({
+                                ...newSubsidiary,
+                                divisions: newSubsidiary.divisions.filter((_, i) => i !== index),
+                              })
+                            }
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="Enter division"
+                          value={newSubsidiaryDivision}
+                          onChange={(e) => setNewSubsidiaryDivision(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault()
+                              const value = newSubsidiaryDivision.trim()
+                              if (value) {
+                                setNewSubsidiary({
+                                  ...newSubsidiary,
+                                  divisions: [...newSubsidiary.divisions, value],
+                                })
+                                setNewSubsidiaryDivision("")
+                              }
+                            }
+                          }}
+                        />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!newSubsidiaryDivision.trim()}
+                        onClick={() => {
+                          const value = newSubsidiaryDivision.trim()
+                          if (!value) return
+                          setNewSubsidiary({
+                            ...newSubsidiary,
+                            divisions: [...newSubsidiary.divisions, value],
+                          })
+                          setNewSubsidiaryDivision("")
+                        }}
+                      >
                         Add Division
                       </Button>
+                      </div>
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label>Departments</Label>
                     <div className="space-y-2">
-                      <Input placeholder="Enter department" />
-                      <Button variant="outline" size="sm">
+                      {newSubsidiary.departments.map((department, index) => (
+                        <div key={`${department}-${index}`} className="flex items-center gap-2">
+                          <Input
+                            value={department}
+                            onChange={(e) =>
+                              setNewSubsidiary({
+                                ...newSubsidiary,
+                                departments: newSubsidiary.departments.map((item, i) =>
+                                  i === index ? e.target.value : item,
+                                ),
+                              })
+                            }
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setNewSubsidiary({
+                                ...newSubsidiary,
+                                departments: newSubsidiary.departments.filter((_, i) => i !== index),
+                              })
+                            }
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="Enter department"
+                          value={newSubsidiaryDepartment}
+                          onChange={(e) => setNewSubsidiaryDepartment(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault()
+                              const value = newSubsidiaryDepartment.trim()
+                              if (value) {
+                                setNewSubsidiary({
+                                  ...newSubsidiary,
+                                  departments: [...newSubsidiary.departments, value],
+                                })
+                                setNewSubsidiaryDepartment("")
+                              }
+                            }
+                          }}
+                        />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!newSubsidiaryDepartment.trim()}
+                        onClick={() => {
+                          const value = newSubsidiaryDepartment.trim()
+                          if (!value) return
+                          setNewSubsidiary({
+                            ...newSubsidiary,
+                            departments: [...newSubsidiary.departments, value],
+                          })
+                          setNewSubsidiaryDepartment("")
+                        }}
+                      >
                         Add Department
                       </Button>
+                      </div>
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label>Locations</Label>
                     <div className="space-y-2">
-                      <Input placeholder="Enter location name" />
-                      <Button variant="outline" size="sm">
+                      {newSubsidiary.locations.map((location, index) => (
+                        <div key={`${location}-${index}`} className="flex items-center gap-2">
+                          <Input
+                            value={location}
+                            onChange={(e) =>
+                              setNewSubsidiary({
+                                ...newSubsidiary,
+                                locations: newSubsidiary.locations.map((item, i) =>
+                                  i === index ? e.target.value : item,
+                                ),
+                              })
+                            }
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setNewSubsidiary({
+                                ...newSubsidiary,
+                                locations: newSubsidiary.locations.filter((_, i) => i !== index),
+                              })
+                            }
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="Enter location name"
+                          value={newSubsidiaryLocation}
+                          onChange={(e) => setNewSubsidiaryLocation(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault()
+                              const value = newSubsidiaryLocation.trim()
+                              if (value) {
+                                setNewSubsidiary({
+                                  ...newSubsidiary,
+                                  locations: [...newSubsidiary.locations, value],
+                                })
+                                setNewSubsidiaryLocation("")
+                              }
+                            }
+                          }}
+                        />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!newSubsidiaryLocation.trim()}
+                        onClick={() => {
+                          const value = newSubsidiaryLocation.trim()
+                          if (!value) return
+                          setNewSubsidiary({
+                            ...newSubsidiary,
+                            locations: [...newSubsidiary.locations, value],
+                          })
+                          setNewSubsidiaryLocation("")
+                        }}
+                      >
                         Add Location
                       </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
                 <div className="flex justify-end space-x-2">
-                  <Button variant="ghost" onClick={() => setShowAddSubsidiary(false)}>
+                  <Button variant="ghost" onClick={() => setShowAddSubsidiary(false)} disabled={isSavingSubsidiary}>
                     Cancel
                   </Button>
-                  <Button onClick={() => setShowAddSubsidiary(false)}>Add Subsidiary</Button>
+                  <Button onClick={handleCreateSubsidiary} disabled={isSavingSubsidiary || !newSubsidiary.name.trim()}>
+                    {isSavingSubsidiary ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Add Subsidiary"
+                    )}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -9829,6 +10854,415 @@ Format the response in a professional, actionable manner for HR decision-makers.
                 </div>
               </CardContent>
             </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Add Leave Type Modal */}
+      {showAddLeaveTypeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Add Leave Type</h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowAddLeaveTypeModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="leaveTypeName">Name</Label>
+                <Input
+                  id="leaveTypeName"
+                  value={newLeaveType.name}
+                  onChange={(e) => setNewLeaveType({ ...newLeaveType, name: e.target.value })}
+                  placeholder="e.g., Annual Leave"
+                />
+              </div>
+              <div>
+                <Label htmlFor="leaveTypeDays">Days</Label>
+                <Input
+                  id="leaveTypeDays"
+                  type="number"
+                  min="1"
+                  value={newLeaveType.days || ""}
+                  onChange={(e) => setNewLeaveType({ ...newLeaveType, days: Number.parseInt(e.target.value) || 0 })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="leaveTypeDescription">Description</Label>
+                <Textarea
+                  id="leaveTypeDescription"
+                  value={newLeaveType.description}
+                  onChange={(e) => setNewLeaveType({ ...newLeaveType, description: e.target.value })}
+                  placeholder="Brief policy description"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Allow carry over</Label>
+                  <p className="text-sm text-muted-foreground">Unused days can roll into the next leave year</p>
+                </div>
+                <Switch
+                  checked={!!newLeaveType.carryOver}
+                  onCheckedChange={(checked) => setNewLeaveType({ ...newLeaveType, carryOver: checked })}
+                />
+              </div>
+              <div className="flex justify-end space-x-3 pt-2">
+                <Button variant="outline" onClick={() => setShowAddLeaveTypeModal(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleAddLeaveType}
+                  disabled={isSavingPolicy}
+                  className="bg-black text-white hover:bg-gray-800"
+                >
+                  {isSavingPolicy ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Leave Type"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Leave Policy View / Edit / Delete Modal */}
+      {showPolicyModal && selectedPolicy && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">
+                {policyModalType === "view" && `View Policy: ${selectedPolicy.name}`}
+                {policyModalType === "edit" && "Edit Leave Policy"}
+                {policyModalType === "delete" && "Delete Leave Policy"}
+              </h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowPolicyModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {policyModalType === "view" && (
+              <div className="space-y-3">
+                <p className="text-sm">
+                  <span className="font-medium">Name:</span> {selectedPolicy.name}
+                </p>
+                <p className="text-sm">
+                  <span className="font-medium">Days:</span> {selectedPolicy.days}
+                </p>
+                <p className="text-sm">
+                  <span className="font-medium">Usage:</span> {selectedPolicy.usage || "0%"}
+                </p>
+                <p className="text-sm">
+                  <span className="font-medium">Carry over:</span> {selectedPolicy.carryOver ? "Yes" : "No"}
+                </p>
+                <p className="text-sm">
+                  <span className="font-medium">Description:</span> {selectedPolicy.description || "—"}
+                </p>
+                <div className="flex justify-end pt-2">
+                  <Button variant="outline" onClick={() => setShowPolicyModal(false)}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {policyModalType === "edit" && (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="editPolicyName">Name</Label>
+                  <Input
+                    id="editPolicyName"
+                    value={editingPolicy.name}
+                    onChange={(e) => setEditingPolicy({ ...editingPolicy, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editPolicyDays">Days</Label>
+                  <Input
+                    id="editPolicyDays"
+                    type="number"
+                    min="0"
+                    value={editingPolicy.days}
+                    onChange={(e) =>
+                      setEditingPolicy({ ...editingPolicy, days: Number.parseInt(e.target.value) || 0 })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editPolicyDescription">Description</Label>
+                  <Textarea
+                    id="editPolicyDescription"
+                    value={editingPolicy.description}
+                    onChange={(e) => setEditingPolicy({ ...editingPolicy, description: e.target.value })}
+                  />
+                </div>
+                <div className="flex justify-end space-x-3 pt-2">
+                  <Button variant="outline" onClick={() => setShowPolicyModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSavePolicyChanges}
+                    disabled={isSavingPolicy}
+                    className="bg-black text-white hover:bg-gray-800"
+                  >
+                    {isSavingPolicy ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save Changes"
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {policyModalType === "delete" && (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Are you sure you want to delete <span className="font-medium text-foreground">{selectedPolicy.name}</span>?
+                  This will deactivate the leave policy for the tenant.
+                </p>
+                <div className="flex justify-end space-x-3">
+                  <Button variant="outline" onClick={() => setShowPolicyModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button variant="destructive" onClick={handleDeletePolicy} disabled={isSavingPolicy}>
+                    {isSavingPolicy ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      "Delete Policy"
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Structured Salary Grade Modal */}
+      {showSalaryGradeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">{editingGrade ? "Edit Salary Grade" : "Add Salary Grade"}</h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowSalaryGradeModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="gradeName">Grade Name</Label>
+                <Input
+                  id="gradeName"
+                  value={newGrade.name}
+                  onChange={(e) => setNewGrade({ ...newGrade, name: e.target.value })}
+                  placeholder="e.g., Grade 1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="gradeDescription">Description</Label>
+                <Input
+                  id="gradeDescription"
+                  value={newGrade.description}
+                  onChange={(e) => setNewGrade({ ...newGrade, description: e.target.value })}
+                  placeholder="e.g., Entry Level"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="minSalary">Min Salary</Label>
+                  <Input
+                    id="minSalary"
+                    type="number"
+                    value={newGrade.minSalary}
+                    onChange={(e) => setNewGrade({ ...newGrade, minSalary: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="maxSalary">Max Salary</Label>
+                  <Input
+                    id="maxSalary"
+                    type="number"
+                    value={newGrade.maxSalary}
+                    onChange={(e) => setNewGrade({ ...newGrade, maxSalary: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="numberOfNotches">Number of Notches</Label>
+                <Input
+                  id="numberOfNotches"
+                  type="number"
+                  min="2"
+                  max="20"
+                  value={newGrade.numberOfNotches}
+                  onChange={(e) =>
+                    setNewGrade({ ...newGrade, numberOfNotches: Number.parseInt(e.target.value) || 5 })
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Button variant="outline" onClick={handleGenerateNotches} disabled={isGeneratingNotches}>
+                  {isGeneratingNotches ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    "Generate Notches"
+                  )}
+                </Button>
+                <span className="text-xs text-muted-foreground">{(newGrade.notches || []).length} notches ready</span>
+              </div>
+              {(newGrade.notches || []).length > 0 && (
+                <div className="bg-gray-50 border rounded-md p-3 max-h-40 overflow-y-auto space-y-1">
+                  {newGrade.notches.map((notch) => (
+                    <div key={notch.step} className="flex justify-between text-xs">
+                      <span>Step {notch.step}</span>
+                      <span className="font-medium">₵{Number(notch.amount || 0).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex justify-end space-x-3 pt-2">
+                <Button variant="outline" onClick={() => setShowSalaryGradeModal(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveSalaryGrade} className="bg-black text-white hover:bg-gray-800">
+                  {editingGrade ? "Update Grade" : "Save Grade"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Unstructured Salary Grade Modal */}
+      {showUnstructuredModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">
+                {editingUnstructured ? "Edit Unstructured Grade" : "Add Unstructured Grade"}
+              </h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowUnstructuredModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="unstructuredName">Grade Name</Label>
+                <Input
+                  id="unstructuredName"
+                  value={newUnstructured.name}
+                  onChange={(e) => setNewUnstructured({ ...newUnstructured, name: e.target.value })}
+                  placeholder="e.g., Management Level"
+                />
+              </div>
+              <div>
+                <Label htmlFor="unstructuredDescription">Description</Label>
+                <Textarea
+                  id="unstructuredDescription"
+                  value={newUnstructured.description}
+                  onChange={(e) => setNewUnstructured({ ...newUnstructured, description: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>General Increment Type</Label>
+                  <Select
+                    value={newUnstructured.generalIncrement.type}
+                    onValueChange={(value) =>
+                      setNewUnstructured({
+                        ...newUnstructured,
+                        generalIncrement: { ...newUnstructured.generalIncrement, type: value },
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="percentage">Percentage</SelectItem>
+                      <SelectItem value="fixed">Fixed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>General Increment Value</Label>
+                  <Input
+                    type="number"
+                    value={newUnstructured.generalIncrement.value}
+                    onChange={(e) =>
+                      setNewUnstructured({
+                        ...newUnstructured,
+                        generalIncrement: {
+                          ...newUnstructured.generalIncrement,
+                          value: Number.parseFloat(e.target.value) || 0,
+                        },
+                      })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Performance Increment Type</Label>
+                  <Select
+                    value={newUnstructured.performanceIncrement.type}
+                    onValueChange={(value) =>
+                      setNewUnstructured({
+                        ...newUnstructured,
+                        performanceIncrement: { ...newUnstructured.performanceIncrement, type: value },
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="percentage">Percentage</SelectItem>
+                      <SelectItem value="fixed">Fixed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Performance Increment Value</Label>
+                  <Input
+                    type="number"
+                    value={newUnstructured.performanceIncrement.value}
+                    onChange={(e) =>
+                      setNewUnstructured({
+                        ...newUnstructured,
+                        performanceIncrement: {
+                          ...newUnstructured.performanceIncrement,
+                          value: Number.parseFloat(e.target.value) || 0,
+                        },
+                      })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3 pt-2">
+                <Button variant="outline" onClick={() => setShowUnstructuredModal(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveUnstructuredGrade} className="bg-black text-white hover:bg-gray-800">
+                  {editingUnstructured ? "Update Grade" : "Save Grade"}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}

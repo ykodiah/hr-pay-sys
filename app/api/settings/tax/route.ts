@@ -2,35 +2,36 @@
  * GET  /api/settings/tax  — load SSNIT/Tier rates + PAYE bands for a company
  * POST /api/settings/tax  — save SSNIT/Tier rates + PAYE bands for a company
  *
- * Delegates to the existing tax-config-service helpers which use the
- * tax_rates and paye_tax_bands tables.
+ * Uses resolveTenantContext so company_id cannot be spoofed across tenants.
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createServiceClient } from "@/lib/supabase/server"
-import { GRA_MONTHLY_PAYE_BANDS, GRA_2025_SSNIT, GRA_2025_TIER2, GRA_2025_TIER3 } from "@/lib/ghana-tax/engine"
+import {
+  GRA_MONTHLY_PAYE_BANDS,
+  GRA_2025_SSNIT,
+  GRA_2025_TIER2,
+  GRA_2025_TIER3,
+  normalizePayeBands,
+} from "@/lib/ghana-tax/engine"
+import { jsonError, resolveTenantContext } from "@/lib/settings/resolve-tenant"
 
 export async function GET(req: NextRequest) {
   try {
+    const ctx = await resolveTenantContext(req)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId, service } = ctx
     const { searchParams } = new URL(req.url)
-    const companyId = searchParams.get("company_id")
     const taxYear = parseInt(searchParams.get("tax_year") ?? String(new Date().getFullYear()), 10)
 
-    if (!companyId) {
-      return NextResponse.json({ error: "company_id is required" }, { status: 400 })
-    }
-
-    const supabase = createServiceClient()
-
     // Load SSNIT / Tier rates
-    const { data: rateRows, error: rateError } = await supabase
+    const { data: rateRows, error: rateError } = await service
       .from("tax_rates")
       .select("rate_type, employee_rate, employer_rate, tax_year")
       .eq("company_id", companyId)
       .eq("is_active", true)
 
     // Load PAYE bands
-    const { data: bandRows, error: bandError } = await supabase
+    const { data: bandRows, error: bandError } = await service
       .from("paye_tax_bands")
       .select("band_order, rate, threshold_amount, is_remaining_amount, description")
       .eq("company_id", companyId)
@@ -54,7 +55,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const payeBands =
+    const rawBands =
       !bandError && bandRows && bandRows.length > 0
         ? bandRows.map((r: any) => ({
             band_order: r.band_order,
@@ -65,20 +66,32 @@ export async function GET(req: NextRequest) {
           }))
         : GRA_MONTHLY_PAYE_BANDS
 
-    return NextResponse.json({ ssnit, tier2, tier3, paye_bands: payeBands, tax_year: taxYear })
+    const { bands: payeBands, isMonthly } = normalizePayeBands(rawBands)
+
+    // Repair SSNIT 0.5% typo (legacy Tier-1 split) → Act 766 employee 5.5%
+    if (Number(ssnit.employee_rate) > 0 && Number(ssnit.employee_rate) < 1) {
+      ssnit = { ...ssnit, employee_rate: 5.5 }
+    }
+
+    return NextResponse.json({
+      ssnit,
+      tier2,
+      tier3,
+      paye_bands: payeBands,
+      paye_bands_are_monthly: isMonthly,
+      tax_year: taxYear,
+      company_id: companyId,
+    })
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to load tax config" },
-      { status: 500 },
-    )
+    return jsonError(err, "Failed to load tax config")
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { company_id, ssnit, tier2, tier3, paye_bands, tax_year } = body as {
-      company_id: string
+    const { ssnit, tier2, tier3, paye_bands, tax_year } = body as {
+      company_id?: string
       ssnit?: { employee: number; employer: number }
       tier2?: { employee: number; employer: number }
       tier3?: { employee: number; employer: number }
@@ -92,21 +105,29 @@ export async function POST(req: NextRequest) {
       tax_year?: number
     }
 
-    if (!company_id) {
-      return NextResponse.json({ error: "company_id is required" }, { status: 400 })
-    }
+    const ctx = await resolveTenantContext(req, body.company_id)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId, service } = ctx
 
-    const supabase = createServiceClient()
     const year = tax_year ?? new Date().getFullYear()
     const now = new Date().toISOString()
     const errors: string[] = []
 
     // Save SSNIT / Tier rates using upsert on (company_id, rate_type)
-    const ratePayloads: Array<{ company_id: string; rate_type: string; employee_rate: number; employer_rate: number; tax_year: number; effective_date: string; is_active: boolean; updated_at: string }> = []
+    const ratePayloads: Array<{
+      company_id: string
+      rate_type: string
+      employee_rate: number
+      employer_rate: number
+      tax_year: number
+      effective_date: string
+      is_active: boolean
+      updated_at: string
+    }> = []
 
     if (ssnit) {
       ratePayloads.push({
-        company_id,
+        company_id: companyId,
         rate_type: "ssnit",
         employee_rate: Number(ssnit.employee),
         employer_rate: Number(ssnit.employer),
@@ -118,7 +139,7 @@ export async function POST(req: NextRequest) {
     }
     if (tier2) {
       ratePayloads.push({
-        company_id,
+        company_id: companyId,
         rate_type: "tier2",
         employee_rate: Number(tier2.employee),
         employer_rate: Number(tier2.employer),
@@ -130,7 +151,7 @@ export async function POST(req: NextRequest) {
     }
     if (tier3) {
       ratePayloads.push({
-        company_id,
+        company_id: companyId,
         rate_type: "tier3",
         employee_rate: Number(tier3.employee),
         employer_rate: Number(tier3.employer),
@@ -142,7 +163,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (ratePayloads.length) {
-      const { error } = await supabase
+      const { error } = await service
         .from("tax_rates")
         .upsert(ratePayloads, { onConflict: "company_id,rate_type" })
       if (error) errors.push(`Rates: ${error.message}`)
@@ -150,15 +171,25 @@ export async function POST(req: NextRequest) {
 
     // Save PAYE bands if provided
     if (paye_bands && paye_bands.length > 0) {
-      // Deactivate existing bands for this year first
-      await supabase
+      await service
         .from("paye_tax_bands")
         .update({ is_active: false, updated_at: now })
-        .eq("company_id", company_id)
+        .eq("company_id", companyId)
         .eq("tax_year", year)
 
-      const bandRows = paye_bands.map((b, i) => ({
-        company_id,
+      // Normalize so cumulative ceilings from the Settings UI are stored as GRA widths.
+      const { bands: normalizedBands } = normalizePayeBands(
+        paye_bands.map((b, i) => ({
+          band_order: b.band_order ?? i + 1,
+          rate: Number(b.rate),
+          threshold_amount: Number(b.threshold_amount),
+          is_remaining_amount: Boolean(b.is_remaining_amount),
+          description: b.description ?? `${b.rate}% band`,
+        })),
+      )
+
+      const bandRows = normalizedBands.map((b, i) => ({
+        company_id: companyId,
         band_order: b.band_order ?? i + 1,
         rate: b.rate,
         threshold_amount: b.threshold_amount,
@@ -171,7 +202,7 @@ export async function POST(req: NextRequest) {
         updated_at: now,
       }))
 
-      const { error } = await supabase
+      const { error } = await service
         .from("paye_tax_bands")
         .upsert(bandRows, { onConflict: "company_id,tax_year,band_order" })
       if (error) errors.push(`PAYE bands: ${error.message}`)
@@ -181,11 +212,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, errors }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, saved_rates: ratePayloads.length, saved_bands: paye_bands?.length ?? 0 })
+    return NextResponse.json({
+      success: true,
+      company_id: companyId,
+      saved_rates: ratePayloads.length,
+      saved_bands: paye_bands?.length ?? 0,
+    })
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to save tax config" },
-      { status: 500 },
-    )
+    return jsonError(err, "Failed to save tax config")
   }
 }

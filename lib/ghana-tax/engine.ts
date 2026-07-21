@@ -4,8 +4,9 @@
  * Implements:
  *   - GRA PAYE rates effective 1 January 2024 (monthly progressive bands)
  *   - National Pensions Act 766 employee deductions (applied on basic salary):
- *       Tier 1 (SSNIT)  — employee 5.5%, employer 13%  → total 18.5% to SSNIT
- *       Tier 2 (Trustee) — employee 5%,  employer 0%   → total 5% to trustee
+ *       Tier 1 (SSNIT)  — employee 5.5%, employer 13%  → deducted on payroll / payslip
+ *       Tier 2 (Trustee) — employee 5%,  employer 0%   → computed for compliance REPORTS only
+ *         (not deducted on payroll/payslip; not included in total deductions or net pay)
  *   - Voluntary Tier 3 provident fund
  *   - Overtime taxed at marginal PAYE rate (remitted with PAYE)
  *   - Bonus final withholding at 5% (when within GRA bonus rules)
@@ -178,10 +179,9 @@ const OBSOLETE_FIRST_BAND_THRESHOLDS = new Set([365, 402, 4380, 4824])
 
 /**
  * GRA Act 766 defaults.
- * Tier 1 (SSNIT): employee 5.5%, employer 13% of basic salary.
- * Tier 2 (Trustee): employee 5%, employer 0% of basic salary.
- * Total employee pension deduction = 10.5% of basic.
- * Total employer pension cost = 13% of basic.
+ * Tier 1 (SSNIT): employee 5.5%, employer 13% of basic salary — deducted on payroll.
+ * Tier 2 (Trustee): employee 5%, employer 0% of basic salary — reports only (not payroll cash).
+ * Voluntary Tier 3 / PF may also be deducted when applicable.
  */
 export const GRA_2025_SSNIT: SSNITRates = { employee_rate: 5.5, employer_rate: 13 }
 export const GRA_2025_TIER2: Tier2Rates = { employee_rate: 5, employer_rate: 0 }
@@ -235,6 +235,59 @@ export function applyPayeBands(
   return { totalTax: round2(totalTax), breakdown }
 }
 
+/**
+ * Detect bands stored as cumulative absolute ceilings (from/to UI style)
+ * instead of GRA width thresholds. Width format has a smaller second band
+ * (e.g. 110 after 490); cumulative has strictly increasing ceilings
+ * (490 → 600 → 730 …).
+ */
+function looksLikeCumulativeAbsoluteCeilings(sorted: PAYEBand[]): boolean {
+  const finite = sorted.filter((b) => !b.is_remaining_amount)
+  if (finite.length < 2) return false
+  for (let i = 1; i < finite.length; i++) {
+    if (Number(finite[i].threshold_amount) <= Number(finite[i - 1].threshold_amount)) {
+      return false
+    }
+  }
+  // Also treat huge sentinel ceilings from the settings UI as cumulative.
+  return (
+    Number(finite[1].threshold_amount) > Number(finite[0].threshold_amount) &&
+    Number(finite[0].threshold_amount) > 0
+  )
+}
+
+function convertCumulativeCeilingsToWidths(sorted: PAYEBand[]): PAYEBand[] {
+  let previousCeiling = 0
+  return sorted.map((band, index) => {
+    if (band.is_remaining_amount) {
+      return {
+        ...band,
+        band_order: band.band_order || index + 1,
+        threshold_amount: 0,
+        is_remaining_amount: true,
+      }
+    }
+    const ceiling = Number(band.threshold_amount || 0)
+    // Sentinel "∞" saves from the settings UI
+    if (ceiling >= 99999999) {
+      return {
+        ...band,
+        band_order: band.band_order || index + 1,
+        threshold_amount: 0,
+        is_remaining_amount: true,
+      }
+    }
+    const width = Math.round(Math.max(0, ceiling - previousCeiling) * 100) / 100
+    previousCeiling = ceiling
+    return {
+      ...band,
+      band_order: band.band_order || index + 1,
+      threshold_amount: width,
+      is_remaining_amount: false,
+    }
+  })
+}
+
 export function normalizePayeBands(bands: PAYEBand[] | null | undefined): {
   bands: PAYEBand[]
   isMonthly: boolean
@@ -243,21 +296,30 @@ export function normalizePayeBands(bands: PAYEBand[] | null | undefined): {
     return { bands: GRA_MONTHLY_PAYE_BANDS, isMonthly: true }
   }
 
-  const sorted = [...bands].sort((a, b) => a.band_order - b.band_order)
+  let sorted = [...bands].sort((a, b) => a.band_order - b.band_order)
   const first = sorted.find((b) => !b.is_remaining_amount)
 
   if (first && OBSOLETE_FIRST_BAND_THRESHOLDS.has(Number(first.threshold_amount))) {
     return { bands: GRA_MONTHLY_PAYE_BANDS, isMonthly: true }
   }
 
-  const isMonthly = first != null && Number(first.threshold_amount) <= 1000
+  // Repair cumulative absolute ceilings accidentally saved as threshold_amount.
+  if (looksLikeCumulativeAbsoluteCeilings(sorted)) {
+    sorted = convertCumulativeCeilingsToWidths(sorted)
+  }
+
+  const repairedFirst = sorted.find((b) => !b.is_remaining_amount)
+  const isMonthly = repairedFirst != null && Number(repairedFirst.threshold_amount) <= 1000
   return { bands: sorted, isMonthly }
 }
 
 /**
  * Validate/normalise pension rates before calculation.
  * Falls back to GRA Act 766 defaults only when values are clearly invalid
- * (zero or missing). User-configured rates from DB are respected as-is.
+ * (zero or missing). User-configured rates from DB are respected as-is,
+ * with two legacy repairs:
+ *  - SSNIT employee < 1% (old 0.5% Tier-1 split typo) → 5.5%
+ *  - Tier 2 employer 5% (incorrect seed) → 0%
  */
 export function normalizePensionRates(ssnit: SSNITRates, tier2: Tier2Rates): {
   ssnit: SSNITRates
@@ -266,13 +328,23 @@ export function normalizePensionRates(ssnit: SSNITRates, tier2: Tier2Rates): {
   const ssnitEmp = Number(ssnit?.employee_rate)
   const ssnitEr  = Number(ssnit?.employer_rate)
   const t2Emp    = Number(tier2?.employee_rate)
+  const t2Er     = Number(tier2?.employer_rate)
 
-  // If rates are missing/NaN/zero, fall back to Act 766 defaults
+  // If rates are missing/NaN, fall back to Act 766 defaults
   if (!isFinite(ssnitEmp) || !isFinite(ssnitEr) || !isFinite(t2Emp)) {
     return { ssnit: { ...GRA_2025_SSNIT }, tier2: { ...GRA_2025_TIER2 } }
   }
 
-  return { ssnit, tier2 }
+  let nextSsnit: SSNITRates = {
+    employee_rate: ssnitEmp > 0 && ssnitEmp < 1 ? 5.5 : ssnitEmp,
+    employer_rate: ssnitEr,
+  }
+  let nextTier2: Tier2Rates = {
+    employee_rate: t2Emp,
+    employer_rate: !isFinite(t2Er) || t2Er === 5 ? 0 : t2Er,
+  }
+
+  return { ssnit: nextSsnit, tier2: nextTier2 }
 }
 
 export function calculateMonthlyPaye(
@@ -310,11 +382,12 @@ export function calculateGhanaTax(
   const monthlyOvertime = round2(input.monthly_overtime ?? 0)
   const monthlyBonus = round2(input.monthly_bonus ?? 0)
 
-  // Act 766: Tier 1 (SSNIT) on basic
+  // Act 766: Tier 1 (SSNIT) on basic — deducted on payroll / payslip
   const monthlySsnitEmployee = round2(input.monthly_basic * (ssnitRates.employee_rate / 100))
   const monthlySsnitEmployer = round2(input.monthly_basic * (ssnitRates.employer_rate / 100))
 
-  // Tier 2 on basic (mandatory for most employees)
+  // Tier 2 on basic — computed for compliance REPORTS only.
+  // It is NOT deducted on payroll / payslip and does NOT reduce chargeable income here.
   const tier2Applicable = input.tier2_applicable !== false
   const monthlyTier2Employee = tier2Applicable
     ? round2(input.monthly_basic * (tier2Rates.employee_rate / 100))
@@ -323,8 +396,9 @@ export function calculateGhanaTax(
     ? round2(input.monthly_basic * (tier2Rates.employer_rate / 100))
     : 0
 
-  const monthlyPensionEmployee = round2(monthlySsnitEmployee + monthlyTier2Employee)
-  const monthlyPensionEmployer = round2(monthlySsnitEmployer + monthlyTier2Employer)
+  // Payroll pension (cash) = SSNIT Tier 1 only
+  const monthlyPensionEmployee = monthlySsnitEmployee
+  const monthlyPensionEmployer = monthlySsnitEmployer
 
   // Tier 3 / Provident Fund voluntary — employee rate capped at 16.5%
   const tier3Applicable = input.tier3_applicable === true
@@ -351,7 +425,8 @@ export function calculateGhanaTax(
   )
   const monthlyTaxReliefs = round2(annualTaxReliefs / 12)
 
-  // Chargeable income: cash emoluments − employee pension (5.5%) − employee Tier 3 − reliefs
+  // Chargeable income: cash emoluments − SSNIT Tier 1 − Tier 3 − reliefs
+  // (Tier 2 excluded from payroll chargeable-income path — report-only)
   const monthlyTaxableIncome = round2(
     Math.max(
       0,

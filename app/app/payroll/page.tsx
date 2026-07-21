@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { calculateGhanaTax, DEFAULT_TAX_RATES, round2 } from "@/lib/ghana-tax/engine"
 import { toast } from "@/hooks/use-toast"
@@ -33,6 +33,7 @@ import {
   Loader2,
   ArrowRight,
   Zap,
+  Shield,
 } from "lucide-react"
 
 type PayInputApiRow = {
@@ -77,6 +78,12 @@ type PayInputApiRow = {
   }
 }
 
+type TaxReliefItem = {
+  relief_code: string
+  relief_name: string
+  annual_amount: number
+}
+
 type WorksheetRow = {
   employeeId: string
   employeeCode: string
@@ -86,26 +93,77 @@ type WorksheetRow = {
   dateOfJoining: string | null
   basicSalary: number
   allowances: number
+  /** Human-readable allowance breakdown, e.g. "Transport 200.00; Housing 100.00" */
+  allowanceTypes: string
   overtime: number
   bonus: number
   loan: number
   advance: number
   other: number
+  /** Human-readable voluntary deduction types, e.g. "Loan 50.00; Advance 25.00" */
+  deductionTypes: string
   tier2: boolean
   tier3: boolean
   tier3Rate: number
   grossPay: number
   providentFund: number
   ssnitEmployee: number
+  /** Stored for SSNIT Tier 2 reports only — not shown on worksheet / payslip deductions. */
   tier2Employee: number
   taxableIncome: number
   paye: number
   overtimeTax: number
   bonusTax: number
+  taxReliefTotal: number
   totalDeductions: number
   netPay: number
   selected: boolean
   status: "Loaded" | "Calculated" | "Processed" | "Submitted"
+}
+
+function formatMoneyPart(label: string, amount: number) {
+  if (!(amount > 0)) return null
+  return `${label} ${amount.toFixed(2)}`
+}
+
+function buildAllowanceTypes(parts: {
+  transport: number
+  housing: number
+  medical: number
+  meal: number
+  communication: number
+  uniform: number
+  other: number
+  overtime: number
+  bonus: number
+}) {
+  return (
+    [
+      formatMoneyPart("Transport", parts.transport),
+      formatMoneyPart("Housing", parts.housing),
+      formatMoneyPart("Medical", parts.medical),
+      formatMoneyPart("Meal", parts.meal),
+      formatMoneyPart("Comm", parts.communication),
+      formatMoneyPart("Uniform", parts.uniform),
+      formatMoneyPart("Other", parts.other),
+      formatMoneyPart("OT", parts.overtime),
+      formatMoneyPart("Bonus", parts.bonus),
+    ]
+      .filter(Boolean)
+      .join("; ") || "—"
+  )
+}
+
+function buildDeductionTypes(loan: number, advance: number, other: number) {
+  return (
+    [
+      formatMoneyPart("Loan", loan),
+      formatMoneyPart("Advance", advance),
+      formatMoneyPart("Other", other),
+    ]
+      .filter(Boolean)
+      .join("; ") || "—"
+  )
 }
 
 type PayrollRunSummary = {
@@ -157,15 +215,19 @@ function mapApiRow(row: PayInputApiRow): WorksheetRow {
   const basic = pick(row.input.basic_salary, row.master.basic_salary)
   const cardAllow = Number(row.master.card_allowances ?? 0)
   const cardDed = Number(row.master.card_deductions ?? 0)
-  const allowances =
-    pick(row.input.transport_allowance, row.master.transport_allowance) +
-    pick(row.input.housing_allowance, row.master.housing_allowance) +
-    pick(row.input.medical_allowance, row.master.medical_allowance) +
-    pick(row.input.meal_allowance, row.master.meal_allowance) +
-    pick(row.input.communication_allowance, row.master.communication_allowance) +
-    pick(row.input.uniform_allowance, row.master.uniform_allowance) +
-    pick(row.input.other_allowances, row.master.other_allowances) +
-    cardAllow
+  const transport = pick(row.input.transport_allowance, row.master.transport_allowance)
+  const housing = pick(row.input.housing_allowance, row.master.housing_allowance)
+  const medical = pick(row.input.medical_allowance, row.master.medical_allowance)
+  const meal = pick(row.input.meal_allowance, row.master.meal_allowance)
+  const communication = pick(row.input.communication_allowance, row.master.communication_allowance)
+  const uniform = pick(row.input.uniform_allowance, row.master.uniform_allowance)
+  const otherAllow = pick(row.input.other_allowances, row.master.other_allowances) + cardAllow
+  const overtime = Number(row.input.overtime_amount ?? 0)
+  const bonus = Number(row.input.bonus_amount ?? 0)
+  const loan = Number(row.input.loan_deduction ?? 0)
+  const advance = Number(row.input.advance_deduction ?? 0)
+  const other = Number(row.input.other_deductions ?? 0) + cardDed
+  const allowances = transport + housing + medical + meal + communication + uniform + otherAllow
 
   return {
     employeeId: row.employee_id,
@@ -176,11 +238,23 @@ function mapApiRow(row: PayInputApiRow): WorksheetRow {
     dateOfJoining: row.date_of_joining ?? null,
     basicSalary: basic,
     allowances,
-    overtime: Number(row.input.overtime_amount ?? 0),
-    bonus: Number(row.input.bonus_amount ?? 0),
-    loan: Number(row.input.loan_deduction ?? 0),
-    advance: Number(row.input.advance_deduction ?? 0),
-    other: Number(row.input.other_deductions ?? 0) + cardDed,
+    allowanceTypes: buildAllowanceTypes({
+      transport,
+      housing,
+      medical,
+      meal,
+      communication,
+      uniform,
+      other: otherAllow,
+      overtime,
+      bonus,
+    }),
+    overtime,
+    bonus,
+    loan,
+    advance,
+    other,
+    deductionTypes: buildDeductionTypes(loan, advance, other),
     tier2: row.input.tier2_applicable !== false,
     tier3: Boolean(row.input.tier3_applicable),
     tier3Rate: Number(row.input.tier3_employee_rate ?? 0),
@@ -192,6 +266,7 @@ function mapApiRow(row: PayInputApiRow): WorksheetRow {
     paye: 0,
     overtimeTax: 0,
     bonusTax: 0,
+    taxReliefTotal: 0,
     totalDeductions: 0,
     netPay: 0,
     selected: false,
@@ -199,7 +274,11 @@ function mapApiRow(row: PayInputApiRow): WorksheetRow {
   }
 }
 
-function calculateRow(row: WorksheetRow, taxRates = DEFAULT_TAX_RATES): WorksheetRow {
+function calculateRow(
+  row: WorksheetRow,
+  taxRates = DEFAULT_TAX_RATES,
+  annualTaxReliefs: TaxReliefItem[] = [],
+): WorksheetRow {
   const tax = calculateGhanaTax(
     {
       monthly_basic: row.basicSalary,
@@ -209,6 +288,7 @@ function calculateRow(row: WorksheetRow, taxRates = DEFAULT_TAX_RATES): Workshee
       tier2_applicable: row.tier2,
       tier3_applicable: row.tier3,
       tier3_employee_rate: row.tier3Rate || undefined,
+      annual_tax_reliefs: annualTaxReliefs,
       other_deductions: {
         loan: row.loan,
         advance: row.advance,
@@ -234,6 +314,7 @@ function calculateRow(row: WorksheetRow, taxRates = DEFAULT_TAX_RATES): Workshee
     paye: round2(tax.monthly_total_paye_withheld),
     overtimeTax: round2(tax.monthly_overtime_tax),
     bonusTax: round2(tax.monthly_bonus_tax),
+    taxReliefTotal: round2((tax.annual_tax_reliefs || 0) / 12),
     totalDeductions: round2(tax.monthly_total_employee_deductions),
     netPay: round2(tax.monthly_net_pay),
     status: "Calculated",
@@ -256,18 +337,21 @@ function exportPayload(rows: WorksheetRow[]) {
     department: r.department,
     basicSalary: r.basicSalary,
     allowances: r.allowances,
+    allowanceTypes: r.allowanceTypes,
     overtime: r.overtime,
     grossPay: r.grossPay,
-    tier2Employee: r.tier2Employee,
     overtimeTax: r.overtimeTax,
     bonusTax: r.bonusTax,
     providentFund: r.providentFund,
     ssnitEmployee: r.ssnitEmployee,
+    taxReliefTotal: r.taxReliefTotal,
     taxableIncome: r.taxableIncome,
     paye: r.paye,
     loan: r.loan,
+    deductionTypes: r.deductionTypes,
     totalDeductions: r.totalDeductions,
     netPay: r.netPay,
+    // Tier 2 kept off payroll export — available via SSNIT Tier 2 report
   }))
 }
 
@@ -279,6 +363,7 @@ function sumRows(rows: WorksheetRow[]) {
     grossPay: rows.reduce((s, r) => s + r.grossPay, 0),
     providentFund: rows.reduce((s, r) => s + r.providentFund, 0),
     ssnitEmployee: rows.reduce((s, r) => s + r.ssnitEmployee, 0),
+    taxReliefTotal: rows.reduce((s, r) => s + r.taxReliefTotal, 0),
     taxableIncome: rows.reduce((s, r) => s + r.taxableIncome, 0),
     paye: rows.reduce((s, r) => s + r.paye, 0),
     loan: rows.reduce((s, r) => s + r.loan, 0),
@@ -306,19 +391,22 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms = 45000) {
 
 function downloadClientCsv(rows: WorksheetRow[], payPeriod: string, companyName?: string | null) {
   const totals = sumRows(rows)
+  const showLoans = rows.some((r) => r.loan > 0 || r.advance > 0)
   const columns = [
     "Employee ID",
     "Employee Name",
     "Department",
     "Basic Salary",
-    "Allowances",
-    "Overtime",
+    "Allowances (by type)",
+    "Allowances Total",
     "Gross Pay",
-    "Provident Fund",
     "SSNIT Employee",
+    "Tier 3 / PF",
+    "Tax Relief",
     "Taxable Income",
     "PAYE",
-    "Loans",
+    ...(showLoans ? ["Loans"] : []),
+    "Deduction Types",
     "Total Deductions",
     "Net Pay",
   ]
@@ -336,14 +424,16 @@ function downloadClientCsv(rows: WorksheetRow[], payPeriod: string, companyName?
         r.name,
         r.department,
         round2(r.basicSalary),
+        r.allowanceTypes,
         round2(r.allowances),
-        round2(r.overtime),
         round2(r.grossPay),
-        round2(r.providentFund),
         round2(r.ssnitEmployee),
+        round2(r.providentFund),
+        round2(r.taxReliefTotal),
         round2(r.taxableIncome),
         round2(r.paye),
-        round2(r.loan),
+        ...(showLoans ? [round2(r.loan)] : []),
+        r.deductionTypes,
         round2(r.totalDeductions),
         round2(r.netPay),
       ]
@@ -355,14 +445,16 @@ function downloadClientCsv(rows: WorksheetRow[], payPeriod: string, companyName?
       `""`,
       `""`,
       round2(totals.basicSalary),
+      `""`,
       round2(totals.allowances),
-      round2(totals.overtime),
       round2(totals.grossPay),
-      round2(totals.providentFund),
       round2(totals.ssnitEmployee),
+      round2(totals.providentFund),
+      round2(totals.taxReliefTotal),
       round2(totals.taxableIncome),
       round2(totals.paye),
-      round2(totals.loan),
+      ...(showLoans ? [round2(totals.loan)] : []),
+      `""`,
       round2(totals.totalDeductions),
       round2(totals.netPay),
     ].join(","),
@@ -380,19 +472,22 @@ function downloadClientCsv(rows: WorksheetRow[], payPeriod: string, companyName?
 
 function openClientPdf(rows: WorksheetRow[], payPeriod: string, companyName?: string | null) {
   const totals = sumRows(rows)
+  const showLoans = rows.some((r) => r.loan > 0 || r.advance > 0)
   const bodyRows = rows
     .map(
       (r) => `<tr>
       <td>${r.employeeCode}</td><td>${r.name}</td><td>${r.department || "—"}</td>
       <td style="text-align:right">${moneyPlain(r.basicSalary)}</td>
+      <td>${r.allowanceTypes}</td>
       <td style="text-align:right">${moneyPlain(r.allowances)}</td>
-      <td style="text-align:right">${moneyPlain(r.overtime)}</td>
       <td style="text-align:right">${moneyPlain(r.grossPay)}</td>
-      <td style="text-align:right">${moneyPlain(r.providentFund)}</td>
       <td style="text-align:right">${moneyPlain(r.ssnitEmployee)}</td>
+      <td style="text-align:right">${moneyPlain(r.providentFund)}</td>
+      <td style="text-align:right">${moneyPlain(r.taxReliefTotal)}</td>
       <td style="text-align:right">${moneyPlain(r.taxableIncome)}</td>
       <td style="text-align:right">${moneyPlain(r.paye)}</td>
-      <td style="text-align:right">${moneyPlain(r.loan)}</td>
+      ${showLoans ? `<td style="text-align:right">${moneyPlain(r.loan)}</td>` : ""}
+      <td>${r.deductionTypes}</td>
       <td style="text-align:right">${moneyPlain(r.totalDeductions)}</td>
       <td style="text-align:right">${moneyPlain(r.netPay)}</td>
     </tr>`,
@@ -402,8 +497,8 @@ function openClientPdf(rows: WorksheetRow[], payPeriod: string, companyName?: st
   <style>
     body{font-family:Georgia,serif;padding:24px;color:#14201a}
     h1{margin:0 0 4px;font-size:22px} .muted{color:#5b6b62;margin-bottom:14px}
-    table{width:100%;border-collapse:collapse;font-size:11px}
-    th,td{border:1px solid #d7ddd8;padding:6px 7px} th{background:#eef6f1}
+    table{width:100%;border-collapse:collapse;font-size:10px}
+    th,td{border:1px solid #d7ddd8;padding:5px 6px} th{background:#eef6f1}
     .right{text-align:right} .total{font-weight:700;background:#f7faf8}
     .brand{margin-top:20px;color:#0f6b4c;font-weight:700}
     button{margin-bottom:12px;background:#0f6b4c;color:#fff;border:0;padding:8px 12px;border-radius:6px}
@@ -415,9 +510,11 @@ function openClientPdf(rows: WorksheetRow[], payPeriod: string, companyName?: st
   <table>
     <thead><tr>
       <th>Employee ID</th><th>Employee Name</th><th>Department</th>
-      <th class="right">Basic Salary</th><th class="right">Allowances</th><th class="right">Overtime</th>
-      <th class="right">Gross Pay</th><th class="right">Provident Fund</th><th class="right">SSNIT Employee</th>
-      <th class="right">Taxable Income</th><th class="right">PAYE</th><th class="right">Loans</th>
+      <th class="right">Basic</th><th>Allowances (by type)</th><th class="right">Allowances</th>
+      <th class="right">Gross</th><th class="right">SSNIT</th><th class="right">Tier 3 / PF</th>
+      <th class="right">Tax Relief</th><th class="right">Taxable Income</th><th class="right">PAYE</th>
+      ${showLoans ? `<th class="right">Loans</th>` : ""}
+      <th>Deduction Types</th>
       <th class="right">Total Deductions</th><th class="right">Net Pay</th>
     </tr></thead>
     <tbody>
@@ -425,14 +522,16 @@ function openClientPdf(rows: WorksheetRow[], payPeriod: string, companyName?: st
       <tr class="total">
         <td colspan="3">TOTALS (${rows.length} employees)</td>
         <td class="right">${moneyPlain(totals.basicSalary)}</td>
+        <td></td>
         <td class="right">${moneyPlain(totals.allowances)}</td>
-        <td class="right">${moneyPlain(totals.overtime)}</td>
         <td class="right">${moneyPlain(totals.grossPay)}</td>
-        <td class="right">${moneyPlain(totals.providentFund)}</td>
         <td class="right">${moneyPlain(totals.ssnitEmployee)}</td>
+        <td class="right">${moneyPlain(totals.providentFund)}</td>
+        <td class="right">${moneyPlain(totals.taxReliefTotal)}</td>
         <td class="right">${moneyPlain(totals.taxableIncome)}</td>
         <td class="right">${moneyPlain(totals.paye)}</td>
-        <td class="right">${moneyPlain(totals.loan)}</td>
+        ${showLoans ? `<td class="right">${moneyPlain(totals.loan)}</td>` : ""}
+        <td></td>
         <td class="right">${moneyPlain(totals.totalDeductions)}</td>
         <td class="right">${moneyPlain(totals.netPay)}</td>
       </tr>
@@ -448,9 +547,13 @@ function openClientPdf(rows: WorksheetRow[], payPeriod: string, companyName?: st
 
 export default function PayrollPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [companyId, setCompanyId] = useState("")
   const [company, setCompany] = useState<CompanyInfo | null>(null)
-  const [payPeriod, setPayPeriod] = useState(currentPeriod())
+  const [payPeriod, setPayPeriod] = useState(() => {
+    const fromQuery = searchParams?.get("pay_period") || ""
+    return /^\d{4}-\d{2}$/.test(fromQuery) ? fromQuery : currentPeriod()
+  })
   const [rows, setRows] = useState<WorksheetRow[]>([])
   const [runs, setRuns] = useState<PayrollRunSummary[]>([])
   const [activeRun, setActiveRun] = useState<PayrollRunSummary | null>(null)
@@ -463,6 +566,8 @@ export default function PayrollPage() {
   const [isPending, startTransition] = useTransition()
   // Tax rates fetched from DB (falls back to GRA defaults if not configured)
   const [dbTaxRates, setDbTaxRates] = useState(DEFAULT_TAX_RATES)
+  // Employee → tax-year reliefs (loaded for the pay period's year)
+  const [reliefsByEmployee, setReliefsByEmployee] = useState<Record<string, TaxReliefItem[]>>({})
 
   // Prorate dialog state
   type ProrateEmployee = { employeeId: string; name: string; dateOfJoining: string; proratedDays: number; totalDays: number }
@@ -472,45 +577,55 @@ export default function PayrollPage() {
   const [pendingRunFn, setPendingRunFn] = useState<(() => void) | null>(null)
 
   const resolveCompany = useCallback(async () => {
-    const supabase = createClient()
-    const { data } = await supabase
-      .from("companies")
-      .select("id, name, address, logo_url, phone, email, email_address, city, region, country")
-      .limit(1)
-      .maybeSingle()
-    if (data?.id) {
-      setCompanyId(data.id)
-      setCompany(data)
-      // Fetch saved tax rates from DB for this company
-      try {
-        const taxRes = await fetch(`/api/settings/tax?company_id=${encodeURIComponent(data.id)}`, { credentials: "include" })
-        if (taxRes.ok) {
-          const tax = await taxRes.json()
-          setDbTaxRates({
-            paye_bands: tax.paye_bands ?? DEFAULT_TAX_RATES.paye_bands,
-            paye_bands_are_monthly: DEFAULT_TAX_RATES.paye_bands_are_monthly,
-            ssnit: tax.ssnit
-              ? { employee_rate: tax.ssnit.employee_rate, employer_rate: tax.ssnit.employer_rate }
-              : DEFAULT_TAX_RATES.ssnit,
-            tier2: tax.tier2
-              ? { employee_rate: tax.tier2.employee_rate, employer_rate: tax.tier2.employer_rate }
-              : DEFAULT_TAX_RATES.tier2,
-            tier3: tax.tier3
-              ? { employee_rate: tax.tier3.employee_rate, employer_rate: tax.tier3.employer_rate }
-              : DEFAULT_TAX_RATES.tier3,
-          })
+    // Prefer authenticated meta resolution (tenant isolation) over first-company fallback
+    try {
+      const metaRes = await fetch("/api/employees/meta", { cache: "no-store", credentials: "include" })
+      const meta = await metaRes.json()
+      if (metaRes.ok && meta.company_id) {
+        setCompanyId(meta.company_id)
+        setCompany({
+          id: meta.company_id,
+          name: meta.company?.name,
+          address: meta.company?.address,
+          logo_url: meta.company?.logo_url,
+        })
+        try {
+          const taxRes = await fetch(
+            `/api/settings/tax?company_id=${encodeURIComponent(meta.company_id)}`,
+            { credentials: "include" },
+          )
+          if (taxRes.ok) {
+            const tax = await taxRes.json()
+            setDbTaxRates({
+              paye_bands: tax.paye_bands ?? DEFAULT_TAX_RATES.paye_bands,
+              paye_bands_are_monthly: DEFAULT_TAX_RATES.paye_bands_are_monthly,
+              ssnit: tax.ssnit
+                ? { employee_rate: tax.ssnit.employee_rate, employer_rate: tax.ssnit.employer_rate }
+                : DEFAULT_TAX_RATES.ssnit,
+              tier2: tax.tier2
+                ? { employee_rate: tax.tier2.employee_rate, employer_rate: tax.tier2.employer_rate }
+                : DEFAULT_TAX_RATES.tier2,
+              tier3: tax.tier3
+                ? { employee_rate: tax.tier3.employee_rate, employer_rate: tax.tier3.employer_rate }
+                : DEFAULT_TAX_RATES.tier3,
+            })
+          }
+        } catch {
+          // GRA defaults
         }
-      } catch {
-        // silently fall back to GRA defaults
+        return meta.company_id as string
       }
+    } catch {
+      // fall through
     }
-    return data?.id ?? ""
+    return ""
   }, [])
 
   const loadWorksheet = useCallback(async (cid: string, period: string) => { // eslint-disable-line react-hooks/exhaustive-deps
     setLoading(true)
     try {
-      const [inputRes, runsRes] = await Promise.all([
+      const taxYear = Number(String(period).split("-")[0]) || new Date().getFullYear()
+      const [inputRes, runsRes, reliefRes] = await Promise.all([
         fetch(
           `/api/payroll/input?company_id=${encodeURIComponent(cid)}&pay_period=${encodeURIComponent(period)}`,
           { cache: "no-store", credentials: "include" },
@@ -519,6 +634,10 @@ export default function PayrollPage() {
           cache: "no-store",
           credentials: "include",
         }),
+        fetch(
+          `/api/payroll/tax-reliefs?company_id=${encodeURIComponent(cid)}&tax_year=${taxYear}&mode=payroll_map`,
+          { cache: "no-store", credentials: "include" },
+        ),
       ])
 
       const inputJson = await inputRes.json()
@@ -527,7 +646,14 @@ export default function PayrollPage() {
       const runsJson = runsRes.ok ? await runsRes.json() : { runs: [] }
       const periodRuns: PayrollRunSummary[] = runsJson.runs ?? runsJson.data ?? []
 
-      const mapped = (inputJson.rows ?? []).map((r: PayInputApiRow) => calculateRow(mapApiRow(r), dbTaxRates))
+      const reliefJson = reliefRes.ok ? await reliefRes.json() : { by_employee: {} }
+      const byEmp: Record<string, TaxReliefItem[]> = reliefJson.by_employee || {}
+      setReliefsByEmployee(byEmp)
+
+      const mapped = (inputJson.rows ?? []).map((r: PayInputApiRow) => {
+        const base = mapApiRow(r)
+        return calculateRow(base, dbTaxRates, byEmp[base.employeeId] || [])
+      })
       const matchingRun =
         periodRuns.find((r) => String(r.pay_period_start ?? "").startsWith(period)) ?? null
 
@@ -547,7 +673,7 @@ export default function PayrollPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [dbTaxRates])
 
   useEffect(() => {
     ensureDemoSessionCookie()
@@ -572,6 +698,10 @@ export default function PayrollPage() {
   const selected = rows.filter((r) => r.selected)
   const worksheetSource = selected.length ? selected : rows
   const columnTotals = useMemo(() => sumRows(worksheetSource), [worksheetSource])
+  const showLoansColumn = useMemo(
+    () => worksheetSource.some((r) => r.loan > 0 || r.advance > 0),
+    [worksheetSource],
+  )
   const totals = useMemo(
     () => ({
       employees: worksheetSource.length,
@@ -588,8 +718,15 @@ export default function PayrollPage() {
   }
 
   const handleRecalculate = () => {
-    setRows((prev) => prev.map((r) => (r.selected ? calculateRow(r) : r)))
-    toast({ title: "Recalculated", description: "Preview figures refreshed from loaded DB values." })
+    setRows((prev) =>
+      prev.map((r) =>
+        r.selected ? calculateRow(r, dbTaxRates, reliefsByEmployee[r.employeeId] || []) : r,
+      ),
+    )
+    toast({
+      title: "Recalculated",
+      description: `Preview refreshed using ${payPeriod.slice(0, 4)} tax reliefs and current rates.`,
+    })
   }
 
   const handleProcess = async () => {
@@ -646,6 +783,10 @@ export default function PayrollPage() {
               ssnitEmployee: r.ssnitEmployee,
               taxableIncome: r.taxableIncome,
               paye: r.paye,
+              overtimeTax: r.overtimeTax,
+              bonusTax: r.bonusTax,
+              tier2Employee: r.tier2Employee,
+              taxReliefTotal: r.taxReliefTotal,
               totalDeductions: r.totalDeductions,
               netPay: r.netPay,
             })),
@@ -812,9 +953,7 @@ export default function PayrollPage() {
   }
 
   /**
-   * Run Payroll — direct completion path.
-   * Processes all calculated rows and marks the run as completed immediately
-   * without routing through the approval workflow.
+   * Run Payroll — process selected (or all) worksheet rows and queue for approval.
    */
   const handleRunPayroll = async (prorateMeta: Record<string, "prorate" | "full"> = {}) => {
     ensureDemoSessionCookie()
@@ -830,7 +969,14 @@ export default function PayrollPage() {
     setProcessing(true)
     setLastProcessMessage(null)
     try {
-      const baseEmployees = selected.length ? selected : rows
+      // Always recalculate the set we're about to process so amounts aren't stale
+      const baseEmployees = (selected.length ? selected : rows).map((r) =>
+        calculateRow(r, dbTaxRates, reliefsByEmployee[r.employeeId] || []),
+      )
+      if (!baseEmployees.length || baseEmployees.some((r) => !r.employeeId)) {
+        throw new Error("Selected employees are missing ids. Sync from DB and try again.")
+      }
+
       // Apply prorate decisions: scale basicSalary, allowances, grossPay, netPay proportionally
       const employeesToRun = baseEmployees.map((r) => {
         const decision = prorateMeta[r.employeeId]
@@ -864,9 +1010,10 @@ export default function PayrollPage() {
               activeRun && !["approved", "paid", "cancelled"].includes(activeRun.status)
                 ? activeRun.id
                 : undefined,
-            submit_for_approval: false,
+            submit_for_approval: true,
             rows: employeesToRun.map((r) => ({
               employeeId: r.employeeId,
+              employee_id: r.employeeId,
               employeeCode: r.employeeCode,
               name: r.name,
               department: r.department,
@@ -883,6 +1030,10 @@ export default function PayrollPage() {
               ssnitEmployee: r.ssnitEmployee,
               taxableIncome: r.taxableIncome,
               paye: r.paye,
+              overtimeTax: r.overtimeTax,
+              bonusTax: r.bonusTax,
+              tier2Employee: r.tier2Employee,
+              taxReliefTotal: r.taxReliefTotal,
               totalDeductions: r.totalDeductions,
               netPay: r.netPay,
             })),
@@ -892,19 +1043,22 @@ export default function PayrollPage() {
       )
       const json = await res.json().catch(() => ({}))
 
-      if (!res.ok && res.status !== 422) {
+      if (!res.ok) {
         throw new Error(json.error || `Run failed (${res.status})`)
       }
 
       const processed = json.processed || 0
+      if (processed < 1) {
+        throw new Error(json.error || "No employees were saved to the payroll run.")
+      }
       const warnings = json.errors || []
-      setRows((prev) => prev.map((r) => ({ ...r, status: "Processed" })))
+      setRows((prev) => prev.map((r) => ({ ...r, status: "Submitted" })))
       setLastProcessMessage(
-        `${processed} employee(s) processed and saved. Payroll run is now complete.`,
+        `${processed} employee(s) processed and queued for approval.`,
       )
       toast({
-        title: "✓ Payroll run complete",
-        description: `${processed} of ${employeesToRun.length} employee(s) saved${warnings.length ? ` with ${warnings.length} warning(s)` : ""}. View payslips and reports.`,
+        title: "✓ Submitted for approval",
+        description: `${processed} of ${employeesToRun.length} employee(s) saved${warnings.length ? ` with ${warnings.length} warning(s)` : ""}. Open Approvals to review.`,
       })
       setTimeout(() => void loadWorksheet(companyId, payPeriod), 1500)
     } catch (err) {
@@ -996,6 +1150,12 @@ export default function PayrollPage() {
             <Link href="/app/payroll/input">
               <ClipboardList className="h-4 w-4 mr-2" />
               Pay Inputs
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/app/payroll/tax-reliefs">
+              <Shield className="h-4 w-4 mr-2" />
+              Tax Reliefs
             </Link>
           </Button>
           <Button variant="outline" asChild>
@@ -1128,7 +1288,8 @@ export default function PayrollPage() {
             <div>
               <CardTitle>Employee worksheet — {fmtPeriod(payPeriod)}</CardTitle>
               <CardDescription>
-                Columns include Provident Fund, taxable income, PAYE, loans, and net pay.
+                Allowances by type, Tier 3/PF, tax relief, taxable income, PAYE, loans (when present),
+                deduction types, total deductions, and net pay. Tier 2 is report-only and excluded.
               </CardDescription>
             </div>
             <Input
@@ -1165,14 +1326,18 @@ export default function PayrollPage() {
                     <TableHead>Employee Name</TableHead>
                     <TableHead>Department</TableHead>
                     <TableHead className="text-right">Basic Salary</TableHead>
+                    <TableHead>Allowances (by type)</TableHead>
                     <TableHead className="text-right">Allowances</TableHead>
-                    <TableHead className="text-right">Overtime</TableHead>
                     <TableHead className="text-right">Gross Pay</TableHead>
-                    <TableHead className="text-right">Provident Fund</TableHead>
                     <TableHead className="text-right">SSNIT Employee</TableHead>
+                    <TableHead className="text-right">Tier 3 / PF</TableHead>
+                    <TableHead className="text-right">Tax Relief</TableHead>
                     <TableHead className="text-right">Taxable Income</TableHead>
                     <TableHead className="text-right">PAYE</TableHead>
-                    <TableHead className="text-right">Loans</TableHead>
+                    {showLoansColumn && (
+                      <TableHead className="text-right">Loans</TableHead>
+                    )}
+                    <TableHead>Deduction Types</TableHead>
                     <TableHead className="text-right">Total Deductions</TableHead>
                     <TableHead className="text-right">Net Pay</TableHead>
                     <TableHead>Status</TableHead>
@@ -1199,14 +1364,18 @@ export default function PayrollPage() {
                       <TableCell className="font-medium whitespace-nowrap">{row.name}</TableCell>
                       <TableCell>{row.department || "—"}</TableCell>
                       <TableCell className="text-right whitespace-nowrap">{money(row.basicSalary)}</TableCell>
+                      <TableCell className="text-xs max-w-[220px]">{row.allowanceTypes}</TableCell>
                       <TableCell className="text-right whitespace-nowrap">{money(row.allowances)}</TableCell>
-                      <TableCell className="text-right whitespace-nowrap">{money(row.overtime)}</TableCell>
                       <TableCell className="text-right whitespace-nowrap">{money(row.grossPay)}</TableCell>
-                      <TableCell className="text-right whitespace-nowrap">{money(row.providentFund)}</TableCell>
                       <TableCell className="text-right whitespace-nowrap">{money(row.ssnitEmployee)}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">{money(row.providentFund)}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">{money(row.taxReliefTotal)}</TableCell>
                       <TableCell className="text-right whitespace-nowrap">{money(row.taxableIncome)}</TableCell>
                       <TableCell className="text-right whitespace-nowrap">{money(row.paye)}</TableCell>
-                      <TableCell className="text-right whitespace-nowrap">{money(row.loan)}</TableCell>
+                      {showLoansColumn && (
+                        <TableCell className="text-right whitespace-nowrap">{money(row.loan)}</TableCell>
+                      )}
+                      <TableCell className="text-xs max-w-[180px]">{row.deductionTypes}</TableCell>
                       <TableCell className="text-right whitespace-nowrap">{money(row.totalDeductions)}</TableCell>
                       <TableCell className="text-right font-medium whitespace-nowrap">
                         {money(row.netPay)}
@@ -1227,20 +1396,21 @@ export default function PayrollPage() {
                       <TableCell className="text-right whitespace-nowrap">
                         {money(columnTotals.basicSalary)}
                       </TableCell>
+                      <TableCell />
                       <TableCell className="text-right whitespace-nowrap">
                         {money(columnTotals.allowances)}
-                      </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        {money(columnTotals.overtime)}
                       </TableCell>
                       <TableCell className="text-right whitespace-nowrap">
                         {money(columnTotals.grossPay)}
                       </TableCell>
                       <TableCell className="text-right whitespace-nowrap">
+                        {money(columnTotals.ssnitEmployee)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
                         {money(columnTotals.providentFund)}
                       </TableCell>
                       <TableCell className="text-right whitespace-nowrap">
-                        {money(columnTotals.ssnitEmployee)}
+                        {money(columnTotals.taxReliefTotal)}
                       </TableCell>
                       <TableCell className="text-right whitespace-nowrap">
                         {money(columnTotals.taxableIncome)}
@@ -1248,9 +1418,12 @@ export default function PayrollPage() {
                       <TableCell className="text-right whitespace-nowrap">
                         {money(columnTotals.paye)}
                       </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        {money(columnTotals.loan)}
-                      </TableCell>
+                      {showLoansColumn && (
+                        <TableCell className="text-right whitespace-nowrap">
+                          {money(columnTotals.loan)}
+                        </TableCell>
+                      )}
+                      <TableCell />
                       <TableCell className="text-right whitespace-nowrap">
                         {money(columnTotals.totalDeductions)}
                       </TableCell>

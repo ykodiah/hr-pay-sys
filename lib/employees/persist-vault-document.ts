@@ -17,6 +17,9 @@ export type VaultInsertPayload = {
   company_id?: string | null
   access_level?: string
   signature_status?: string
+  checklist_id?: string | null
+  onboarding_task_id?: string | null
+  requires_signature?: boolean
 }
 
 function isUuid(value: string | null | undefined): boolean {
@@ -53,6 +56,11 @@ export async function persistVaultDocument(
     source: payload.source || "employee-onboarding",
     category: payload.category || "employee-document",
     company_id: isUuid(payload.company_id) ? payload.company_id : null,
+    access_level: payload.access_level || "standard",
+    signature_status: payload.signature_status || "not_required",
+    requires_signature: Boolean(payload.requires_signature),
+    checklist_id: isUuid(payload.checklist_id) ? payload.checklist_id : null,
+    onboarding_task_id: isUuid(payload.onboarding_task_id) ? payload.onboarding_task_id : null,
     updated_at: now,
   }
 

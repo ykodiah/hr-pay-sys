@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -118,10 +119,23 @@ interface Successor {
 }
 
 export default function PerformancePage() {
+  const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState("overview")
   const [showGoalDialog, setShowGoalDialog] = useState(false)
   const [showReviewDialog, setShowReviewDialog] = useState(false)
   const [showSuccessionDialog, setShowSuccessionDialog] = useState(false)
+
+  useEffect(() => {
+    const tab = searchParams.get("tab")
+    const action = searchParams.get("action")
+    const allowed = new Set(["overview", "goals", "reviews", "competencies", "succession", "analytics"])
+    if (tab && allowed.has(tab)) setActiveTab(tab)
+    if (action === "add") {
+      if (tab === "goals") setShowGoalDialog(true)
+      if (tab === "reviews") setShowReviewDialog(true)
+      if (tab === "succession") setShowSuccessionDialog(true)
+    }
+  }, [searchParams])
 
   const [goals] = useState<Goal[]>([
     {

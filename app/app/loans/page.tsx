@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
+import { resolveClientCompanyId } from "@/lib/tenant/resolve-company-client"
 import { buildAmortizationPreview } from "@/lib/services/loan-calculations"
 import {
   CreditCard, Plus, DollarSign, TrendingDown,
@@ -86,26 +87,27 @@ export default function AdminLoansPage() {
   const loadLoans = useCallback(async () => {
     setLoading(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: emp } = await supabase.from("employees").select("company_id").eq("id", user.id).single()
-      const cid = emp?.company_id ?? ""
+      const cid = await resolveClientCompanyId()
       setCompanyId(cid)
 
       const params = new URLSearchParams()
-      if (cid) params.set("company_id", cid)
+      params.set("company_id", cid)
       if (statusFilter !== "all") params.set("status", statusFilter)
 
-      const res = await fetch(`/api/loans?${params}`)
+      const res = await fetch(`/api/loans?${params}`, { credentials: "include", cache: "no-store" })
       if (res.ok) {
         const data = await res.json()
         setLoans(data.loans ?? [])
       }
 
       // Load employees for new loan form from shared employees API
-      const empParams = new URLSearchParams({ status: "active", options: "true", limit: "500" })
-      if (cid) empParams.set("company_id", cid)
-      const empRes = await fetch(`/api/employees?${empParams}`, { cache: "no-store" })
+      const empParams = new URLSearchParams({
+        status: "active",
+        options: "true",
+        limit: "500",
+        company_id: cid,
+      })
+      const empRes = await fetch(`/api/employees?${empParams}`, { cache: "no-store", credentials: "include" })
       if (empRes.ok) {
         const empJson = await empRes.json()
         setEmployees(empJson.employees ?? empJson.data ?? [])

@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifySuperAdminToken } from '@/lib/superadmin/auth'
-import { createClient } from '@supabase/supabase-js'
+import { getSuperadminDb } from '@/lib/superadmin/db'
 import { logAudit } from '@/lib/superadmin/audit'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,6 +14,7 @@ export async function GET(request: NextRequest) {
     const status = url.searchParams.get('status')
     const priority = url.searchParams.get('priority')
 
+    const supabase = getSuperadminDb()
     let query = supabase
       .from('superadmin_issues')
       .select('*')
@@ -53,6 +48,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Title and issue_type are required' }, { status: 400 })
     }
 
+    const supabase = getSuperadminDb()
     const { data: issue, error } = await supabase
       .from('superadmin_issues')
       .insert([

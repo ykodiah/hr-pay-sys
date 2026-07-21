@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { toast } from "@/hooks/use-toast"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -57,6 +58,7 @@ function chartPreviewSrc(chart: Pick<OrgChart, "preview_image" | "chart_data" | 
 }
 
 export default function OrgChartPage() {
+  const searchParams = useSearchParams()
   const [companyId, setCompanyId] = useState("")
   const [charts, setCharts] = useState<OrgChart[]>([])
   const [subsidiaries, setSubsidiaries] = useState<Subsidiary[]>([])
@@ -64,6 +66,14 @@ export default function OrgChartPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [syncedAt, setSyncedAt] = useState<string | null>(null)
+  const [orgTab, setOrgTab] = useState("create")
+
+  useEffect(() => {
+    const action = searchParams.get("action")
+    const tab = searchParams.get("tab")
+    if (action === "create" || tab === "create") setOrgTab("create")
+    else if (tab === "manage" || action === "view") setOrgTab("manage")
+  }, [searchParams])
 
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
@@ -253,7 +263,7 @@ export default function OrgChartPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="create">
+      <Tabs value={orgTab} onValueChange={setOrgTab}>
         <TabsList>
           <TabsTrigger value="create">Create</TabsTrigger>
           <TabsTrigger value="manage">Manage ({charts.length})</TabsTrigger>

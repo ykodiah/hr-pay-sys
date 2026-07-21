@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifySuperAdminToken } from '@/lib/superadmin/auth'
-import { createClient } from '@supabase/supabase-js'
+import { getSuperadminDb } from '@/lib/superadmin/db'
 import { logAudit } from '@/lib/superadmin/audit'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,6 +10,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const supabase = getSuperadminDb()
     const { data: backups, error } = await supabase
       .from('superadmin_backups')
       .select('*')
@@ -46,6 +41,7 @@ export async function POST(request: NextRequest) {
     const retention_until = new Date()
     retention_until.setDate(retention_until.getDate() + 90)
 
+    const supabase = getSuperadminDb()
     const { data: backup, error } = await supabase
       .from('superadmin_backups')
       .insert([

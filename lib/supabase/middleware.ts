@@ -60,6 +60,8 @@ export async function updateSession(request: NextRequest) {
     "/about",
     "/contact",
     "/careers",
+    "/j",
+    "/o",
     "/help",
     "/api-docs",
     "/auth",
@@ -67,6 +69,7 @@ export async function updateSession(request: NextRequest) {
     "/privacy",
     "/terms",
     "/api/careers",
+    "/api/offers/public",
   ]
   const isPublicPath = publicPaths.some(
     (path) => pathname === path || pathname.startsWith(path + "/"),

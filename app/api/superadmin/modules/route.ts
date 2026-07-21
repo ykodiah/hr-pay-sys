@@ -1,29 +1,34 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifySuperAdminToken } from "@/lib/superadmin/auth"
-import { createClient } from "@supabase/supabase-js"
+import { getSuperadminDb } from "@/lib/superadmin/db"
 import { logAudit } from "@/lib/superadmin/audit"
-
-function getDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  )
-}
+import { syncAdminPortalModules } from "@/lib/superadmin/tenant-provision"
+import { ADMIN_PORTAL_MODULES } from "@/lib/modules/admin-portal-modules"
 
 export async function GET(req: NextRequest) {
   try {
     const auth = await verifySuperAdminToken(req)
     if (!auth?.valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const client = getDb()
+    const client = getSuperadminDb()
+    // Keep catalog aligned with admin portal navigation
+    try {
+      await syncAdminPortalModules(client)
+    } catch (err) {
+      console.warn("[v0] Module catalog sync skipped:", err)
+    }
+
     const { data: modules, error } = await client
       .from("superadmin_modules")
       .select("*")
-      .order("created_at", { ascending: true })
+      .order("name", { ascending: true })
 
     if (error) throw error
-    return NextResponse.json({ modules })
+
+    return NextResponse.json({
+      modules: modules || [],
+      catalog: ADMIN_PORTAL_MODULES,
+    })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
@@ -35,14 +40,29 @@ export async function POST(req: NextRequest) {
     if (!auth?.valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const body = await req.json()
-    const { name, slug, description, monthly_cost = 0, is_active = true } = body
+    if (body.action === "sync_catalog") {
+      const client = getSuperadminDb()
+      await syncAdminPortalModules(client)
+      const { data: modules } = await client.from("superadmin_modules").select("*").order("name")
+      return NextResponse.json({ modules: modules || [], synced: true })
+    }
 
-    if (!name || !slug) return NextResponse.json({ error: "Name and slug required" }, { status: 400 })
+    const { name, slug, code, description, monthly_cost = 0, is_active = true, href, section } = body
+    if (!name) return NextResponse.json({ error: "Name required" }, { status: 400 })
 
-    const client = getDb()
+    const client = getSuperadminDb()
     const { data: module, error } = await client
       .from("superadmin_modules")
-      .insert({ name, slug, description, monthly_cost, is_active })
+      .insert({
+        name,
+        slug: slug || code || null,
+        code: code || slug || null,
+        description,
+        monthly_cost,
+        is_active,
+        href: href || null,
+        section: section || null,
+      })
       .select("*")
       .single()
 
@@ -53,7 +73,7 @@ export async function POST(req: NextRequest) {
       action: "module_created",
       resourceType: "module",
       resourceId: module.id,
-      changes: { name, slug, monthly_cost, is_active },
+      changes: { name, code, monthly_cost, is_active },
       ipAddress: req.headers.get("x-forwarded-for") || "unknown",
     })
 

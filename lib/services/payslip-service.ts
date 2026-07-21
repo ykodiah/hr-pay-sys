@@ -10,6 +10,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import type { TaxCalculationResult } from "@/lib/ghana-tax/engine"
+import { normalizePayrollCashRow, normalizePayrollCashRows } from "@/lib/payroll/cash-deductions"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -118,8 +119,7 @@ export async function createPayslip(
   const totalPaye =
     r.monthly_total_paye_withheld ??
     r.monthly_paye_tax + (r.monthly_overtime_tax ?? 0) + (r.monthly_bonus_tax ?? 0)
-  const pensionEmployee =
-    r.monthly_pension_employee ?? r.monthly_ssnit_employee + r.monthly_tier2_employee
+  const pensionEmployee = r.monthly_ssnit_employee
   const totalDeductions =
     pensionEmployee +
     r.monthly_tier3_employee +
@@ -151,6 +151,7 @@ export async function createPayslip(
     gross_pay: grossPay,
     ssnit_employee: r.monthly_ssnit_employee,
     ssnit_employer: r.monthly_ssnit_employer,
+    // Tier 2 stored for reports only — not included in total_deductions / net_pay
     tier2_employee: r.monthly_tier2_employee,
     tier2_employer: r.monthly_tier2_employer,
     tier3_employee: r.monthly_tier3_employee,
@@ -175,6 +176,7 @@ export async function createPayslip(
       monthly_other_deduction: other,
       monthly_total_paye_withheld: totalPaye,
       monthly_net_pay: netPay,
+      tier2_excluded_from_payroll_deductions: true,
     } as unknown as object,
     status: "draft",
   }
@@ -215,7 +217,7 @@ export async function getEmployeePayslips(
   const { data, error } = await query
 
   if (error) return { data: [], error: error.message }
-  return { data: (data ?? []) as PayslipRow[], error: null }
+  return { data: normalizePayrollCashRows((data ?? []) as PayslipRow[]), error: null }
 }
 
 // ---------------------------------------------------------------------------
@@ -234,7 +236,7 @@ export async function getPayslipById(
     .single()
 
   if (error) return { data: null, error: error.message }
-  return { data: data as PayslipRow, error: null }
+  return { data: data ? (normalizePayrollCashRow(data as PayslipRow) as PayslipRow) : null, error: null }
 }
 
 // ---------------------------------------------------------------------------
@@ -271,7 +273,7 @@ export async function getPayrollRunPayslips(
     .order("snapshot_employee_name", { ascending: true })
 
   if (error) return { data: [], error: error.message }
-  return { data: (data ?? []) as PayslipRow[], error: null }
+  return { data: normalizePayrollCashRows((data ?? []) as PayslipRow[]), error: null }
 }
 
 // ---------------------------------------------------------------------------
