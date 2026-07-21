@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
       currency: body.currency ?? "GHS",
       headcount: Number(body.headcount ?? 1),
       requester_name: body.requester_name ?? null,
+      requester_employee_id: body.requester_employee_id ?? null,
       deadline: body.deadline ?? null,
       description: body.description ?? null,
       requirements: body.requirements ?? [],
@@ -96,6 +97,8 @@ export async function PATCH(req: NextRequest) {
       "description",
       "requirements",
       "ai_analysis",
+      "requester_name",
+      "requester_employee_id",
     ]) {
       if (body[key] !== undefined) patch[key] = body[key]
     }

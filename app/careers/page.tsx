@@ -15,6 +15,8 @@ type PublicJob = {
   company_id: string
   company_name?: string | null
   slug?: string | null
+  short_code?: string | null
+  apply_path?: string | null
   title: string
   description?: string | null
   requirements?: unknown
@@ -206,7 +208,7 @@ function CareersContent() {
               jobs.map((job) => (
                 <Link
                   key={job.id}
-                  href={`/careers?job=${encodeURIComponent(job.slug || job.id)}`}
+                  href={(job as any).apply_path || (job.short_code ? `/j/${job.short_code}` : `/careers?job=${encodeURIComponent(job.slug || job.id)}`)}
                   className="rounded-xl border bg-white p-5 hover:border-emerald-300 hover:shadow-sm transition"
                 >
                   <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">

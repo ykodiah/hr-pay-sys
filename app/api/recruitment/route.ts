@@ -25,16 +25,16 @@ export async function GET(req: NextRequest) {
       client
         .from("recruitment_job_postings")
         .select(
-          "id, company_id, requisition_id, slug, title, description, requirements, benefits, salary_min, salary_max, currency, location, department, employment_type, status, published_at, expires_at, views_count, created_at, updated_at",
+          "id, company_id, requisition_id, slug, short_code, title, description, public_summary, requirements, benefits, salary_min, salary_max, currency, location, department, employment_type, status, published_at, expires_at, views_count, applications_count, created_at, updated_at",
         )
         .eq("company_id", companyId)
         .order("created_at", { ascending: false }),
       client
         .from("recruitment_applications")
         .select(
-          `id, status, score, source, applied_at, notes, cover_letter, job_posting_id, candidate_id,
-           candidate:recruitment_candidates(id, candidate_name, email, phone, skills, resume_filename, resume_url, previous_company),
-           job:recruitment_job_postings(id, title, department, slug)`,
+          `id, status, score, source, applied_at, notes, cover_letter, job_posting_id, candidate_id, resume_url, resume_filename,
+           candidate:recruitment_candidates(id, candidate_name, email, phone, skills, resume_filename, resume_url, previous_company, linkedin_url),
+           job:recruitment_job_postings(id, title, department, slug, short_code)`,
         )
         .eq("company_id", companyId)
         .order("applied_at", { ascending: false }),
@@ -81,12 +81,14 @@ export async function GET(req: NextRequest) {
         candidate_email: candidate?.email ?? "",
         candidate_phone: candidate?.phone ?? "",
         skills: candidate?.skills ?? [],
-        resume_filename: candidate?.resume_filename ?? null,
-        resume_url: candidate?.resume_url ?? null,
+        resume_filename: a.resume_filename || candidate?.resume_filename || null,
+        resume_url: a.resume_url || candidate?.resume_url || null,
         previous_company: candidate?.previous_company ?? null,
+        linkedin_url: candidate?.linkedin_url ?? null,
         job_title: job?.title ?? "Role",
         department: job?.department ?? "",
         job_slug: job?.slug ?? null,
+        job_short_code: job?.short_code ?? null,
       }
     })
 

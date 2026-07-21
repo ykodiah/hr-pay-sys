@@ -24,12 +24,14 @@ import {
   RefreshCw,
   Search,
   Send,
+  Share2,
   Trash2,
   UserPlus,
   Users,
   XCircle,
   type LucideIcon,
 } from "lucide-react"
+import { buildJobApplyUrl } from "@/lib/recruitment/public-origin"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -81,8 +83,10 @@ type JobPosting = {
   id: string
   requisition_id?: string | null
   slug?: string | null
+  short_code?: string | null
   title: string
   description?: string | null
+  public_summary?: string | null
   requirements?: unknown
   benefits?: unknown
   salary_min?: number | null
@@ -97,6 +101,14 @@ type JobPosting = {
   created_at?: string | null
   views_count?: number | null
   applications_count?: number | null
+}
+
+type OrgPerson = {
+  id: string
+  name: string
+  department?: string | null
+  position?: string | null
+  special_role?: string | null
 }
 
 type Application = {
@@ -212,6 +224,8 @@ type RequisitionForm = {
   currency: string
   headcount: string
   requester_name: string
+  requester_employee_id: string
+  requester_mode: string
   deadline: string
   description: string
   requirements: string
@@ -285,6 +299,8 @@ const initialRequisitionForm: RequisitionForm = {
   currency: "GHS",
   headcount: "1",
   requester_name: "",
+  requester_employee_id: "",
+  requester_mode: "",
   deadline: "",
   description: "",
   requirements: "",
@@ -495,7 +511,56 @@ export default function RecruitmentPage() {
   const [jobForm, setJobForm] = useState<JobForm>(initialJobForm)
   const [applicationForm, setApplicationForm] = useState<ApplicationForm>(initialApplicationForm)
   const [interviewForm, setInterviewForm] = useState<InterviewForm>(initialInterviewForm)
+  const [departments, setDepartments] = useState<string[]>([])
+  const [locations, setLocations] = useState<string[]>([])
+  const [requestorOptions, setRequestorOptions] = useState<OrgPerson[]>([])
   const hasLoadedRef = useRef(false)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/employees/meta", { cache: "no-store", credentials: "include" })
+        const json = await res.json()
+        if (!res.ok || cancelled) return
+        const deps = Array.isArray(json.departments) ? json.departments.map(String).filter(Boolean) : []
+        const locs = Array.isArray(json.locations) ? json.locations.map(String).filter(Boolean) : []
+        setDepartments(deps)
+        setLocations(locs)
+        if (json.company_id && !companyId) setCompanyId(json.company_id)
+
+        const peopleMap = new Map<string, OrgPerson>()
+        for (const list of [json.heads_of_department, json.supervisors, json.employees]) {
+          for (const p of list || []) {
+            if (!p?.id || !p?.name) continue
+            if (!peopleMap.has(p.id)) {
+              peopleMap.set(p.id, {
+                id: p.id,
+                name: p.name,
+                department: p.department,
+                position: p.position,
+                special_role: p.special_role,
+              })
+            }
+          }
+        }
+        // Prefer HOD/supervisors first in the list
+        const hodIds = new Set((json.heads_of_department || []).map((p: any) => p.id))
+        const supIds = new Set((json.supervisors || []).map((p: any) => p.id))
+        const sorted = Array.from(peopleMap.values()).sort((a, b) => {
+          const rank = (p: OrgPerson) => (hodIds.has(p.id) ? 0 : supIds.has(p.id) ? 1 : 2)
+          return rank(a) - rank(b) || a.name.localeCompare(b.name)
+        })
+        setRequestorOptions(sorted)
+      } catch {
+        /* keep empty catalogs */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     const tab = searchParams.get("tab")
@@ -664,6 +729,10 @@ export default function RecruitmentPage() {
           currency: requisitionForm.currency || "GHS",
           headcount: numberFromForm(requisitionForm.headcount) ?? 1,
           requester_name: requisitionForm.requester_name || null,
+          requester_employee_id:
+            requisitionForm.requester_mode === "__manual__" || !requisitionForm.requester_employee_id
+              ? null
+              : requisitionForm.requester_employee_id,
           deadline: requisitionForm.deadline || null,
           description: requisitionForm.description || null,
           requirements: splitList(requisitionForm.requirements),
@@ -932,12 +1001,49 @@ export default function RecruitmentPage() {
   }
 
   const handleShareJob = async (job: JobPosting) => {
-    const url = `${window.location.origin}/careers?job=${encodeURIComponent(job.slug || job.id)}`
+    if (job.status !== "published") {
+      toast({
+        title: "Publish first",
+        description: "Publish the job before sharing the public apply link.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    let shortCode = job.short_code
+    if (!shortCode) {
+      try {
+        const res = await fetch("/api/recruitment/jobs", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: job.id, action: "ensure_short_code", status: "published" }),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || "Could not create share code")
+        shortCode = json.job?.short_code
+        await loadRecruitment(companyId)
+      } catch (err) {
+        toast({
+          title: "Share failed",
+          description: err instanceof Error ? err.message : "Could not create share link",
+          variant: "destructive",
+        })
+        return
+      }
+    }
+
+    const url =
+      buildJobApplyUrl(String(shortCode || ""), window.location.origin) ||
+      `${window.location.origin}/j/${encodeURIComponent(String(shortCode || job.slug || job.id))}`
+
     try {
       await navigator.clipboard.writeText(url)
-      toast({ title: "Job link copied", description: url })
+      toast({
+        title: "Apply link copied",
+        description: `Short link ready: ${url}`,
+      })
     } catch {
-      toast({ title: "Copy failed", description: "Could not copy the job link.", variant: "destructive" })
+      toast({ title: "Copy failed", description: url, variant: "destructive" })
     }
   }
 
@@ -958,11 +1064,14 @@ export default function RecruitmentPage() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Recruitment</h1>
-          <p className="text-muted-foreground">DB-backed applicant tracking for requisitions, jobs, candidates, and hiring workflows.</p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Company: {companyId || "resolving"} · Last synced:{" "}
-            {lastSynced ? lastSynced.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "not yet"}
+          <p className="text-muted-foreground">
+            Recruitment tracking system for requisitions, jobs, candidates and hiring workflows
           </p>
+          {lastSynced ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Last synced {lastSynced.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => void loadRecruitment(companyId)} disabled={loading || saving}>
@@ -992,20 +1101,70 @@ export default function RecruitmentPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="req-department">Department</Label>
-                    <Input
-                      id="req-department"
-                      value={requisitionForm.department}
-                      onChange={(event) => setRequisitionForm((prev) => ({ ...prev, department: event.target.value }))}
-                    />
+                    <Label>Department</Label>
+                    <Select
+                      value={requisitionForm.department || "__none__"}
+                      onValueChange={(value) =>
+                        setRequisitionForm((prev) => ({
+                          ...prev,
+                          department: value === "__none__" ? "" : value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Select department</SelectItem>
+                        {departments.map((dep) => (
+                          <SelectItem key={dep} value={dep}>
+                            {dep}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!departments.length ? (
+                      <Input
+                        placeholder="Type department"
+                        value={requisitionForm.department}
+                        onChange={(event) =>
+                          setRequisitionForm((prev) => ({ ...prev, department: event.target.value }))
+                        }
+                      />
+                    ) : null}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="req-location">Location</Label>
-                    <Input
-                      id="req-location"
-                      value={requisitionForm.location}
-                      onChange={(event) => setRequisitionForm((prev) => ({ ...prev, location: event.target.value }))}
-                    />
+                    <Label>Location</Label>
+                    <Select
+                      value={requisitionForm.location || "__none__"}
+                      onValueChange={(value) =>
+                        setRequisitionForm((prev) => ({
+                          ...prev,
+                          location: value === "__none__" ? "" : value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select location" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Select location</SelectItem>
+                        {locations.map((loc) => (
+                          <SelectItem key={loc} value={loc}>
+                            {loc}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!locations.length ? (
+                      <Input
+                        placeholder="Type location"
+                        value={requisitionForm.location}
+                        onChange={(event) =>
+                          setRequisitionForm((prev) => ({ ...prev, location: event.target.value }))
+                        }
+                      />
+                    ) : null}
                   </div>
                   <div className="space-y-2">
                     <Label>Employment type</Label>
@@ -1071,12 +1230,60 @@ export default function RecruitmentPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="req-requester">Requester</Label>
-                    <Input
-                      id="req-requester"
-                      value={requisitionForm.requester_name}
-                      onChange={(event) => setRequisitionForm((prev) => ({ ...prev, requester_name: event.target.value }))}
-                    />
+                    <Label>Requestor (HOD / Supervisor)</Label>
+                    <Select
+                      value={requisitionForm.requester_mode || "__none__"}
+                      onValueChange={(value) => {
+                        if (value === "__none__") {
+                          setRequisitionForm((prev) => ({
+                            ...prev,
+                            requester_mode: "",
+                            requester_employee_id: "",
+                            requester_name: "",
+                          }))
+                          return
+                        }
+                        if (value === "__manual__") {
+                          setRequisitionForm((prev) => ({
+                            ...prev,
+                            requester_mode: "__manual__",
+                            requester_employee_id: "",
+                          }))
+                          return
+                        }
+                        const person = requestorOptions.find((p) => p.id === value)
+                        setRequisitionForm((prev) => ({
+                          ...prev,
+                          requester_mode: value,
+                          requester_employee_id: value,
+                          requester_name: person?.name || "",
+                        }))
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select requestor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Select requestor</SelectItem>
+                        {requestorOptions.map((person) => (
+                          <SelectItem key={person.id} value={person.id}>
+                            {person.name}
+                            {person.position ? ` · ${person.position}` : ""}
+                            {person.department ? ` · ${person.department}` : ""}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="__manual__">Type name manually…</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {requisitionForm.requester_mode === "__manual__" ? (
+                      <Input
+                        placeholder="Enter requestor name"
+                        value={requisitionForm.requester_name}
+                        onChange={(event) =>
+                          setRequisitionForm((prev) => ({ ...prev, requester_name: event.target.value }))
+                        }
+                      />
+                    ) : null}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="req-deadline">Deadline</Label>
@@ -1145,7 +1352,17 @@ export default function RecruitmentPage() {
                     <Label>Requisition</Label>
                     <Select
                       value={jobForm.requisition_id}
-                      onValueChange={(value) => setJobForm((prev) => ({ ...prev, requisition_id: value }))}
+                      onValueChange={(value) => {
+                        const req = requisitions.find((r) => r.id === value)
+                        setJobForm((prev) => ({
+                          ...prev,
+                          requisition_id: value,
+                          title: prev.title || req?.title || "",
+                          department: req?.department || prev.department,
+                          location: req?.location || prev.location,
+                          employment_type: req?.employment_type || prev.employment_type,
+                        }))
+                      }}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue />
@@ -1161,20 +1378,60 @@ export default function RecruitmentPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="job-department">Department</Label>
-                    <Input
-                      id="job-department"
-                      value={jobForm.department}
-                      onChange={(event) => setJobForm((prev) => ({ ...prev, department: event.target.value }))}
-                    />
+                    <Label>Department</Label>
+                    <Select
+                      value={jobForm.department || "__none__"}
+                      onValueChange={(value) =>
+                        setJobForm((prev) => ({ ...prev, department: value === "__none__" ? "" : value }))
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Select department</SelectItem>
+                        {departments.map((dep) => (
+                          <SelectItem key={dep} value={dep}>
+                            {dep}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!departments.length ? (
+                      <Input
+                        placeholder="Type department"
+                        value={jobForm.department}
+                        onChange={(event) => setJobForm((prev) => ({ ...prev, department: event.target.value }))}
+                      />
+                    ) : null}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="job-location">Location</Label>
-                    <Input
-                      id="job-location"
-                      value={jobForm.location}
-                      onChange={(event) => setJobForm((prev) => ({ ...prev, location: event.target.value }))}
-                    />
+                    <Label>Location</Label>
+                    <Select
+                      value={jobForm.location || "__none__"}
+                      onValueChange={(value) =>
+                        setJobForm((prev) => ({ ...prev, location: value === "__none__" ? "" : value }))
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select location" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Select location</SelectItem>
+                        {locations.map((loc) => (
+                          <SelectItem key={loc} value={loc}>
+                            {loc}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {!locations.length ? (
+                      <Input
+                        placeholder="Type location"
+                        value={jobForm.location}
+                        onChange={(event) => setJobForm((prev) => ({ ...prev, location: event.target.value }))}
+                      />
+                    ) : null}
                   </div>
                   <div className="space-y-2">
                     <Label>Employment type</Label>
@@ -1529,6 +1786,11 @@ export default function RecruitmentPage() {
                               <span>{applicationCount} applications</span>
                               <span>{job.views_count ?? 0} views</span>
                               <span>Published {formatDate(job.published_at)}</span>
+                              {job.short_code ? (
+                                <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-700">
+                                  /j/{job.short_code}
+                                </span>
+                              ) : null}
                             </div>
                           </div>
                           <div className="flex flex-wrap gap-2">
@@ -1544,8 +1806,18 @@ export default function RecruitmentPage() {
                               <Copy className="h-4 w-4" />
                               Duplicate
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => void handleShareJob(job)}>
-                              <Copy className="h-4 w-4" />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={saving}
+                              onClick={() => void handleShareJob(job)}
+                              title={
+                                job.short_code
+                                  ? `Share /j/${job.short_code}`
+                                  : "Generate short public apply link"
+                              }
+                            >
+                              <Share2 className="h-4 w-4" />
                               Share
                             </Button>
                             <Button size="sm" variant="destructive" disabled={saving || job.status === "archived"} onClick={() => void handleJobAction(job, "archive")}>
@@ -1749,6 +2021,7 @@ export default function RecruitmentPage() {
                     <TableRow>
                       <TableHead>Candidate</TableHead>
                       <TableHead>Role</TableHead>
+                      <TableHead>CV</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Score</TableHead>
                       <TableHead>Source</TableHead>
@@ -1773,6 +2046,21 @@ export default function RecruitmentPage() {
                           </div>
                         </TableCell>
                         <TableCell>{getApplicationJobTitle(application)}</TableCell>
+                        <TableCell>
+                          {application.resume_url ? (
+                            <a
+                              href={application.resume_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-sm text-emerald-700 hover:underline"
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                              {application.resume_filename || "View CV"}
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">No CV</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={statusClass(application.status)}>
                             {application.status || "unknown"}

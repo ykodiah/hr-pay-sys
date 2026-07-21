@@ -3,6 +3,21 @@ import { createClient } from "@/lib/supabase/server"
 import { requireApiUser } from "@/lib/auth/api-user"
 import { resolveCompanyId } from "@/lib/employees/resolve-company"
 import { slugify } from "@/lib/recruitment/defaults"
+import { generateJobShortCode } from "@/lib/recruitment/short-code"
+
+async function ensureUniqueShortCode(client: any, preferred?: string | null) {
+  let code = (preferred || generateJobShortCode(8)).toUpperCase()
+  for (let i = 0; i < 8; i++) {
+    const { data } = await client
+      .from("recruitment_job_postings")
+      .select("id")
+      .eq("short_code", code)
+      .maybeSingle()
+    if (!data) return code
+    code = generateJobShortCode(8)
+  }
+  return generateJobShortCode(10)
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -64,12 +79,15 @@ export async function POST(req: NextRequest) {
     }
 
     const status = body.status ?? "draft"
+    const shortCode = await ensureUniqueShortCode(client, body.short_code)
     const payload = {
       company_id: companyId,
       requisition_id: body.requisition_id ?? null,
       slug: body.slug || slugify(body.title),
+      short_code: shortCode,
       title: body.title,
       description: body.description ?? "",
+      public_summary: body.public_summary ?? null,
       requirements: body.requirements ?? [],
       benefits: body.benefits ?? [],
       salary_min: Number(body.salary_min ?? 0),
@@ -85,7 +103,14 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     }
 
-    const { data, error } = await client.from("recruitment_job_postings").insert(payload).select().single()
+    let { data, error } = await client.from("recruitment_job_postings").insert(payload).select().single()
+    // Pre-085 DBs may not have short_code / public_summary yet
+    if (error && /short_code|public_summary|applications_count/i.test(error.message || "")) {
+      const { short_code: _sc, public_summary: _ps, ...legacy } = payload as any
+      const retry = await client.from("recruitment_job_postings").insert(legacy).select().single()
+      data = retry.data
+      error = retry.error
+    }
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true, job: data }, { status: 201 })
   } catch (err) {
@@ -119,25 +144,40 @@ export async function PATCH(req: NextRequest) {
       if (body[key] !== undefined) patch[key] = body[key]
     }
     if (body.status === "published") patch.published_at = new Date().toISOString()
+    if (body.public_summary !== undefined) patch.public_summary = body.public_summary
     if (body.action === "duplicate") {
       const { data: src } = await client.from("recruitment_job_postings").select("*").eq("id", body.id).single()
       if (!src) return NextResponse.json({ error: "Job not found" }, { status: 404 })
-      const { id: _id, created_at: _c, updated_at: _u, published_at: _p, ...rest } = src
+      const { id: _id, created_at: _c, updated_at: _u, published_at: _p, short_code: _sc, ...rest } = src
       const { data, error } = await client
         .from("recruitment_job_postings")
         .insert({
           ...rest,
           title: `${src.title} (Copy)`,
           slug: slugify(`${src.title}-copy`),
+          short_code: await ensureUniqueShortCode(client),
           status: "draft",
           published_at: null,
           views_count: 0,
+          applications_count: 0,
           updated_at: new Date().toISOString(),
         })
         .select()
         .single()
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
       return NextResponse.json({ success: true, job: data })
+    }
+
+    // Ensure published jobs always have a short share code
+    if (body.status === "published" || body.action === "ensure_short_code") {
+      const { data: current } = await client
+        .from("recruitment_job_postings")
+        .select("short_code")
+        .eq("id", body.id)
+        .maybeSingle()
+      if (!current?.short_code) {
+        patch.short_code = await ensureUniqueShortCode(client)
+      }
     }
 
     const { data, error } = await client

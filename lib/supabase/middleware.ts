@@ -60,6 +60,7 @@ export async function updateSession(request: NextRequest) {
     "/about",
     "/contact",
     "/careers",
+    "/j",
     "/help",
     "/api-docs",
     "/auth",
