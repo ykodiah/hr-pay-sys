@@ -77,7 +77,7 @@ export async function syncSignedOfferToOnboarding(
       file_type: "text/plain",
       file_url: dataUrl,
       status: "approved",
-      notes: `Signed offer letter · checklist ${checklist?.id || "pending"}`,
+      notes: `Signed offer letter`,
       source: "recruitment-offer",
       category: "employment-contract",
       company_id: offer.company_id,

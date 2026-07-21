@@ -3,7 +3,7 @@
 export type TaskFieldDef = {
   key: string
   label: string
-  type: "text" | "email" | "tel" | "textarea"
+  type: "text" | "email" | "tel" | "textarea" | "bank"
   required?: boolean
   placeholder?: string
 }
@@ -35,8 +35,13 @@ export function getOnboardingTaskArtifactConfig(task: {
         { key: "full_legal_name", label: "Full legal name", type: "text", required: true },
         { key: "phone", label: "Phone", type: "tel", required: true },
         { key: "emergency_contact", label: "Emergency contact name & phone", type: "text", required: true },
-        { key: "tin", label: "TIN", type: "text", required: true, placeholder: "Tax Identification Number" },
-        { key: "ghana_card_number", label: "Ghana Card number", type: "text" },
+        {
+          key: "ghana_card_number",
+          label: "Ghana Card number",
+          type: "text",
+          required: true,
+          placeholder: "GHA-XXXXXXXXX-X",
+        },
       ],
     }
   }
@@ -52,11 +57,10 @@ export function getOnboardingTaskArtifactConfig(task: {
 
   if (title.includes("payroll") || title.includes("ssnit") || title.includes("banking")) {
     return {
-      requiresUpload: true,
-      uploadLabel: "Bank letter / SSNIT proof (optional)",
+      requiresUpload: false,
       documentType: task.document_type || "bank-details",
       fields: [
-        { key: "bank_name", label: "Bank name", type: "text", required: true },
+        { key: "bank_name", label: "Bank name", type: "bank", required: true },
         { key: "account_number", label: "Account number", type: "text", required: true },
         { key: "account_name", label: "Account name", type: "text", required: true },
         { key: "ssnit_number", label: "SSNIT number", type: "text", required: true },

@@ -217,22 +217,42 @@ import {
 import { AdvancedDocumentService, AdvancedDocument } from "@/lib/storage/advancedDocumentService"
 
 // Enhanced document type labels
-const documentTypeLabels = {
+const documentTypeLabels: Record<string, string> = {
+  "ghana-card": "Ghana Card / ID",
+  "bank-details": "Bank Details",
+  "employment-contract": "Employment Contract",
+  "onboarding-document": "Onboarding Document",
+  "onboarding-form": "Onboarding Form",
+  "tax-relief": "Tax Relief",
+  other: "Other Documents",
+  cv: "CV / Resume",
+  certificate: "Certificate",
+  contract: "Employment Contract",
+  id: "ID Document",
+  passport: "Passport Copy",
+  ssnit: "SSNIT",
+  tin: "TIN",
   academic: "Academic Certificate",
   "passport-picture": "Passport Picture",
   resume: "Resume & Application",
-  passport: "Passport Copy",
   "national-id": "National ID",
   medical: "Medical Report",
   police: "Police Report",
-  other: "Other Documents",
-  contract: "Employment Contract",
   policy: "Company Policy",
   training: "Training Material",
   compliance: "Compliance Document",
   financial: "Financial Document",
   legal: "Legal Document",
   confidential: "Confidential Document",
+}
+
+function humanizeDocType(type: string) {
+  return (
+    documentTypeLabels[type] ||
+    String(type || "Other")
+      .replace(/[-_]/g, " ")
+      .replace(/\b\w/g, (l) => l.toUpperCase())
+  )
 }
 
 // Access level labels and colors
@@ -910,16 +930,46 @@ export default function FullyFunctionalDocumentVaultPage() {
   }
 
   // Helper functions
+  const employees = (() => {
+    const map = new Map<string, { id: string; name: string; code?: string }>()
+    for (const emp of vaultEmployees) {
+      if (!emp?.id) continue
+      map.set(emp.id, emp)
+    }
+    for (const doc of documents) {
+      const key =
+        doc.employeeId ||
+        (doc.employeeName ? `name:${String(doc.employeeName).toLowerCase().trim()}` : "")
+      if (!key) continue
+      if (!map.has(key)) {
+        map.set(key, {
+          id: doc.employeeId || key,
+          name: doc.employeeName || "Employee",
+          code: (doc as any).employeeCode || doc.metadata?.employeeCode,
+        })
+      }
+    }
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
+  })()
+
   const getFilteredDocuments = () => {
+    const selectedEmpName = employees.find((e) => e.id === selectedEmployee)?.name
     return documents.filter((doc) => {
       const matchesSearch =
         doc.employeeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         doc.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         doc.employeeId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String((doc as any).employeeCode || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String((doc as any).documentCode || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
         doc.fileType.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (doc.tags || []).some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
       
-      const matchesEmployee = selectedEmployee === "all" || doc.employeeId === selectedEmployee
+      const matchesEmployee =
+        selectedEmployee === "all" ||
+        doc.employeeId === selectedEmployee ||
+        (!!doc.employeeName &&
+          !!selectedEmpName &&
+          doc.employeeName.toLowerCase().trim() === selectedEmpName.toLowerCase().trim())
       const matchesDocumentType =
         selectedDocumentType === "all" ||
         doc.documentType === selectedDocumentType ||
@@ -947,7 +997,7 @@ export default function FullyFunctionalDocumentVaultPage() {
     const rows = docs.map(doc => [
       doc.fileName,
       doc.employeeName || "System",
-      documentTypeLabels[doc.documentType as keyof typeof documentTypeLabels] || doc.documentType,
+      humanizeDocType(doc.documentType),
       doc.status,
       new Date(doc.uploadDate).toLocaleDateString(),
       formatFileSize(doc.fileSize),
@@ -1049,27 +1099,6 @@ export default function FullyFunctionalDocumentVaultPage() {
 
   const stats = getDocumentStats()
   const filteredDocuments = getFilteredDocuments()
-  const employees = (() => {
-    const map = new Map<string, { id: string; name: string; code?: string }>()
-    for (const emp of vaultEmployees) {
-      if (!emp?.id) continue
-      map.set(emp.id, emp)
-    }
-    for (const doc of documents) {
-      const key =
-        doc.employeeId ||
-        (doc.employeeName ? `name:${String(doc.employeeName).toLowerCase().trim()}` : "")
-      if (!key) continue
-      if (!map.has(key)) {
-        map.set(key, {
-          id: doc.employeeId || key,
-          name: doc.employeeName || "Employee",
-          code: (doc as any).employeeCode || doc.metadata?.employeeCode,
-        })
-      }
-    }
-    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name))
-  })()
   const documentTypes = [...new Set(documents.map((doc) => doc.documentType))]
 
   return (
@@ -1250,7 +1279,7 @@ export default function FullyFunctionalDocumentVaultPage() {
                   <SelectItem value="all">All Types</SelectItem>
                   {documentTypes.map((type) => (
                     <SelectItem key={type} value={type}>
-                      {documentTypeLabels[type as keyof typeof documentTypeLabels]}
+                      {humanizeDocType(type)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1451,7 +1480,7 @@ export default function FullyFunctionalDocumentVaultPage() {
                               <div className="flex items-center text-sm text-gray-500">
                                 <FileText className="w-4 h-4 mr-1" />
                                 {documentTypeLabels[document.documentType as keyof typeof documentTypeLabels] ||
-                                  document.documentType}
+                                  humanizeDocType(document.documentType)}
                               </div>
                               <div className="flex items-center text-sm text-gray-500">
                                 <Calendar className="w-4 h-4 mr-1" />

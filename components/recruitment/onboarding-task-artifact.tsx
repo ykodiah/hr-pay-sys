@@ -1,11 +1,18 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Loader2, Paperclip, Upload } from "lucide-react"
 import {
   getOnboardingTaskArtifactConfig,
@@ -53,6 +60,27 @@ export function OnboardingTaskArtifactPanel({
   }))
   const [file, setFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
+  const [banks, setBanks] = useState<string[]>([])
+
+  const needsBanks = config.fields.some((f) => f.type === "bank")
+
+  useEffect(() => {
+    if (!needsBanks) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const qs = companyId ? `?company_id=${encodeURIComponent(companyId)}` : ""
+        const res = await fetch(`/api/banks${qs}`, { credentials: "include", cache: "no-store" })
+        const json = await res.json()
+        if (!cancelled && res.ok && Array.isArray(json.banks)) setBanks(json.banks)
+      } catch {
+        if (!cancelled) setBanks([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [needsBanks, companyId])
 
   const hasInputs =
     config.fields.length > 0 || config.requiresUpload || config.linkedOfferSignature
@@ -67,7 +95,10 @@ export function OnboardingTaskArtifactPanel({
       <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/80 p-3 text-sm space-y-2">
         <p className="font-medium text-slate-800">Offer letter signatures</p>
         <div className="flex flex-wrap gap-2">
-          <Badge variant={candidateOk ? "default" : "outline"} className={candidateOk ? "bg-emerald-600" : ""}>
+          <Badge
+            variant={candidateOk ? "default" : "outline"}
+            className={candidateOk ? "bg-emerald-600" : ""}
+          >
             Candidate {candidateOk ? `· ${offerSignatures?.candidate}` : "· pending"}
           </Badge>
           <Badge variant={hrOk ? "default" : "outline"} className={hrOk ? "bg-emerald-600" : ""}>
@@ -139,6 +170,23 @@ export function OnboardingTaskArtifactPanel({
                   value={fields[field.key] || ""}
                   onChange={(e) => setFields({ ...fields, [field.key]: e.target.value })}
                 />
+              ) : field.type === "bank" ? (
+                <Select
+                  value={fields[field.key] || ""}
+                  onValueChange={(v) => setFields({ ...fields, [field.key]: v })}
+                  disabled={disabled || done || saving}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select bank" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {banks.map((bank) => (
+                      <SelectItem key={bank} value={bank}>
+                        {bank}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               ) : (
                 <Input
                   type={field.type}
@@ -189,7 +237,7 @@ export function OnboardingTaskArtifactPanel({
             onClick={() => void submit(true)}
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-            Save &amp; complete
+            Save & complete
           </Button>
         </div>
       ) : (

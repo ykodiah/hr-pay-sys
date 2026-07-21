@@ -57,7 +57,7 @@ export default function PublicOfferPage() {
       if (!res.ok) throw new Error(json.error || "Offer not found")
       setOffer(json.offer)
       if (json.offer?.candidate_name) {
-        setSignatureName((prev: string) => prev || json.offer.candidate_name)
+        setSignatureName((prev) => prev || json.offer.candidate_name)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load offer")
@@ -311,3 +311,7 @@ export default function PublicOfferPage() {
     </div>
   )
 }
+'''
+)
+print("wrote", path, "bytes", path.stat().st_size)
+PY
