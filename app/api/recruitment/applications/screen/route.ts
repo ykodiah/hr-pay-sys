@@ -31,10 +31,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "application_id is required" }, { status: 400 })
     }
 
+    const authClient = await createClient()
     let companyId =
       (body.company_id as string | undefined) ||
-      (await resolveCompanyId(client, user.isDemo ? null : user.id))?.companyId ||
+      (await resolveCompanyId(authClient, user.isDemo ? null : user.id, user))?.companyId ||
+      (await resolveCompanyId(client, user.isDemo ? null : user.id, user))?.companyId ||
       null
+
+    // Fallback from the application row itself when tenant resolve is flaky
+    if (!companyId) {
+      const { data: stub } = await client
+        .from("recruitment_applications")
+        .select("company_id")
+        .eq("id", applicationId)
+        .maybeSingle()
+      companyId = stub?.company_id ?? null
+    }
+
     if (!companyId) {
       return NextResponse.json({ error: "Unable to resolve company" }, { status: 400 })
     }

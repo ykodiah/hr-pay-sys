@@ -32,8 +32,8 @@ export async function GET(req: NextRequest) {
       client
         .from("recruitment_applications")
         .select(
-          `id, status, score, source, applied_at, notes, cover_letter, job_posting_id, candidate_id, resume_url, resume_filename, screening_score, screening_summary, screening_status, screened_at,
-           candidate:recruitment_candidates(id, candidate_name, email, phone, skills, experience_text, education, resume_filename, resume_url, resume_text, resume_text_chars, resume_text_method, previous_company, linkedin_url),
+          `id, company_id, status, score, source, applied_at, notes, cover_letter, job_posting_id, candidate_id, resume_url, resume_filename, screening_score, screening_summary, screening_status, screened_at,
+           candidate:recruitment_candidates(*),
            job:recruitment_job_postings(id, title, department, slug, short_code)`,
         )
         .eq("company_id", companyId)

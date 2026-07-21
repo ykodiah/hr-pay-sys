@@ -113,6 +113,7 @@ type OrgPerson = {
 
 type Application = {
   id: string
+  company_id?: string | null
   job_posting_id: string | null
   candidate_id?: string | null
   status: string | null
@@ -136,6 +137,7 @@ type Application = {
   resume_text_chars?: number | null
   resume_text_method?: string | null
   resume_text_extracted_at?: string | null
+  resume_extract_warning?: string | null
   job_title?: string | null
   department?: string | null
   location?: string | null
@@ -895,13 +897,18 @@ export default function RecruitmentPage() {
     setPreviewLoading(true)
     setPreviewApplication(application)
     try {
-      const res = await fetch(`/api/recruitment/applications/${application.id}`, {
+      const cid = companyId || application.company_id || ""
+      const qs = cid ? `?company_id=${encodeURIComponent(cid)}` : ""
+      const res = await fetch(`/api/recruitment/applications/${application.id}${qs}`, {
         cache: "no-store",
         credentials: "include",
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Failed to load application")
       setPreviewApplication(json.application)
+      if (json.application?.company_id && !companyId) {
+        setCompanyId(json.application.company_id)
+      }
     } catch (err) {
       toast({
         title: "Preview failed",
@@ -925,18 +932,23 @@ export default function RecruitmentPage() {
       description: `Analyzing ${application.candidate_name || "candidate"} materials against the role requirements…`,
     })
     try {
+      const cid = companyId || application.company_id || null
       const res = await fetch("/api/recruitment/applications/screen", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ application_id: application.id, company_id: companyId }),
+        body: JSON.stringify({
+          application_id: application.id,
+          company_id: cid,
+        }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Screening failed")
       setScreeningResult(json.result || json.screening)
       setScreeningMeta(json.resume_extract || null)
       setOverrideScore(String(json.result?.ai_score ?? json.screening?.ai_score ?? ""))
-      await loadRecruitment(companyId)
+      if (cid && !companyId) setCompanyId(cid)
+      await loadRecruitment(cid || companyId)
       toast({
         title: "Screening complete",
         description: `Proposed score: ${json.result?.ai_score ?? json.screening?.ai_score ?? "—"}/100`,
@@ -961,13 +973,14 @@ export default function RecruitmentPage() {
     }
     setScreeningSaving(true)
     try {
+      const cid = companyId || screeningApplication.company_id || null
       const res = await fetch("/api/recruitment/applications/screen", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           application_id: screeningApplication.id,
-          company_id: companyId,
+          company_id: cid,
           final_score: score,
           override_reason: overrideReason || "Manual override by recruiter",
           save_only: Boolean(screeningResult),
@@ -980,10 +993,11 @@ export default function RecruitmentPage() {
       if (!screeningResult) {
         /* already handled */
       }
-      await loadRecruitment(companyId)
+      await loadRecruitment(cid || companyId)
       toast({ title: "Score saved", description: `Final screening score set to ${score}/100.` })
       setScreeningApplication(null)
       setScreeningResult(null)
+      setScreeningMeta(null)
     } catch (err) {
       toast({
         title: "Save failed",
@@ -2776,6 +2790,10 @@ export default function RecruitmentPage() {
                       Readable · {previewApplication.resume_text_chars.toLocaleString()} chars
                       {previewApplication.resume_text_method ? ` · ${previewApplication.resume_text_method}` : ""}
                     </Badge>
+                  ) : previewApplication.resume_text?.trim() && previewApplication.resume_text.length > 40 ? (
+                    <Badge variant="secondary" className="bg-emerald-100 text-emerald-800">
+                      Readable · {previewApplication.resume_text.length.toLocaleString()} chars
+                    </Badge>
                   ) : previewApplication.resume_url || previewApplication.resume_filename ? (
                     <Badge variant="outline" className="text-amber-800 border-amber-300">
                       Uploaded — text will extract on screen
@@ -2784,6 +2802,9 @@ export default function RecruitmentPage() {
                     <Badge variant="outline">No CV</Badge>
                   )}
                 </div>
+                {(previewApplication as any).resume_extract_warning ? (
+                  <p className="text-xs text-amber-700">{(previewApplication as any).resume_extract_warning}</p>
+                ) : null}
                 {previewApplication.resume_url ? (
                   <Button asChild variant="outline" size="sm">
                     <a href={previewApplication.resume_url} target="_blank" rel="noreferrer">
