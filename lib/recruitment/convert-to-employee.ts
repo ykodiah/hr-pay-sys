@@ -295,27 +295,31 @@ export async function convertChecklistToEmployee(
     .replace(/\s+/g, " ")
     .trim()
 
+  // Truncate helper — avoids varchar(100) / varchar(150) overflow errors
+  const t = (s: string | null | undefined, max = 100) =>
+    s ? String(s).slice(0, max) : null
+
   const employeePayload = {
     company_id: input.companyId,
-    employee_id: employeeCode,
+    employee_id: t(employeeCode, 20),
     prefix: "EMP",
-    first_name: draft.first_name,
-    other_names: draft.other_names || null,
-    last_name: draft.last_name,
-    full_name: fullName,
-    display_name: fullName,
-    personal_email: draft.personal_email || null,
-    corporate_email: draft.corporate_email || null,
-    phone: draft.phone || null,
-    position: draft.position || null,
-    department: draft.department || null,
-    location: draft.location || null,
-    status: normalizeEmployeeStatus(draft.status || "Active"),
-    contract_type: draft.contract_type || "Permanent",
+    first_name: t(draft.first_name, 100),
+    other_names: t(draft.other_names, 100),
+    last_name: t(draft.last_name, 100),
+    full_name: t(fullName, 255),
+    display_name: t(fullName, 255),
+    personal_email: t(draft.personal_email, 255),
+    corporate_email: t(draft.corporate_email, 255),
+    phone: t(draft.phone, 50),
+    position: t(draft.position, 150),
+    department: t(draft.department, 150),
+    location: t(draft.location, 150),
+    status: t(normalizeEmployeeStatus(draft.status || "Active"), 50),
+    contract_type: t(draft.contract_type || "Permanent", 100),
     date_of_joining: draft.date_of_joining || null,
     probation_period: draft.probation_period,
-    notice_period: draft.notice_period || null,
-    educational_level: draft.educational_level || null,
+    notice_period: t(draft.notice_period, 100),
+    educational_level: t(draft.educational_level, 100),
     updated_at: new Date().toISOString(),
   }
 

@@ -172,17 +172,6 @@ export default function PublicOfferPage() {
               </div>
             </div>
 
-            {offer.benefits?.length ? (
-              <div>
-                <h2 className="font-medium mb-2">Benefits</h2>
-                <ul className="list-disc pl-5 text-sm text-slate-700 space-y-1">
-                  {offer.benefits.map((b) => (
-                    <li key={b}>{b}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-
             <div>
               <h2 className="font-medium mb-2 flex items-center gap-2">
                 <FileText className="h-4 w-4" /> Offer letter

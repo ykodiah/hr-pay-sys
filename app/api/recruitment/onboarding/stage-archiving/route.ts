@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     // Fetch current checklist
     const { data: checklist, error: checklistError } = await client
       .from("recruitment_onboarding_checklists")
-      .select("id, completed_stages, company_id")
+      .select("id, completed_stages, archived_stages, company_id")
       .eq("id", checklist_id)
       .single()
 
@@ -60,11 +60,20 @@ export async function POST(req: NextRequest) {
 
     completedStages.push(stageSummary)
 
+    // Build simple string array of archived stage names for fast lookup
+    const existingArchivedStages = Array.isArray((checklist as any).archived_stages)
+      ? [...(checklist as any).archived_stages as string[]]
+      : []
+    if (!existingArchivedStages.includes(stage)) {
+      existingArchivedStages.push(stage)
+    }
+
     // Update checklist with completed stage
     const { error: updateError } = await client
       .from("recruitment_onboarding_checklists")
       .update({
         completed_stages: completedStages,
+        archived_stages: existingArchivedStages,
         is_stage_archived: true,
         archive_reason: `Stage ${stage} signed off at ${new Date().toLocaleString()}`,
       })

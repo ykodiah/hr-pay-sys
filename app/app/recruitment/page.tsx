@@ -25,6 +25,7 @@ import {
   Mail,
   MapPin,
   MessageSquare,
+  MoreHorizontal,
   PauseCircle,
   Pencil,
   PlayCircle,
@@ -51,6 +52,12 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
@@ -784,6 +791,17 @@ export default function RecruitmentPage() {
         setOffers(body.offers ?? [])
         const nextOnboarding = body.onboarding ?? []
         setOnboarding(nextOnboarding)
+        // Restore archived stages from DB (persisted in checklist.archived_stages)
+        const restoredArchives: Record<string, string[]> = {}
+        for (const c of nextOnboarding) {
+          const archivedArr = (c as any).archived_stages
+          if (Array.isArray(archivedArr) && archivedArr.length > 0) {
+            restoredArchives[c.id] = archivedArr as string[]
+          }
+        }
+        if (Object.keys(restoredArchives).length > 0) {
+          setArchivedStages(restoredArchives)
+        }
         setLastSynced(new Date())
         return nextOnboarding
       } catch (error) {
@@ -831,10 +849,11 @@ export default function RecruitmentPage() {
   }, [applications])
 
   const orderedOnboarding = useMemo(() => {
-    if (!focusedOnboardingId) return onboarding
-    const focused = onboarding.filter((c) => c.id === focusedOnboardingId)
-    const rest = onboarding.filter((c) => c.id !== focusedOnboardingId)
-    return [...focused, ...rest]
+    // When a hire is focused/selected in the queue, only show that hire's card
+    if (focusedOnboardingId) {
+      return onboarding.filter((c) => c.id === focusedOnboardingId)
+    }
+    return onboarding
   }, [onboarding, focusedOnboardingId])
 
   const applicationsByJob = useMemo(() => {
@@ -1435,11 +1454,9 @@ export default function RecruitmentPage() {
                 benefits: asStringList(json.offer.benefits).join("\n"),
                 salary: String(json.offer.salary ?? prev.salary),
                 currency: json.offer.currency || prev.currency,
-                hr_signature_name:
-                  json.offer.hr_signature_name || json.offer.signatory_name || prev.hr_signature_name,
-                signatory_name:
-                  json.offer.signatory_name || prev.signatory_name,
-                signatory_title: json.offer.signatory_title || prev.signatory_title,
+                hr_signature_name: prev.hr_signature_name || json.offer.hr_signature_name || json.offer.signatory_name,
+                signatory_name: prev.signatory_name || json.offer.signatory_name,
+                signatory_title: prev.signatory_title || json.offer.signatory_title,
               }
             : prev,
         )
@@ -3203,8 +3220,9 @@ export default function RecruitmentPage() {
                   {offers.map((offer) => {
                     const benefits = asStringList(offer.benefits)
                     return (
-                      <div key={offer.id} className="rounded-xl border bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm">
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div key={offer.id} className="rounded-xl border bg-gradient-to-br from-white to-slate-50 shadow-sm overflow-hidden">
+                        {/* Top row: name/status + action buttons */}
+                        <div className="flex flex-col gap-4 p-4 lg:flex-row lg:items-start lg:justify-between">
                           <div className="space-y-2 min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
                               <h3 className="text-lg font-semibold">{getOfferCandidateName(offer)}</h3>
@@ -3265,105 +3283,6 @@ export default function RecruitmentPage() {
                                 Candidate note: {offer.candidate_response_note}
                               </p>
                             ) : null}
-
-                            {/* Medical Requirements Section */}
-                            <div className="rounded-xl border border-slate-200 bg-slate-50/60">
-                              <button
-                                type="button"
-                                className="flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium"
-                                onClick={() => setOfferMedicalExpanded((prev) => ({ ...prev, [offer.id]: !prev[offer.id] }))}
-                              >
-                                <span className="flex items-center gap-2">
-                                  <Stethoscope className="h-4 w-4 text-teal-600" />
-                                  Medicals
-                                  {offerMedicalRequired[offer.id] ? (
-                                    <Badge className="text-[10px] bg-teal-100 text-teal-800 hover:bg-teal-100">
-                                      {offerMedicalTiming[offer.id] === "before" ? "Required before offer" : "Required after offer"}
-                                    </Badge>
-                                  ) : null}
-                                </span>
-                                {offerMedicalExpanded[offer.id]
-                                  ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                                  : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                              </button>
-                              {offerMedicalExpanded[offer.id] && (
-                                <div className="border-t px-3 py-3 space-y-3">
-                                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                                    <input
-                                      type="checkbox"
-                                      checked={offerMedicalRequired[offer.id] ?? false}
-                                      onChange={(e) => setOfferMedicalRequired((prev) => ({ ...prev, [offer.id]: e.target.checked }))}
-                                      className="rounded"
-                                    />
-                                    <span>Medical examination required for this hire</span>
-                                  </label>
-                                  {offerMedicalRequired[offer.id] && (
-                                    <div className="space-y-2 pl-5">
-                                      <p className="text-xs font-semibold text-slate-600">When must medicals be submitted?</p>
-                                      <div className="flex gap-3">
-                                        <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-                                          <input
-                                            type="radio"
-                                            name={`medical-timing-${offer.id}`}
-                                            value="before"
-                                            checked={(offerMedicalTiming[offer.id] ?? "after") === "before"}
-                                            onChange={() => setOfferMedicalTiming((prev) => ({ ...prev, [offer.id]: "before" }))}
-                                          />
-                                          <FlaskConical className="h-3.5 w-3.5 text-amber-600" />
-                                          Before offer letter is generated
-                                        </label>
-                                        <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-                                          <input
-                                            type="radio"
-                                            name={`medical-timing-${offer.id}`}
-                                            value="after"
-                                            checked={(offerMedicalTiming[offer.id] ?? "after") === "after"}
-                                            onChange={() => setOfferMedicalTiming((prev) => ({ ...prev, [offer.id]: "after" }))}
-                                          />
-                                          <FileText className="h-3.5 w-3.5 text-blue-600" />
-                                          After offer letter is generated
-                                        </label>
-                                      </div>
-                                      {(offerMedicalTiming[offer.id] ?? "after") === "before" ? (
-                                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 space-y-2">
-                                          <p className="font-medium flex items-center gap-1.5"><FlaskConical className="h-3.5 w-3.5" /> Medical-first workflow</p>
-                                          <p>The offer letter will be blocked until the applicant submits their medical documents. A communication will be sent to the applicant with an upload link. Once uploaded, the documents auto-fill the onboarding checklist.</p>
-                                          {!offerMedicalSent[offer.id] ? (
-                                            <Button
-                                              size="sm"
-                                              className="bg-amber-600 hover:bg-amber-700 mt-1"
-                                              disabled={offerMedicalSaving[offer.id]}
-                                              onClick={() => void handleSendMedicalRequest(offer)}
-                                            >
-                                              <Upload className="h-3.5 w-3.5" />
-                                              Send medical request to applicant
-                                            </Button>
-                                          ) : (
-                                            <p className="flex items-center gap-1.5 text-emerald-800 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Request sent — awaiting applicant submission</p>
-                                          )}
-                                        </div>
-                                      ) : (
-                                        <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
-                                          <p className="font-medium flex items-center gap-1.5"><FileText className="h-3.5 w-3.5" /> Offer-first workflow</p>
-                                          <p className="mt-0.5">The offer letter can be sent immediately. Medicals will be part of the onboarding checklist and the applicant must upload them during onboarding.</p>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                  <div className="flex justify-end">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      disabled={offerMedicalSaving[offer.id]}
-                                      onClick={() => void handleSaveMedical(offer.id)}
-                                    >
-                                      {offerMedicalSaving[offer.id] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                                      Save medical settings
-                                    </Button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
                           </div>
                           <div className="flex flex-col gap-2 shrink-0">
                             <div className="flex flex-wrap justify-end gap-2">
@@ -3466,6 +3385,141 @@ export default function RecruitmentPage() {
                               </Select>
                             </div>
                           </div>
+                        </div>
+
+                        {/* Medical Requirements Section — full-width horizontal panel */}
+                        <div className="border-t bg-slate-50/70">
+                          <button
+                            type="button"
+                            className="flex w-full items-center justify-between px-4 py-2.5 text-sm font-medium"
+                            onClick={() => setOfferMedicalExpanded((prev) => ({ ...prev, [offer.id]: !prev[offer.id] }))}
+                          >
+                            <span className="flex items-center gap-2">
+                              <Stethoscope className="h-4 w-4 text-teal-600" />
+                              Medicals
+                              {offerMedicalRequired[offer.id] ? (
+                                <Badge className="text-[10px] bg-teal-100 text-teal-800 hover:bg-teal-100">
+                                  {offerMedicalTiming[offer.id] === "before" ? "Required before offer" : "Required after offer"}
+                                </Badge>
+                              ) : null}
+                            </span>
+                            {offerMedicalExpanded[offer.id]
+                              ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                          </button>
+                          {offerMedicalExpanded[offer.id] && (
+                            <div className="border-t px-4 py-4">
+                              <div className="flex flex-wrap gap-6 items-start">
+                                {/* Left: checkbox + timing */}
+                                <div className="flex-1 min-w-[220px] space-y-3">
+                                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={offerMedicalRequired[offer.id] ?? false}
+                                      onChange={(e) => setOfferMedicalRequired((prev) => ({ ...prev, [offer.id]: e.target.checked }))}
+                                      className="rounded"
+                                    />
+                                    <span>Medical examination required for this hire</span>
+                                  </label>
+                                  {offerMedicalRequired[offer.id] && (
+                                    <div className="pl-5 space-y-2">
+                                      <p className="text-xs font-semibold text-slate-600">When must medicals be submitted?</p>
+                                      <div className="flex flex-wrap gap-4">
+                                        <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                                          <input
+                                            type="radio"
+                                            name={`medical-timing-${offer.id}`}
+                                            value="before"
+                                            checked={(offerMedicalTiming[offer.id] ?? "after") === "before"}
+                                            onChange={() => setOfferMedicalTiming((prev) => ({ ...prev, [offer.id]: "before" }))}
+                                          />
+                                          <FlaskConical className="h-3.5 w-3.5 text-amber-600" />
+                                          Before offer letter is generated
+                                        </label>
+                                        <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                                          <input
+                                            type="radio"
+                                            name={`medical-timing-${offer.id}`}
+                                            value="after"
+                                            checked={(offerMedicalTiming[offer.id] ?? "after") === "after"}
+                                            onChange={() => setOfferMedicalTiming((prev) => ({ ...prev, [offer.id]: "after" }))}
+                                          />
+                                          <FileText className="h-3.5 w-3.5 text-blue-600" />
+                                          After offer letter is generated
+                                        </label>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                {/* Right: workflow info + actions */}
+                                {offerMedicalRequired[offer.id] && (
+                                  <div className="flex-1 min-w-[240px]">
+                                    {(offerMedicalTiming[offer.id] ?? "after") === "before" ? (
+                                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 space-y-2">
+                                        <p className="font-medium flex items-center gap-1.5"><FlaskConical className="h-3.5 w-3.5" /> Medical-first workflow</p>
+                                        <p>The offer letter will be blocked until the applicant submits their medical documents. A communication will be sent to the applicant with an upload link. Once uploaded, the documents auto-fill the onboarding checklist.</p>
+                                        {!offerMedicalSent[offer.id] ? (
+                                          <div className="flex flex-wrap gap-2 mt-1">
+                                            <Button
+                                              size="sm"
+                                              className="bg-amber-600 hover:bg-amber-700"
+                                              disabled={offerMedicalSaving[offer.id]}
+                                              onClick={() => void handleSendMedicalRequest(offer)}
+                                            >
+                                              <Upload className="h-3.5 w-3.5" />
+                                              Send medical request
+                                            </Button>
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => {
+                                                const link = `${window.location.origin}/medical/${offer.short_code || offer.id}`
+                                                void navigator.clipboard.writeText(link).then(() => toast({ title: "Link copied", description: "Medical upload link copied to clipboard." }))
+                                              }}
+                                            >
+                                              <Link2 className="h-3.5 w-3.5" />
+                                              Copy link
+                                            </Button>
+                                          </div>
+                                        ) : (
+                                          <p className="flex items-center gap-1.5 text-emerald-800 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Request sent — awaiting applicant submission</p>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                                        <p className="font-medium flex items-center gap-1.5"><FileText className="h-3.5 w-3.5" /> Offer-first workflow</p>
+                                        <p className="mt-0.5">The offer letter can be sent immediately. Medicals will be part of the onboarding checklist and the applicant must upload them during onboarding.</p>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="mt-2 text-blue-800 border-blue-300 hover:bg-blue-100"
+                                          onClick={() => {
+                                            const link = `${window.location.origin}/medical/${offer.short_code || offer.id}`
+                                            void navigator.clipboard.writeText(link).then(() => toast({ title: "Link copied", description: "Medical upload link copied to clipboard." }))
+                                          }}
+                                        >
+                                          <Link2 className="h-3.5 w-3.5" />
+                                          Copy medical link
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                {/* Save button always visible */}
+                                <div className="flex items-start">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={offerMedicalSaving[offer.id]}
+                                    onClick={() => void handleSaveMedical(offer.id)}
+                                  >
+                                    {offerMedicalSaving[offer.id] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                                    Save medical settings
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )
@@ -3771,14 +3825,23 @@ export default function RecruitmentPage() {
                                     {stageLabels[stage] || stage}
                                   </div>
                                   {done && !isArchived && (
-                                    <button
-                                      type="button"
-                                      title="Sign off & archive this stage"
-                                      className="text-emerald-600 hover:text-emerald-800 text-xs font-medium underline"
-                                      onClick={() => setSignOffStage({ checklistId: checklist.id, stage })}
-                                    >
-                                      Sign off
-                                    </button>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <button
+                                          type="button"
+                                          className="rounded p-0.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                                          title="Stage actions"
+                                        >
+                                          <MoreHorizontal className="h-3.5 w-3.5" />
+                                        </button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="start">
+                                        <DropdownMenuItem onClick={() => setSignOffStage({ checklistId: checklist.id, stage })}>
+                                          <CheckCircle2 className="h-3.5 w-3.5 mr-1.5 text-emerald-600" />
+                                          Sign off &amp; archive
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
                                   )}
                                 </div>
                               )
@@ -3795,6 +3858,11 @@ export default function RecruitmentPage() {
                             {tasks.length ? (
                               tasks.map((task) => {
                                 const done = task.status === "completed" || task.status === "skipped"
+                                // Hide task items that belong to a signed-off/archived stage
+                                const taskStage = (task as any).stage as string | undefined
+                                if (taskStage && (archivedStages[checklist.id] ?? []).includes(taskStage)) {
+                                  return null
+                                }
                                 const linkedOffer =
                                   checklist.offer_id
                                     ? offers.find((o) => o.id === checklist.offer_id)
