@@ -5,20 +5,26 @@ import { useSearchParams } from "next/navigation"
 import {
   AlertCircle,
   BarChart3,
+  Bell,
   Briefcase,
   Building2,
   Calendar,
   Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   ClipboardCheck,
   Clock,
   Copy,
   Download,
   FileText,
+  FlaskConical,
   Link2,
+  List,
   Loader2,
   Mail,
   MapPin,
+  MessageSquare,
   PauseCircle,
   Pencil,
   PlayCircle,
@@ -28,9 +34,13 @@ import {
   Send,
   Share2,
   Sparkles,
+  Stethoscope,
   Trash2,
+  Upload,
+  UserCheck,
   UserPlus,
   Users,
+  X,
   XCircle,
   type LucideIcon,
 } from "lucide-react"
@@ -353,6 +363,9 @@ type InterviewForm = {
   location: string
   meeting_url: string
   notes: string
+  notify_email: boolean
+  notify_sms: boolean
+  notify_in_app: boolean
 }
 
 const emptyMetrics: Metrics = {
@@ -429,6 +442,9 @@ const initialInterviewForm: InterviewForm = {
   location: "",
   meeting_url: "",
   notes: "",
+  notify_email: true,
+  notify_sms: false,
+  notify_in_app: true,
 }
 
 function splitList(value: string) {
@@ -622,6 +638,44 @@ export default function RecruitmentPage() {
     department: string
     date_of_joining: string
   } | null>(null)
+  // --- Interview: staff tagging state ---
+  const [interviewerSearch, setInterviewerSearch] = useState("")
+  const [interviewerDropdownOpen, setInterviewerDropdownOpen] = useState(false)
+  const [selectedInterviewers, setSelectedInterviewers] = useState<OrgPerson[]>([])
+  const [interviewNotifyEmail, setInterviewNotifyEmail] = useState(true)
+  const [interviewNotifySms, setInterviewNotifySms] = useState(false)
+  const [interviewNotifyInApp, setInterviewNotifyInApp] = useState(true)
+
+  // --- Offer: medical requirements state ---
+  const [offerMedicalExpanded, setOfferMedicalExpanded] = useState<Record<string, boolean>>({})
+  const [offerMedicalRequired, setOfferMedicalRequired] = useState<Record<string, boolean>>({})
+  const [offerMedicalTiming, setOfferMedicalTiming] = useState<Record<string, "before" | "after">>({})
+  const [offerMedicalSaving, setOfferMedicalSaving] = useState<Record<string, boolean>>({})
+  const [offerMedicalSent, setOfferMedicalSent] = useState<Record<string, boolean>>({})
+
+  // --- Probation: review board state ---
+  const [probationBoard, setProbationBoard] = useState<{
+    checklistId: string
+    candidateName: string
+    startDate: string
+    probationEndDate: string
+    employeeId?: string
+  } | null>(null)
+  const [probationDecision, setProbationDecision] = useState<"confirmed" | "non_confirmed" | "">("")
+  const [probationPayDecision, setProbationPayDecision] = useState<"same" | "increase" | "">("")
+  const [probationNewSalary, setProbationNewSalary] = useState("")
+  const [probationNotes, setProbationNotes] = useState("")
+  const [probationSaving, setProbationSaving] = useState(false)
+
+  // --- Onboarding: queue & stage archiving state ---
+  const [onboardingQueueOpen, setOnboardingQueueOpen] = useState(false)
+  const [archivedStages, setArchivedStages] = useState<Record<string, string[]>>({})
+  const [signOffStage, setSignOffStage] = useState<{ checklistId: string; stage: string } | null>(null)
+  const [signOffSaving, setSignOffSaving] = useState(false)
+
+  // --- Direct hire toggle in convert modal ---
+  const [convertIsDirectHire, setConvertIsDirectHire] = useState(false)
+
   const [requisitionSearch, setRequisitionSearch] = useState("")
   const [requisitionStatus, setRequisitionStatus] = useState("all")
   const [jobSearch, setJobSearch] = useState("")
@@ -1147,6 +1201,12 @@ export default function RecruitmentPage() {
     event.preventDefault()
     const scheduledAt =
       interviewForm.date && interviewForm.time ? new Date(`${interviewForm.date}T${interviewForm.time}`).toISOString() : ""
+    // Build interviewers list: tagged staff takes priority; fall back to free-text name
+    const interviewersList = selectedInterviewers.length > 0
+      ? selectedInterviewers.map((s) => ({ id: s.id, name: s.name, department: s.department ?? null, position: s.position ?? null }))
+      : interviewForm.interviewer_name
+        ? [{ id: null, name: interviewForm.interviewer_name, department: null, position: null }]
+        : []
     const scheduled = await runMutation(
       "/api/recruitment/interviews",
       {
@@ -1157,18 +1217,124 @@ export default function RecruitmentPage() {
           scheduled_at: scheduledAt,
           interview_type: interviewForm.interview_type,
           duration_minutes: numberFromForm(interviewForm.duration_minutes) ?? 60,
-          interviewer_name: interviewForm.interviewer_name || null,
+          interviewer_name: interviewersList.map((i) => i.name).join(", ") || null,
+          interviewers: interviewersList,
           location: interviewForm.location || null,
           meeting_url: interviewForm.meeting_url || null,
           notes: interviewForm.notes || null,
+          notify_email: interviewNotifyEmail,
+          notify_sms: interviewNotifySms,
+          notify_in_app: interviewNotifyInApp,
         }),
       },
       "Interview scheduled",
-      "The candidate interview has been added.",
+      interviewersList.length
+        ? `Notifications sent to ${interviewersList.map((i) => i.name).join(", ")}.`
+        : "The candidate interview has been added.",
     )
     if (scheduled) {
       setInterviewForm(initialInterviewForm)
+      setSelectedInterviewers([])
+      setInterviewerSearch("")
       setShowInterviewDialog(false)
+    }
+  }
+
+  const handleSaveMedical = async (offerId: string) => {
+    setOfferMedicalSaving((prev) => ({ ...prev, [offerId]: true }))
+    try {
+      await fetch("/api/recruitment/offers/medical-requirements", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          offer_id: offerId,
+          medical_required: offerMedicalRequired[offerId] ?? false,
+          medical_timing: offerMedicalTiming[offerId] ?? "after",
+        }),
+      })
+      toast({ title: "Medical settings saved", description: "Medical requirements updated for this offer." })
+    } catch {
+      toast({ title: "Error", description: "Could not save medical settings.", variant: "destructive" })
+    } finally {
+      setOfferMedicalSaving((prev) => ({ ...prev, [offerId]: false }))
+    }
+  }
+
+  const handleSendMedicalRequest = async (offer: Offer) => {
+    setOfferMedicalSaving((prev) => ({ ...prev, [offer.id]: true }))
+    try {
+      await fetch("/api/recruitment/offers/medical-submission", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ offer_id: offer.id, company_id: companyId }),
+      })
+      setOfferMedicalSent((prev) => ({ ...prev, [offer.id]: true }))
+      toast({ title: "Medical request sent", description: `${getOfferCandidateName(offer)} has been asked to submit their medical documents.` })
+    } catch {
+      toast({ title: "Error", description: "Could not send medical request.", variant: "destructive" })
+    } finally {
+      setOfferMedicalSaving((prev) => ({ ...prev, [offer.id]: false }))
+    }
+  }
+
+  const handleProbationConfirm = async () => {
+    if (!probationBoard || !probationDecision || !probationPayDecision) return
+    setProbationSaving(true)
+    try {
+      await fetch("/api/recruitment/confirmation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          checklist_id: probationBoard.checklistId,
+          employee_id: probationBoard.employeeId,
+          decision: probationDecision,
+          pay_decision: probationPayDecision,
+          new_salary: probationNewSalary ? Number(probationNewSalary) : null,
+          confirmation_date: probationBoard.probationEndDate,
+          notes: probationNotes,
+          company_id: companyId,
+        }),
+      })
+      if (probationDecision === "confirmed") {
+        toast({ title: "Employee Confirmed!", description: `${probationBoard.candidateName} has been confirmed. Congratulatory notification sent.` })
+      } else {
+        toast({ title: "Non-Confirmation Recorded", description: `HR alert triggered for ${probationBoard.candidateName}.`, variant: "destructive" })
+      }
+      setProbationBoard(null)
+      setProbationDecision("")
+      setProbationPayDecision("")
+      setProbationNewSalary("")
+      setProbationNotes("")
+    } catch {
+      toast({ title: "Error", description: "Could not save confirmation decision.", variant: "destructive" })
+    } finally {
+      setProbationSaving(false)
+    }
+  }
+
+  const handleSignOffStage = async () => {
+    if (!signOffStage) return
+    setSignOffSaving(true)
+    try {
+      await fetch("/api/recruitment/onboarding/stage-archiving", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ checklist_id: signOffStage.checklistId, stage: signOffStage.stage, company_id: companyId }),
+      })
+      setArchivedStages((prev) => ({
+        ...prev,
+        [signOffStage.checklistId]: [...(prev[signOffStage.checklistId] ?? []), signOffStage.stage],
+      }))
+      toast({ title: "Stage signed off", description: `${signOffStage.stage.replace(/_/g, " ")} stage archived.` })
+      setSignOffStage(null)
+    } catch {
+      toast({ title: "Error", description: "Could not sign off stage.", variant: "destructive" })
+    } finally {
+      setSignOffSaving(false)
     }
   }
 
@@ -2831,13 +2997,87 @@ export default function RecruitmentPage() {
                           onChange={(event) => setInterviewForm((prev) => ({ ...prev, duration_minutes: event.target.value }))}
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="int-interviewer">Interviewer</Label>
-                        <Input
-                          id="int-interviewer"
-                          value={interviewForm.interviewer_name}
-                          onChange={(event) => setInterviewForm((prev) => ({ ...prev, interviewer_name: event.target.value }))}
-                        />
+                      <div className="space-y-2 col-span-2">
+                        <Label>Interviewers (tag from staff list)</Label>
+                        {/* Tagged interviewers chips */}
+                        {selectedInterviewers.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mb-1">
+                            {selectedInterviewers.map((s) => (
+                              <span key={s.id} className="inline-flex items-center gap-1 rounded-full bg-slate-900 text-white text-xs px-2.5 py-1">
+                                {s.name}
+                                {s.position ? <span className="opacity-60">· {s.position}</span> : null}
+                                <button
+                                  type="button"
+                                  className="ml-1 hover:text-red-300"
+                                  onClick={() => setSelectedInterviewers((prev) => prev.filter((i) => i.id !== s.id))}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {/* Staff search dropdown */}
+                        <div className="relative">
+                          <Input
+                            placeholder="Search staff by name or department…"
+                            value={interviewerSearch}
+                            onFocus={() => setInterviewerDropdownOpen(true)}
+                            onBlur={() => setTimeout(() => setInterviewerDropdownOpen(false), 150)}
+                            onChange={(e) => { setInterviewerSearch(e.target.value); setInterviewerDropdownOpen(true) }}
+                          />
+                          {interviewerDropdownOpen && (
+                            <div className="absolute z-50 mt-1 w-full rounded-lg border bg-white shadow-lg max-h-48 overflow-y-auto">
+                              {requestorOptions
+                                .filter((p) =>
+                                  !selectedInterviewers.find((s) => s.id === p.id) &&
+                                  (interviewerSearch === "" ||
+                                    p.name.toLowerCase().includes(interviewerSearch.toLowerCase()) ||
+                                    (p.department ?? "").toLowerCase().includes(interviewerSearch.toLowerCase()))
+                                )
+                                .slice(0, 20)
+                                .map((person) => (
+                                  <button
+                                    key={person.id}
+                                    type="button"
+                                    className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-slate-50 text-left"
+                                    onMouseDown={() => {
+                                      setSelectedInterviewers((prev) => [...prev, person])
+                                      setInterviewerSearch("")
+                                    }}
+                                  >
+                                    <span className="font-medium">{person.name}</span>
+                                    <span className="text-xs text-muted-foreground">{person.position ?? person.department ?? ""}</span>
+                                  </button>
+                                ))}
+                              {requestorOptions.filter((p) =>
+                                !selectedInterviewers.find((s) => s.id === p.id) &&
+                                (interviewerSearch === "" || p.name.toLowerCase().includes(interviewerSearch.toLowerCase()))
+                              ).length === 0 && (
+                                <p className="px-3 py-2 text-sm text-muted-foreground">No staff found</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        {/* Notification channels */}
+                        <div className="mt-2 rounded-lg border bg-slate-50 px-3 py-2.5">
+                          <p className="text-xs font-semibold text-slate-600 mb-2">Notify interviewers via</p>
+                          <div className="flex flex-wrap gap-3">
+                            <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                              <input type="checkbox" checked={interviewNotifyEmail} onChange={(e) => setInterviewNotifyEmail(e.target.checked)} className="rounded" />
+                              <Mail className="h-3.5 w-3.5" /> Email
+                            </label>
+                            <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                              <input type="checkbox" checked={interviewNotifySms} onChange={(e) => setInterviewNotifySms(e.target.checked)} className="rounded" />
+                              <MessageSquare className="h-3.5 w-3.5" /> SMS
+                            </label>
+                            <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                              <input type="checkbox" checked={interviewNotifyInApp} onChange={(e) => setInterviewNotifyInApp(e.target.checked)} className="rounded" />
+                              <Bell className="h-3.5 w-3.5" /> In-app
+                            </label>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1.5">Each interviewer receives the schedule, interview details, and a brief applicant summary.</p>
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="int-location">Location or room</Label>
@@ -2902,7 +3142,18 @@ export default function RecruitmentPage() {
                             {interview.interview_type || "interview"} · {interview.duration_minutes || 60} min
                           </p>
                         </TableCell>
-                        <TableCell>{interview.interviewer_name || "Unassigned"}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {interview.interviewer_name
+                              ? interview.interviewer_name.split(",").map((name, i) => (
+                                  <span key={i} className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-800 text-xs px-2 py-0.5">
+                                    <UserCheck className="h-3 w-3 text-emerald-600" />
+                                    {name.trim()}
+                                  </span>
+                                ))
+                              : <span className="text-muted-foreground text-sm">Unassigned</span>}
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={statusClass(interview.status)}>
                             {interview.status || "unknown"}
@@ -3014,6 +3265,105 @@ export default function RecruitmentPage() {
                                 Candidate note: {offer.candidate_response_note}
                               </p>
                             ) : null}
+
+                            {/* Medical Requirements Section */}
+                            <div className="rounded-xl border border-slate-200 bg-slate-50/60">
+                              <button
+                                type="button"
+                                className="flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium"
+                                onClick={() => setOfferMedicalExpanded((prev) => ({ ...prev, [offer.id]: !prev[offer.id] }))}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <Stethoscope className="h-4 w-4 text-teal-600" />
+                                  Medicals
+                                  {offerMedicalRequired[offer.id] ? (
+                                    <Badge className="text-[10px] bg-teal-100 text-teal-800 hover:bg-teal-100">
+                                      {offerMedicalTiming[offer.id] === "before" ? "Required before offer" : "Required after offer"}
+                                    </Badge>
+                                  ) : null}
+                                </span>
+                                {offerMedicalExpanded[offer.id]
+                                  ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                  : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                              </button>
+                              {offerMedicalExpanded[offer.id] && (
+                                <div className="border-t px-3 py-3 space-y-3">
+                                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={offerMedicalRequired[offer.id] ?? false}
+                                      onChange={(e) => setOfferMedicalRequired((prev) => ({ ...prev, [offer.id]: e.target.checked }))}
+                                      className="rounded"
+                                    />
+                                    <span>Medical examination required for this hire</span>
+                                  </label>
+                                  {offerMedicalRequired[offer.id] && (
+                                    <div className="space-y-2 pl-5">
+                                      <p className="text-xs font-semibold text-slate-600">When must medicals be submitted?</p>
+                                      <div className="flex gap-3">
+                                        <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                                          <input
+                                            type="radio"
+                                            name={`medical-timing-${offer.id}`}
+                                            value="before"
+                                            checked={(offerMedicalTiming[offer.id] ?? "after") === "before"}
+                                            onChange={() => setOfferMedicalTiming((prev) => ({ ...prev, [offer.id]: "before" }))}
+                                          />
+                                          <FlaskConical className="h-3.5 w-3.5 text-amber-600" />
+                                          Before offer letter is generated
+                                        </label>
+                                        <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                                          <input
+                                            type="radio"
+                                            name={`medical-timing-${offer.id}`}
+                                            value="after"
+                                            checked={(offerMedicalTiming[offer.id] ?? "after") === "after"}
+                                            onChange={() => setOfferMedicalTiming((prev) => ({ ...prev, [offer.id]: "after" }))}
+                                          />
+                                          <FileText className="h-3.5 w-3.5 text-blue-600" />
+                                          After offer letter is generated
+                                        </label>
+                                      </div>
+                                      {(offerMedicalTiming[offer.id] ?? "after") === "before" ? (
+                                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 space-y-2">
+                                          <p className="font-medium flex items-center gap-1.5"><FlaskConical className="h-3.5 w-3.5" /> Medical-first workflow</p>
+                                          <p>The offer letter will be blocked until the applicant submits their medical documents. A communication will be sent to the applicant with an upload link. Once uploaded, the documents auto-fill the onboarding checklist.</p>
+                                          {!offerMedicalSent[offer.id] ? (
+                                            <Button
+                                              size="sm"
+                                              className="bg-amber-600 hover:bg-amber-700 mt-1"
+                                              disabled={offerMedicalSaving[offer.id]}
+                                              onClick={() => void handleSendMedicalRequest(offer)}
+                                            >
+                                              <Upload className="h-3.5 w-3.5" />
+                                              Send medical request to applicant
+                                            </Button>
+                                          ) : (
+                                            <p className="flex items-center gap-1.5 text-emerald-800 font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Request sent — awaiting applicant submission</p>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                                          <p className="font-medium flex items-center gap-1.5"><FileText className="h-3.5 w-3.5" /> Offer-first workflow</p>
+                                          <p className="mt-0.5">The offer letter can be sent immediately. Medicals will be part of the onboarding checklist and the applicant must upload them during onboarding.</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                  <div className="flex justify-end">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={offerMedicalSaving[offer.id]}
+                                      onClick={() => void handleSaveMedical(offer.id)}
+                                    >
+                                      {offerMedicalSaving[offer.id] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                                      Save medical settings
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </div>
                           <div className="flex flex-col gap-2 shrink-0">
                             <div className="flex flex-wrap justify-end gap-2">
@@ -3167,11 +3517,61 @@ export default function RecruitmentPage() {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle>New hire onboarding</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>New hire onboarding</CardTitle>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => setOnboardingQueueOpen((prev) => !prev)}
+                >
+                  <List className="h-4 w-4" />
+                  {onboardingQueueOpen ? "Hide queue" : `Queue (${onboarding.filter((c) => c.status !== "completed").length})`}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {orderedOnboarding.length ? (
-                <div className="grid gap-5">
+                <div className={`flex gap-5 ${onboardingQueueOpen ? "" : ""}`}>
+                  {/* Onboarding applicant queue sidebar */}
+                  {onboardingQueueOpen && (
+                    <div className="w-64 shrink-0 rounded-xl border bg-slate-50 flex flex-col max-h-[70vh] overflow-y-auto">
+                      <div className="px-3 py-2.5 border-b">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Awaiting onboarding</p>
+                      </div>
+                      {onboarding.map((c) => {
+                        const isActive = c.id === focusedOnboardingId
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            className={`flex items-center justify-between px-3 py-2.5 text-left border-b last:border-b-0 transition-colors ${isActive ? "bg-emerald-100 text-emerald-900" : "hover:bg-white text-slate-800"}`}
+                            onClick={() => {
+                              if (isActive) {
+                                setFocusedOnboardingId(null)
+                                setFocusOnboardingLookup(null)
+                              } else {
+                                setFocusedOnboardingId(c.id)
+                                setFocusOnboardingLookup({ checklistId: c.id })
+                                setTimeout(() => document.getElementById(`onboarding-${c.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50)
+                              }
+                            }}
+                          >
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm truncate">{c.candidate_name ?? "New hire"}</p>
+                              <p className="text-xs text-muted-foreground truncate">{c.job_title ?? c.stage ?? ""}</p>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                              <span className="text-xs tabular-nums text-muted-foreground">{c.progress ?? 0}%</span>
+                              {isActive ? <ChevronDown className="h-3.5 w-3.5 text-emerald-700" /> : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  <div className="flex-1 grid gap-5">
                   {focusedOnboardingId ? (
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-950">
                       Continue onboarding for the highlighted hire — complete remaining tasks, then{" "}
@@ -3296,9 +3696,30 @@ export default function RecruitmentPage() {
                                 {checklist.status === "completed" ? "Completed" : "Mark complete"}
                               </Button>
                               {checklist.employee_id ? (
-                                <Button size="sm" variant="secondary" asChild>
-                                  <a href="/app/employees">View employee list</a>
-                                </Button>
+                                <>
+                                  <Button size="sm" variant="secondary" asChild>
+                                    <a href="/app/employees">View employee list</a>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-purple-300 text-purple-800 hover:bg-purple-50"
+                                    onClick={() => {
+                                      const startDate = checklist.start_date ?? new Date().toISOString().slice(0, 10)
+                                      const endDate = new Date(new Date(startDate).setMonth(new Date(startDate).getMonth() + 6)).toISOString().slice(0, 10)
+                                      setProbationBoard({
+                                        checklistId: checklist.id,
+                                        candidateName: checklist.candidate_name ?? "Employee",
+                                        startDate,
+                                        probationEndDate: endDate,
+                                        employeeId: checklist.employee_id ?? undefined,
+                                      })
+                                    }}
+                                  >
+                                    <UserCheck className="h-4 w-4" />
+                                    Review Board
+                                  </Button>
+                                </>
                               ) : (
                                 <Button
                                   size="sm"
@@ -3315,22 +3736,50 @@ export default function RecruitmentPage() {
                         </div>
 
                         <div className="space-y-4 p-5">
-                          <div className="flex flex-wrap gap-2">
+                          {/* Completed stages archive summary */}
+                          {(archivedStages[checklist.id] ?? []).length > 0 && (
+                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                              <p className="text-xs font-semibold text-emerald-800 mb-1.5 flex items-center gap-1.5">
+                                <CheckCircle2 className="h-3.5 w-3.5" /> Completed stages (archived)
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {(archivedStages[checklist.id] ?? []).map((s) => (
+                                  <span key={s} className="rounded-full bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 border border-emerald-200">
+                                    {stageLabels[s] ?? s}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          <div className="flex flex-wrap gap-2 items-center">
                             {stages.map((stage, idx) => {
                               const active = idx === stageIdx
                               const done = idx < stageIdx || currentStage === "completed"
+                              const isArchived = (archivedStages[checklist.id] ?? []).includes(stage)
+                              if (isArchived) return null
                               return (
-                                <div
-                                  key={stage}
-                                  className={`rounded-full px-3 py-1 text-xs font-medium border ${
-                                    done
-                                      ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                                      : active
-                                        ? "bg-slate-900 text-white border-slate-900"
-                                        : "bg-white text-slate-500 border-slate-200"
-                                  }`}
-                                >
-                                  {stageLabels[stage] || stage}
+                                <div key={stage} className="flex items-center gap-1">
+                                  <div
+                                    className={`rounded-full px-3 py-1 text-xs font-medium border ${
+                                      done
+                                        ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                        : active
+                                          ? "bg-slate-900 text-white border-slate-900"
+                                          : "bg-white text-slate-500 border-slate-200"
+                                    }`}
+                                  >
+                                    {stageLabels[stage] || stage}
+                                  </div>
+                                  {done && !isArchived && (
+                                    <button
+                                      type="button"
+                                      title="Sign off & archive this stage"
+                                      className="text-emerald-600 hover:text-emerald-800 text-xs font-medium underline"
+                                      onClick={() => setSignOffStage({ checklistId: checklist.id, stage })}
+                                    >
+                                      Sign off
+                                    </button>
+                                  )}
                                 </div>
                               )
                             })}
@@ -3431,6 +3880,7 @@ export default function RecruitmentPage() {
                       </div>
                     )
                   })}
+                  </div>
                 </div>
               ) : (
                 <EmptyState
@@ -4173,6 +4623,7 @@ export default function RecruitmentPage() {
             setConvertChecklist(null)
             setConvertPreview(null)
             setConvertDraft(null)
+            setConvertIsDirectHire(false)
           }
         }}
       >
@@ -4186,9 +4637,35 @@ export default function RecruitmentPage() {
             </div>
           ) : convertDraft ? (
             <div className="space-y-4">
+              {/* Hire path toggle */}
+              <div className="rounded-xl border bg-slate-50 p-3">
+                <p className="text-xs font-semibold text-slate-600 mb-2">Employee addition method</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    className={`rounded-lg border-2 px-3 py-2.5 text-sm font-medium text-left transition-colors ${!convertIsDirectHire ? "border-slate-900 bg-white" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
+                    onClick={() => setConvertIsDirectHire(false)}
+                  >
+                    <UserPlus className="h-4 w-4 mb-1" />
+                    Via recruitment portal
+                    <p className="text-xs font-normal text-muted-foreground mt-0.5">Prefilled from offer &amp; onboarding</p>
+                  </button>
+                  <button
+                    type="button"
+                    className={`rounded-lg border-2 px-3 py-2.5 text-sm font-medium text-left transition-colors ${convertIsDirectHire ? "border-slate-900 bg-white" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
+                    onClick={() => setConvertIsDirectHire(true)}
+                  >
+                    <Users className="h-4 w-4 mb-1" />
+                    Direct hire
+                    <p className="text-xs font-normal text-muted-foreground mt-0.5">No prior recruitment process</p>
+                  </button>
+                </div>
+              </div>
               <p className="text-sm text-muted-foreground">
-                Details are prefilled from the offer and candidate profile. Confirm to create (or link) the
-                employee securely — nothing is invented for bank/SSNIT unless you opt in to payroll.
+                {convertIsDirectHire
+                  ? "Fill in employee details manually. Financial details from this form will be synced to the employee card."
+                  : "Details are prefilled from the offer and candidate profile. Financial details from onboarding are auto-captured to the employee card."
+                }
               </p>
 
               {convertPreview?.conflicts?.already_converted || convertPreview?.conflicts?.existing_employee ? (
@@ -4267,17 +4744,81 @@ export default function RecruitmentPage() {
                 </div>
               </div>
 
-              {/* Salary information (auto-included from onboarding) */}
-              {convertPreview?.draft?.suggested_monthly_salary != null ? (
-                <div className="rounded-lg border bg-blue-50 px-3 py-2 text-sm text-blue-900">
-                  <strong>Monthly Salary:</strong>{" "}
-                  {convertPreview.draft.currency || "GHS"}{" "}
-                  {Number(convertPreview.draft.suggested_monthly_salary).toLocaleString()}
-                  <p className="text-xs text-blue-800 mt-1">
-                    Financial details will be auto-captured from onboarding and synced to employee card.
-                  </p>
+              {/* Financial auto-capture summary */}
+              <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 space-y-2">
+                <p className="text-xs font-semibold text-blue-800 flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Financial data auto-capture
+                </p>
+                {convertPreview?.draft?.suggested_monthly_salary != null ? (
+                  <div className="grid grid-cols-2 gap-2 text-sm text-blue-900">
+                    <div>
+                      <p className="text-xs text-blue-700">Monthly salary</p>
+                      <p className="font-semibold">{convertPreview.draft.currency || "GHS"} {Number(convertPreview.draft.suggested_monthly_salary).toLocaleString()}</p>
+                    </div>
+                    {convertPreview.draft.bank_name ? (
+                      <div>
+                        <p className="text-xs text-blue-700">Bank</p>
+                        <p className="font-medium">{convertPreview.draft.bank_name}</p>
+                      </div>
+                    ) : null}
+                    {convertPreview.draft.bank_account_number ? (
+                      <div>
+                        <p className="text-xs text-blue-700">Account no.</p>
+                        <p className="font-medium">{convertPreview.draft.bank_account_number}</p>
+                      </div>
+                    ) : null}
+                    {convertPreview.draft.ssnit_number ? (
+                      <div>
+                        <p className="text-xs text-blue-700">SSNIT</p>
+                        <p className="font-medium">{convertPreview.draft.ssnit_number}</p>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-xs text-blue-700">Financial details from onboarding checklist will be auto-synced to the employee card and self-service portal (read-only for employee, editable by HR).</p>
+                )}
+              </div>
+
+              {/* Direct hire: manual salary / bank / SSNIT fields */}
+              {convertIsDirectHire && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 space-y-3">
+                  <p className="text-xs font-semibold text-slate-700">Financial details (direct hire)</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Monthly salary</Label>
+                      <Input placeholder="e.g. 5000" type="number" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Currency</Label>
+                      <Select defaultValue="GHS">
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="GHS">GHS</SelectItem>
+                          <SelectItem value="USD">USD</SelectItem>
+                          <SelectItem value="EUR">EUR</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Bank name</Label>
+                      <Input placeholder="e.g. GCB Bank" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Account number</Label>
+                      <Input placeholder="Account number" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">SSNIT number</Label>
+                      <Input placeholder="SSNIT number" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">TIN</Label>
+                      <Input placeholder="Tax identification number" />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">These will auto-populate the employee card financial tab and sync to the employee self-service portal (read-only).</p>
                 </div>
-              ) : null}
+              )}
 
               <div className="flex justify-end gap-2">
                 <Button
@@ -4303,6 +4844,142 @@ export default function RecruitmentPage() {
           ) : (
             <p className="text-sm text-muted-foreground">No draft available.</p>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Probation Review Board */}
+      <Dialog open={Boolean(probationBoard)} onOpenChange={(open) => !open && setProbationBoard(null)}>
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-purple-700" />
+              Probation Review Board
+            </DialogTitle>
+          </DialogHeader>
+          {probationBoard && (
+            <div className="space-y-5">
+              <div className="rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 space-y-1">
+                <p className="font-semibold text-purple-900">{probationBoard.candidateName}</p>
+                <p className="text-sm text-purple-800">Start date: {formatDate(probationBoard.startDate)}</p>
+                <p className="text-sm text-purple-800 font-medium">Probation ends: {formatDate(probationBoard.probationEndDate)} <Badge className="ml-1 bg-purple-200 text-purple-900 text-[10px] hover:bg-purple-200">6-month period</Badge></p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold">Confirmation Decision <span className="text-red-500">*</span></Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    className={`rounded-xl border-2 px-4 py-3 text-sm font-medium transition-colors ${probationDecision === "confirmed" ? "border-emerald-500 bg-emerald-50 text-emerald-900" : "border-slate-200 hover:border-slate-300"}`}
+                    onClick={() => setProbationDecision("confirmed")}
+                  >
+                    <CheckCircle2 className={`h-5 w-5 mx-auto mb-1 ${probationDecision === "confirmed" ? "text-emerald-600" : "text-slate-400"}`} />
+                    Confirm
+                  </button>
+                  <button
+                    type="button"
+                    className={`rounded-xl border-2 px-4 py-3 text-sm font-medium transition-colors ${probationDecision === "non_confirmed" ? "border-red-400 bg-red-50 text-red-900" : "border-slate-200 hover:border-slate-300"}`}
+                    onClick={() => setProbationDecision("non_confirmed")}
+                  >
+                    <XCircle className={`h-5 w-5 mx-auto mb-1 ${probationDecision === "non_confirmed" ? "text-red-500" : "text-slate-400"}`} />
+                    Do not confirm
+                  </button>
+                </div>
+              </div>
+
+              {probationDecision === "confirmed" && (
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold">Pay Increase Decision <span className="text-red-500">*</span></Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      className={`rounded-xl border-2 px-4 py-3 text-sm font-medium transition-colors ${probationPayDecision === "same" ? "border-slate-500 bg-slate-50 text-slate-900" : "border-slate-200 hover:border-slate-300"}`}
+                      onClick={() => setProbationPayDecision("same")}
+                    >
+                      Same pay
+                    </button>
+                    <button
+                      type="button"
+                      className={`rounded-xl border-2 px-4 py-3 text-sm font-medium transition-colors ${probationPayDecision === "increase" ? "border-emerald-500 bg-emerald-50 text-emerald-900" : "border-slate-200 hover:border-slate-300"}`}
+                      onClick={() => setProbationPayDecision("increase")}
+                    >
+                      Pay increase
+                    </button>
+                  </div>
+                  {probationPayDecision === "increase" && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="new-salary">New monthly salary</Label>
+                      <Input
+                        id="new-salary"
+                        type="number"
+                        placeholder="e.g. 6500"
+                        value={probationNewSalary}
+                        onChange={(e) => setProbationNewSalary(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <Label htmlFor="prob-notes">Review notes</Label>
+                <Textarea
+                  id="prob-notes"
+                  rows={3}
+                  placeholder="Performance summary, comments…"
+                  value={probationNotes}
+                  onChange={(e) => setProbationNotes(e.target.value)}
+                />
+              </div>
+
+              {probationDecision === "confirmed" && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+                  Confirmation date will be auto-calculated as exactly 6 months from start date ({formatDate(probationBoard.probationEndDate)}). A congratulatory notification will be triggered on the employee dashboard.
+                </div>
+              )}
+              {probationDecision === "non_confirmed" && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+                  An HR alert will be triggered for termination proceedings. The employee portal will be notified accordingly.
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setProbationBoard(null)}>Cancel</Button>
+                <Button
+                  className={probationDecision === "confirmed" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}
+                  disabled={probationSaving || !probationDecision || !probationPayDecision}
+                  onClick={() => void handleProbationConfirm()}
+                >
+                  {probationSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Submit decision
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Stage sign-off confirmation dialog */}
+      <Dialog open={Boolean(signOffStage)} onOpenChange={(open) => !open && setSignOffStage(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Sign off stage</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Sign off <strong className="capitalize">{signOffStage?.stage?.replace(/_/g, " ")}</strong>? The detailed form will be archived and only a summary will be displayed.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setSignOffStage(null)}>Cancel</Button>
+              <Button
+                className="bg-slate-900 hover:bg-slate-800"
+                disabled={signOffSaving}
+                onClick={() => void handleSignOffStage()}
+              >
+                {signOffSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Sign off &amp; archive
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
