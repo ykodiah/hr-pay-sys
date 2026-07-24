@@ -167,12 +167,21 @@ type Application = {
   job_requirements?: unknown
   screening_score?: number | null
   screening_summary?: string | null
+  screening_notes?: string | null
   screening_status?: string | null
   screened_at?: string | null
+  ai_score?: number | null
+  ai_score_override?: number | null
+  ai_score_override_at?: string | null
+  ai_score_override_by?: string | null
+  candidate_skills?: unknown
+  candidate_experience?: string | null
+  cover_letter_text?: string | null
 }
 
 type Interview = {
   id: string
+  company_id?: string | null
   application_id: string | null
   interview_type: string | null
   scheduled_at: string | null
@@ -184,6 +193,11 @@ type Interview = {
   notes: string | null
   feedback: string | null
   rating: number | null
+  applicant_result?: "pass" | "fail" | "on_hold" | null
+  result_notified_at?: string | null
+  assessment_form?: Record<string, unknown> | null
+  assessment_sent_at?: string | null
+  assessment_completed_at?: string | null
   candidate_name?: string | null
   candidate_email?: string | null
   job_title?: string | null
@@ -1364,6 +1378,50 @@ export default function RecruitmentPage() {
       action === "complete" ? "Interview completed" : "Interview cancelled",
       `${interview.candidate_name || "Candidate"} interview was updated.`,
     )
+  }
+
+  const setInterviewResult = async (interview: Interview, result: "pass" | "fail" | "on_hold") => {
+    setSaving(true)
+    try {
+      const res = await fetch("/api/recruitment/interviews", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: interview.id, applicant_result: result }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Could not set result")
+      await loadRecruitment(companyId)
+      const label = result === "pass" ? "Passed" : result === "fail" ? "Failed" : "On hold"
+      toast({ title: `Result set: ${label}`, description: `Click "Notify applicant" to send the email to ${interview.candidate_name || "the candidate"}.` })
+    } catch (err) {
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Could not set result", variant: "destructive" })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const sendInterviewResult = async (interview: Interview) => {
+    setSaving(true)
+    try {
+      const res = await fetch("/api/recruitment/interviews/notify-result", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          interview_id: interview.id,
+          company_id: companyId || interview.company_id,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Could not send notification")
+      await loadRecruitment(companyId)
+      toast({ title: "Notification sent", description: `Result notification emailed to ${interview.candidate_name || "the candidate"}.` })
+    } catch (err) {
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Could not send notification", variant: "destructive" })
+    } finally {
+      setSaving(false)
+    }
   }
 
   const openOfferEditor = (offer: Offer) => {
@@ -2949,6 +3007,27 @@ export default function RecruitmentPage() {
                     <DialogTitle>Schedule interview</DialogTitle>
                   </DialogHeader>
                   <form className="space-y-4" onSubmit={handleScheduleInterview}>
+                    {/* Applicant profile summary for interviewers */}
+                    {interviewForm.application_id && (() => {
+                      const app = applications.find((a) => a.id === interviewForm.application_id)
+                      if (!app) return null
+                      return (
+                        <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3 space-y-2">
+                          <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide">Applicant profile summary</p>
+                          <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2 text-sm text-blue-900">
+                            <p><span className="text-xs text-blue-600">Name:</span> {app.candidate_name || "—"}</p>
+                            <p><span className="text-xs text-blue-600">Role:</span> {getApplicationJobTitle(app)}</p>
+                            <p><span className="text-xs text-blue-600">Email:</span> {app.candidate_email || "—"}</p>
+                            <p><span className="text-xs text-blue-600">AI Score:</span> {app.ai_score_override ?? app.ai_score ?? "—"}/100</p>
+                            {app.candidate_experience ? <p className="sm:col-span-2"><span className="text-xs text-blue-600">Experience:</span> {String(app.candidate_experience).substring(0, 120)}</p> : null}
+                            {app.candidate_skills?.length ? <p className="sm:col-span-2"><span className="text-xs text-blue-600">Skills:</span> {(app.candidate_skills as string[]).join(", ")}</p> : null}
+                          </div>
+                          {app.cover_letter_text || app.screening_notes ? (
+                            <p className="text-xs text-blue-700 line-clamp-3">{app.cover_letter_text || app.screening_notes}</p>
+                          ) : null}
+                        </div>
+                      )
+                    })()}
                     <div className="space-y-2">
                       <Label>Application</Label>
                       <Select
@@ -3122,12 +3201,38 @@ export default function RecruitmentPage() {
                         onChange={(event) => setInterviewForm((prev) => ({ ...prev, notes: event.target.value }))}
                       />
                     </div>
+
+                    {/* Assessment form attachment */}
+                    <div className="rounded-xl border p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold">Assessment form</p>
+                          <p className="text-xs text-muted-foreground">An AI-generated assessment sheet is attached to this interview notification. Each assessor must sign off online.</p>
+                        </div>
+                        <Badge className="bg-teal-100 text-teal-800 hover:bg-teal-100 text-xs">Auto-attached</Badge>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs space-y-1">
+                        <p className="font-medium text-slate-700">Assessment sheet includes:</p>
+                        <ul className="list-disc pl-4 text-muted-foreground space-y-0.5">
+                          <li>Candidate profile &amp; background</li>
+                          <li>Role requirements vs. candidate profile</li>
+                          <li>Structured scoring rubric (Technical, Communication, Culture fit, Experience)</li>
+                          <li>Open-ended interviewer notes</li>
+                          <li>Overall recommendation (Pass / Fail / On hold)</li>
+                          <li>Online assessor sign-off</li>
+                        </ul>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        After all assessors complete and sign off, HR reviews results to issue a pass/fail notification to the applicant before proceeding to the offer stage.
+                      </p>
+                    </div>
+
                     <div className="flex justify-end gap-2">
                       <Button type="button" variant="outline" onClick={() => setShowInterviewDialog(false)}>
                         Cancel
                       </Button>
                       <Button type="submit" disabled={saving || !interviewForm.application_id}>
-                        Schedule
+                        Schedule &amp; send assessment
                       </Button>
                     </div>
                   </form>
@@ -3143,6 +3248,7 @@ export default function RecruitmentPage() {
                       <TableHead>When</TableHead>
                       <TableHead>Interviewer</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Result</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -3175,6 +3281,65 @@ export default function RecruitmentPage() {
                           <Badge variant="outline" className={statusClass(interview.status)}>
                             {interview.status || "unknown"}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {interview.applicant_result ? (
+                            <div className="space-y-1">
+                              <Badge
+                                className={
+                                  interview.applicant_result === "pass"
+                                    ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
+                                    : interview.applicant_result === "fail"
+                                    ? "bg-red-100 text-red-800 hover:bg-red-100"
+                                    : "bg-amber-100 text-amber-800 hover:bg-amber-100"
+                                }
+                              >
+                                {interview.applicant_result === "pass" ? "Pass" : interview.applicant_result === "fail" ? "Fail" : "On hold"}
+                              </Badge>
+                              {interview.result_notified_at ? (
+                                <p className="text-xs text-muted-foreground">Notified {new Date(interview.result_notified_at).toLocaleDateString()}</p>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-6 text-xs px-2"
+                                  onClick={() => void sendInterviewResult(interview)}
+                                >
+                                  <Mail className="h-3 w-3 mr-1" />
+                                  Notify applicant
+                                </Button>
+                              )}
+                            </div>
+                          ) : interview.status === "completed" ? (
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs px-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                                onClick={() => void setInterviewResult(interview, "pass")}
+                              >
+                                Pass
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs px-2 border-red-300 text-red-700 hover:bg-red-50"
+                                onClick={() => void setInterviewResult(interview, "fail")}
+                              >
+                                Fail
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs px-2"
+                                onClick={() => void setInterviewResult(interview, "on_hold")}
+                              >
+                                Hold
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Pending</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex justify-end gap-2">
@@ -4289,28 +4454,47 @@ export default function RecruitmentPage() {
               ) : null}
 
               <div className="rounded-xl border p-4 space-y-3">
-                <h4 className="text-sm font-semibold">Manual score override</h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold">Score review &amp; override</h4>
+                  {screeningResult?.ai_score != null && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                      onClick={() => setOverrideScore(String(screeningResult.ai_score))}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                      Accept AI score ({screeningResult.ai_score})
+                    </Button>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Accept the AI score or set your own. Saving keeps status as screening and updates the queue score.
+                  Accept the AI score by clicking above, or type a different score to override it. Saving updates the candidate queue score.
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label>Final score (0–100)</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={overrideScore}
-                      onChange={(e) => setOverrideScore(e.target.value)}
-                      disabled={screeningLoading}
-                    />
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={overrideScore}
+                        onChange={(e) => setOverrideScore(e.target.value)}
+                        disabled={screeningLoading}
+                        className={overrideScore && screeningResult?.ai_score != null && Number(overrideScore) !== screeningResult.ai_score ? "border-amber-400 focus-visible:ring-amber-400" : ""}
+                      />
+                      {overrideScore && screeningResult?.ai_score != null && Number(overrideScore) !== screeningResult.ai_score && (
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-amber-600 font-medium">overridden</span>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label>Override reason</Label>
                     <Input
                       value={overrideReason}
                       onChange={(e) => setOverrideReason(e.target.value)}
-                      placeholder="Optional"
+                      placeholder="Optional note"
                       disabled={screeningLoading}
                     />
                   </div>
@@ -4319,9 +4503,9 @@ export default function RecruitmentPage() {
                   <Button variant="outline" onClick={() => setScreeningApplication(null)}>
                     Close
                   </Button>
-                  <Button disabled={screeningLoading || screeningSaving} onClick={() => void saveScreeningOverride()}>
+                  <Button disabled={screeningLoading || screeningSaving || !overrideScore} onClick={() => void saveScreeningOverride()}>
                     {screeningSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                    Save final score
+                    Save score
                   </Button>
                 </div>
               </div>

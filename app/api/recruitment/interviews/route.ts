@@ -113,6 +113,11 @@ export async function PATCH(req: NextRequest) {
       "rating",
       "feedback",
       "notes",
+      "applicant_result",
+      "result_notified_at",
+      "assessment_form",
+      "assessment_sent_at",
+      "assessment_completed_at",
     ]) {
       if (body[key] !== undefined) patch[key] = body[key]
     }
