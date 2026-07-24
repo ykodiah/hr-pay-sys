@@ -4267,23 +4267,16 @@ export default function RecruitmentPage() {
                 </div>
               </div>
 
+              {/* Salary information (auto-included from onboarding) */}
               {convertPreview?.draft?.suggested_monthly_salary != null ? (
-                <label className="flex items-start gap-2 rounded-lg border bg-slate-50 p-3 text-sm">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={convertIncludePayroll}
-                    onChange={(e) => setConvertIncludePayroll(e.target.checked)}
-                  />
-                  <span>
-                    Also set suggested monthly salary{" "}
-                    <strong>
-                      {convertPreview.draft.currency || "GHS"}{" "}
-                      {Number(convertPreview.draft.suggested_monthly_salary).toLocaleString()}
-                    </strong>{" "}
-                    (no bank/SSNIT placeholders — HR completes payroll setup later).
-                  </span>
-                </label>
+                <div className="rounded-lg border bg-blue-50 px-3 py-2 text-sm text-blue-900">
+                  <strong>Monthly Salary:</strong>{" "}
+                  {convertPreview.draft.currency || "GHS"}{" "}
+                  {Number(convertPreview.draft.suggested_monthly_salary).toLocaleString()}
+                  <p className="text-xs text-blue-800 mt-1">
+                    Financial details will be auto-captured from onboarding and synced to employee card.
+                  </p>
+                </div>
               ) : null}
 
               <div className="flex justify-end gap-2">
