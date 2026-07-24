@@ -3020,7 +3020,7 @@ export default function RecruitmentPage() {
                             <p><span className="text-xs text-blue-600">Email:</span> {app.candidate_email || "—"}</p>
                             <p><span className="text-xs text-blue-600">AI Score:</span> {app.ai_score_override ?? app.ai_score ?? "—"}/100</p>
                             {app.candidate_experience ? <p className="sm:col-span-2"><span className="text-xs text-blue-600">Experience:</span> {String(app.candidate_experience).substring(0, 120)}</p> : null}
-                            {app.candidate_skills?.length ? <p className="sm:col-span-2"><span className="text-xs text-blue-600">Skills:</span> {(app.candidate_skills as string[]).join(", ")}</p> : null}
+                            {Array.isArray(app.candidate_skills) && app.candidate_skills.length > 0 ? <p className="sm:col-span-2"><span className="text-xs text-blue-600">Skills:</span> {(app.candidate_skills as string[]).join(", ")}</p> : null}
                           </div>
                           {app.cover_letter_text || app.screening_notes ? (
                             <p className="text-xs text-blue-700 line-clamp-3">{app.cover_letter_text || app.screening_notes}</p>
