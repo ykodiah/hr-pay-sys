@@ -197,7 +197,7 @@ async function fetchReportRows(
       .select("id")
       .eq("company_id", companyId)
       .eq("pay_period_start", start)
-    runIds = (runs ?? []).map((r) => r.id)
+    runIds = (runs ?? []).map((r: any) => r.id)
   }
 
   if (!runIds.length) {
@@ -294,7 +294,7 @@ async function fetchReportRows(
       current_loan_balance: 0,
       current_loan_deduction: Number(it.loan_deduction ?? 0),
     } as PayrollReportRow
-  }).map((r) => normalizePayrollCashRow(r) as PayrollReportRow)
+  }).map((r: any) => normalizePayrollCashRow(r) as PayrollReportRow)
   
   return { 
     rows: mappedRows,
