@@ -70,15 +70,15 @@ export function ReportSelector({ selectedReport, onSelectReport }: ReportSelecto
         <CardDescription>Choose which Ghana payroll report to generate</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {REPORT_OPTIONS.map(({ type, label, description, icon: Icon }) => (
             <Button
               key={type}
               variant={selectedReport === type ? 'default' : 'outline'}
-              className="h-auto flex-col items-start gap-1.5 p-3 text-left"
+              className="h-auto flex-col items-start gap-1.5 p-3 text-left whitespace-normal min-h-[64px]"
               onClick={() => onSelectReport(type)}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full">
                 <Icon className="h-4 w-4 shrink-0" />
                 <span className="text-sm font-semibold leading-tight">{label}</span>
               </div>

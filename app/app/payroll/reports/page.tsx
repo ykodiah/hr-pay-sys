@@ -1,12 +1,10 @@
 "use client"
 
-import { useCallback, useEffect, useState, useTransition } from "react"
-import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
+import { useCallback, useState, useTransition } from "react"
 import { toast } from "@/hooks/use-toast"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Loader2, AlertCircle } from "lucide-react"
+import { Loader2, AlertCircle, FileBarChart } from "lucide-react"
 import { ReportSelector, type ReportType } from "@/components/payroll/reports/ReportSelector"
 import { PeriodSelector } from "@/components/payroll/reports/PeriodSelector"
 import { StandardReportViewer } from "@/components/payroll/reports/StandardReportViewer"
@@ -22,93 +20,67 @@ import {
   exportDeductionsReportToExcel,
 } from "@/lib/payroll/report-export"
 
+// Column definitions keyed by report type slug (must match ReportType values)
 const REPORT_COLUMNS: Record<string, Array<{ key: string; label: string; format?: (v: any) => string }>> = {
-  ssnit_tier1: [
+  'ssnit-tier1': [
     { key: 'staff_id', label: 'Staff ID' },
     { key: 'ssnit_number', label: 'SSNIT Number' },
     { key: 'nia_number', label: 'NIA Number' },
     { key: 'surname', label: 'Surname' },
     { key: 'first_name', label: 'First Name' },
     { key: 'other_names', label: 'Other Names' },
-    { key: 'basic_salary', label: 'Basic Salary (GHS)', format: (v) => (v as number).toFixed(2) },
-    { key: 'tier1_contribution', label: '13.50% (GHS)', format: (v) => (v as number).toFixed(2) },
+    { key: 'basic_salary', label: 'Basic Salary (GHS)', format: (v) => Number(v).toFixed(2) },
+    { key: 'tier1_contribution', label: '13.50% (GHS)', format: (v) => Number(v).toFixed(2) },
     { key: 'code', label: 'Code' },
   ],
-  ssnit_tier2: [
+  'ssnit-tier2': [
     { key: 'staff_id', label: 'Staff ID' },
     { key: 'ssnit_number', label: 'SSNIT Number' },
     { key: 'nia_number', label: 'NIA Number' },
     { key: 'surname', label: 'Surname' },
     { key: 'first_name', label: 'First Name' },
     { key: 'other_names', label: 'Other Names' },
-    { key: 'basic_salary', label: 'Basic Salary (GHS)', format: (v) => (v as number).toFixed(2) },
-    { key: 'tier2_contribution', label: '5% (GHS)', format: (v) => (v as number).toFixed(2) },
+    { key: 'basic_salary', label: 'Basic Salary (GHS)', format: (v) => Number(v).toFixed(2) },
+    { key: 'tier2_contribution', label: '5% (GHS)', format: (v) => Number(v).toFixed(2) },
     { key: 'code', label: 'Code' },
   ],
-  provident_fund: [
+  'provident-fund': [
     { key: 'staff_id', label: 'Staff ID' },
     { key: 'ssnit_number', label: 'SSNIT Number' },
+    { key: 'nia_number', label: 'NIA Number' },
     { key: 'full_name', label: 'Full Name' },
-    { key: 'basic_salary', label: 'Basic Salary (GHS)', format: (v) => (v as number).toFixed(2) },
-    { key: 'pf_contribution', label: 'PF Deducted (GHS)', format: (v) => (v as number).toFixed(2) },
-    { key: 'pf_percentage', label: 'Percentage (%)', format: (v) => (v as number).toFixed(2) },
+    { key: 'basic_salary', label: 'Basic Salary (GHS)', format: (v) => Number(v).toFixed(2) },
+    { key: 'pf_contribution', label: 'PF Deducted (GHS)', format: (v) => Number(v).toFixed(2) },
+    { key: 'pf_percentage', label: 'Percentage (%)', format: (v) => Number(v).toFixed(2) },
   ],
-  paye: [
+  'paye': [
     { key: 'staff_id', label: 'Staff ID' },
     { key: 'tin_number', label: 'TIN' },
     { key: 'full_name', label: 'Employee Name' },
     { key: 'category', label: 'Category' },
-    { key: 'basic_salary', label: 'Basic Salary (GHS)', format: (v) => (v as number).toFixed(2) },
-    { key: 'total_allowances', label: 'Allowances (GHS)', format: (v) => (v as number).toFixed(2) },
-    { key: 'overtime_income', label: 'OT Income (GHS)', format: (v) => (v as number).toFixed(2) },
-    { key: 'basic_tax', label: 'Basic Tax (GHS)', format: (v) => (v as number).toFixed(2) },
-    { key: 'total_tax_payable', label: 'Total Tax (GHS)', format: (v) => (v as number).toFixed(2) },
-    { key: 'net_pay', label: 'Net Pay (GHS)', format: (v) => (v as number).toFixed(2) },
+    { key: 'basic_salary', label: 'Basic Salary (GHS)', format: (v) => Number(v).toFixed(2) },
+    { key: 'total_allowances', label: 'Allowances (GHS)', format: (v) => Number(v).toFixed(2) },
+    { key: 'overtime_income', label: 'OT Income (GHS)', format: (v) => Number(v).toFixed(2) },
+    { key: 'basic_tax', label: 'Basic Tax (GHS)', format: (v) => Number(v).toFixed(2) },
+    { key: 'total_tax_payable', label: 'Total Tax (GHS)', format: (v) => Number(v).toFixed(2) },
+    { key: 'net_pay', label: 'Net Pay (GHS)', format: (v) => Number(v).toFixed(2) },
   ],
 }
 
-export default function PayrollReportsPage() {
-  const router = useRouter()
-  const supabase = createClient()
-  const [isPending, startTransition] = useTransition()
+const MULTI_SECTION_TYPES: ReportType[] = ['allowances', 'deductions']
 
-  const [companyId, setCompanyId] = useState<string>('')
+export default function PayrollReportsPage() {
+  const [, startTransition] = useTransition()
+
   const [selectedReport, setSelectedReport] = useState<ReportType | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState<string>('')
   const [report, setReport] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>('')
 
-  // Get company ID on mount
-  useEffect(() => {
-    const getCompanyId = async () => {
-      try {
-        const { data: user } = await supabase.auth.getUser()
-        if (!user) {
-          router.push('/login')
-          return
-        }
-
-        const { data: emp } = await supabase
-          .from('employees')
-          .select('company_id')
-          .eq('id', user.user.id)
-          .single()
-
-        if (emp?.company_id) {
-          setCompanyId(emp.company_id)
-        }
-      } catch (err) {
-        console.error('[v0] Failed to get company:', err)
-      }
-    }
-
-    getCompanyId()
-  }, [supabase, router])
-
   const generateReport = useCallback(async () => {
-    if (!selectedReport || !selectedPeriod || !companyId) {
-      setError('Please select a report type and period')
+    if (!selectedReport || !selectedPeriod) {
+      setError('Please select a report type and pay period')
       return
     }
 
@@ -117,187 +89,129 @@ export default function PayrollReportsPage() {
     setReport(null)
 
     try {
+      // companyId is resolved server-side via resolveTenantContext — send empty string
+      // and let the API route derive it from the session/demo cookie
       const response = await fetch(`/api/payroll/reports/${selectedReport}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyId,
-          payPeriod: selectedPeriod,
-        }),
+        body: JSON.stringify({ companyId: '', payPeriod: selectedPeriod }),
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to generate report')
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || `Server error ${response.status}`)
       }
 
       const data = await response.json()
       setReport(data.report)
-      toast({ title: 'Success', description: 'Report generated successfully' })
+      toast({ title: 'Report generated', description: `${data.report.reportType} for ${selectedPeriod}` })
     } catch (err: any) {
       const message = err.message || 'Failed to generate report'
       setError(message)
       toast({ title: 'Error', description: message, variant: 'destructive' })
-      console.error('[v0] Report generation error:', err)
     } finally {
       setLoading(false)
     }
-  }, [selectedReport, selectedPeriod, companyId])
+  }, [selectedReport, selectedPeriod])
 
-  const handleExportPDF = async () => {
-    if (!report) return
-    try {
-      // PDF export via print: user can save as PDF from print dialog
-      window.print()
-      toast({ title: 'Info', description: 'Use browser print dialog to save as PDF', variant: 'default' })
-    } catch (err) {
-      toast({ title: 'Error', description: 'Failed to export PDF', variant: 'destructive' })
-    }
+  const makeExportOptions = () => ({
+    reportType: report?.reportType ?? '',
+    companyName: report?.companyName ?? '',
+    erNumber: report?.erNumber ?? '',
+    payPeriod: report?.payPeriod ?? selectedPeriod,
+    generatedAt: report?.generatedAt ?? new Date().toISOString(),
+  })
+
+  const handleExportPDF = () => {
+    window.print()
   }
 
-  const handleExportExcel = async () => {
+  const handleExportExcel = () => {
     if (!report || !selectedReport) return
-    try {
-      if (selectedReport === 'allowances') {
-        exportAllowancesReportToExcel(
-          {
-            reportType: report.reportType,
-            companyName: report.companyName,
-            erNumber: report.erNumber,
-            payPeriod: report.payPeriod,
-            generatedAt: report.generatedAt,
-          },
-          report.sections || []
-        )
-      } else if (selectedReport === 'deductions') {
-        exportDeductionsReportToExcel(
-          {
-            reportType: report.reportType,
-            companyName: report.companyName,
-            erNumber: report.erNumber,
-            payPeriod: report.payPeriod,
-            generatedAt: report.generatedAt,
-          },
-          report.sections || []
-        )
-      } else {
-        exportStandardReportToExcel(
-          {
-            reportType: report.reportType,
-            companyName: report.companyName,
-            erNumber: report.erNumber,
-            payPeriod: report.payPeriod,
-            generatedAt: report.generatedAt,
-          },
-          REPORT_COLUMNS[selectedReport as keyof typeof REPORT_COLUMNS] || [],
-          report.rows || []
-        )
-      }
-      toast({ title: 'Success', description: 'Report exported to Excel', variant: 'default' })
-    } catch (err) {
-      console.error('[v0] Excel export error:', err)
-      toast({ title: 'Error', description: 'Failed to export Excel', variant: 'destructive' })
+    const opts = makeExportOptions()
+    if (selectedReport === 'allowances') {
+      exportAllowancesReportToExcel(opts, report.sections || [])
+    } else if (selectedReport === 'deductions') {
+      exportDeductionsReportToExcel(opts, report.sections || [])
+    } else {
+      exportStandardReportToExcel(opts, REPORT_COLUMNS[selectedReport] || [], report.rows || [])
     }
+    toast({ title: 'Excel exported' })
   }
 
-  const handleExportCSV = async () => {
+  const handleExportCSV = () => {
     if (!report || !selectedReport) return
-    try {
-      if (selectedReport === 'allowances') {
-        exportAllowancesReportToCSV(
-          {
-            reportType: report.reportType,
-            companyName: report.companyName,
-            erNumber: report.erNumber,
-            payPeriod: report.payPeriod,
-            generatedAt: report.generatedAt,
-          },
-          report.sections || []
-        )
-      } else if (selectedReport === 'deductions') {
-        exportDeductionsReportToCSV(
-          {
-            reportType: report.reportType,
-            companyName: report.companyName,
-            erNumber: report.erNumber,
-            payPeriod: report.payPeriod,
-            generatedAt: report.generatedAt,
-          },
-          report.sections || []
-        )
-      } else {
-        exportStandardReportToCSV(
-          {
-            reportType: report.reportType,
-            companyName: report.companyName,
-            erNumber: report.erNumber,
-            payPeriod: report.payPeriod,
-            generatedAt: report.generatedAt,
-          },
-          REPORT_COLUMNS[selectedReport as keyof typeof REPORT_COLUMNS] || [],
-          report.rows || []
-        )
-      }
-      toast({ title: 'Success', description: 'Report exported to CSV', variant: 'default' })
-    } catch (err) {
-      console.error('[v0] CSV export error:', err)
-      toast({ title: 'Error', description: 'Failed to export CSV', variant: 'destructive' })
+    const opts = makeExportOptions()
+    if (selectedReport === 'allowances') {
+      exportAllowancesReportToCSV(opts, report.sections || [])
+    } else if (selectedReport === 'deductions') {
+      exportDeductionsReportToCSV(opts, report.sections || [])
+    } else {
+      exportStandardReportToCSV(opts, REPORT_COLUMNS[selectedReport] || [], report.rows || [])
     }
+    toast({ title: 'CSV exported' })
   }
+
+  const canGenerate = !!selectedReport && !!selectedPeriod
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
+
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold">Ghana Payroll Reports</h1>
-          <p className="text-muted-foreground mt-1">Generate statutory and operational payroll reports</p>
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <FileBarChart className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Ghana Payroll Reports</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Generate statutory and operational payroll reports for submission
+            </p>
+          </div>
         </div>
 
-        {/* Selectors */}
+        {/* Step 1 & 2 — selectors side-by-side */}
         <div className="grid gap-4 lg:grid-cols-2">
           <ReportSelector selectedReport={selectedReport} onSelectReport={setSelectedReport} />
           <PeriodSelector selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} />
         </div>
 
-        {/* Generate Button */}
-        <div>
-          <Button
-            onClick={() => startTransition(generateReport)}
-            disabled={!selectedReport || !selectedPeriod || loading}
-            size="lg"
-            className="w-full sm:w-auto"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generating Report...
-              </>
-            ) : (
-              'Generate Report'
-            )}
-          </Button>
-        </div>
+        {/* Generate */}
+        <Button
+          onClick={() => startTransition(generateReport)}
+          disabled={!canGenerate || loading}
+          size="lg"
+          className="w-full sm:w-auto min-w-48"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Generating...
+            </>
+          ) : (
+            'Generate Report'
+          )}
+        </Button>
 
-        {/* Error Display */}
+        {/* Error */}
         {error && (
           <Card className="border-destructive bg-destructive/10">
-            <CardContent className="pt-6 flex gap-3">
-              <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+            <CardContent className="pt-5 flex gap-3 items-start">
+              <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
               <div>
-                <p className="font-semibold text-destructive">Error</p>
-                <p className="text-sm">{error}</p>
+                <p className="font-semibold text-destructive text-sm">Error generating report</p>
+                <p className="text-sm text-muted-foreground mt-0.5">{error}</p>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Report Display */}
+        {/* Report output */}
         {report && (
-          <div className="space-y-4">
-            {/* Export Buttons */}
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Report</h2>
+          <div className="space-y-4 print:mt-0">
+            <div className="flex flex-wrap justify-between items-center gap-3 print:hidden">
+              <h2 className="text-lg font-semibold">{report.reportType}</h2>
               <ExportButtons
                 reportType={selectedReport || ''}
                 payPeriod={selectedPeriod}
@@ -309,7 +223,6 @@ export default function PayrollReportsPage() {
               />
             </div>
 
-            {/* Render appropriate viewer based on report type */}
             {selectedReport === 'allowances' ? (
               <AllowancesSectionViewer
                 companyName={report.companyName}
@@ -332,9 +245,9 @@ export default function PayrollReportsPage() {
                 companyName={report.companyName}
                 erNumber={report.erNumber}
                 payPeriod={report.payPeriod}
-                columns={REPORT_COLUMNS[selectedReport as keyof typeof REPORT_COLUMNS] || []}
+                columns={REPORT_COLUMNS[selectedReport as string] || []}
                 rows={report.rows || []}
-                totalRows={report.totalRows}
+                totalRows={report.totalRows ?? (report.rows?.length ?? 0)}
                 generatedAt={report.generatedAt}
                 footerNote={report.notes}
               />

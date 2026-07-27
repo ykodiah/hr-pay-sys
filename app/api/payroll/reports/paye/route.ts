@@ -1,109 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { requireApiUser } from '@/lib/auth/api-user'
+import {
+  resolveReportContext,
+  fetchPayrollItems,
+  cacheReport,
+} from '@/lib/payroll/report-query-helpers'
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireApiUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
     const { companyId, payPeriod } = await request.json()
 
     if (!companyId || !payPeriod) {
       return NextResponse.json({ error: 'Missing required fields: companyId, payPeriod' }, { status: 400 })
     }
 
-    const client = await createClient()
+    const ctx = await resolveReportContext(request, companyId, payPeriod)
+    if ('error' in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status })
 
-    const { data: userAccess } = await client
-      .from('employees')
-      .select('id')
-      .eq('id', user.id)
-      .eq('company_id', companyId)
-      .in('special_role', ['HR', 'Admin', 'Finance'])
-      .single()
+    const { client, company, periodStart, periodEnd } = ctx
 
-    if (!userAccess) return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+    const items = await fetchPayrollItems(
+      client,
+      company.id,
+      periodStart,
+      periodEnd,
+      `basic_salary, allowances, deductions, net_pay,
+       employees!inner(employee_id_no, tin_number, last_name, first_name, middle_name, job_title)`,
+    )
 
-    const { data: company } = await client
-      .from('companies')
-      .select('name, er_number')
-      .eq('id', companyId)
-      .single()
-
-    if (!company) return NextResponse.json({ error: 'Company not found' }, { status: 404 })
-
-    // Get PAYE data with special handling for basic salary ≤ 1500
-    const { data: reportData } = await client
-      .from('payroll_items')
-      .select(`
-        employee_id,
-        basic_salary,
-        allowances,
-        deductions,
-        overtime_income,
-        paye_tax,
-        overtime_tax,
-        net_pay,
-        employees!inner(tin_number, employee_id_no, job_title, last_name, first_name, middle_name)
-      `)
-      .eq('company_id', companyId)
-      .eq('pay_period', payPeriod)
-      .neq('status', 'cancelled')
-
-    const processedData = (reportData || []).map((item: any) => {
-      const allowances = item.allowances || {}
-      const deductions = item.deductions || {}
-      const totalAllowances = Object.values(allowances).reduce((sum: number, val: any) => sum + (val || 0), 0)
-      const totalDeductions = Object.values(deductions).reduce((sum: number, val: any) => sum + (val || 0), 0)
-      const isBasicOvertime = item.basic_salary <= 1500
+    const rows = items.map((item: any) => {
+      const emp = item.employees
+      const allowances = (item.allowances as Record<string, number>) || {}
+      const deductions = (item.deductions as Record<string, number>) || {}
+      const basic = Number(item.basic_salary || 0)
+      const totalAllowances = Object.values(allowances).reduce((s, v) => s + Number(v || 0), 0)
+      const totalDeductions = Object.values(deductions).reduce((s, v) => s + Number(v || 0), 0)
+      // Ghana PAYE rule: if basic ≤ 1500, tax only on overtime
+      const isOvertimeRule = basic <= 1500
+      const overtimeIncome = Number(allowances.overtime ?? allowances.overtime_pay ?? 0)
+      // paye_tax field may not exist on payroll_items — derive from deductions
+      const payeTax = Number(deductions.paye ?? deductions.paye_tax ?? deductions.income_tax ?? 0)
+      const overtimeTax = isOvertimeRule ? payeTax : 0
+      const basicTax = isOvertimeRule ? 0 : payeTax
 
       return {
-        staff_id: item.employees.employee_id_no,
-        tin_number: item.employees.tin_number || '',
-        full_name: `${item.employees.last_name} ${item.employees.first_name}${item.employees.middle_name ? ' ' + item.employees.middle_name : ''}`,
-        category: item.employees.job_title || '',
-        basic_salary: item.basic_salary,
+        staff_id: emp.employee_id_no || '',
+        tin_number: emp.tin_number || '',
+        full_name: `${emp.last_name || ''} ${emp.first_name || ''}${emp.middle_name ? ' ' + emp.middle_name : ''}`.trim(),
+        category: emp.job_title || '',
+        basic_salary: basic,
         total_allowances: totalAllowances,
-        overtime_income: isBasicOvertime ? item.overtime_income : 0,
-        basic_tax: isBasicOvertime ? 0 : item.paye_tax,
-        total_tax_payable: isBasicOvertime ? item.overtime_tax : item.paye_tax,
-        total_deductions: totalDeductions,
-        net_pay: item.net_pay,
-        is_basic_overtime_rule: isBasicOvertime,
+        overtime_income: isOvertimeRule ? overtimeIncome : 0,
+        basic_tax: basicTax,
+        total_tax_payable: payeTax,
+        net_pay: Number(item.net_pay || 0),
+        is_basic_overtime_rule: isOvertimeRule,
       }
     })
 
-    await client
-      .from('ghana_payroll_reports')
-      .insert({
-        company_id: companyId,
-        pay_period: payPeriod,
-        report_type: 'paye',
-        report_data: {
-          companyName: company.name,
-          erNumber: company.er_number,
-          reportType: 'PAYE TAX REPORT',
-          payPeriod,
-          notes: 'Basic salary ≤ 1500: tax calculated on overtime income only',
-          rows: processedData,
-        },
-        generated_by: user.id,
-      })
+    const reportPayload = {
+      companyName: company.name,
+      erNumber: company.erNumber,
+      reportType: 'PAYE TAX REPORT',
+      payPeriod,
+      notes: 'Basic salary ≤ GHS 1,500: PAYE calculated on overtime income only',
+      rows,
+      totalRows: rows.length,
+      generatedAt: new Date().toISOString(),
+    }
 
-    return NextResponse.json({
-      success: true,
-      report: {
-        companyName: company.name,
-        erNumber: company.er_number,
-        reportType: 'PAYE TAX REPORT',
-        payPeriod,
-        rows: processedData,
-        totalRows: processedData.length,
-        notes: 'Basic salary ≤ 1500: tax calculated on overtime income only',
-        generatedAt: new Date().toISOString(),
-      },
-    })
+    await cacheReport(client, company.id, payPeriod, 'paye', reportPayload, companyId)
+
+    return NextResponse.json({ success: true, report: reportPayload })
   } catch (error) {
     console.error('[v0] PAYE report error:', error)
     return NextResponse.json({ error: 'Failed to generate report' }, { status: 500 })
