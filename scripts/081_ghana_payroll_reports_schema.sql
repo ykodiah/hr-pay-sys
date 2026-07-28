@@ -21,7 +21,8 @@ ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS tier3_employer NUMERIC(15,2) 
 ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS overtime_income NUMERIC(15,2) DEFAULT 0;
 ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS overtime_tax NUMERIC(15,2) DEFAULT 0;
 ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS paye_total_tax NUMERIC(15,2) DEFAULT 0;
-ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS paye_basic_handling BOOLEAN DEFAULT FALSE COMMENT 'TRUE if basic_salary <= 1500';
+ALTER TABLE payroll_items ADD COLUMN IF NOT EXISTS paye_basic_handling BOOLEAN DEFAULT FALSE;
+COMMENT ON COLUMN payroll_items.paye_basic_handling IS 'TRUE if basic_salary <= 1500, only overtime income taxed';
 
 -- Create ghana_payroll_reports table for caching generated reports
 CREATE TABLE IF NOT EXISTS ghana_payroll_reports (
@@ -141,11 +142,11 @@ CREATE INDEX IF NOT EXISTS idx_payroll_deduction_details_item
   ON payroll_deduction_details(payroll_item_id);
 
 -- Create indexes for report generation performance
-CREATE INDEX IF NOT EXISTS idx_payroll_items_company_period_status 
-  ON payroll_items(company_id, pay_period, status);
+CREATE INDEX IF NOT EXISTS idx_payroll_items_company_run 
+  ON payroll_items(company_id, payroll_run_id);
 
-CREATE INDEX IF NOT EXISTS idx_payroll_items_employee_period 
-  ON payroll_items(employee_id, pay_period);
+CREATE INDEX IF NOT EXISTS idx_payroll_items_employee_run 
+  ON payroll_items(employee_id, payroll_run_id);
 
 -- Notify PostgREST to reload schema cache (Supabase)
 NOTIFY pgrst, 'reload schema';

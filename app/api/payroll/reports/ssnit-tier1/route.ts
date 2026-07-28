@@ -9,8 +9,9 @@ export async function POST(request: NextRequest) {
   try {
     const { companyId, payPeriod } = await request.json()
 
-    if (!companyId || !payPeriod) {
-      return NextResponse.json({ error: 'Missing required fields: companyId, payPeriod' }, { status: 400 })
+    // companyId may be empty string — resolveTenantContext auto-resolves from session
+    if (!payPeriod) {
+      return NextResponse.json({ error: 'Missing required field: payPeriod' }, { status: 400 })
     }
 
     const ctx = await resolveReportContext(request, companyId, payPeriod)

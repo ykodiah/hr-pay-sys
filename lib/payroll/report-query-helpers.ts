@@ -2,8 +2,7 @@
  * Shared helpers for Ghana payroll report API routes.
  * Handles company resolution, payroll run lookup by period, and data isolation.
  */
-import { createClient } from '@/lib/supabase/server'
-import { resolveTenantContext, isTenantContext } from '@/lib/settings/resolve-tenant'
+import { resolveTenantContext, isTenantContext, TenantContext } from '@/lib/settings/resolve-tenant'
 import { NextRequest } from 'next/server'
 
 export interface ReportCompany {
@@ -13,7 +12,8 @@ export interface ReportCompany {
 }
 
 export interface ReportContext {
-  client: Awaited<ReturnType<typeof createClient>>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  client: any  // Supabase service or regular client — both share the same query API
   company: ReportCompany
   payPeriod: string   // e.g. "06-2026" as sent from the client
   periodStart: string // e.g. "2026-06-01"
@@ -81,7 +81,7 @@ export async function resolveReportContext(
     }
   }
 
-  const { companyId: resolvedCompanyId, service } = tenantResult
+  const { companyId: resolvedCompanyId, service } = tenantResult as TenantContext
 
   const { data: company } = await service
     .from('companies')
@@ -91,10 +91,9 @@ export async function resolveReportContext(
 
   if (!company) return { error: 'Company not found', status: 404 }
 
-  const client = await createClient()
-
+  // Use the service client from tenant context — already authenticated and correctly scoped
   return {
-    client,
+    client: service as any,
     company: {
       id: company.id,
       name: company.name,
@@ -109,16 +108,19 @@ export async function resolveReportContext(
 }
 
 /**
- * Fetch payroll_items for a company + period by joining through payroll_runs.
- * payroll_items has no pay_period column — linked via payroll_run_id → payroll_runs(pay_period_start).
+ * Fetch payroll_items for a company + period.
+ * payroll_items.company_id was added in migration 080.
+ * We also join payroll_runs to filter by period date range so the results
+ * are scoped to the correct month even when multiple runs exist.
  */
 export async function fetchPayrollItems(
-  client: Awaited<ReturnType<typeof createClient>>,
+  client: any,
   companyId: string,
   periodStart: string,
   periodEnd: string,
   selectFields: string,
 ): Promise<any[]> {
+  // First get the run IDs for this company + period (handles multi-run months)
   const { data: runs } = await client
     .from('payroll_runs')
     .select('id')
@@ -129,12 +131,19 @@ export async function fetchPayrollItems(
 
   if (!runs || runs.length === 0) return []
 
-  const runIds = runs.map((r: any) => r.id)
+  const runIds = (runs as any[]).map((r) => r.id)
 
-  const { data: items } = await client
+  // Fetch payroll_items filtered by both company_id and run IDs for safety
+  const { data: items, error } = await client
     .from('payroll_items')
     .select(selectFields)
+    .eq('company_id', companyId)
     .in('payroll_run_id', runIds)
+
+  if (error) {
+    console.error('[v0] fetchPayrollItems error:', error.message)
+    return []
+  }
 
   return items || []
 }
@@ -144,7 +153,7 @@ export async function fetchPayrollItems(
  * if the table does not exist yet; migration 081 creates it).
  */
 export async function cacheReport(
-  client: Awaited<ReturnType<typeof createClient>>,
+  client: any,
   companyId: string,
   payPeriod: string,
   reportType: string,
