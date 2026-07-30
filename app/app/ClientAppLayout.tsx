@@ -273,6 +273,7 @@ export default function ClientAppLayout({
   const flatSectionIconMap: Record<string, any> = {
     payroll_input: ClipboardList,
     payroll: Calculator,
+    payroll_reports: FileCheck,
     tax_reliefs: Shield,
     payslips: Receipt,
     payroll_history: History,
