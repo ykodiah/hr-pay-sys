@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useState, useTransition } from "react"
+import { useCallback, useState, useTransition, useEffect } from "react"
 import { toast } from "@/hooks/use-toast"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,7 @@ import { StandardReportViewer } from "@/components/payroll/reports/StandardRepor
 import { AllowancesSectionViewer } from "@/components/payroll/reports/AllowancesSectionViewer"
 import { DeductionsSectionViewer } from "@/components/payroll/reports/DeductionsSectionViewer"
 import { ExportButtons } from "@/components/payroll/reports/ExportButtons"
+import { CachedReportsList, type CachedReport } from "@/components/payroll/reports/CachedReportsList"
 import {
   exportStandardReportToCSV,
   exportStandardReportToExcel,
@@ -77,6 +78,19 @@ export default function PayrollReportsPage() {
   const [report, setReport] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>('')
+  const [cachedReports, setCachedReports] = useState<CachedReport[]>([])
+
+  // Load cached reports from session storage and database on mount
+  useEffect(() => {
+    const stored = sessionStorage.getItem('payroll_reports_cache')
+    if (stored) {
+      try {
+        setCachedReports(JSON.parse(stored))
+      } catch {
+        // Ignore parse errors
+      }
+    }
+  }, [])
 
   const generateReport = useCallback(async () => {
     if (!selectedReport || !selectedPeriod) {
@@ -104,6 +118,21 @@ export default function PayrollReportsPage() {
 
       const data = await response.json()
       setReport(data.report)
+
+      // Add to cached reports list (session storage for current session)
+      const cachedReport: CachedReport = {
+        id: `${selectedReport}-${selectedPeriod}-${Date.now()}`,
+        reportType: data.report.reportType,
+        payPeriod: selectedPeriod,
+        generatedAt: data.report.generatedAt || new Date().toISOString(),
+        companyName: data.report.companyName,
+        totalRows: data.report.totalRows || data.report.rows?.length || 0,
+        reportData: data.report,
+      }
+      const updated = [cachedReport, ...cachedReports]
+      setCachedReports(updated)
+      sessionStorage.setItem('payroll_reports_cache', JSON.stringify(updated))
+
       toast({ title: 'Report generated', description: `${data.report.reportType} for ${selectedPeriod}` })
     } catch (err: any) {
       const message = err.message || 'Failed to generate report'
@@ -153,6 +182,74 @@ export default function PayrollReportsPage() {
   }
 
   const canGenerate = !!selectedReport && !!selectedPeriod
+
+  const handleDeleteReport = (id: string) => {
+    const updated = cachedReports.filter(r => r.id !== id)
+    setCachedReports(updated)
+    sessionStorage.setItem('payroll_reports_cache', JSON.stringify(updated))
+    toast({ title: 'Report removed' })
+  }
+
+  const handleViewReport = (cachedReport: CachedReport) => {
+    setReport(cachedReport.reportData)
+    // Find matching report type from cached report
+    const reportTypeFromData = Object.keys(REPORT_COLUMNS).find(
+      key => cachedReport.reportType.includes(key.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')) ||
+             cachedReport.reportType === (key === 'ssnit-tier1' ? 'TIER 1 CONTRIBUTION' : 
+                                         key === 'ssnit-tier2' ? 'TIER 2 CONTRIBUTION' :
+                                         key === 'provident-fund' ? 'PROVIDENT FUND' :
+                                         key === 'paye' ? 'PAYE TAX' :
+                                         key === 'allowances' ? 'ALLOWANCES' : 'DEDUCTIONS')
+    ) as ReportType | undefined
+    if (reportTypeFromData) {
+      setSelectedReport(reportTypeFromData)
+    }
+    toast({ title: 'Report loaded', description: `${cachedReport.reportType} for ${cachedReport.payPeriod}` })
+  }
+
+  const handleDownloadReport = (cachedReport: CachedReport, format: 'pdf' | 'excel' | 'csv') => {
+    const opts = {
+      reportType: cachedReport.reportType,
+      companyName: cachedReport.companyName,
+      erNumber: cachedReport.reportData?.erNumber ?? '',
+      payPeriod: cachedReport.payPeriod,
+      generatedAt: cachedReport.generatedAt,
+    }
+
+    // Determine report type from data
+    const reportKey = Object.keys(REPORT_COLUMNS).find(
+      key => cachedReport.reportType === (key === 'ssnit-tier1' ? 'TIER 1 CONTRIBUTION' : 
+                                         key === 'ssnit-tier2' ? 'TIER 2 CONTRIBUTION' :
+                                         key === 'provident-fund' ? 'PROVIDENT FUND' :
+                                         key === 'paye' ? 'PAYE TAX' :
+                                         key === 'allowances' ? 'ALLOWANCES' : 'DEDUCTIONS')
+    ) as ReportType | undefined
+
+    try {
+      if (format === 'pdf') {
+        window.print()
+      } else if (format === 'excel') {
+        if (reportKey === 'allowances') {
+          exportAllowancesReportToExcel(opts, cachedReport.reportData?.sections || [])
+        } else if (reportKey === 'deductions') {
+          exportDeductionsReportToExcel(opts, cachedReport.reportData?.sections || [])
+        } else if (reportKey) {
+          exportStandardReportToExcel(opts, REPORT_COLUMNS[reportKey] || [], cachedReport.reportData?.rows || [])
+        }
+      } else if (format === 'csv') {
+        if (reportKey === 'allowances') {
+          exportAllowancesReportToCSV(opts, cachedReport.reportData?.sections || [])
+        } else if (reportKey === 'deductions') {
+          exportDeductionsReportToCSV(opts, cachedReport.reportData?.sections || [])
+        } else if (reportKey) {
+          exportStandardReportToCSV(opts, REPORT_COLUMNS[reportKey] || [], cachedReport.reportData?.rows || [])
+        }
+      }
+      toast({ title: `Downloaded as ${format.toUpperCase()}` })
+    } catch (err) {
+      toast({ title: 'Download failed', description: String(err), variant: 'destructive' })
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
@@ -254,6 +351,14 @@ export default function PayrollReportsPage() {
             )}
           </div>
         )}
+
+        {/* Cached reports queue */}
+        <CachedReportsList
+          reports={cachedReports}
+          onDelete={handleDeleteReport}
+          onView={handleViewReport}
+          onDownload={handleDownloadReport}
+        />
       </div>
     </div>
   )
