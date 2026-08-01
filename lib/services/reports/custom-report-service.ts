@@ -57,11 +57,20 @@ async function fetchPayrollRows(companyId: string, payPeriod: string): Promise<P
   const { data: payslips } = await client
     .from("payslips")
     .select(
-      `*, employee:employees(employee_id, first_name, last_name, department, position, ghana_card_number),
+      `*, employee:employees(employee_id, first_name, last_name, other_names, department, position, ghana_card_number),
        financial:employee_financial(bank_name, bank_account_number, ssnit_number)`,
     )
     .eq("company_id", companyId)
     .eq("pay_period", payPeriod)
+
+  // Helper to format full name with other names
+  const formatFullName = (first?: string | null, other?: string | null, last?: string | null): string => {
+    const parts = []
+    if (first?.trim()) parts.push(first.trim())
+    if (other?.trim()) parts.push(other.trim())
+    if (last?.trim()) parts.push(last.trim())
+    return parts.join(" ")
+  }
 
   return (payslips ?? []).map((p: any) => {
     const emp = Array.isArray(p.employee) ? p.employee[0] : p.employee
@@ -81,7 +90,7 @@ async function fetchPayrollRows(companyId: string, payPeriod: string): Promise<P
       pay_period_end: p.pay_period_end,
       pay_date: p.pay_date,
       employee_id: p.employee_id,
-      employee_name: emp ? `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim() : "",
+      employee_name: emp ? formatFullName(emp.first_name, emp.other_names, emp.last_name) || "" : "",
       employee_id_no: emp?.employee_id ?? "",
       position: emp?.position ?? "",
       department: emp?.department ?? "",
@@ -90,6 +99,9 @@ async function fetchPayrollRows(companyId: string, payPeriod: string): Promise<P
       account_number: fin?.bank_account_number ?? "",
       company_name: p.snapshot_company_name ?? "",
       ghana_card_number: emp?.ghana_card_number ?? "",
+      first_name: emp?.first_name ?? "",
+      last_name: emp?.last_name ?? "",
+      other_names: emp?.other_names ?? "",
       snapshot_subsidiary: p.snapshot_subsidiary ?? emp?.subsidiary_name ?? null,
       snapshot_division: p.snapshot_division ?? emp?.division ?? null,
       snapshot_location: p.snapshot_location ?? emp?.location ?? null,

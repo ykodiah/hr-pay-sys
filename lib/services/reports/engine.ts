@@ -28,6 +28,18 @@ function ghs(v: unknown): number {
   return Math.round(Number(v ?? 0) * 100) / 100
 }
 
+/**
+ * Format full employee name: "First Other1 Other2 Surname"
+ * Includes other_names if present, doesn't omit any component
+ */
+function formatFullName(firstName?: string | null, otherNames?: string | null, lastName?: string | null): string {
+  const parts = []
+  if (firstName?.trim()) parts.push(firstName.trim())
+  if (otherNames?.trim()) parts.push(otherNames.trim())
+  if (lastName?.trim()) parts.push(lastName.trim())
+  return parts.join(" ")
+}
+
 interface ReportMeta {
   pay_period: string
   generated_at: string
@@ -99,7 +111,7 @@ function mapPayslipToReportRow(p: any): PayrollReportRow {
     employee_id: p.employee_id,
     employee_name:
       p.snapshot_employee_name ||
-      (emp ? `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim() : null),
+      (emp ? formatFullName(emp.first_name, emp.other_names, emp.last_name) || null : null),
     employee_id_no: p.snapshot_employee_id_no || emp?.employee_id || null,
     position: p.snapshot_position || emp?.position || null,
     department: p.snapshot_department || emp?.department || null,
@@ -285,7 +297,7 @@ async function fetchReportRows(
       payroll_run_id: it.payroll_run_id,
       pay_period: payPeriod || "",
       employee_id: it.employee_id,
-      employee_name: emp ? `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim() : null,
+      employee_name: emp ? formatFullName(emp.first_name, emp.other_names, emp.last_name) || null : null,
       employee_id_no: emp?.employee_id ?? null,
       position: emp?.position ?? null,
       department: emp?.department ?? null,
@@ -406,7 +418,7 @@ function buildPAYEReport(
     return {
       sn:                      String(idx + 1),
       ghana_card_number:       r.ghana_card_number ?? "",
-      employee_name:           r.employee_name ?? "",
+      employee_name:           formatFullName(r.first_name, r.other_names, r.last_name) || r.employee_name || "",
       position:                r.position ?? "",
       residency_status:        "Resident",  // default, can be enhanced if tracked
       basic_salary:            basicSalary,
@@ -553,6 +565,8 @@ function buildSSNITTier1Report(
       basic_salary:      basicSalary,
       tier1_contrib:     tier1Amount,
       code:              "",
+      // Full name for reference
+      _full_name:        formatFullName(firstName, otherNames, lastName),
     }
   })
 
@@ -643,6 +657,8 @@ function buildSSNITTier2Report(
       basic_salary:      basicSalary,
       tier2_contrib:     tier2Amount,
       code:              "",
+      // Full name for reference
+      _full_name:        formatFullName(firstName, otherNames, lastName),
     }
   })
 
