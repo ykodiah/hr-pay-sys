@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { resolveEmployeeForUser } from "@/lib/employees/resolve-employee"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { LoanApplication } from "@/components/loans/loan-application"
@@ -31,13 +32,11 @@ export default function LoansPage() {
         }
         setUser(userData)
 
-        // Get employee record
-        const { data: empData } = await supabase
-          .from("employees")
-          .select("*, company_id")
-          .eq("id", userData.id)
-          .limit(1)
-          .single()
+        // Resolve employee record using proper multi-fallback pattern
+        const empData = await resolveEmployeeForUser(supabase, {
+          userId: userData.id,
+          email: userData.email || undefined,
+        })
 
         if (empData) {
           setEmployee(empData)
@@ -53,6 +52,8 @@ export default function LoansPage() {
           if (compData) {
             setCompany(compData)
           }
+        } else {
+          console.error("[v0] Employee record not found for user:", userData.id)
         }
       } catch (error) {
         console.error("[v0] Error fetching user data:", error)
