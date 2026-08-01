@@ -10,6 +10,7 @@ type DemoDb = {
   employees: DemoRow[]
   employee_financial: DemoRow[]
   employee_loans: DemoRow[]
+  loan_amortization_schedule: DemoRow[]
   employee_allowances: DemoRow[]
   employee_deductions: DemoRow[]
   payroll_pay_inputs: DemoRow[]
@@ -118,12 +119,76 @@ function seedDb(): DemoDb {
         id: "loan-1",
         company_id: companyId,
         employee_id: "e-1002",
+        loan_type: "Salary Advance",
+        purpose: "School fees",
+        principal: 2000,
+        interest_rate: 0,
+        repayment_months: 12,
         monthly_payment: 150,
         remaining_balance: 1800,
         amount_paid: 200,
+        start_date: "2026-01-01",
+        end_date: "2026-12-01",
         status: "active",
         auto_deduct: true,
+        notes: "Demo active loan",
+        approved_by: "demo-user",
+        approved_at: new Date().toISOString(),
+        disbursed_at: new Date().toISOString(),
+        created_by: "demo-user",
         created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      {
+        id: "loan-2",
+        company_id: companyId,
+        employee_id: "e-1001",
+        loan_type: "Personal Loan",
+        purpose: "Medical expenses",
+        principal: 1500,
+        interest_rate: 5,
+        repayment_months: 6,
+        monthly_payment: 254.56,
+        remaining_balance: 1500,
+        amount_paid: 0,
+        start_date: "2026-08-01",
+        end_date: "2027-01-01",
+        status: "pending",
+        auto_deduct: true,
+        notes: "Awaiting HR approval",
+        created_by: "demo-user",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    ],
+    loan_amortization_schedule: [
+      {
+        id: "las-1",
+        loan_id: "loan-1",
+        month_number: 1,
+        due_date: "2026-02-01",
+        payment_amount: 150,
+        principal_portion: 150,
+        interest_portion: 0,
+        balance_remaining: 1850,
+        paid_amount: 150,
+        paid_date: "2026-02-01",
+        status: "paid",
+        payslip_id: null,
+      },
+      {
+        id: "las-2",
+        loan_id: "loan-1",
+        month_number: 2,
+        due_date: "2026-03-01",
+        payment_amount: 150,
+        principal_portion: 150,
+        interest_portion: 0,
+        balance_remaining: 1700,
+        paid_amount: 0,
+        paid_date: null,
+        status: "pending",
+        payslip_id: null,
       },
     ],
     employee_allowances: [],
@@ -201,10 +266,14 @@ function applyFilters(rows: DemoRow[], filters: Filter[]): DemoRow[] {
 
 function parseEmbeds(select: string): { embed: string; table: string }[] {
   const embeds: { embed: string; table: string }[] = []
-  const re = /(\w+)\s*:\s*(\w+)\s*\(/g
+  // Supports: employees(...), employees!fk_name(...), alias:employees(...)
+  const re = /(?:(\w+)\s*:\s*)?(\w+)(?:!\w+)?\s*\(/g
   let m: RegExpExecArray | null
   while ((m = re.exec(select))) {
-    embeds.push({ embed: m[1], table: m[2] })
+    const alias = m[1]
+    const table = m[2]
+    if (!table || table === "count") continue
+    embeds.push({ embed: alias || table, table })
   }
   return embeds
 }

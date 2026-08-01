@@ -1,50 +1,37 @@
 import { NextRequest, NextResponse } from "next/server"
+import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
 import { getLoanTypes, createLoanType } from "@/lib/services/loan-advanced-service"
-import { createClient } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const searchParams = request.nextUrl.searchParams
-    const companyId = searchParams.get("company_id")
-
-    if (!companyId) {
-      return NextResponse.json({ error: "company_id required" }, { status: 400 })
-    }
+    const ctx = await resolveTenantContext(request)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId } = ctx
 
     const loanTypes = await getLoanTypes(companyId)
     return NextResponse.json(loanTypes)
   } catch (error) {
     console.error("[v0] Loan types error:", error)
-    return NextResponse.json({ error: "Failed to fetch loan types" }, { status: 500 })
+    return jsonError(error, "Failed to fetch loan types")
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
     const body = await request.json()
+    const ctx = await resolveTenantContext(request, body.company_id)
+    if (ctx instanceof NextResponse) return ctx
+    const { companyId, userId } = ctx
 
-    const loanType = await createLoanType(body.company_id, {
+    const loanType = await createLoanType(companyId, {
       ...body,
-      created_by: user.id,
+      company_id: companyId,
+      created_by: userId || "system",
     })
 
     return NextResponse.json(loanType, { status: 201 })
   } catch (error) {
     console.error("[v0] Create loan type error:", error)
-    return NextResponse.json({ error: "Failed to create loan type" }, { status: 500 })
+    return jsonError(error, "Failed to create loan type")
   }
 }

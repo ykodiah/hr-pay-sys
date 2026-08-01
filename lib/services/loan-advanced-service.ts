@@ -1,7 +1,9 @@
-import type { Database } from "@/types/supabase"
+// Note: Don't create client at module level — resolve per call (demo + RLS aware).
 
-// Note: Don't create client at module level, create it in each function
-// This avoids issues with Next.js build-time evaluation
+async function getDb() {
+  const { createServiceClient } = await import("@/lib/supabase/server")
+  return createServiceClient()
+}
 
 // ============================================================================
 // TYPES
@@ -80,11 +82,7 @@ export interface LoanSchedule {
 // ============================================================================
 
 export async function getLoanTypes(companyId: string): Promise<LoanType[]> {
-  const { createClient } = await import("@supabase/supabase-js")
-  const supabase = createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-    process.env.SUPABASE_SERVICE_ROLE_KEY || ""
-  )
+  const supabase = await getDb()
 
   const { data, error } = await supabase
     .from("loan_types")
@@ -98,32 +96,27 @@ export async function getLoanTypes(companyId: string): Promise<LoanType[]> {
 }
 
 export async function getLoanTypeById(loanTypeId: string): Promise<LoanType | null> {
-  const { createClient } = await import("@supabase/supabase-js")
-  const supabase = createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-    process.env.SUPABASE_SERVICE_ROLE_KEY || ""
-  )
+  const supabase = await getDb()
 
   const { data, error } = await supabase
     .from("loan_types")
     .select("*")
     .eq("id", loanTypeId)
-    .single()
+    .maybeSingle()
 
   if (error) throw error
   return data
 }
 
-export async function createLoanType(companyId: string, loanType: Omit<LoanType, "id" | "created_at" | "updated_at">): Promise<LoanType> {
-  const { createClient } = await import("@supabase/supabase-js")
-  const supabase = createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-    process.env.SUPABASE_SERVICE_ROLE_KEY || ""
-  )
+export async function createLoanType(
+  companyId: string,
+  loanType: Omit<LoanType, "id" | "created_at" | "updated_at"> & { created_by?: string },
+): Promise<LoanType> {
+  const supabase = await getDb()
 
   const { data, error } = await supabase
     .from("loan_types")
-    .insert([{ company_id: companyId, ...loanType }])
+    .insert([{ company_id: companyId, is_active: true, ...loanType }])
     .select()
     .single()
 
@@ -132,21 +125,28 @@ export async function createLoanType(companyId: string, loanType: Omit<LoanType,
 }
 
 export async function updateLoanType(id: string, updates: Partial<LoanType>): Promise<LoanType> {
-  const { createClient } = await import("@supabase/supabase-js")
-  const supabase = createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-    process.env.SUPABASE_SERVICE_ROLE_KEY || ""
-  )
+  const supabase = await getDb()
 
   const { data, error } = await supabase
     .from("loan_types")
-    .update(updates)
+    .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select()
     .single()
 
   if (error) throw error
   return data
+}
+
+export async function deleteLoanType(id: string): Promise<void> {
+  const supabase = await getDb()
+  // Soft-delete so existing loans keep a historical loan_type_id reference
+  const { error } = await supabase
+    .from("loan_types")
+    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .eq("id", id)
+
+  if (error) throw error
 }
 
 // ============================================================================
@@ -303,6 +303,8 @@ export interface CreateLoanRequest {
 }
 
 export async function createLoan(request: CreateLoanRequest): Promise<{ loan: EmployeeLoan; schedules: LoanSchedule[] }> {
+  const supabase = await getDb()
+
   // Get loan type
   const loanType = await getLoanTypeById(request.loanTypeId)
   if (!loanType) throw new Error("Loan type not found")
@@ -351,12 +353,16 @@ export async function createLoan(request: CreateLoanRequest): Promise<{ loan: Em
 
   const totalCharges = processingFee + insuranceFee + adminFee
 
-  // Determine approval status
-  const requiresApproval = request.principalAmount > loanType.auto_approve_max_amount
+  // Determine approval status — use payroll-compatible status values
+  // (pending | approved | active | completed | rejected | defaulted | cancelled)
+  const requiresApproval =
+    loanType.requires_approval !== false &&
+    request.principalAmount > Number(loanType.auto_approve_max_amount || 0)
   const approvalStatus = requiresApproval ? "pending" : "approved"
-  const status = requiresApproval ? "pending_approval" : "approved"
+  const status = requiresApproval ? "pending" : "active"
+  const outstanding = request.principalAmount // principal-only outstanding for payroll deductions
 
-  // Create loan
+  // Create loan (write both advanced + payroll columns for sync compatibility)
   const { data: loanData, error: loanError } = await supabase
     .from("employee_loans")
     .insert([
@@ -364,12 +370,19 @@ export async function createLoan(request: CreateLoanRequest): Promise<{ loan: Em
         company_id: request.companyId,
         employee_id: request.employeeId,
         loan_type_id: request.loanTypeId,
+        loan_type: loanType.name,
+        purpose: request.reason ?? null,
         principal_amount: request.principalAmount,
+        principal: request.principalAmount,
         tenure_months: request.tenureMonths,
+        repayment_months: request.tenureMonths,
         interest_rate: loanType.annual_interest_rate,
         interest_type: loanType.interest_type,
         monthly_installment: calculation.monthlyPayment,
-        outstanding_balance: request.principalAmount + calculation.totalInterest,
+        monthly_payment: calculation.monthlyPayment,
+        outstanding_balance: outstanding,
+        remaining_balance: outstanding,
+        amount_paid: 0,
         total_interest: calculation.totalInterest,
         processing_fee: processingFee,
         insurance_fee: insuranceFee,
@@ -377,9 +390,13 @@ export async function createLoan(request: CreateLoanRequest): Promise<{ loan: Em
         total_charges: totalCharges,
         approval_status: approvalStatus,
         status,
+        auto_deduct: true,
         initiated_by: request.initiatedById,
         initiated_by_role: request.initiatedByRole,
         created_by: request.initiatedById,
+        approved_by: requiresApproval ? null : request.initiatedById,
+        approved_at: requiresApproval ? null : new Date().toISOString(),
+        disbursed_at: requiresApproval ? null : new Date().toISOString(),
       },
     ])
     .select()
@@ -443,13 +460,16 @@ export async function createLoan(request: CreateLoanRequest): Promise<{ loan: Em
 // ============================================================================
 
 export async function approveLoan(loanId: string, approvedById: string, approvalNotes?: string): Promise<EmployeeLoan> {
+  const supabase = await getDb()
   const { data, error } = await supabase
     .from("employee_loans")
     .update({
       approval_status: "approved",
-      status: "approved",
+      status: "active",
       approved_by: approvedById,
       approval_date: new Date().toISOString(),
+      approved_at: new Date().toISOString(),
+      disbursed_at: new Date().toISOString(),
       notes: approvalNotes,
     })
     .eq("id", loanId)
@@ -457,15 +477,30 @@ export async function approveLoan(loanId: string, approvedById: string, approval
     .single()
 
   if (error) throw error
+
+  // Sync payroll-compatible fields when advanced schema columns are present
+  if (data) {
+    const sync: Record<string, unknown> = { status: "active" }
+    if (data.monthly_installment != null) sync.monthly_payment = data.monthly_installment
+    if (data.outstanding_balance != null) sync.remaining_balance = data.outstanding_balance
+    else if (data.principal_amount != null) sync.remaining_balance = data.principal_amount
+    if (data.principal_amount != null && data.principal == null) sync.principal = data.principal_amount
+    if (data.tenure_months != null && data.repayment_months == null) sync.repayment_months = data.tenure_months
+    await supabase.from("employee_loans").update(sync).eq("id", loanId)
+  }
+
   return data
 }
 
 export async function rejectLoan(loanId: string, rejectedById: string, rejectionReason: string): Promise<EmployeeLoan> {
+  const supabase = await getDb()
   const { data, error } = await supabase
     .from("employee_loans")
     .update({
       approval_status: "rejected",
-      status: "cancelled",
+      status: "rejected",
+      rejected_by: rejectedById,
+      rejected_at: new Date().toISOString(),
       rejection_reason: rejectionReason,
     })
     .eq("id", loanId)
@@ -486,6 +521,8 @@ export async function recordLoanPayment(
   paymentMethod: string,
   paymentReference?: string
 ): Promise<LoanSchedule> {
+  const supabase = await getDb()
+
   // Get schedule
   const { data: schedule, error: scheduleError } = await supabase
     .from("loan_schedules")
@@ -524,7 +561,12 @@ export async function recordLoanPayment(
 
   await supabase
     .from("employee_loans")
-    .update({ outstanding_balance: outstandingBalance })
+    .update({
+      outstanding_balance: outstandingBalance,
+      remaining_balance: outstandingBalance,
+      amount_paid: Number(schedule.employee_loans?.amount_paid ?? 0) + paidAmount,
+      status: outstandingBalance <= 0 ? "completed" : "active",
+    })
     .eq("id", schedule.employee_loan_id)
 
   // Record in ledger
@@ -553,21 +595,22 @@ export async function recordLoanPayment(
 // ============================================================================
 
 export async function getEmployeeActiveLoan(employeeId: string): Promise<EmployeeLoan | null> {
+  const supabase = await getDb()
   const { data, error } = await supabase
     .from("employee_loans")
     .select("*")
     .eq("employee_id", employeeId)
-    .in("status", ["active", "disbursed"])
+    .in("status", ["active", "disbursed", "approved"])
     .order("created_at", { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
-  if (error && error.code === "PGRST116") return null
   if (error) throw error
   return data
 }
 
 export async function getEmployeeLoanSchedules(employeeId: string, loanId: string): Promise<LoanSchedule[]> {
+  const supabase = await getDb()
   const { data, error } = await supabase
     .from("loan_schedules")
     .select("*")
@@ -580,6 +623,7 @@ export async function getEmployeeLoanSchedules(employeeId: string, loanId: strin
 }
 
 export async function getEmployeeLoanLedger(employeeId: string, loanId: string) {
+  const supabase = await getDb()
   const { data, error } = await supabase
     .from("loan_ledger")
     .select("*")

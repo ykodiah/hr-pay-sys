@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
       start_date,
       auto_deduct,
       notes,
+      activate,
     } = body
 
     if (!employee_id || !principal || !repayment_months) {
@@ -67,7 +68,8 @@ export async function POST(request: NextRequest) {
       start_date,
       auto_deduct,
       notes,
-      created_by: userId,
+      created_by: userId ?? undefined,
+      activate: activate !== false, // admin creates are active by default for payroll
     })
 
     return NextResponse.json({ loan }, { status: 201 })

@@ -1,20 +1,18 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { LoanTypeForm } from "@/components/loans/loan-type-form"
 import { useToast } from "@/hooks/use-toast"
+import { resolveClientCompanyId } from "@/lib/tenant/resolve-company-client"
 import type { LoanType } from "@/lib/services/loan-advanced-service"
-import { Plus, Edit2, Trash2 } from "lucide-react"
+import { Plus, Edit2, Trash2, ArrowLeft } from "lucide-react"
+import Link from "next/link"
 
 export default function LoanSettingsPage() {
-  const router = useRouter()
   const { toast } = useToast()
-  const supabase = createClient()
   const [loanTypes, setLoanTypes] = useState<LoanType[]>([])
   const [selectedLoanType, setSelectedLoanType] = useState<LoanType | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -24,26 +22,16 @@ export default function LoanSettingsPage() {
   useEffect(() => {
     const fetchUserAndCompany = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-          router.push("/auth/login")
-          return
-        }
-
-        // Get company from user
-        const { data: company } = await supabase
-          .from("company_users")
-          .select("company_id")
-          .eq("user_id", user.id)
-          .limit(1)
-          .single()
-
-        if (company?.company_id) {
-          setCompanyId(company.company_id)
-          await fetchLoanTypes(company.company_id)
-        }
+        const cid = await resolveClientCompanyId()
+        setCompanyId(cid)
+        await fetchLoanTypes(cid)
       } catch (error) {
         console.error("[v0] Error fetching company:", error)
+        toast({
+          title: "Could not resolve company",
+          description: error instanceof Error ? error.message : "Open Company settings first",
+          variant: "destructive",
+        })
       }
     }
 
@@ -124,9 +112,17 @@ export default function LoanSettingsPage() {
 
   return (
     <div className="container mx-auto py-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Loan Settings</h1>
-        <p className="text-gray-600">Manage loan types and configurations</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Loan Settings</h1>
+          <p className="text-gray-600">Manage loan types and configurations</p>
+        </div>
+        <Button variant="outline" asChild>
+          <Link href="/app/loans">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Loans
+          </Link>
+        </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
