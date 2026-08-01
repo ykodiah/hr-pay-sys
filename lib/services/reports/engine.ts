@@ -383,7 +383,12 @@ function buildPAYEReport(
 
   const typedRows = rows.map((r, idx) => {
     const basicSalary = ghs(r.basic_salary)
-    const ssnitTotal = ghs(r.ssnit_employer) + ghs(r.ssnit_employee)
+    // Social Security Fund = SSNIT employee deduction (employee contribution only)
+    // This is Tier 1 (5.5%) + Tier 2 (5%) = 10.5% of basic salary, deducted from employee
+    const ssnitTotal = ghs(r.ssnit_employee ?? 0)
+    // If ssnit_employee is 0/null, calculate from tier components
+    const calculatedSsnit = ghs((r.tier2_employee ?? 0) + (r.ssnit_employee ?? 0))
+    const ssnitEmployeeDeduction = ssnitTotal > 0 ? ssnitTotal : calculatedSsnit
     const tier3Total = ghs(r.tier3_employer) + ghs(r.tier3_employee)
     const allowancesTotal = ghs(r.transport_allowance + r.housing_allowance + r.medical_allowance + r.meal_allowance + r.communication_allowance + r.other_allowances)
     const bonusIncome = ghs(r.bonus_pay)
@@ -391,7 +396,7 @@ function buildPAYEReport(
     const totalCashEmolument = basicSalary + allowancesTotal + bonusIncome
     const totalAssessableIncome = totalCashEmolument  // simplified, no accommodation/vehicle/non-cash benefits tracked yet
     const deductibleReliefs = ghs(r.tax_relief_total)
-    const totalReliefs = ssnitTotal + tier3Total + deductibleReliefs
+    const totalReliefs = ssnitEmployeeDeduction + tier3Total + deductibleReliefs
     const chargeableIncome = Math.max(0, totalAssessableIncome - totalReliefs)
     const taxDeductible = ghs(r.paye_tax)
     const overtimeIncome = ghs(r.overtime_pay)
@@ -407,7 +412,7 @@ function buildPAYEReport(
       basic_salary:            basicSalary,
       secondary_employment:    "N",  // default, can be enhanced if tracked
       paid_ssnit:              "Y",  // assume yes if SSNIT amounts present
-      ssnit_total:             ssnitTotal,
+      ssnit_total:             ssnitEmployeeDeduction,
       tier3_total:             tier3Total,
       allowances_total:        allowancesTotal,
       bonus_income:            bonusIncome,
@@ -433,7 +438,7 @@ function buildPAYEReport(
   const totals = {
     total_employees:           rows.length,
     total_basic_salary:        typedRows.reduce((s, r) => s + r.basic_salary, 0),
-    total_ssnit:               typedRows.reduce((s, r) => s + r.ssnit_total, 0),
+    total_ssnit:               typedRows.reduce((s, r) => s + (r.ssnit_total ?? 0), 0),
     total_tier3:               typedRows.reduce((s, r) => s + r.tier3_total, 0),
     total_allowances:          typedRows.reduce((s, r) => s + r.allowances_total, 0),
     total_bonus_income:        typedRows.reduce((s, r) => s + r.bonus_income, 0),
