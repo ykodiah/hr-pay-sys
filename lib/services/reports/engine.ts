@@ -52,6 +52,31 @@ function withCsvMeta(
 
 // ─── Data fetcher ─────────────────────────────────────────────────────────────
 
+/**
+ * Deduplicate rows by employee_id, keeping only the latest payroll_run_id.
+ * Ensures no duplicate employee names appear in reports.
+ */
+function deduplicateRowsByEmployee(rows: PayrollReportRow[]): PayrollReportRow[] {
+  const latestByEmployee: Record<string, PayrollReportRow> = {}
+
+  for (const row of rows) {
+    const empId = row.employee_id
+    const existing = latestByEmployee[empId]
+
+    // Keep the row with the latest payroll_run_id (if available)
+    if (!existing || (row.payroll_run_id && (!existing.payroll_run_id || row.payroll_run_id > existing.payroll_run_id))) {
+      latestByEmployee[empId] = row
+    }
+  }
+
+  return Object.values(latestByEmployee).sort((a, b) => {
+    // Sort by employee name to maintain consistent order
+    const nameA = a.employee_name ?? ""
+    const nameB = b.employee_name ?? ""
+    return nameA.localeCompare(nameB)
+  })
+}
+
 function mapPayslipToReportRow(p: any): PayrollReportRow {
   const emp = Array.isArray(p.employee) ? p.employee[0] : p.employee
   const fin = Array.isArray(p.financial) ? p.financial[0] : p.financial
@@ -83,6 +108,9 @@ function mapPayslipToReportRow(p: any): PayrollReportRow {
     account_number: fin?.bank_account_number ?? p.snapshot_account_number ?? null,
     company_name: company?.name ?? null,
     ghana_card_number: emp?.ghana_card_number ?? null,
+    first_name: emp?.first_name ?? null,
+    last_name: emp?.last_name ?? null,
+    other_names: emp?.other_names ?? null,
     snapshot_subsidiary: p.snapshot_subsidiary ?? emp?.subsidiary ?? null,
     snapshot_division: p.snapshot_division ?? emp?.division ?? null,
     snapshot_location: p.snapshot_location ?? emp?.location ?? null,
@@ -160,7 +188,8 @@ async function fetchReportRows(
     const rows = (data as PayrollReportRow[]).map((r) =>
       normalizePayrollCashRow(r) as PayrollReportRow,
     )
-    return { rows, source: "view", rowCount: rows.length }
+    const dedupedRows = deduplicateRowsByEmployee(rows)
+    return { rows: dedupedRows, source: "view", rowCount: dedupedRows.length }
   }
 
   // Fallback — direct payslips query
@@ -179,10 +208,12 @@ async function fetchReportRows(
 
   const { data: payslips, error: payslipError } = await payslipQuery
   if (!payslipError && (payslips ?? []).length > 0) {
+    const mappedRows = (payslips ?? []).map(mapPayslipToReportRow)
+    const dedupedRows = deduplicateRowsByEmployee(mappedRows)
     return { 
-      rows: (payslips ?? []).map(mapPayslipToReportRow),
+      rows: dedupedRows,
       source: "payslips",
-      rowCount: payslips.length,
+      rowCount: dedupedRows.length,
     }
   }
 
@@ -261,6 +292,9 @@ async function fetchReportRows(
       account_number: fin?.bank_account_number ?? null,
       company_name: company?.name ?? null,
       ghana_card_number: emp?.ghana_card_number ?? null,
+      first_name: emp?.first_name ?? null,
+      last_name: emp?.last_name ?? null,
+      other_names: emp?.other_names ?? null,
       date_of_joining: emp?.date_of_joining ?? null,
       contract_type: emp?.contract_type ?? null,
       basic_salary: Number(it.basic_salary ?? 0),
@@ -296,10 +330,11 @@ async function fetchReportRows(
     } as PayrollReportRow
   }).map((r: any) => normalizePayrollCashRow(r) as PayrollReportRow)
   
+  const dedupedRows = deduplicateRowsByEmployee(mappedRows)
   return { 
-    rows: mappedRows,
+    rows: dedupedRows,
     source: "payroll_items",
-    rowCount: mappedRows.length,
+    rowCount: dedupedRows.length,
   }
 }
 
@@ -370,66 +405,65 @@ function buildPAYEReport(
   }
 }
 
-/** Report 2 — SSNIT Tier 1 Contributions
- *  Employee: 5.5% on basic earnings
- *  Employer: 13% on basic earnings
- *  Total Tier 1 Payable to SSNIT: 13.5% on basic earnings (employer 13% + employee 0.5% — the other 5% goes to Tier 2)
- *  Note: ssnit_employee in the payslip may store the legacy 0.5% value from older runs.
- *  We always recompute from basic_salary for display correctness per the new rates.
+/** Report 2 — SSNIT Tier 1 Contributions (13.5%)
+ *  Exact 10 columns as per Ghana compliance requirements:
+ *  S/N, Staff ID, SSNIT Number, NIA Number, Surname, First Name, Other Names,
+ *  Basic Salary, Tier 1 (13.5%) (GHS), Code (blank)
  */
 function buildSSNITTier1Report(
   rows: PayrollReportRow[],
   meta: ReportMeta
 ): GeneratedReport {
   const columns: ReportColumn[] = [
-    { key: "employee_id_no",    label: "Employee ID",                        type: "text" },
-    { key: "employee_name",     label: "Employee Name",                      type: "text" },
-    { key: "ssnit_number",      label: "SSNIT Number",                       type: "text" },
-    { key: "department",        label: "Department",                         type: "text" },
-    { key: "basic_earnings",    label: "Basic Earnings (GHS)",               type: "currency" },
-    { key: "employee_contrib",  label: "Employee Tier 1 (5.5%) (GHS)",       type: "currency" },
-    { key: "employer_contrib",  label: "Employer Tier 1 (13%) (GHS)",        type: "currency" },
-    { key: "total_contrib",     label: "Total Tier 1 Payable to SSNIT (13.5%) (GHS)", type: "currency" },
+    { key: "sn",               label: "S/N",                        type: "text" },
+    { key: "employee_id_no",   label: "Staff ID",                   type: "text" },
+    { key: "ssnit_number",     label: "SSNIT Number",               type: "text" },
+    { key: "ghana_card_number",label: "NIA Number",                 type: "text" },
+    { key: "last_name",        label: "Surname",                    type: "text" },
+    { key: "first_name",       label: "First Name",                 type: "text" },
+    { key: "other_names",      label: "Other Names",                type: "text" },
+    { key: "basic_salary",     label: "Basic Salary",               type: "currency" },
+    { key: "tier1_contrib",    label: "Tier 1 (13.5%) (GHS)",       type: "currency" },
+    { key: "code",             label: "Code",                       type: "text" },
   ]
 
-  const typedRows = rows.map((r) => {
-    const basic         = ghs(r.basic_salary)
-    const empContrib    = ghs(basic * 0.055)   // employee 5.5%
-    const emplrContrib  = ghs(basic * 0.13)    // employer 13%
-    // Total payable to SSNIT = 13.5% (employer 13% + employee 0.5% portion; the other 5% of employee goes to Tier 2)
-    const totalPayable  = ghs(basic * 0.135)
+  const typedRows = rows.map((r, idx) => {
+    const basicSalary = ghs(r.basic_salary)
+    const tier1Amount = ghs(basicSalary * 0.135)  // 13.5%
     return {
-      employee_id_no:   r.employee_id_no ?? "",
-      employee_name:    r.employee_name ?? "",
-      ssnit_number:     r.ssnit_number ?? "",
-      department:       r.department ?? "",
-      basic_earnings:   basic,
-      employee_contrib: empContrib,
-      employer_contrib: emplrContrib,
-      total_contrib:    totalPayable,
+      sn:                String(idx + 1),
+      employee_id_no:    r.employee_id_no ?? "",
+      ssnit_number:      r.ssnit_number ?? "",
+      ghana_card_number: r.ghana_card_number ?? "",
+      last_name:         r.last_name ?? "",
+      first_name:        r.first_name ?? "",
+      other_names:       r.other_names ?? "",
+      basic_salary:      basicSalary,
+      tier1_contrib:     tier1Amount,
+      code:              "",
     }
   })
 
   const summary = {
-    total_employees:     rows.length,
-    total_basic_earnings:typedRows.reduce((s, r) => s + r.basic_earnings, 0),
-    total_employee_5_5:  typedRows.reduce((s, r) => s + r.employee_contrib, 0),
-    total_employer_13:   typedRows.reduce((s, r) => s + r.employer_contrib, 0),
-    total_payable_ssnit: typedRows.reduce((s, r) => s + r.total_contrib, 0),
+    total_employees:   rows.length,
+    total_basic_salary: typedRows.reduce((s, r) => s + r.basic_salary, 0),
+    total_tier1:       typedRows.reduce((s, r) => s + r.tier1_contrib, 0),
   }
 
   const allRows: Record<string, unknown>[] = [
     ...typedRows,
     {
-      employee_id_no:   "GRAND TOTAL",
-      employee_name:    `${rows.length} employee(s)`,
-      ssnit_number:     "",
-      department:       "",
-      basic_earnings:   summary.total_basic_earnings,
-      employee_contrib: summary.total_employee_5_5,
-      employer_contrib: summary.total_employer_13,
-      total_contrib:    summary.total_payable_ssnit,
-      _is_total_row:    true,
+      sn:                "",
+      employee_id_no:    "GRAND TOTAL",
+      ssnit_number:      "",
+      ghana_card_number: "",
+      last_name:         "",
+      first_name:        `${rows.length} employee(s)`,
+      other_names:       "",
+      basic_salary:      summary.total_basic_salary,
+      tier1_contrib:     summary.total_tier1,
+      code:              "",
+      _is_total_row:     true,
     },
   ]
 
@@ -445,55 +479,64 @@ function buildSSNITTier1Report(
   }
 }
 
-/** Report 3 — SSNIT Tier 2 (Occupational Pension) Contributions
- *  Employee: 5% on basic earnings (Act 766)
- *  Ghana Card column populated from employee record
- *  Employer Tier 2 column removed per new requirement
+/** Report 3 — SSNIT Tier 2 (Occupational Pension) Contributions (5%)
+ *  Exact 10 columns as per Ghana compliance requirements:
+ *  S/N, Staff ID, SSNIT Number, NIA Number, Surname, First Name, Other Names,
+ *  Basic Salary, Tier 2 (5%) (GHS), Code (blank)
  */
 function buildSSNITTier2Report(
   rows: PayrollReportRow[],
   meta: ReportMeta
 ): GeneratedReport {
   const columns: ReportColumn[] = [
-    { key: "employee_id_no",   label: "Employee ID",               type: "text" },
-    { key: "employee_name",    label: "Employee Name",             type: "text" },
-    { key: "ssnit_number",     label: "SSNIT Number",              type: "text" },
-    { key: "ghana_card_number",label: "Ghana Card No.",            type: "text" },
-    { key: "department",       label: "Department",                type: "text" },
-    { key: "basic_earnings",   label: "Basic Earnings (GHS)",      type: "currency" },
-    { key: "employee_contrib", label: "Employee Tier 2 (5%) (GHS)", type: "currency" },
+    { key: "sn",               label: "S/N",                        type: "text" },
+    { key: "employee_id_no",   label: "Staff ID",                   type: "text" },
+    { key: "ssnit_number",     label: "SSNIT Number",               type: "text" },
+    { key: "ghana_card_number",label: "NIA Number",                 type: "text" },
+    { key: "last_name",        label: "Surname",                    type: "text" },
+    { key: "first_name",       label: "First Name",                 type: "text" },
+    { key: "other_names",      label: "Other Names",                type: "text" },
+    { key: "basic_salary",     label: "Basic Salary",               type: "currency" },
+    { key: "tier2_contrib",    label: "Tier 2 (5%) (GHS)",          type: "currency" },
+    { key: "code",             label: "Code",                       type: "text" },
   ]
 
-  const typedRows = rows.map((r) => {
-    const basic        = ghs(r.basic_salary)
-    const empContrib   = ghs(basic * 0.05)   // employee 5%
+  const typedRows = rows.map((r, idx) => {
+    const basicSalary = ghs(r.basic_salary)
+    const tier2Amount = ghs(basicSalary * 0.05)  // 5%
     return {
+      sn:                String(idx + 1),
       employee_id_no:    r.employee_id_no ?? "",
-      employee_name:     r.employee_name ?? "",
       ssnit_number:      r.ssnit_number ?? "",
       ghana_card_number: r.ghana_card_number ?? "",
-      department:        r.department ?? "",
-      basic_earnings:    basic,
-      employee_contrib:  empContrib,
+      last_name:         r.last_name ?? "",
+      first_name:        r.first_name ?? "",
+      other_names:       r.other_names ?? "",
+      basic_salary:      basicSalary,
+      tier2_contrib:     tier2Amount,
+      code:              "",
     }
   })
 
   const summary = {
-    total_employees:      rows.length,
-    total_basic_earnings: typedRows.reduce((s, r) => s + r.basic_earnings, 0),
-    total_employee_5:     typedRows.reduce((s, r) => s + r.employee_contrib, 0),
+    total_employees:   rows.length,
+    total_basic_salary: typedRows.reduce((s, r) => s + r.basic_salary, 0),
+    total_tier2:       typedRows.reduce((s, r) => s + r.tier2_contrib, 0),
   }
 
   const allRows: Record<string, unknown>[] = [
     ...typedRows,
     {
+      sn:                "",
       employee_id_no:    "GRAND TOTAL",
-      employee_name:     `${rows.length} employee(s)`,
       ssnit_number:      "",
       ghana_card_number: "",
-      department:        "",
-      basic_earnings:    summary.total_basic_earnings,
-      employee_contrib:  summary.total_employee_5,
+      last_name:         "",
+      first_name:        `${rows.length} employee(s)`,
+      other_names:       "",
+      basic_salary:      summary.total_basic_salary,
+      tier2_contrib:     summary.total_tier2,
+      code:              "",
       _is_total_row:     true,
     },
   ]
@@ -877,57 +920,101 @@ function buildAllowancesReport(
   }
 }
 
-/** Report 8 — Provident Fund (Tier 3) */
+/** Report 8 — Provident Fund (Tier 3)
+ *  8-9 columns with conditional employer contribution:
+ *  S/N, Employee ID, SSNIT Number, NIA Number (ghana_card_number),
+ *  Employee Name, Basic Salary,
+ *  [CONDITIONAL] Employer Contribution (only if employer_rate > 0),
+ *  Employee Contribution, Total Contribution
+ */
 function buildProvidentFundReport(
   rows: PayrollReportRow[],
-  meta: ReportMeta
+  meta: ReportMeta,
+  tier3EmployerRate: number = 0
 ): GeneratedReport {
+  // Determine if employer contribution column should be included
+  const hasEmployerContrib = tier3EmployerRate > 0
+
+  // Build columns dynamically based on whether employer rate exists
   const columns: ReportColumn[] = [
-    { key: "employee_id_no",  label: "Employee ID",          type: "text" },
-    { key: "employee_name",   label: "Employee Name",        type: "text" },
-    { key: "ssnit_number",    label: "SSNIT Number",         type: "text" },
-    { key: "department",      label: "Department",           type: "text" },
-    { key: "basic_salary",    label: "Basic Salary (GHS)",   type: "currency" },
-    { key: "tier3_employee",  label: "Employee Contrib (GHS)", type: "currency" },
-    { key: "tier3_employer",  label: "Employer Contrib (GHS)", type: "currency" },
-    { key: "total_tier3",     label: "Total Tier 3 (GHS)",   type: "currency" },
+    { key: "sn",               label: "S/N",                         type: "text" },
+    { key: "employee_id_no",   label: "Employee ID",                 type: "text" },
+    { key: "ssnit_number",     label: "SSNIT Number",                type: "text" },
+    { key: "ghana_card_number",label: "NIA Number",                  type: "text" },
+    { key: "employee_name",    label: "Employee Name",               type: "text" },
+    { key: "basic_salary",     label: "Basic Salary (GHS)",          type: "currency" },
   ]
+
+  // Conditionally add employer contribution column
+  if (hasEmployerContrib) {
+    columns.push({ key: "tier3_employer", label: "Employer Contribution (GHS)", type: "currency" })
+  }
+
+  // Add remaining columns
+  columns.push(
+    { key: "tier3_employee",   label: "Employee Contribution (GHS)", type: "currency" },
+    { key: "total_tier3",      label: "Total Contribution (GHS)",    type: "currency" }
+  )
 
   const withTier3 = rows.filter(
     (r) => ghs(r.tier3_employee) > 0 || ghs(r.tier3_employer) > 0
   )
 
-  const typedRows = withTier3.map((r) => ({
-    employee_id_no: r.employee_id_no ?? "",
-    employee_name:  r.employee_name ?? "",
-    ssnit_number:   r.ssnit_number ?? "",
-    department:     r.department ?? "",
-    basic_salary:   ghs(r.basic_salary),
-    tier3_employee: ghs(r.tier3_employee),
-    tier3_employer: ghs(r.tier3_employer),
-    total_tier3:    ghs(r.tier3_employee) + ghs(r.tier3_employer),
-  }))
+  const typedRows = withTier3.map((r, idx) => {
+    const basicSalary = ghs(r.basic_salary)
+    const empContrib = ghs(r.tier3_employee)
+    const emplrContrib = ghs(r.tier3_employer)
+    const totalContrib = empContrib + emplrContrib
+
+    const row: Record<string, any> = {
+      sn:                String(idx + 1),
+      employee_id_no:    r.employee_id_no ?? "",
+      ssnit_number:      r.ssnit_number ?? "",
+      ghana_card_number: r.ghana_card_number ?? "",
+      employee_name:     r.employee_name ?? "",
+      basic_salary:      basicSalary,
+    }
+
+    // Include employer contribution only if the column is needed
+    if (hasEmployerContrib) {
+      row.tier3_employer = emplrContrib
+    }
+
+    row.tier3_employee = empContrib
+    row.total_tier3 = totalContrib
+
+    return row
+  })
 
   const summary = {
     total_members:       withTier3.length,
+    total_basic_salary:  typedRows.reduce((s, r) => s + r.basic_salary, 0),
     total_employee:      typedRows.reduce((s, r) => s + r.tier3_employee, 0),
-    total_employer:      typedRows.reduce((s, r) => s + r.tier3_employer, 0),
+    total_employer:      hasEmployerContrib ? typedRows.reduce((s, r) => s + (r.tier3_employer ?? 0), 0) : 0,
     total_contributions: typedRows.reduce((s, r) => s + r.total_tier3, 0),
   }
 
+  // Build grand total row
+  const totalRow: Record<string, any> = {
+    sn:                "",
+    employee_id_no:    "GRAND TOTAL",
+    ssnit_number:      "",
+    ghana_card_number: "",
+    employee_name:     `${withTier3.length} member(s)`,
+    basic_salary:      summary.total_basic_salary,
+  }
+
+  if (hasEmployerContrib) {
+    totalRow.tier3_employer = summary.total_employer
+  }
+
+  totalRow.tier3_employee = summary.total_employee
+  totalRow.total_tier3 = summary.total_contributions
+  totalRow._is_total_row = true
+
   const allRows: Record<string, unknown>[] = [
     ...typedRows,
-    {
-      employee_id_no: "GRAND TOTAL",
-      employee_name:  `${withTier3.length} member(s)`,
-      ssnit_number:   "",
-      department:     "",
-      basic_salary:   typedRows.reduce((s, r) => s + r.basic_salary, 0),
-      tier3_employee: summary.total_employee,
-      tier3_employer: summary.total_employer,
-      total_tier3:    summary.total_contributions,
-      _is_total_row:  true,
-    },
+    totalRow,
   ]
 
   return {
@@ -1169,6 +1256,17 @@ export async function generateReport(
   const clientForBrand = await createClient()
   const companyInfo = await loadCompanyBrand(clientForBrand, input.company_id)
 
+  // Fetch tier3_rates employer_rate for Provident Fund report (if needed)
+  let tier3EmployerRate = 0
+  if (input.report_type === "provident_fund") {
+    const { data: tier3Rates } = await clientForBrand
+      .from("tier3_rates")
+      .select("employer_rate")
+      .eq("company_id", input.company_id)
+      .maybeSingle()
+    tier3EmployerRate = tier3Rates?.employer_rate ?? 0
+  }
+
   const meta: ReportMeta = {
     pay_period:   input.pay_period ?? rows[0].pay_period,
     generated_at: new Date().toISOString(),
@@ -1179,17 +1277,17 @@ export async function generateReport(
   let report: GeneratedReport
 
   switch (input.report_type) {
-    case "paye":            report = buildPAYEReport(rows, meta);           break
-    case "ssnit_tier1":     report = buildSSNITTier1Report(rows, meta);     break
-    case "ssnit_tier2":     report = buildSSNITTier2Report(rows, meta);     break
-    case "bank_advice":     report = buildBankAdviceReport(rows, meta);     break
-    case "cost_to_company": report = buildCTCReport(rows, meta);            break
-    case "loans":           report = buildLoansReport(rows, meta);          break
-    case "allowances":      report = buildAllowancesReport(rows, meta);     break
-    case "provident_fund":  report = buildProvidentFundReport(rows, meta);  break
-    case "deductions":      report = buildDeductionsReport(rows, meta);     break
+    case "paye":            report = buildPAYEReport(rows, meta);                           break
+    case "ssnit_tier1":     report = buildSSNITTier1Report(rows, meta);                     break
+    case "ssnit_tier2":     report = buildSSNITTier2Report(rows, meta);                     break
+    case "bank_advice":     report = buildBankAdviceReport(rows, meta);                     break
+    case "cost_to_company": report = buildCTCReport(rows, meta);                            break
+    case "loans":           report = buildLoansReport(rows, meta);                          break
+    case "allowances":      report = buildAllowancesReport(rows, meta);                     break
+    case "provident_fund":  report = buildProvidentFundReport(rows, meta, tier3EmployerRate); break
+    case "deductions":      report = buildDeductionsReport(rows, meta);                     break
     case "payroll_summary":
-    default:                report = buildPayrollSummaryReport(rows, meta); break
+    default:                report = buildPayrollSummaryReport(rows, meta);                 break
   }
 
   // Persist metadata to DB with data source tracking
