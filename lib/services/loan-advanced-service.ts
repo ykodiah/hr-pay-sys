@@ -81,6 +81,116 @@ export interface LoanSchedule {
 // LOAN TYPE SERVICES
 // ============================================================================
 
+const LOAN_TYPE_COLUMNS = [
+  "code",
+  "name",
+  "description",
+  "interest_type",
+  "annual_interest_rate",
+  "min_amount",
+  "max_amount",
+  "min_tenure_months",
+  "max_tenure_months",
+  "default_tenure_months",
+  "processing_fee_type",
+  "processing_fee_amount",
+  "insurance_fee_type",
+  "insurance_fee_amount",
+  "admin_fee_type",
+  "admin_fee_amount",
+  "requires_approval",
+  "auto_approve_max_amount",
+  "approval_roles",
+  "min_service_months",
+  "min_monthly_salary",
+  "max_loan_multiplier",
+  "is_active",
+] as const
+
+function isUuid(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  )
+}
+
+function sanitizeLoanTypePayload(input: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = {}
+  for (const key of LOAN_TYPE_COLUMNS) {
+    if (input[key] !== undefined) out[key] = input[key]
+  }
+
+  out.code = String(out.code || "")
+    .trim()
+    .toUpperCase()
+  out.name = String(out.name || "").trim()
+  if (!out.code) throw new Error("Loan code is required")
+  if (!out.name) throw new Error("Loan name is required")
+
+  const interestType = String(out.interest_type || "reducing_balance")
+  if (!["fixed", "reducing_balance", "daily_compound"].includes(interestType)) {
+    throw new Error("Invalid interest type")
+  }
+  out.interest_type = interestType
+
+  const num = (v: unknown, fallback = 0) => {
+    const n = Number(v)
+    return Number.isFinite(n) ? n : fallback
+  }
+
+  out.annual_interest_rate = num(out.annual_interest_rate, 0)
+  out.min_amount = num(out.min_amount, 0)
+  out.max_amount = num(out.max_amount, 1000000)
+  out.min_tenure_months = Math.max(1, Math.floor(num(out.min_tenure_months, 3)))
+  out.max_tenure_months = Math.max(out.min_tenure_months, Math.floor(num(out.max_tenure_months, 60)))
+  out.default_tenure_months = Math.min(
+    out.max_tenure_months,
+    Math.max(out.min_tenure_months, Math.floor(num(out.default_tenure_months, 12))),
+  )
+
+  for (const fee of ["processing", "insurance", "admin"] as const) {
+    const typeKey = `${fee}_fee_type`
+    const amountKey = `${fee}_fee_amount`
+    const feeType = out[typeKey] == null || out[typeKey] === "" ? "fixed" : String(out[typeKey])
+    if (!["fixed", "percentage"].includes(feeType)) {
+      throw new Error(`Invalid ${fee} fee type`)
+    }
+    out[typeKey] = feeType
+    out[amountKey] = num(out[amountKey], 0)
+  }
+
+  out.requires_approval = out.requires_approval !== false
+  out.auto_approve_max_amount = num(out.auto_approve_max_amount, 0)
+  out.min_service_months = Math.max(0, Math.floor(num(out.min_service_months, 0)))
+  out.min_monthly_salary = num(out.min_monthly_salary, 0)
+  out.max_loan_multiplier = num(out.max_loan_multiplier, 3)
+  out.is_active = out.is_active !== false
+  out.approval_roles = Array.isArray(out.approval_roles)
+    ? out.approval_roles
+    : ["admin", "finance_manager"]
+  out.description = out.description != null ? String(out.description) : null
+
+  return out
+}
+
+function mapLoanTypeDbError(error: any): Error {
+  const message = String(error?.message || "Failed to save loan type")
+  if (/relation .*loan_types.* does not exist/i.test(message)) {
+    return new Error(
+      "loan_types table is missing. Run scripts/090_comprehensive_loan_module.sql and scripts/092_loan_types_hardening.sql",
+    )
+  }
+  if (/duplicate key|unique/i.test(message)) {
+    return new Error("A loan type with this code already exists for your company")
+  }
+  if (/foreign key|created_by/i.test(message)) {
+    return new Error(
+      "Could not save loan type (created_by constraint). Run scripts/092_loan_types_hardening.sql",
+    )
+  }
+  return new Error(message)
+}
+
 export async function getLoanTypes(companyId: string): Promise<LoanType[]> {
   const supabase = await getDb()
 
@@ -91,7 +201,10 @@ export async function getLoanTypes(companyId: string): Promise<LoanType[]> {
     .eq("is_active", true)
     .order("created_at", { ascending: false })
 
-  if (error) throw error
+  if (error) {
+    if (/relation .*loan_types.* does not exist/i.test(error.message)) return []
+    throw mapLoanTypeDbError(error)
+  }
   return data || []
 }
 
@@ -104,7 +217,7 @@ export async function getLoanTypeById(loanTypeId: string): Promise<LoanType | nu
     .eq("id", loanTypeId)
     .maybeSingle()
 
-  if (error) throw error
+  if (error) throw mapLoanTypeDbError(error)
   return data
 }
 
@@ -113,29 +226,53 @@ export async function createLoanType(
   loanType: Omit<LoanType, "id" | "created_at" | "updated_at"> & { created_by?: string },
 ): Promise<LoanType> {
   const supabase = await getDb()
+  const payload = sanitizeLoanTypePayload(loanType as any)
 
-  const { company_id: _c, is_active: _a, ...rest } = loanType as any
-  const { data, error } = await supabase
+  // Enforce unique (company_id, code) even in demo memory-db
+  const { data: existing } = await supabase
     .from("loan_types")
-    .insert([{ ...rest, company_id: companyId, is_active: true }])
-    .select()
-    .single()
+    .select("id")
+    .eq("company_id", companyId)
+    .eq("code", payload.code)
+    .limit(1)
+    .maybeSingle()
+  if (existing?.id) {
+    throw new Error("A loan type with this code already exists for your company")
+  }
 
-  if (error) throw error
+  const row: Record<string, any> = {
+    ...payload,
+    company_id: companyId,
+    is_active: true,
+    updated_at: new Date().toISOString(),
+  }
+
+  // Only persist created_by when it is a real UUID (avoids auth.users FK failures)
+  if (isUuid((loanType as any).created_by)) {
+    row.created_by = (loanType as any).created_by
+  }
+
+  const { data, error } = await supabase.from("loan_types").insert([row]).select().single()
+
+  if (error) throw mapLoanTypeDbError(error)
   return data
 }
 
 export async function updateLoanType(id: string, updates: Partial<LoanType>): Promise<LoanType> {
   const supabase = await getDb()
+  const existing = await getLoanTypeById(id)
+  if (!existing) throw new Error("Loan type not found")
+
+  const payload = sanitizeLoanTypePayload({ ...existing, ...updates } as any)
 
   const { data, error } = await supabase
     .from("loan_types")
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update({ ...payload, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select()
     .single()
 
-  if (error) throw error
+  if (error) throw mapLoanTypeDbError(error)
   return data
 }
 
@@ -147,7 +284,7 @@ export async function deleteLoanType(id: string): Promise<void> {
     .update({ is_active: false, updated_at: new Date().toISOString() })
     .eq("id", id)
 
-  if (error) throw error
+  if (error) throw mapLoanTypeDbError(error)
 }
 
 // ============================================================================

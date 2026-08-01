@@ -64,6 +64,7 @@ export interface CreateLoanInput {
   employee_id: string
   company_id: string
   loan_type: string
+  loan_type_id?: string | null
   purpose?: string
   principal: number
   interest_rate?: number
@@ -163,29 +164,34 @@ export async function createLoan(input: CreateLoanInput): Promise<EmployeeLoan> 
   const activate = Boolean(input.activate)
   const now = new Date().toISOString()
 
+  const insertRow: Record<string, unknown> = {
+    company_id: input.company_id,
+    employee_id: input.employee_id,
+    loan_type: input.loan_type,
+    purpose: input.purpose ?? null,
+    principal: input.principal,
+    interest_rate: input.interest_rate ?? 0,
+    repayment_months: input.repayment_months,
+    monthly_payment,
+    remaining_balance: input.principal,
+    amount_paid: 0,
+    start_date: startDate,
+    end_date: endDate,
+    auto_deduct: input.auto_deduct ?? true,
+    notes: input.notes ?? null,
+    created_by: input.created_by ?? null,
+    status: activate ? "active" : "pending",
+    approved_by: activate ? input.created_by ?? null : null,
+    approved_at: activate ? now : null,
+    disbursed_at: activate ? now : null,
+  }
+  if (input.loan_type_id) {
+    insertRow.loan_type_id = input.loan_type_id
+  }
+
   const { data, error } = await supabase
     .from("employee_loans")
-    .insert({
-      company_id: input.company_id,
-      employee_id: input.employee_id,
-      loan_type: input.loan_type,
-      purpose: input.purpose ?? null,
-      principal: input.principal,
-      interest_rate: input.interest_rate ?? 0,
-      repayment_months: input.repayment_months,
-      monthly_payment,
-      remaining_balance: input.principal,
-      amount_paid: 0,
-      start_date: startDate,
-      end_date: endDate,
-      auto_deduct: input.auto_deduct ?? true,
-      notes: input.notes ?? null,
-      created_by: input.created_by ?? null,
-      status: activate ? "active" : "pending",
-      approved_by: activate ? input.created_by ?? null : null,
-      approved_at: activate ? now : null,
-      disbursed_at: activate ? now : null,
-    })
+    .insert(insertRow)
     .select()
     .single()
 

@@ -83,14 +83,19 @@ type EmployeeOption = {
   department?: string
 }
 
-const LOAN_TYPES = [
-  "Personal Loan",
-  "Salary Advance",
-  "Emergency Loan",
-  "Housing Loan",
-  "Education Loan",
-  "Medical Loan",
-]
+type LoanTypeOption = {
+  id: string
+  code: string
+  name: string
+  description?: string | null
+  annual_interest_rate: number
+  min_amount: number
+  max_amount: number
+  min_tenure_months: number
+  max_tenure_months: number
+  default_tenure_months: number
+  is_active?: boolean
+}
 
 function money(n: number) {
   return `GHS ${Number(n || 0).toLocaleString("en-GH", {
@@ -129,6 +134,7 @@ export default function PayrollLoansPage() {
   const [companyId, setCompanyId] = useState("")
   const [loans, setLoans] = useState<Loan[]>([])
   const [employees, setEmployees] = useState<EmployeeOption[]>([])
+  const [loanTypes, setLoanTypes] = useState<LoanTypeOption[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState("")
@@ -136,7 +142,7 @@ export default function PayrollLoansPage() {
 
   const [showCreate, setShowCreate] = useState(false)
   const [employeeId, setEmployeeId] = useState("")
-  const [loanType, setLoanType] = useState(LOAN_TYPES[0])
+  const [loanTypeId, setLoanTypeId] = useState("")
   const [principal, setPrincipal] = useState("")
   const [interestRate, setInterestRate] = useState("0")
   const [repaymentMonths, setRepaymentMonths] = useState("6")
@@ -145,6 +151,11 @@ export default function PayrollLoansPage() {
   const [notes, setNotes] = useState("")
   const [autoDeduct, setAutoDeduct] = useState(true)
   const [activateNow, setActivateNow] = useState(true)
+
+  const selectedLoanType = useMemo(
+    () => loanTypes.find((t) => t.id === loanTypeId) || null,
+    [loanTypes, loanTypeId],
+  )
 
   const [detailLoan, setDetailLoan] = useState<Loan | null>(null)
   const [schedule, setSchedule] = useState<any[]>([])
@@ -192,11 +203,37 @@ export default function PayrollLoansPage() {
     setEmployees(json.employees || json.data || [])
   }, [])
 
+  const loadLoanTypes = useCallback(async (cid: string) => {
+    const res = await fetch(`/api/loans/loan-types?company_id=${encodeURIComponent(cid)}`, {
+      cache: "no-store",
+      credentials: "include",
+    })
+    const json = await res.json().catch(() => ([]))
+    if (!res.ok) throw new Error(json.error || "Failed to load loan types")
+    const list = Array.isArray(json) ? json : []
+    setLoanTypes(list)
+    return list as LoanTypeOption[]
+  }, [])
+
+  const applyLoanTypeDefaults = useCallback((type: LoanTypeOption | null | undefined) => {
+    if (!type) return
+    setLoanTypeId(type.id)
+    setInterestRate(String(type.annual_interest_rate ?? 0))
+    setRepaymentMonths(String(type.default_tenure_months ?? type.min_tenure_months ?? 6))
+  }, [])
+
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
       const cid = companyId || (await loadCompany())
-      await Promise.all([loadLoans(cid, statusFilter), loadEmployees(cid)])
+      const [, , types] = await Promise.all([
+        loadLoans(cid, statusFilter),
+        loadEmployees(cid),
+        loadLoanTypes(cid),
+      ])
+      if (!loanTypeId && types.length) {
+        applyLoanTypeDefaults(types[0])
+      }
     } catch (err) {
       toast({
         title: "Could not load loans",
@@ -206,7 +243,17 @@ export default function PayrollLoansPage() {
     } finally {
       setLoading(false)
     }
-  }, [companyId, statusFilter, loadCompany, loadLoans, loadEmployees, toast])
+  }, [
+    companyId,
+    statusFilter,
+    loanTypeId,
+    loadCompany,
+    loadLoans,
+    loadEmployees,
+    loadLoanTypes,
+    applyLoanTypeDefaults,
+    toast,
+  ])
 
   useEffect(() => {
     void refresh()
@@ -241,15 +288,37 @@ export default function PayrollLoansPage() {
 
   const resetCreateForm = () => {
     setEmployeeId("")
-    setLoanType(LOAN_TYPES[0])
     setPrincipal("")
-    setInterestRate("0")
-    setRepaymentMonths("6")
     setStartDate(new Date().toISOString().split("T")[0])
     setPurpose("")
     setNotes("")
     setAutoDeduct(true)
     setActivateNow(true)
+    applyLoanTypeDefaults(loanTypes[0] || null)
+  }
+
+  const openCreateDialog = async () => {
+    try {
+      if (companyId) {
+        const types = await loadLoanTypes(companyId)
+        if (!types.length) {
+          toast({
+            title: "No loan types configured",
+            description: "Create a loan type first under Loan Types.",
+            variant: "destructive",
+          })
+          return
+        }
+        applyLoanTypeDefaults(types.find((t) => t.id === loanTypeId) || types[0])
+      }
+      setShowCreate(true)
+    } catch (err) {
+      toast({
+        title: "Could not load loan types",
+        description: err instanceof Error ? err.message : "Request failed",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleCreate = async () => {
@@ -257,10 +326,37 @@ export default function PayrollLoansPage() {
       toast({ title: "Select an employee", variant: "destructive" })
       return
     }
+    if (!loanTypeId || !selectedLoanType) {
+      toast({
+        title: "Select a loan type",
+        description: "Loan types are loaded from the database. Configure them under Loan Types.",
+        variant: "destructive",
+      })
+      return
+    }
     const p = Number(principal)
     const months = Number(repaymentMonths)
     if (!p || p <= 0 || !months || months <= 0) {
       toast({ title: "Enter a valid principal and tenure", variant: "destructive" })
+      return
+    }
+    if (p < Number(selectedLoanType.min_amount) || p > Number(selectedLoanType.max_amount)) {
+      toast({
+        title: "Principal out of range",
+        description: `${selectedLoanType.name} allows GHS ${selectedLoanType.min_amount} – ${selectedLoanType.max_amount}`,
+        variant: "destructive",
+      })
+      return
+    }
+    if (
+      months < Number(selectedLoanType.min_tenure_months) ||
+      months > Number(selectedLoanType.max_tenure_months)
+    ) {
+      toast({
+        title: "Tenure out of range",
+        description: `${selectedLoanType.name} allows ${selectedLoanType.min_tenure_months} – ${selectedLoanType.max_tenure_months} months`,
+        variant: "destructive",
+      })
       return
     }
 
@@ -273,7 +369,8 @@ export default function PayrollLoansPage() {
         body: JSON.stringify({
           company_id: companyId,
           employee_id: employeeId,
-          loan_type: loanType,
+          loan_type_id: loanTypeId,
+          loan_type: selectedLoanType.name,
           purpose: purpose || null,
           principal: p,
           interest_rate: Number(interestRate) || 0,
@@ -390,12 +487,7 @@ export default function PayrollLoansPage() {
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
-          <Button
-            onClick={() => {
-              resetCreateForm()
-              setShowCreate(true)
-            }}
-          >
+          <Button onClick={() => void openCreateDialog()}>
             <Plus className="mr-2 h-4 w-4" />
             New Loan
           </Button>
@@ -477,7 +569,7 @@ export default function PayrollLoansPage() {
                   Create a loan for an employee to start payroll deductions.
                 </p>
               </div>
-              <Button onClick={() => setShowCreate(true)}>
+              <Button onClick={() => void openCreateDialog()}>
                 <Plus className="mr-2 h-4 w-4" />
                 New Loan
               </Button>
@@ -595,18 +687,40 @@ export default function PayrollLoansPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label>Loan type</Label>
-                <Select value={loanType} onValueChange={setLoanType}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LOAN_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {loanTypes.length ? (
+                  <Select
+                    value={loanTypeId}
+                    onValueChange={(id) => {
+                      const type = loanTypes.find((t) => t.id === id)
+                      applyLoanTypeDefaults(type || null)
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select loan type from database" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {loanTypes.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name} ({t.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
+                    No loan types in database.{" "}
+                    <Link href="/app/settings/loan-settings" className="underline">
+                      Create loan types
+                    </Link>
+                  </div>
+                )}
+                {selectedLoanType ? (
+                  <p className="text-xs text-muted-foreground">
+                    Range GHS {selectedLoanType.min_amount}–{selectedLoanType.max_amount} ·{" "}
+                    {selectedLoanType.min_tenure_months}–{selectedLoanType.max_tenure_months} months ·{" "}
+                    {selectedLoanType.annual_interest_rate}% p.a.
+                  </p>
+                ) : null}
               </div>
               <div className="grid gap-2">
                 <Label>Start date</Label>
