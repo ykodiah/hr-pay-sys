@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
-import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
+import {
+  resolveTenantContext,
+  jsonError,
+  isUnresolvedTenant,
+} from "@/lib/settings/resolve-tenant"
 import { deleteLoanType, getLoanTypeById, updateLoanType } from "@/lib/services/loan-advanced-service"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const ctx = await resolveTenantContext(request)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) {
+      return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
+    }
     const { companyId } = ctx
     const { id } = await params
 
@@ -23,6 +30,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   try {
     const ctx = await resolveTenantContext(request)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) {
+      return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
+    }
     const { companyId } = ctx
     const { id } = await params
     const body = await request.json()
@@ -43,6 +53,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   try {
     const ctx = await resolveTenantContext(request)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) {
+      return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
+    }
     const { companyId } = ctx
     const { id } = await params
 

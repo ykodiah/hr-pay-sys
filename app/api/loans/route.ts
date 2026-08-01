@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
-import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
+import {
+  resolveTenantContext,
+  jsonError,
+  isUnresolvedTenant,
+} from "@/lib/settings/resolve-tenant"
 import { createLoan, listLoans } from "@/lib/services/loan-service"
 
 export async function GET(request: NextRequest) {
   try {
     const ctx = await resolveTenantContext(request)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) {
+      return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
+    }
     const { companyId } = ctx
 
     const { searchParams } = new URL(request.url)
@@ -28,6 +35,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const ctx = await resolveTenantContext(request, body.company_id)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) {
+      return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
+    }
     const { companyId, userId, service } = ctx
 
     const {
@@ -69,7 +79,7 @@ export async function POST(request: NextRequest) {
       auto_deduct,
       notes,
       created_by: userId ?? undefined,
-      activate: activate !== false, // admin creates are active by default for payroll
+      activate: activate !== false,
     })
 
     return NextResponse.json({ loan }, { status: 201 })

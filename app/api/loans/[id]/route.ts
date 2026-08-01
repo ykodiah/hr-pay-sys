@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
+import {
+  resolveTenantContext,
+  jsonError,
+  isUnresolvedTenant,
+} from "@/lib/settings/resolve-tenant"
 import {
   getLoanWithSchedule,
   approveLoan,
@@ -12,6 +16,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const ctx = await resolveTenantContext(request)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) {
+      return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
+    }
     const { companyId } = ctx
 
     const { id } = await params
@@ -31,6 +38,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   try {
     const ctx = await resolveTenantContext(request)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) {
+      return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
+    }
     const { companyId, userId, service } = ctx
 
     const { id } = await params

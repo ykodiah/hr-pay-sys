@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
-import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
+import {
+  resolveTenantContext,
+  jsonError,
+  isUnresolvedTenant,
+} from "@/lib/settings/resolve-tenant"
 import { getLoanTypes, createLoanType } from "@/lib/services/loan-advanced-service"
 
 export async function GET(request: NextRequest) {
   try {
     const ctx = await resolveTenantContext(request)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) {
+      return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
+    }
     const { companyId } = ctx
 
     const loanTypes = await getLoanTypes(companyId)
@@ -21,11 +28,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const ctx = await resolveTenantContext(request, body.company_id)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) {
+      return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
+    }
     const { companyId, userId } = ctx
 
+    const { company_id: _ignored, created_by: _cb, ...rest } = body
     const loanType = await createLoanType(companyId, {
-      ...body,
-      company_id: companyId,
+      ...rest,
       created_by: userId || "system",
     })
 

@@ -114,9 +114,10 @@ export async function createLoanType(
 ): Promise<LoanType> {
   const supabase = await getDb()
 
+  const { company_id: _c, is_active: _a, ...rest } = loanType as any
   const { data, error } = await supabase
     .from("loan_types")
-    .insert([{ company_id: companyId, is_active: true, ...loanType }])
+    .insert([{ ...rest, company_id: companyId, is_active: true }])
     .select()
     .single()
 

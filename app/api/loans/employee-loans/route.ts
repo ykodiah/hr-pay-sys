@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
+import {
+  resolveTenantContext,
+  jsonError,
+  isUnresolvedTenant,
+} from "@/lib/settings/resolve-tenant"
 import { createLoan as createAdvancedLoan } from "@/lib/services/loan-advanced-service"
 import { createLoan as createPayrollLoan, listLoans } from "@/lib/services/loan-service"
 
@@ -7,6 +11,9 @@ export async function GET(request: NextRequest) {
   try {
     const ctx = await resolveTenantContext(request)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) {
+      return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
+    }
     const { companyId } = ctx
 
     const searchParams = request.nextUrl.searchParams
@@ -28,6 +35,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const ctx = await resolveTenantContext(request, body.company_id)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) {
+      return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
+    }
     const { companyId, userId, service } = ctx
 
     if (!body.employee_id) {
@@ -44,7 +54,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Employee not found in your company" }, { status: 403 })
     }
 
-    // Prefer advanced loan-type path when loan_type_id is supplied
     if (body.loan_type_id) {
       const result = await createAdvancedLoan({
         companyId,
@@ -59,7 +68,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(result, { status: 201 })
     }
 
-    // Fallback: payroll-compatible loan create
     const loan = await createPayrollLoan({
       company_id: companyId,
       employee_id: body.employee_id,
