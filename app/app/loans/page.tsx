@@ -62,6 +62,10 @@ type Loan = {
   monthly_payment: number
   amount_paid: number
   remaining_balance: number
+  expected_total_payment?: number | null
+  total_interest?: number | null
+  last_payment_date?: string | null
+  last_payment_amount?: number | null
   start_date: string | null
   end_date: string | null
   status: LoanStatus
@@ -174,6 +178,33 @@ export default function PayrollLoansPage() {
   }, [principal, interestRate, repaymentMonths, startDate])
 
   const monthlyPreview = preview?.[0]?.payment_amount ?? 0
+
+  const scheduleTotals = useMemo(() => {
+    const payment = schedule.reduce((s, r) => s + Number(r.payment_amount || 0), 0)
+    const principal = schedule.reduce((s, r) => s + Number(r.principal_portion || 0), 0)
+    const interest = schedule.reduce((s, r) => s + Number(r.interest_portion || 0), 0)
+    const paidFromSchedule = schedule.reduce((s, r) => s + Number(r.paid_amount || 0), 0)
+    const paidInstallments = schedule.filter((r) => r.status === "paid").length
+    return {
+      payment: Math.round(payment * 100) / 100,
+      principal: Math.round(principal * 100) / 100,
+      interest: Math.round(interest * 100) / 100,
+      paidFromSchedule: Math.round(paidFromSchedule * 100) / 100,
+      paidInstallments,
+      totalInstallments: schedule.length,
+    }
+  }, [schedule])
+
+  const paidSoFar = useMemo(() => {
+    if (!detailLoan) return 0
+    // Keep "Paid so far" live from loan ledger and/or schedule installments
+    return Math.max(Number(detailLoan.amount_paid || 0), scheduleTotals.paidFromSchedule)
+  }, [detailLoan, scheduleTotals.paidFromSchedule])
+
+  const interestTotal = useMemo(() => {
+    if (scheduleTotals.interest > 0) return scheduleTotals.interest
+    return Number(detailLoan?.total_interest || 0)
+  }, [scheduleTotals.interest, detailLoan?.total_interest])
 
   const loadCompany = useCallback(async () => {
     const cid = await resolveClientCompanyId()
@@ -582,8 +613,9 @@ export default function PayrollLoansPage() {
                     <TableHead>Employee</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead className="text-right">Principal</TableHead>
-                    <TableHead className="text-right">Monthly</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
+                    <TableHead className="text-right">Expected amount to pay</TableHead>
+                    <TableHead className="text-right">Loan paid</TableHead>
+                    <TableHead className="text-right">Remaining Balance</TableHead>
                     <TableHead>Tenure</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -607,7 +639,17 @@ export default function PayrollLoansPage() {
                       </TableCell>
                       <TableCell className="text-right">{money(loan.principal)}</TableCell>
                       <TableCell className="text-right">{money(loan.monthly_payment)}</TableCell>
-                      <TableCell className="text-right">{money(loan.remaining_balance)}</TableCell>
+                      <TableCell className="text-right font-medium text-emerald-700">
+                        {money(loan.amount_paid)}
+                        {loan.last_payment_date ? (
+                          <div className="text-[11px] font-normal text-muted-foreground">
+                            Last {loan.last_payment_date}
+                          </div>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {money(loan.remaining_balance)}
+                      </TableCell>
                       <TableCell>{loan.repayment_months} mo</TableCell>
                       <TableCell>
                         <Badge variant={statusVariant(loan.status)} className="capitalize">
@@ -820,17 +862,24 @@ export default function PayrollLoansPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <div className="rounded-md border p-3">
                   <div className="text-xs text-muted-foreground">Principal</div>
                   <div className="font-semibold">{money(detailLoan.principal)}</div>
                 </div>
                 <div className="rounded-md border p-3">
-                  <div className="text-xs text-muted-foreground">Monthly</div>
+                  <div className="text-xs text-muted-foreground">Expected amount to pay</div>
                   <div className="font-semibold">{money(detailLoan.monthly_payment)}</div>
                 </div>
+                <div className="rounded-md border border-amber-200 bg-amber-50/60 p-3">
+                  <div className="text-xs text-amber-800">Interest</div>
+                  <div className="font-semibold text-amber-950">{money(interestTotal)}</div>
+                  <div className="text-[11px] text-amber-700">
+                    {Number(detailLoan.interest_rate || 0)}% p.a.
+                  </div>
+                </div>
                 <div className="rounded-md border p-3">
-                  <div className="text-xs text-muted-foreground">Balance</div>
+                  <div className="text-xs text-muted-foreground">Remaining Balance</div>
                   <div className="font-semibold">{money(detailLoan.remaining_balance)}</div>
                 </div>
                 <div className="rounded-md border p-3">
@@ -843,10 +892,6 @@ export default function PayrollLoansPage() {
 
               <div className="grid gap-2 text-sm sm:grid-cols-2">
                 <div>
-                  <span className="text-muted-foreground">Interest: </span>
-                  {Number(detailLoan.interest_rate || 0)}% p.a.
-                </div>
-                <div>
                   <span className="text-muted-foreground">Tenure: </span>
                   {detailLoan.repayment_months} months
                 </div>
@@ -854,9 +899,37 @@ export default function PayrollLoansPage() {
                   <span className="text-muted-foreground">Start: </span>
                   {detailLoan.start_date || "—"}
                 </div>
-                <div>
-                  <span className="text-muted-foreground">Paid so far: </span>
-                  {money(detailLoan.amount_paid)}
+                <div className="rounded-md border border-emerald-200 bg-emerald-50/70 px-3 py-2 sm:col-span-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span className="text-emerald-800">Paid so far: </span>
+                      <span className="font-semibold text-emerald-900">{money(paidSoFar)}</span>
+                    </div>
+                    <div className="text-xs text-emerald-700">
+                      {scheduleTotals.paidInstallments}/{scheduleTotals.totalInstallments || detailLoan.repayment_months} installments paid
+                      {detailLoan.last_payment_date
+                        ? ` · last ${detailLoan.last_payment_date} (${money(Number(detailLoan.last_payment_amount || 0))})`
+                        : ""}
+                    </div>
+                  </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-emerald-100">
+                    <div
+                      className="h-full rounded-full bg-emerald-600 transition-all"
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          Math.round(
+                            (paidSoFar /
+                              Math.max(
+                                Number(detailLoan.expected_total_payment || detailLoan.principal) || 1,
+                                1,
+                              )) *
+                              100,
+                          ),
+                        )}%`,
+                      }}
+                    />
+                  </div>
                 </div>
                 {detailLoan.purpose ? (
                   <div className="sm:col-span-2">
@@ -904,7 +977,7 @@ export default function PayrollLoansPage() {
                   <Clock3 className="h-4 w-4" />
                   Amortization schedule
                 </div>
-                <div className="max-h-72 overflow-auto rounded-md border">
+                <div className="max-h-80 overflow-auto rounded-md border">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -913,6 +986,7 @@ export default function PayrollLoansPage() {
                         <TableHead className="text-right">Payment</TableHead>
                         <TableHead className="text-right">Principal</TableHead>
                         <TableHead className="text-right">Interest</TableHead>
+                        <TableHead className="text-right">Paid</TableHead>
                         <TableHead className="text-right">Balance</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
@@ -925,10 +999,24 @@ export default function PayrollLoansPage() {
                           <TableCell className="text-right">{money(row.payment_amount)}</TableCell>
                           <TableCell className="text-right">{money(row.principal_portion)}</TableCell>
                           <TableCell className="text-right">{money(row.interest_portion)}</TableCell>
+                          <TableCell className="text-right">{money(row.paid_amount || 0)}</TableCell>
                           <TableCell className="text-right">{money(row.balance_remaining)}</TableCell>
                           <TableCell className="capitalize">{row.status}</TableCell>
                         </TableRow>
                       ))}
+                      {schedule.length > 0 ? (
+                        <TableRow className="bg-muted/50 font-semibold">
+                          <TableCell colSpan={2}>Totals</TableCell>
+                          <TableCell className="text-right">{money(scheduleTotals.payment)}</TableCell>
+                          <TableCell className="text-right">{money(scheduleTotals.principal)}</TableCell>
+                          <TableCell className="text-right">{money(scheduleTotals.interest)}</TableCell>
+                          <TableCell className="text-right">{money(scheduleTotals.paidFromSchedule)}</TableCell>
+                          <TableCell className="text-right">
+                            {money(detailLoan.remaining_balance)}
+                          </TableCell>
+                          <TableCell />
+                        </TableRow>
+                      ) : null}
                     </TableBody>
                   </Table>
                 </div>

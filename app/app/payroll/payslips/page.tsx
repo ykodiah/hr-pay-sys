@@ -118,6 +118,9 @@ interface ActiveLoan {
   start_date: string
   end_date: string
   purpose: string | null
+  status?: string
+  last_payment_amount?: number | null
+  this_month_paid?: number | null
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -155,8 +158,17 @@ function statusBadge(status: string) {
 
 // ─── Payslip Preview Component ────────────────────────────────────────────────
 
-function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | null }) {
+function PayslipPreview({
+  slip,
+  loan,
+  loans = [],
+}: {
+  slip: PayslipRow
+  loan: ActiveLoan | null
+  loans?: ActiveLoan[]
+}) {
   const normalized = normalizePayrollCashRow(slip) as PayslipRow
+  const loanList = loans.length ? loans : loan ? [loan] : []
   const earnings = [
     { label: "Basic Salary",            val: normalized.basic_salary },
     { label: "Transport Allowance",     val: normalized.transport_allowance },
@@ -178,7 +190,9 @@ function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | n
     { label: "Other Deductions",        val: normalized.other_deductions },
   ].filter(d => d.val > 0)
 
-  const hasLoan = loan || normalized.loan_deduction > 0
+  const hasLoan = loanList.length > 0 || normalized.loan_deduction > 0
+  const totalRemaining = loanList.reduce((s, l) => s + Number(l.remaining_balance || 0), 0)
+  const totalPaid = loanList.reduce((s, l) => s + Number(l.amount_paid || 0), 0)
 
   // Determine entity line: subsidiary name or parent company
   const entityName = normalized.snapshot_subsidiary || normalized.snapshot_company_name || "Company"
@@ -290,57 +304,94 @@ function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | n
           </div>
         </div>
 
-        {/* Loan Summary */}
+        {/* Loan Summary — per-loan updates, compact font */}
         {hasLoan && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <CreditCard className="w-4 h-4 text-amber-600" />
-              <h3 className="text-sm font-semibold text-amber-800 uppercase tracking-wider">Loan Summary</h3>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+            <div className="mb-2 flex items-center gap-1.5">
+              <CreditCard className="h-3.5 w-3.5 text-amber-600" />
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-amber-800">
+                Loan Summary
+              </h3>
+              <span className="ml-auto text-[10px] text-amber-700">
+                {loanList.length} loan{loanList.length === 1 ? "" : "s"}
+              </span>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              {loan && (
-                <>
-                  <div className="bg-white rounded-lg px-3 py-2 border border-amber-100">
-                    <p className="text-xs text-gray-400">Loan Type</p>
-                    <p className="text-sm font-semibold text-gray-800">{loan.loan_type}</p>
-                  </div>
-                  <div className="bg-white rounded-lg px-3 py-2 border border-amber-100">
-                    <p className="text-xs text-gray-400">Principal</p>
-                    <p className="text-sm font-semibold text-gray-800">{money(loan.principal)}</p>
-                  </div>
-                  <div className="bg-white rounded-lg px-3 py-2 border border-amber-100">
-                    <p className="text-xs text-gray-400">Monthly Payment</p>
-                    <p className="text-sm font-semibold text-gray-800">{money(loan.monthly_payment)}</p>
-                  </div>
-                  <div className="bg-white rounded-lg px-3 py-2 border border-amber-100">
-                    <p className="text-xs text-gray-400">Amount Paid</p>
-                    <p className="text-sm font-semibold text-emerald-700">{money(loan.amount_paid)}</p>
-                  </div>
-                </>
-              )}
-              <div className="bg-amber-100 rounded-lg px-3 py-2 border border-amber-200 col-span-1">
-                <p className="text-xs text-amber-700">This Month Deducted</p>
-                <p className="text-sm font-bold text-amber-900">{money(slip.loan_deduction)}</p>
+
+            {loanList.length > 0 ? (
+              <div className="mb-2 space-y-1.5">
+                {loanList.map((l) => {
+                  const progress = Math.min(
+                    100,
+                    Math.round(
+                      ((Number(l.principal) - Number(l.remaining_balance)) /
+                        Math.max(Number(l.principal) || 1, 1)) *
+                        100,
+                    ),
+                  )
+                  const monthPaid = Number(l.this_month_paid ?? l.last_payment_amount ?? 0)
+                  return (
+                    <div
+                      key={l.id}
+                      className="rounded-md border border-amber-100 bg-white px-2.5 py-1.5"
+                    >
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-semibold text-gray-800">{l.loan_type}</p>
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium uppercase text-amber-800">
+                          {l.status || "active"}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1.5 text-[10px]">
+                        <div>
+                          <p className="text-gray-400">Expected</p>
+                          <p className="font-semibold text-gray-800">{money(l.monthly_payment)}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400">This month</p>
+                          <p className="font-semibold text-amber-900">{money(monthPaid)}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400">Paid so far</p>
+                          <p className="font-semibold text-emerald-700">{money(l.amount_paid)}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400">Remaining</p>
+                          <p className="font-semibold text-gray-800">{money(l.remaining_balance)}</p>
+                        </div>
+                      </div>
+                      <div className="mt-1.5">
+                        <div className="mb-0.5 flex justify-between text-[9px] text-amber-700">
+                          <span>Progress</span>
+                          <span>{progress}%</span>
+                        </div>
+                        <div className="h-1 w-full rounded-full bg-amber-100">
+                          <div
+                            className="h-1 rounded-full bg-amber-600 transition-all"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-              <div className="bg-amber-100 rounded-lg px-3 py-2 border border-amber-200 col-span-1">
-                <p className="text-xs text-amber-700">Remaining Balance</p>
-                <p className="text-sm font-bold text-amber-900">{money(loan?.remaining_balance ?? slip.loan_balance)}</p>
+            ) : null}
+
+            <div className="grid grid-cols-3 gap-1.5">
+              <div className="rounded-md border border-amber-200 bg-amber-100 px-2 py-1.5">
+                <p className="text-[9px] text-amber-700">This Month Deducted</p>
+                <p className="text-[11px] font-bold text-amber-950">{money(normalized.loan_deduction)}</p>
+              </div>
+              <div className="rounded-md border border-amber-200 bg-amber-100 px-2 py-1.5">
+                <p className="text-[9px] text-amber-700">Total Paid</p>
+                <p className="text-[11px] font-bold text-amber-950">{money(totalPaid)}</p>
+              </div>
+              <div className="rounded-md border border-amber-200 bg-amber-100 px-2 py-1.5">
+                <p className="text-[9px] text-amber-700">Total Remaining</p>
+                <p className="text-[11px] font-bold text-amber-950">
+                  {money(totalRemaining || normalized.loan_balance)}
+                </p>
               </div>
             </div>
-            {loan && (
-              <div className="mt-3">
-                <div className="flex justify-between text-xs text-amber-700 mb-1">
-                  <span>Repayment progress</span>
-                  <span>{Math.min(100, Math.round(((loan.principal - loan.remaining_balance) / loan.principal) * 100))}%</span>
-                </div>
-                <div className="w-full bg-amber-200 rounded-full h-2">
-                  <div
-                    className="bg-amber-600 h-2 rounded-full transition-all"
-                    style={{ width: `${Math.min(100, ((loan.principal - loan.remaining_balance) / loan.principal) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -394,6 +445,7 @@ export default function PayslipsPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<string>("")
   const [indivSlip, setIndivSlip] = useState<PayslipRow | null>(null)
   const [activeLoan, setActiveLoan] = useState<ActiveLoan | null>(null)
+  const [activeLoans, setActiveLoans] = useState<ActiveLoan[]>([])
   const [loadingSlip, setLoadingSlip] = useState(false)
   const [recentSlips, setRecentSlips] = useState<PayslipRow[]>([])
 
@@ -562,6 +614,7 @@ export default function PayslipsPage() {
     setLoadingSlip(true)
     setIndivSlip(null)
     setActiveLoan(null)
+    setActiveLoans([])
     try {
       let slipQ = supabase
         .from("payslips")
@@ -574,28 +627,55 @@ export default function PayslipsPage() {
         .from("employee_loans")
         .select("*")
         .eq("employee_id", empId)
-        .eq("status", "active")
-        .order("created_at", { ascending: false })
-        .limit(1)
+        .in("status", ["active", "approved", "completed"])
+        .order("created_at", { ascending: true })
       let recentQ = supabase
         .from("payslips")
         .select("*")
         .eq("employee_id", empId)
         .order("pay_period", { ascending: false })
         .limit(8)
+      let paymentsQ = supabase
+        .from("payroll_loan_payments")
+        .select("loan_id, amount, pay_period, payment_date")
+        .eq("employee_id", empId)
+        .eq("pay_period", period)
       if (cid) {
         slipQ = slipQ.eq("company_id", cid)
         loanQ = loanQ.eq("company_id", cid)
         recentQ = recentQ.eq("company_id", cid)
+        paymentsQ = paymentsQ.eq("company_id", cid)
       }
-      const [slipRes, loanRes, recentRes] = await Promise.all([
+      const [slipRes, loanRes, recentRes, paymentsRes] = await Promise.all([
         slipQ.maybeSingle(),
-        loanQ.maybeSingle(),
+        loanQ,
         recentQ,
+        paymentsQ,
       ])
 
       if (slipRes.data) setIndivSlip(normalizePayrollCashRow(slipRes.data as PayslipRow) as PayslipRow)
-      if (loanRes.data) setActiveLoan(loanRes.data as ActiveLoan)
+
+      const monthPaidByLoan = new Map<string, number>()
+      for (const p of paymentsRes.data ?? []) {
+        monthPaidByLoan.set(
+          p.loan_id,
+          Number(monthPaidByLoan.get(p.loan_id) || 0) + Number(p.amount || 0),
+        )
+      }
+
+      const loans = ((loanRes.data ?? []) as ActiveLoan[])
+        .filter((l) => l.status !== "completed" || Number(monthPaidByLoan.get(l.id) || 0) > 0 || Number(l.amount_paid || 0) > 0)
+        .map((l) => ({
+          ...l,
+          this_month_paid: monthPaidByLoan.get(l.id) ?? (l.status === "active" ? null : 0),
+        }))
+
+      // Prefer currently active/approved loans for the summary; keep completed only if paid this period
+      const visible = loans.filter(
+        (l) => ["active", "approved"].includes(String(l.status || "active")) || Number(l.this_month_paid || 0) > 0,
+      )
+      setActiveLoans(visible)
+      setActiveLoan(visible[0] ?? null)
       setRecentSlips(normalizePayrollCashRows((recentRes.data ?? []) as PayslipRow[]) as PayslipRow[])
     } catch (err) {
       toast({ title: "Error", description: "Could not load payslip.", variant: "destructive" })
@@ -987,7 +1067,7 @@ export default function PayslipsPage() {
                       Print / PDF
                     </Button>
                   </div>
-                  <PayslipPreview slip={indivSlip} loan={activeLoan} />
+                  <PayslipPreview slip={indivSlip} loan={activeLoan} loans={activeLoans} />
                 </div>
               )}
             </div>

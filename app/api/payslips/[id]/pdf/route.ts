@@ -37,15 +37,36 @@ export async function GET(
 
     const client = await createClient()
 
-    // Load company branding and active loan in parallel
-    const [company, loanRes] = await Promise.all([
+    // Load company branding and all active loans (+ this-period payments)
+    const [company, loanRes, paymentRes] = await Promise.all([
       loadCompanyBrand(client, data.company_id),
-      client.from("employee_loans").select("*").eq("employee_id", data.employee_id).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      client
+        .from("employee_loans")
+        .select("*")
+        .eq("employee_id", data.employee_id)
+        .eq("company_id", data.company_id)
+        .in("status", ["active", "approved", "completed"])
+        .order("created_at", { ascending: true }),
+      client
+        .from("payroll_loan_payments")
+        .select("loan_id, amount")
+        .eq("employee_id", data.employee_id)
+        .eq("company_id", data.company_id)
+        .eq("pay_period", data.pay_period),
     ])
 
     const companyName = company?.name || data.snapshot_company_name || "Company"
     const logoUrl = company?.logo_url || ""
-    const loan = loanRes.data
+    const monthPaid = new Map<string, number>()
+    for (const p of paymentRes.data ?? []) {
+      monthPaid.set(p.loan_id, Number(monthPaid.get(p.loan_id) || 0) + Number(p.amount || 0))
+    }
+    const loans = ((loanRes.data ?? []) as any[]).filter(
+      (l) =>
+        ["active", "approved"].includes(String(l.status)) ||
+        Number(monthPaid.get(l.id) || 0) > 0,
+    )
+    const loan = loans[0] || null
 
     const earnings: [string, number][] = [
       ["Basic Salary",            Number(data.basic_salary)],
@@ -68,12 +89,32 @@ export async function GET(
       ["Other Deductions",        Number(data.other_deductions)],
     ].filter(([, v]) => v > 0)
 
-    const hasLoan = loan || Number(data.loan_deduction) > 0
-    const loanBalance = loan?.remaining_balance ?? data.loan_balance ?? 0
-    const loanPct = loan
-      ? Math.min(100, Math.round(((Number(loan.principal) - Number(loan.remaining_balance)) / Number(loan.principal)) * 100))
-      : 0
+    const hasLoan = loans.length > 0 || Number(data.loan_deduction) > 0
+    const totalRemaining = loans.reduce((s, l) => s + Number(l.remaining_balance || 0), 0)
+    const loanBalance = totalRemaining || data.loan_balance || 0
     const ytd = Number((data as any).ytd_gross ?? 0)
+    const loanRowsHtml = loans
+      .map((l) => {
+        const pct = Math.min(
+          100,
+          Math.round(
+            ((Number(l.principal) - Number(l.remaining_balance)) / Math.max(Number(l.principal) || 1, 1)) * 100,
+          ),
+        )
+        const paidMonth = Number(monthPaid.get(l.id) || l.last_payment_amount || 0)
+        return `<div class="ln-loan">
+          <div class="ln-loan-head"><span>${esc(l.loan_type || "Loan")}</span><span class="ln-status">${esc(l.status || "active")}</span></div>
+          <div class="ln-grid">
+            <div class="ln-cell"><span class="ln-lbl">Expected</span><span class="ln-val">${money(l.monthly_payment)}</span></div>
+            <div class="ln-cell"><span class="ln-lbl">This Month</span><span class="ln-val amber">${money(paidMonth)}</span></div>
+            <div class="ln-cell"><span class="ln-lbl">Paid so far</span><span class="ln-val green">${money(l.amount_paid)}</span></div>
+            <div class="ln-cell"><span class="ln-lbl">Remaining</span><span class="ln-val">${money(l.remaining_balance)}</span></div>
+          </div>
+          <div class="pr-row"><span>Progress</span><span>${pct}%</span></div>
+          <div class="pr-bar"><div class="pr-fill" style="width:${pct}%"></div></div>
+        </div>`
+      })
+      .join("")
 
     const html = `<!DOCTYPE html>
 <html>
@@ -115,18 +156,22 @@ export async function GET(
     .nl { font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:rgba(255,255,255,.6); }
     .na { font-size:22px; font-weight:700; letter-spacing:-.02em; }
     .nd { text-align:right; font-size:11px; color:rgba(255,255,255,.8); }
-    /* Loan */
-    .loan-box { background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:10px 12px; margin-bottom:10px; }
-    .ln-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#92400e; margin-bottom:8px; }
-    .ln-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
-    .ln-cell { background:#fff; border:1px solid #fde68a; border-radius:5px; padding:5px 8px; }
-    .ln-lbl { display:block; font-size:9px; color:#78716c; text-transform:uppercase; }
-    .ln-val { display:block; font-size:11px; font-weight:600; color:#1c1917; margin-top:1px; }
+    /* Loan — compact multi-loan summary */
+    .loan-box { background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:8px 10px; margin-bottom:10px; }
+    .ln-title { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#92400e; margin-bottom:6px; display:flex; justify-content:space-between; }
+    .ln-loan { background:#fff; border:1px solid #fde68a; border-radius:5px; padding:5px 7px; margin-bottom:5px; }
+    .ln-loan-head { display:flex; justify-content:space-between; align-items:center; font-size:10px; font-weight:700; color:#1c1917; margin-bottom:4px; }
+    .ln-status { font-size:8px; text-transform:uppercase; background:#fef3c7; color:#92400e; padding:1px 5px; border-radius:9999px; }
+    .ln-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; }
+    .ln-cell { background:#fffbeb; border:1px solid #fde68a; border-radius:4px; padding:3px 5px; }
+    .ln-lbl { display:block; font-size:8px; color:#78716c; text-transform:uppercase; }
+    .ln-val { display:block; font-size:9px; font-weight:600; color:#1c1917; margin-top:1px; }
+    .ln-tot { display:grid; grid-template-columns:repeat(2,1fr); gap:4px; margin-top:4px; }
     .amber { color:#b45309; }
     .green { color:#065f46; }
-    .pr-row { display:flex; justify-content:space-between; font-size:9px; color:#92400e; margin-top:8px; margin-bottom:3px; }
-    .pr-bar { background:#fde68a; border-radius:9999px; height:5px; }
-    .pr-fill { background:#d97706; height:5px; border-radius:9999px; }
+    .pr-row { display:flex; justify-content:space-between; font-size:8px; color:#92400e; margin-top:4px; margin-bottom:2px; }
+    .pr-bar { background:#fde68a; border-radius:9999px; height:3px; }
+    .pr-fill { background:#d97706; height:3px; border-radius:9999px; }
     /* YTD */
     .ytd-row { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:10px; }
     .ytd-c { background:#f9fafb; border:1px solid #e5e7eb; border-radius:5px; padding:5px 8px; }
@@ -182,18 +227,12 @@ export async function GET(
 
   ${hasLoan ? `
   <div class="loan-box">
-    <div class="ln-title">Loan Summary</div>
-    <div class="ln-grid">
-      ${loan ? `
-      <div class="ln-cell"><span class="ln-lbl">Loan Type</span><span class="ln-val">${esc(loan.loan_type)}</span></div>
-      <div class="ln-cell"><span class="ln-lbl">Principal</span><span class="ln-val">${money(loan.principal)}</span></div>
-      <div class="ln-cell"><span class="ln-lbl">Monthly Payment</span><span class="ln-val">${money(loan.monthly_payment)}</span></div>
-      <div class="ln-cell"><span class="ln-lbl">Amount Paid</span><span class="ln-val green">${money(loan.amount_paid)}</span></div>
-      ` : ""}
+    <div class="ln-title"><span>Loan Summary</span><span>${loans.length} loan${loans.length === 1 ? "" : "s"}</span></div>
+    ${loanRowsHtml}
+    <div class="ln-tot">
       <div class="ln-cell"><span class="ln-lbl">This Month Deducted</span><span class="ln-val amber">${money(data.loan_deduction)}</span></div>
-      <div class="ln-cell"><span class="ln-lbl">Remaining Balance</span><span class="ln-val amber">${money(loanBalance)}</span></div>
+      <div class="ln-cell"><span class="ln-lbl">Total Remaining</span><span class="ln-val amber">${money(loanBalance)}</span></div>
     </div>
-    ${loan ? `<div class="pr-row"><span>Repayment Progress</span><span>${loanPct}%</span></div><div class="pr-bar"><div class="pr-fill" style="width:${loanPct}%"></div></div>` : ""}
   </div>` : ""}
 
   ${ytd > 0 ? `

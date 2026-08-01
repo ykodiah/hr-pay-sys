@@ -146,39 +146,47 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // Apply loan deductions to each employee loan + amortization schedule
+        const { applyEmployeePayrollLoanDeduction } = await import("@/lib/services/loan-service")
         const { data: items } = await supabase
           .from("payroll_items")
           .select("employee_id, loan_deduction")
           .eq("payroll_run_id", payroll_run_id)
 
+        const { data: slips } = await supabase
+          .from("payslips")
+          .select("id, employee_id, pay_period")
+          .eq("payroll_run_id", payroll_run_id)
+          .eq("company_id", companyId)
+
+        const slipByEmployee = new Map<string, { id: string; pay_period?: string }>()
+        for (const slip of slips ?? []) {
+          slipByEmployee.set(slip.employee_id, { id: slip.id, pay_period: slip.pay_period })
+        }
+
+        const payPeriod =
+          run.pay_period_start ? String(run.pay_period_start).slice(0, 7) : null
+
         for (const item of items ?? []) {
           const loanAmt = Number(item.loan_deduction ?? 0)
           if (loanAmt <= 0) continue
-          const { data: loans } = await supabase
-            .from("employee_loans")
-            .select("id, amount_paid, remaining_balance, monthly_payment, status")
-            .eq("employee_id", item.employee_id)
-            .eq("company_id", companyId)
-            .in("status", ["active", "approved"])
-            .order("created_at", { ascending: true })
-
-          let remaining = loanAmt
-          for (const loan of loans ?? []) {
-            if (remaining <= 0) break
-            const pay = Math.min(remaining, Number(loan.remaining_balance ?? loan.monthly_payment ?? remaining))
-            const amountPaid = Number(loan.amount_paid ?? 0) + pay
-            const balance = Math.max(0, Number(loan.remaining_balance ?? 0) - pay)
-            await supabase
-              .from("employee_loans")
-              .update({
-                amount_paid: amountPaid,
-                remaining_balance: balance,
-                status: balance <= 0 ? "completed" : "active",
-                updated_at: now,
-              })
-              .eq("id", loan.id)
-              .eq("company_id", companyId)
-            remaining -= pay
+          const slip = slipByEmployee.get(item.employee_id)
+          try {
+            await applyEmployeePayrollLoanDeduction({
+              companyId,
+              employeeId: item.employee_id,
+              totalDeduction: loanAmt,
+              payrollRunId: payroll_run_id,
+              payslipId: slip?.id ?? null,
+              payPeriod: payPeriod || slip?.pay_period || null,
+              paymentDate: now.slice(0, 10),
+            })
+          } catch (loanErr) {
+            console.warn(
+              "[payroll-approve] loan payment apply failed for employee",
+              item.employee_id,
+              loanErr,
+            )
           }
         }
 

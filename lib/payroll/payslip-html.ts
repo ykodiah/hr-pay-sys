@@ -74,6 +74,30 @@ export function renderPayslipHtml(slip: any, opts?: { autoPrint?: boolean }) {
       <tr class="total"><td>Net Pay</td><td class="right">${money(slip.net_pay)}</td></tr>
     </tbody>
   </table>
+  ${
+    Number(slip.loan_deduction) > 0 || (Array.isArray(slip.loans) && slip.loans.length)
+      ? `<div style="margin-top:14px;border:1px solid #fcd34d;background:#fffbeb;border-radius:6px;padding:8px 10px;font-size:10px">
+    <div style="font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#92400e;margin-bottom:6px">Loan Summary</div>
+    ${(Array.isArray(slip.loans) ? slip.loans : [])
+      .map(
+        (l: any) => `<div style="border:1px solid #fde68a;background:#fff;border-radius:4px;padding:5px 7px;margin-bottom:4px">
+      <div style="display:flex;justify-content:space-between;font-weight:700;margin-bottom:3px"><span>${esc(l.loan_type || "Loan")}</span><span>${esc(l.status || "active")}</span></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
+        <div><div class="muted">Expected</div><div>${money(l.monthly_payment)}</div></div>
+        <div><div class="muted">This month</div><div>${money(l.this_month_paid ?? l.last_payment_amount)}</div></div>
+        <div><div class="muted">Paid so far</div><div>${money(l.amount_paid)}</div></div>
+        <div><div class="muted">Remaining</div><div>${money(l.remaining_balance)}</div></div>
+      </div>
+    </div>`,
+      )
+      .join("")}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px">
+      <div><div class="muted">This Month Deducted</div><div style="font-weight:700">${money(slip.loan_deduction)}</div></div>
+      <div><div class="muted">Loan Balance</div><div style="font-weight:700">${money(slip.loan_balance)}</div></div>
+    </div>
+  </div>`
+      : ""
+  }
   <p class="muted" style="margin-top:24px">Generated ${new Date().toLocaleString("en-GH")} · Status: ${esc(slip.status)}</p>
   ${autoPrint ? "<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),300))</script>" : ""}
 </body></html>`

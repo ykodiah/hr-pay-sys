@@ -55,12 +55,36 @@ function renderOneSlip(slip: PayslipRow & { loan?: any }, company: any): string 
     ["Other Deductions",        Number(slip.other_deductions)],
   ].filter(([, v]) => v > 0)
 
-  const loan = slip.loan
-  const hasLoan = loan || Number(slip.loan_deduction) > 0
-  const loanBalance = loan?.remaining_balance ?? slip.loan_balance ?? 0
-  const loanPct = loan
-    ? Math.min(100, Math.round(((Number(loan.principal) - Number(loan.remaining_balance)) / Number(loan.principal)) * 100))
-    : 0
+  const loans: any[] = Array.isArray(slip.loans)
+    ? slip.loans
+    : slip.loan
+      ? [slip.loan]
+      : []
+  const hasLoan = loans.length > 0 || Number(slip.loan_deduction) > 0
+  const loanBalance =
+    loans.reduce((s, l) => s + Number(l.remaining_balance || 0), 0) || slip.loan_balance || 0
+  const loanRowsHtml = loans
+    .map((l) => {
+      const pct = Math.min(
+        100,
+        Math.round(
+          ((Number(l.principal) - Number(l.remaining_balance)) / Math.max(Number(l.principal) || 1, 1)) * 100,
+        ),
+      )
+      const paidMonth = Number(l.this_month_paid ?? l.last_payment_amount ?? 0)
+      return `<div class="loan-item">
+        <div class="loan-item-head"><span>${esc(l.loan_type || "Loan")}</span><span class="loan-status">${esc(l.status || "active")}</span></div>
+        <div class="loan-grid">
+          <div class="loan-cell"><span class="loan-label">Expected</span><span class="loan-val">GHS ${money(l.monthly_payment)}</span></div>
+          <div class="loan-cell"><span class="loan-label">This Month</span><span class="loan-val amber">GHS ${money(paidMonth)}</span></div>
+          <div class="loan-cell"><span class="loan-label">Paid so far</span><span class="loan-val green">GHS ${money(l.amount_paid)}</span></div>
+          <div class="loan-cell"><span class="loan-label">Remaining</span><span class="loan-val">GHS ${money(l.remaining_balance)}</span></div>
+        </div>
+        <div class="progress-row"><span class="loan-label">Progress</span><span class="loan-label">${pct}%</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      </div>`
+    })
+    .join("")
 
   return `
 <div class="payslip-page">
@@ -118,26 +142,14 @@ function renderOneSlip(slip: PayslipRow & { loan?: any }, company: any): string 
   </div>
 
   ${hasLoan ? `
-  <!-- Loan summary -->
+  <!-- Loan summary (multi-loan, compact) -->
   <div class="loan-box">
-    <div class="loan-title">Loan Summary</div>
-    <div class="loan-grid">
-      ${loan ? `
-      <div class="loan-cell"><span class="loan-label">Loan Type</span><span class="loan-val">${esc(loan.loan_type || "")}</span></div>
-      <div class="loan-cell"><span class="loan-label">Principal</span><span class="loan-val">GHS ${money(loan.principal)}</span></div>
-      <div class="loan-cell"><span class="loan-label">Monthly Payment</span><span class="loan-val">GHS ${money(loan.monthly_payment)}</span></div>
-      <div class="loan-cell"><span class="loan-label">Amount Paid</span><span class="loan-val green">GHS ${money(loan.amount_paid)}</span></div>
-      ` : ""}
+    <div class="loan-title"><span>Loan Summary</span><span>${loans.length} loan${loans.length === 1 ? "" : "s"}</span></div>
+    ${loanRowsHtml}
+    <div class="loan-grid" style="margin-top:4px">
       <div class="loan-cell"><span class="loan-label">This Month Deducted</span><span class="loan-val amber">GHS ${money(slip.loan_deduction)}</span></div>
-      <div class="loan-cell"><span class="loan-label">Remaining Balance</span><span class="loan-val amber">GHS ${money(loanBalance)}</span></div>
+      <div class="loan-cell"><span class="loan-label">Total Remaining</span><span class="loan-val amber">GHS ${money(loanBalance)}</span></div>
     </div>
-    ${loan ? `
-    <div class="progress-row">
-      <span class="loan-label">Repayment Progress</span>
-      <span class="loan-label">${loanPct}%</span>
-    </div>
-    <div class="progress-bar"><div class="progress-fill" style="width:${loanPct}%"></div></div>
-    ` : ""}
   </div>` : ""}
 
   ${(Number(slip.ytd_gross) > 0) ? `
@@ -179,24 +191,49 @@ export async function GET(request: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     if (!slips?.length) return NextResponse.json({ error: "No payslips found" }, { status: 404 })
 
-    // Load active loans for all employee IDs
-    const empIds = [...new Set(slips.map(s => s.employee_id))]
-    const { data: loans } = await client
-      .from("employee_loans")
-      .select("*")
-      .in("employee_id", empIds)
-      .eq("status", "active")
+    // Load all active loans for employees on these slips
+    const empIds = [...new Set(slips.map((s) => s.employee_id))]
+    const periods = [...new Set(slips.map((s) => s.pay_period).filter(Boolean))]
+    const [{ data: loans }, { data: payments }] = await Promise.all([
+      client
+        .from("employee_loans")
+        .select("*")
+        .in("employee_id", empIds)
+        .in("status", ["active", "approved", "completed"]),
+      client
+        .from("payroll_loan_payments")
+        .select("loan_id, employee_id, amount, pay_period")
+        .in("employee_id", empIds)
+        .in("pay_period", periods.length ? periods : ["__none__"]),
+    ])
 
-    const loanByEmp = new Map<string, any>()
+    const monthPaid = new Map<string, number>()
+    for (const p of payments ?? []) {
+      const key = `${p.employee_id}:${p.pay_period}:${p.loan_id}`
+      monthPaid.set(key, Number(monthPaid.get(key) || 0) + Number(p.amount || 0))
+    }
+
+    const loansByEmp = new Map<string, any[]>()
     for (const loan of loans ?? []) {
-      if (!loanByEmp.has(loan.employee_id)) loanByEmp.set(loan.employee_id, loan)
+      if (!["active", "approved"].includes(String(loan.status))) continue
+      const list = loansByEmp.get(loan.employee_id) || []
+      list.push(loan)
+      loansByEmp.set(loan.employee_id, list)
     }
 
     // Load company brand (use first slip's company_id)
     const company = await loadCompanyBrand(client, slips[0]?.company_id)
 
     // Render all slips
-    const slipHtml = slips.map(s => renderOneSlip({ ...s, loan: loanByEmp.get(s.employee_id) }, company)).join("\n")
+    const slipHtml = slips
+      .map((s) => {
+        const empLoans = (loansByEmp.get(s.employee_id) || []).map((l) => ({
+          ...l,
+          this_month_paid: monthPaid.get(`${s.employee_id}:${s.pay_period}:${l.id}`) || 0,
+        }))
+        return renderOneSlip({ ...s, loans: empLoans, loan: empLoans[0] || null }, company)
+      })
+      .join("\n")
     const period = fmtPeriod(slips[0]?.pay_period)
     const companyName = company?.name || "Company"
 
@@ -251,18 +288,21 @@ export async function GET(request: NextRequest) {
     .net-amount { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
     .net-detail { text-align: right; font-size: 11px; color: rgba(255,255,255,0.8); }
 
-    /* Loan */
-    .loan-box { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
-    .loan-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #92400e; margin-bottom: 8px; }
-    .loan-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-    .loan-cell { background: #fff; border: 1px solid #fde68a; border-radius: 5px; padding: 5px 8px; }
-    .loan-label { display: block; font-size: 9px; color: #78716c; text-transform: uppercase; }
-    .loan-val { display: block; font-size: 11px; font-weight: 600; color: #1c1917; margin-top: 1px; }
+    /* Loan — compact multi-loan */
+    .loan-box { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; }
+    .loan-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #92400e; margin-bottom: 6px; display:flex; justify-content:space-between; }
+    .loan-item { background:#fff; border:1px solid #fde68a; border-radius:5px; padding:5px 7px; margin-bottom:5px; }
+    .loan-item-head { display:flex; justify-content:space-between; font-size:10px; font-weight:700; margin-bottom:4px; }
+    .loan-status { font-size:8px; text-transform:uppercase; background:#fef3c7; color:#92400e; padding:1px 5px; border-radius:9999px; }
+    .loan-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+    .loan-cell { background: #fffbeb; border: 1px solid #fde68a; border-radius: 4px; padding: 3px 5px; }
+    .loan-label { display: block; font-size: 8px; color: #78716c; text-transform: uppercase; }
+    .loan-val { display: block; font-size: 9px; font-weight: 600; color: #1c1917; margin-top: 1px; }
     .loan-val.amber { color: #b45309; }
     .loan-val.green { color: #065f46; }
-    .progress-row { display: flex; justify-content: space-between; font-size: 9px; color: #92400e; margin-top: 8px; margin-bottom: 3px; }
-    .progress-bar { background: #fde68a; border-radius: 9999px; height: 5px; }
-    .progress-fill { background: #d97706; height: 5px; border-radius: 9999px; }
+    .progress-row { display: flex; justify-content: space-between; font-size: 8px; color: #92400e; margin-top: 4px; margin-bottom: 2px; }
+    .progress-bar { background: #fde68a; border-radius: 9999px; height: 3px; }
+    .progress-fill { background: #d97706; height: 3px; border-radius: 9999px; }
 
     /* YTD */
     .ytd-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
