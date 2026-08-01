@@ -521,14 +521,30 @@ function buildSSNITTier1Report(
   const typedRows = rows.map((r, idx) => {
     const basicSalary = ghs(r.basic_salary)
     const tier1Amount = ghs(basicSalary * 0.135)  // 13.5%
+    
+    // Parse employee name if individual fields are not populated
+    let lastName = r.last_name ?? ""
+    let firstName = r.first_name ?? ""
+    let otherNames = r.other_names ?? ""
+    
+    if (!firstName && !lastName && r.employee_name) {
+      // Split employee_name into surname and first name
+      const nameParts = r.employee_name.trim().split(/\s+/)
+      if (nameParts.length > 0) {
+        firstName = nameParts[0]
+        lastName = nameParts[nameParts.length - 1]
+        otherNames = nameParts.slice(1, nameParts.length - 1).join(" ")
+      }
+    }
+    
     return {
       sn:                String(idx + 1),
       employee_id_no:    r.employee_id_no ?? "",
       ssnit_number:      r.ssnit_number ?? "",
       ghana_card_number: r.ghana_card_number ?? "",
-      last_name:         r.last_name ?? "",
-      first_name:        r.first_name ?? "",
-      other_names:       r.other_names ?? "",
+      last_name:         lastName,
+      first_name:        firstName,
+      other_names:       otherNames,
       basic_salary:      basicSalary,
       tier1_contrib:     tier1Amount,
       code:              "",
@@ -595,14 +611,30 @@ function buildSSNITTier2Report(
   const typedRows = rows.map((r, idx) => {
     const basicSalary = ghs(r.basic_salary)
     const tier2Amount = ghs(basicSalary * 0.05)  // 5%
+    
+    // Parse employee name if individual fields are not populated
+    let lastName = r.last_name ?? ""
+    let firstName = r.first_name ?? ""
+    let otherNames = r.other_names ?? ""
+    
+    if (!firstName && !lastName && r.employee_name) {
+      // Split employee_name into surname and first name
+      const nameParts = r.employee_name.trim().split(/\s+/)
+      if (nameParts.length > 0) {
+        firstName = nameParts[0]
+        lastName = nameParts[nameParts.length - 1]
+        otherNames = nameParts.slice(1, nameParts.length - 1).join(" ")
+      }
+    }
+    
     return {
       sn:                String(idx + 1),
       employee_id_no:    r.employee_id_no ?? "",
       ssnit_number:      r.ssnit_number ?? "",
       ghana_card_number: r.ghana_card_number ?? "",
-      last_name:         r.last_name ?? "",
-      first_name:        r.first_name ?? "",
-      other_names:       r.other_names ?? "",
+      last_name:         lastName,
+      first_name:        firstName,
+      other_names:       otherNames,
       basic_salary:      basicSalary,
       tier2_contrib:     tier2Amount,
       code:              "",
