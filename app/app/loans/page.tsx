@@ -136,38 +136,5 @@ export default function LoansPage() {
         </TabsContent>
       </Tabs>
     </div>
-              <div>
-                <Label>Amount (GHS) *</Label>
-                <Input type="number" min="100" value={newForm.amount}
-                  onChange={(e) => setNewForm((f) => ({ ...f, amount: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Duration (months)</Label>
-                <Select value={newForm.repayment_months} onValueChange={(v) => setNewForm((f) => ({ ...f, repayment_months: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {[3,6,12,18,24,36].map((m) => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Interest Rate (%)</Label>
-                <Input type="number" min="0" step="0.5" value={newForm.interest_rate}
-                  onChange={(e) => setNewForm((f) => ({ ...f, interest_rate: e.target.value }))} />
-              </div>
-            </div>
-            <div>
-              <Label>Purpose</Label>
-              <Textarea placeholder="Purpose of loan..." rows={2}
-                value={newForm.purpose} onChange={(e) => setNewForm((f) => ({ ...f, purpose: e.target.value }))} />
-            </div>
-            <div className="flex justify-end gap-3">
-              <Button type="button" variant="outline" onClick={() => setNewLoanOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={creating}>{creating ? "Creating..." : "Create Loan"}</Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </div>
   )
 }
