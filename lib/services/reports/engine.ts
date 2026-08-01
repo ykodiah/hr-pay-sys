@@ -319,6 +319,8 @@ async function fetchReportRows(
       paye_taxable_income: Number(it.paye_taxable_income ?? 0),
       tax_relief_total: Number(it.tax_relief_total ?? 0),
       paye_tax: Number(it.tax_deduction ?? it.paye_tax ?? 0),
+      bonus_tax: Number(it.bonus_tax ?? 0),
+      overtime_tax: Number(it.overtime_tax ?? 0),
       loan_deduction: Number(it.loan_deduction ?? 0),
       advance_deduction: Number(it.advance_deduction ?? 0),
       other_deductions: Number(it.other_deductions ?? 0),

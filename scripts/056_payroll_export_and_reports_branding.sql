@@ -38,6 +38,9 @@ SELECT
   COALESCE(ef.bank_account_number, p.snapshot_account_number) AS account_number,
   c.name AS company_name,
   COALESCE(e.ghana_card_number, to_jsonb(e)->>'national_id') AS ghana_card_number,
+  COALESCE(e.first_name, '') AS first_name,
+  COALESCE(e.last_name, '') AS last_name,
+  COALESCE(e.other_names, '') AS other_names,
   COALESCE(
     NULLIF(to_jsonb(e)->>'hire_date', '')::date,
     NULLIF(to_jsonb(e)->>'date_of_joining', '')::date
@@ -71,6 +74,8 @@ SELECT
   COALESCE(p.paye_taxable_income, 0)::numeric AS paye_taxable_income,
   COALESCE(p.tax_relief_total, 0)::numeric AS tax_relief_total,
   COALESCE(p.paye_tax, 0)::numeric AS paye_tax,
+  COALESCE(p.bonus_tax, 0)::numeric AS bonus_tax,
+  COALESCE(p.overtime_tax, 0)::numeric AS overtime_tax,
   COALESCE(p.loan_deduction, 0)::numeric AS loan_deduction,
   COALESCE(p.advance_deduction, 0)::numeric AS advance_deduction,
   COALESCE(p.other_deductions, 0)::numeric AS other_deductions,
