@@ -95,6 +95,8 @@ export interface PayrollReportRow {
   paye_taxable_income:   number
   tax_relief_total:      number
   paye_tax:              number
+  bonus_tax:             number
+  overtime_tax:          number
   loan_deduction:        number
   advance_deduction:     number
   other_deductions:      number

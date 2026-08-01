@@ -136,6 +136,8 @@ function mapPayslipToReportRow(p: any): PayrollReportRow {
     paye_taxable_income: Number(p.paye_taxable_income ?? 0),
     tax_relief_total: Number(p.tax_relief_total ?? 0),
     paye_tax: Number(p.paye_tax ?? p.tax_deduction ?? 0),
+    bonus_tax: Number(p.bonus_tax ?? 0),
+    overtime_tax: Number(p.overtime_tax ?? 0),
     loan_deduction: Number(p.loan_deduction ?? 0),
     advance_deduction: Number(p.advance_deduction ?? 0),
     other_deductions: Number(p.other_deductions ?? 0),
@@ -339,57 +341,144 @@ async function fetchReportRows(
 }
 
 // ─── Report generators ────────────────────────────────────────────────────────
-
-/** Report 1 — PAYE Tax Report (for GRA filing) */
+/** Report 1 — PAYE Tax (Employer's Monthly Tax Deductions)
+ *  GRA Portal Format with 28 columns matching the official schedule
+ */
 function buildPAYEReport(
   rows: PayrollReportRow[],
   meta: ReportMeta
 ): GeneratedReport {
   const columns: ReportColumn[] = [
-    { key: "employee_id_no",      label: "Employee ID",          type: "text" },
-    { key: "employee_name",       label: "Employee Name",        type: "text" },
-    { key: "ghana_card_number",   label: "Ghana Card No.",       type: "text" },
-    { key: "department",          label: "Department",           type: "text" },
-    { key: "position",            label: "Position",             type: "text" },
-    { key: "gross_pay",           label: "Gross Pay (GHS)",      type: "currency" },
-    { key: "paye_taxable_income", label: "Taxable Income (GHS)", type: "currency" },
-    { key: "tax_relief_total",    label: "Tax Reliefs (GHS)",    type: "currency" },
-    { key: "paye_tax",            label: "PAYE Tax (GHS)",       type: "currency" },
+    { key: "sn",                           label: "Ser. No",                                                type: "text" },
+    { key: "ghana_card_number",            label: "TIN / GHANA CARD NO.",                                  type: "text" },
+    { key: "employee_name",                label: "Name Of Employee",                                      type: "text" },
+    { key: "position",                     label: "Position",                                              type: "text" },
+    { key: "residency_status",             label: "Residency/ Part-Time/  Casual",                         type: "text" },
+    { key: "basic_salary",                 label: "Basic Salary",                                          type: "currency" },
+    { key: "secondary_employment",         label: "Secondary Employment (Y / N)",                          type: "text" },
+    { key: "paid_ssnit",                   label: "Paid SSNIT (Y / N)",                                    type: "text" },
+    { key: "ssnit_total",                  label: "Social Security Fund",                                  type: "currency" },
+    { key: "tier3_total",                  label: "Third Tier Total",                                      type: "currency" },
+    { key: "allowances_total",             label: "Cash Allowances",                                       type: "currency" },
+    { key: "bonus_income",                 label: "Bonus Income (up to 15% of Annual Basic salary)",       type: "currency" },
+    { key: "bonus_tax",                    label: "Final Tax on Bonus Income",                             type: "currency" },
+    { key: "excess_bonus",                 label: "Excess Bonus",                                          type: "currency" },
+    { key: "total_cash_emolument",         label: "Total Cash emolument (6+11+14)",                        type: "currency" },
+    { key: "accommodation_element",        label: "Accommodation Element",                                 type: "currency" },
+    { key: "vehicle_element",              label: "Vehicle Element",                                       type: "currency" },
+    { key: "non_cash_benefit",             label: "Non Cash Benefit",                                      type: "currency" },
+    { key: "total_assessable_income",      label: "Total Assessable Income (15+16+17+18)",                 type: "currency" },
+    { key: "deductible_reliefs",           label: "Deductible Reliefs",                                    type: "currency" },
+    { key: "total_reliefs",                label: "Total Reliefs (9+10+20)",                               type: "currency" },
+    { key: "chargeable_income",            label: "Chargeable Income           (19 - 21)",                 type: "currency" },
+    { key: "tax_deductible",               label: "Tax Deductible",                                        type: "currency" },
+    { key: "overtime_income",              label: "Overtime Income",                                       type: "currency" },
+    { key: "overtime_tax",                 label: "Overtime Tax",                                          type: "currency" },
+    { key: "total_tax_payable_gra",        label: "Total Tax Payable to GRA (13+23+25)",                   type: "currency" },
+    { key: "severance_pay",                label: "Severance pay paid",                                    type: "currency" },
+    { key: "remarks",                      label: "Remarks",                                               type: "text" },
   ]
 
-  const typedRows = rows.map((r) => ({
-    employee_id_no:      r.employee_id_no ?? "",
-    employee_name:       r.employee_name ?? "",
-    ghana_card_number:   r.ghana_card_number ?? "",
-    department:          r.department ?? "",
-    position:            r.position ?? "",
-    gross_pay:           ghs(r.gross_pay),
-    paye_taxable_income: ghs(r.paye_taxable_income),
-    tax_relief_total:    ghs(r.tax_relief_total),
-    paye_tax:            ghs(r.paye_tax),
-  }))
+  const typedRows = rows.map((r, idx) => {
+    const basicSalary = ghs(r.basic_salary)
+    const ssnitTotal = ghs(r.ssnit_employer) + ghs(r.ssnit_employee)
+    const tier3Total = ghs(r.tier3_employer) + ghs(r.tier3_employee)
+    const allowancesTotal = ghs(r.transport_allowance + r.housing_allowance + r.medical_allowance + r.meal_allowance + r.communication_allowance + r.other_allowances)
+    const bonusIncome = ghs(r.bonus_pay)
+    const bonusTax = ghs(r.bonus_tax)
+    const totalCashEmolument = basicSalary + allowancesTotal + bonusIncome
+    const totalAssessableIncome = totalCashEmolument  // simplified, no accommodation/vehicle/non-cash benefits tracked yet
+    const deductibleReliefs = ghs(r.tax_relief_total)
+    const totalReliefs = ssnitTotal + tier3Total + deductibleReliefs
+    const chargeableIncome = Math.max(0, totalAssessableIncome - totalReliefs)
+    const taxDeductible = ghs(r.paye_tax)
+    const overtimeIncome = ghs(r.overtime_pay)
+    const overtimeTax = ghs(r.overtime_tax)
+    const totalTaxPayableGRA = bonusTax + taxDeductible + overtimeTax
+
+    return {
+      sn:                      String(idx + 1),
+      ghana_card_number:       r.ghana_card_number ?? "",
+      employee_name:           r.employee_name ?? "",
+      position:                r.position ?? "",
+      residency_status:        "Resident",  // default, can be enhanced if tracked
+      basic_salary:            basicSalary,
+      secondary_employment:    "N",  // default, can be enhanced if tracked
+      paid_ssnit:              "Y",  // assume yes if SSNIT amounts present
+      ssnit_total:             ssnitTotal,
+      tier3_total:             tier3Total,
+      allowances_total:        allowancesTotal,
+      bonus_income:            bonusIncome,
+      bonus_tax:               bonusTax,
+      excess_bonus:            0,  // not tracked separately
+      total_cash_emolument:    totalCashEmolument,
+      accommodation_element:   0,  // not separately tracked
+      vehicle_element:         0,  // not separately tracked
+      non_cash_benefit:        0,  // not separately tracked
+      total_assessable_income: totalAssessableIncome,
+      deductible_reliefs:      deductibleReliefs,
+      total_reliefs:           totalReliefs,
+      chargeable_income:       chargeableIncome,
+      tax_deductible:          taxDeductible,
+      overtime_income:         overtimeIncome,
+      overtime_tax:            overtimeTax,
+      total_tax_payable_gra:   totalTaxPayableGRA,
+      severance_pay:           0,  // not tracked
+      remarks:                 "",
+    }
+  })
 
   const totals = {
-    total_employees:    rows.length,
-    total_gross_pay:    typedRows.reduce((s, r) => s + r.gross_pay, 0),
-    total_taxable:      typedRows.reduce((s, r) => s + r.paye_taxable_income, 0),
-    total_paye_tax:     typedRows.reduce((s, r) => s + r.paye_tax, 0),
+    total_employees:           rows.length,
+    total_basic_salary:        typedRows.reduce((s, r) => s + r.basic_salary, 0),
+    total_ssnit:               typedRows.reduce((s, r) => s + r.ssnit_total, 0),
+    total_tier3:               typedRows.reduce((s, r) => s + r.tier3_total, 0),
+    total_allowances:          typedRows.reduce((s, r) => s + r.allowances_total, 0),
+    total_bonus_income:        typedRows.reduce((s, r) => s + r.bonus_income, 0),
+    total_bonus_tax:           typedRows.reduce((s, r) => s + r.bonus_tax, 0),
+    total_cash_emolument:      typedRows.reduce((s, r) => s + r.total_cash_emolument, 0),
+    total_assessable_income:   typedRows.reduce((s, r) => s + r.total_assessable_income, 0),
+    total_reliefs:             typedRows.reduce((s, r) => s + r.total_reliefs, 0),
+    total_chargeable_income:   typedRows.reduce((s, r) => s + r.chargeable_income, 0),
+    total_tax_deductible:      typedRows.reduce((s, r) => s + r.tax_deductible, 0),
+    total_overtime_income:     typedRows.reduce((s, r) => s + r.overtime_income, 0),
+    total_overtime_tax:        typedRows.reduce((s, r) => s + r.overtime_tax, 0),
+    total_tax_payable_gra:     typedRows.reduce((s, r) => s + r.total_tax_payable_gra, 0),
   }
 
-  // Append a grand total row so it appears in both the preview table and CSV
+  // Append a grand total row
   const allRows: Record<string, unknown>[] = [
     ...typedRows,
     {
-      employee_id_no:      "GRAND TOTAL",
-      employee_name:       `${rows.length} employee(s)`,
-      ghana_card_number:   "",
-      department:          "",
-      position:            "",
-      gross_pay:           totals.total_gross_pay,
-      paye_taxable_income: totals.total_taxable,
-      tax_relief_total:    typedRows.reduce((s, r) => s + r.tax_relief_total, 0),
-      paye_tax:            totals.total_paye_tax,
-      _is_total_row:       true,
+      sn:                      "",
+      ghana_card_number:       "",
+      employee_name:           "TOTAL",
+      position:                "",
+      residency_status:        "",
+      basic_salary:            totals.total_basic_salary,
+      secondary_employment:    "",
+      paid_ssnit:              "",
+      ssnit_total:             totals.total_ssnit,
+      tier3_total:             totals.total_tier3,
+      allowances_total:        totals.total_allowances,
+      bonus_income:            totals.total_bonus_income,
+      bonus_tax:               totals.total_bonus_tax,
+      excess_bonus:            0,
+      total_cash_emolument:    totals.total_cash_emolument,
+      accommodation_element:   0,
+      vehicle_element:         0,
+      non_cash_benefit:        0,
+      total_assessable_income: totals.total_assessable_income,
+      deductible_reliefs:      0,
+      total_reliefs:           totals.total_reliefs,
+      chargeable_income:       totals.total_chargeable_income,
+      tax_deductible:          totals.total_tax_deductible,
+      overtime_income:         totals.total_overtime_income,
+      overtime_tax:            totals.total_overtime_tax,
+      total_tax_payable_gra:   totals.total_tax_payable_gra,
+      severance_pay:           0,
+      remarks:                 `${rows.length} employee(s)`,
+      _is_total_row:           true,
     },
   ]
 
