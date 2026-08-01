@@ -95,13 +95,25 @@ export function renderBrandedHtmlDocument(opts: {
   .meta { color: var(--muted); line-height: 1.45; }
   h2 { margin: 0 0 4px; font-size: 16px; color: var(--brand); }
   table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-  th, td { border: 1px solid var(--line); padding: 7px 8px; text-align: left; vertical-align: top; }
-  th { background: #eef6f1; font-size: 11px; }
+  th, td { border: 1px solid var(--line); padding: 5px 6px; text-align: left; vertical-align: top; font-size: 10px; }
+  th { background: #eef6f1; font-weight: 600; }
   .right { text-align: right; white-space: nowrap; }
   .total { font-weight: 700; background: #f7faf8; }
   .footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; display:flex; justify-content:space-between; gap: 12px; }
   .brand { color: var(--brand); font-weight: 700; }
-  @media print { .toolbar { display: none; } body { padding: 12px; } }
+  @media print { 
+    .toolbar { display: none; } 
+    body { padding: 10px; margin: 0; }
+    .letterhead { padding-bottom: 10px; margin-bottom: 10px; }
+    h1 { margin: 0 0 2px; font-size: 18px; }
+    .meta { font-size: 9px; }
+    table { margin-top: 8px; font-size: 9px; }
+    th, td { padding: 4px 5px; border-width: 0.5px; }
+  }
+  @page { 
+    size: A4 landscape;
+    margin: 10mm;
+  }
 </style></head><body>
   <div class="toolbar"><button onclick="window.print()">Print / Save as PDF</button></div>
   <header class="letterhead">

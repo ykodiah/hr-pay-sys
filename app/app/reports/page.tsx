@@ -440,20 +440,99 @@ export default function ComplianceReportsPage() {
       }
       if (format === "pdf") {
         const html = await res.text()
-        const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }))
-        const opened = window.open(url, "_blank", "noopener,noreferrer")
-        if (!opened) {
-          // Popup blocked — force download as HTML file
-          const a = document.createElement("a")
-          a.href = url
-          a.download = `${type}-${period}.html`
-          a.click()
+        
+        // Generate true PDF using jsPDF + html2canvas
+        try {
+          const { jsPDF } = await import("jspdf")
+          const html2canvas = (await import("html2canvas")).default
+          
+          // Create a temporary container for the HTML
+          const container = document.createElement("div")
+          container.innerHTML = html
+          container.style.position = "absolute"
+          container.style.left = "-9999px"
+          container.style.width = "1600px" // Wide for PAYE with 28 columns in landscape
+          document.body.appendChild(container)
+          
+          const table = container.querySelector("table")
+          if (table) {
+            // For reports with tables (PAYE has many columns), use landscape
+            const isWideReport = type === "paye_report"
+            const orientation = isWideReport ? "landscape" : "portrait"
+            
+            // Render HTML to canvas with high DPI for quality
+            const canvas = await html2canvas(container, {
+              scale: 2,
+              allowTaint: true,
+              useCORS: true,
+              backgroundColor: "#ffffff",
+            })
+            
+            // Calculate PDF dimensions
+            const imgWidth = orientation === "landscape" ? 297 : 210 // A4 in mm
+            const imgHeight = (canvas.height * imgWidth) / canvas.width
+            
+            // Create PDF
+            const doc = new jsPDF({
+              orientation,
+              unit: "mm",
+              format: "a4",
+            })
+            
+            const pageHeight = orientation === "landscape" ? 190 : 277
+            let heightLeft = imgHeight
+            let position = 0
+            
+            // Add image with proper scaling
+            const imgData = canvas.toDataURL("image/png")
+            const pageWidth = orientation === "landscape" ? 297 : 210
+            
+            // First page
+            doc.addImage(imgData, "PNG", 10, 10, pageWidth - 20, Math.min(pageHeight - 20, imgHeight))
+            heightLeft -= pageHeight - 20
+            position = pageHeight - 20
+            
+            // Additional pages if needed
+            while (heightLeft > 0) {
+              position = heightLeft - imgHeight
+              doc.addPage()
+              doc.addImage(imgData, "PNG", 10, position + 10, pageWidth - 20, imgHeight)
+              heightLeft -= pageHeight
+            }
+            
+            // Download the PDF
+            const filename = `${type}-${period}.pdf`
+            doc.save(filename)
+            
+            toast({
+              title: "PDF downloaded",
+              description: `${REPORT_LABELS[type]} saved as PDF with all columns visible.`,
+            })
+          } else {
+            // Fallback if no table found
+            throw new Error("Report table not found")
+          }
+          
+          // Cleanup
+          document.body.removeChild(container)
+        } catch (error) {
+          console.error("[v0] PDF generation error:", error)
+          // Fallback to HTML
+          const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }))
+          const opened = window.open(url, "_blank", "noopener,noreferrer")
+          if (!opened) {
+            const a = document.createElement("a")
+            a.href = url
+            a.download = `${type}-${period}.html`
+            a.click()
+          }
+          setTimeout(() => URL.revokeObjectURL(url), 60_000)
+          toast({
+            title: "PDF generation fallback",
+            description: `HTML opened for printing. Use Print → Save as PDF for best results.`,
+            variant: "warning" as const,
+          })
         }
-        setTimeout(() => URL.revokeObjectURL(url), 60_000)
-        toast({
-          title: "PDF opened",
-          description: `${REPORT_LABELS[type]} — Print → Save as PDF. Company letterhead + AkwaabaHRPay footer included.`,
-        })
       } else {
         const blob     = await res.blob()
         const url      = URL.createObjectURL(blob)
