@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Clock3,
   Eye,
+  FileDown,
   Loader2,
   Plus,
   RefreshCw,
@@ -15,7 +16,10 @@ import {
   XCircle,
 } from "lucide-react"
 import { resolveClientCompanyId } from "@/lib/tenant/resolve-company-client"
-import { buildAmortizationPreview } from "@/lib/services/loan-calculations"
+import {
+  buildAmortizationForInterestType,
+  interestTypeLabel,
+} from "@/lib/services/loan-calculations"
 import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -58,6 +62,7 @@ type Loan = {
   purpose: string | null
   principal: number
   interest_rate: number
+  interest_type?: string | null
   repayment_months: number
   monthly_payment: number
   amount_paid: number
@@ -92,6 +97,7 @@ type LoanTypeOption = {
   code: string
   name: string
   description?: string | null
+  interest_type?: string | null
   annual_interest_rate: number
   min_amount: number
   max_amount: number
@@ -174,17 +180,25 @@ export default function PayrollLoansPage() {
     const r = Number(interestRate)
     const m = Number(repaymentMonths)
     if (!p || !m || p <= 0 || m <= 0) return null
-    return buildAmortizationPreview(p, r || 0, m, startDate || new Date().toISOString().split("T")[0])
-  }, [principal, interestRate, repaymentMonths, startDate])
+    return buildAmortizationForInterestType({
+      principal: p,
+      annualRatePercent: r || 0,
+      tenureMonths: m,
+      interestType: selectedLoanType?.interest_type || "fixed",
+      startDate: startDate || new Date().toISOString().split("T")[0],
+    })
+  }, [principal, interestRate, repaymentMonths, startDate, selectedLoanType?.interest_type])
 
-  const monthlyPreview = preview?.[0]?.payment_amount ?? 0
+  const monthlyPreview = preview?.monthly_payment ?? 0
 
   const scheduleTotals = useMemo(() => {
     const payment = schedule.reduce((s, r) => s + Number(r.payment_amount || 0), 0)
     const principal = schedule.reduce((s, r) => s + Number(r.principal_portion || 0), 0)
     const interest = schedule.reduce((s, r) => s + Number(r.interest_portion || 0), 0)
     const paidFromSchedule = schedule.reduce((s, r) => s + Number(r.paid_amount || 0), 0)
-    const paidInstallments = schedule.filter((r) => r.status === "paid").length
+    const paidInstallments = schedule.filter(
+      (r) => r.status === "paid" || Number(r.paid_amount || 0) > 0.009,
+    ).length
     return {
       payment: Math.round(payment * 100) / 100,
       principal: Math.round(principal * 100) / 100,
@@ -405,6 +419,7 @@ export default function PayrollLoansPage() {
           purpose: purpose || null,
           principal: p,
           interest_rate: Number(interestRate) || 0,
+          interest_type: selectedLoanType.interest_type || "fixed",
           repayment_months: months,
           start_date: startDate,
           auto_deduct: autoDeduct,
@@ -562,7 +577,6 @@ export default function PayrollLoansPage() {
         <CardHeader className="gap-4 space-y-0 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle>Loan register</CardTitle>
-            <CardDescription>Loaded from the employee_loans database table</CardDescription>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="relative">
@@ -613,16 +627,37 @@ export default function PayrollLoansPage() {
                     <TableHead>Employee</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead className="text-right">Principal</TableHead>
-                    <TableHead className="text-right">Expected amount to pay</TableHead>
-                    <TableHead className="text-right">Loan paid</TableHead>
-                    <TableHead className="text-right">Remaining Balance</TableHead>
+                    <TableHead className="text-right">Interest</TableHead>
+                    <TableHead className="text-right">
+                      Total Amount to Pay
+                      <div className="text-[10px] font-normal text-muted-foreground">c+d</div>
+                    </TableHead>
+                    <TableHead className="text-right">Monthly Charge</TableHead>
+                    <TableHead className="text-right">Loan Paid</TableHead>
+                    <TableHead className="text-right">
+                      Remaining Balance
+                      <div className="text-[10px] font-normal text-muted-foreground">e−g</div>
+                    </TableHead>
                     <TableHead>Tenure</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((loan) => (
+                  {filtered.map((loan) => {
+                    const interestAmt = Number(
+                      loan.total_interest ??
+                        Math.max(
+                          0,
+                          Number(loan.expected_total_payment || 0) - Number(loan.principal || 0),
+                        ),
+                    )
+                    const totalToPay =
+                      Number(loan.expected_total_payment || 0) ||
+                      Number(loan.principal || 0) + interestAmt
+                    const remaining =
+                      Number(loan.remaining_balance ?? Math.max(0, totalToPay - Number(loan.amount_paid || 0)))
+                    return (
                     <TableRow key={loan.id}>
                       <TableCell>
                         <div className="font-medium">{loan.employee_name || "—"}</div>
@@ -638,6 +673,8 @@ export default function PayrollLoansPage() {
                         ) : null}
                       </TableCell>
                       <TableCell className="text-right">{money(loan.principal)}</TableCell>
+                      <TableCell className="text-right">{money(interestAmt)}</TableCell>
+                      <TableCell className="text-right">{money(totalToPay)}</TableCell>
                       <TableCell className="text-right">{money(loan.monthly_payment)}</TableCell>
                       <TableCell className="text-right font-medium text-emerald-700">
                         {money(loan.amount_paid)}
@@ -648,7 +685,7 @@ export default function PayrollLoansPage() {
                         ) : null}
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        {money(loan.remaining_balance)}
+                        {money(remaining)}
                       </TableCell>
                       <TableCell>{loan.repayment_months} mo</TableCell>
                       <TableCell>
@@ -690,7 +727,8 @@ export default function PayrollLoansPage() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    )
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -807,7 +845,9 @@ export default function PayrollLoansPage() {
             {preview ? (
               <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Estimated monthly payment</span>
+                  <span className="text-muted-foreground">
+                    Estimated monthly ({interestTypeLabel(selectedLoanType?.interest_type)})
+                  </span>
                   <span className="font-semibold">{money(monthlyPreview)}</span>
                 </div>
               </div>
@@ -850,10 +890,30 @@ export default function PayrollLoansPage() {
       <Dialog open={Boolean(detailLoan)} onOpenChange={(open) => !open && setDetailLoan(null)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Loan details</DialogTitle>
-            <DialogDescription>
-              {detailLoan?.employee_name} · {detailLoan?.loan_type}
-            </DialogDescription>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <DialogTitle>Loan details</DialogTitle>
+                <DialogDescription>
+                  {detailLoan?.employee_name} · {detailLoan?.loan_type}
+                </DialogDescription>
+              </div>
+              {detailLoan ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    window.open(
+                      `/api/loans/${detailLoan.id}/pdf?company_id=${encodeURIComponent(companyId)}`,
+                      "_blank",
+                      "noopener,noreferrer",
+                    )
+                  }
+                >
+                  <FileDown className="mr-2 h-4 w-4" />
+                  Export PDF
+                </Button>
+              ) : null}
+            </div>
           </DialogHeader>
 
           {detailLoading || !detailLoan ? (
@@ -868,14 +928,15 @@ export default function PayrollLoansPage() {
                   <div className="font-semibold">{money(detailLoan.principal)}</div>
                 </div>
                 <div className="rounded-md border p-3">
-                  <div className="text-xs text-muted-foreground">Expected amount to pay</div>
+                  <div className="text-xs text-muted-foreground">Monthly Charge</div>
                   <div className="font-semibold">{money(detailLoan.monthly_payment)}</div>
                 </div>
                 <div className="rounded-md border border-amber-200 bg-amber-50/60 p-3">
                   <div className="text-xs text-amber-800">Interest</div>
                   <div className="font-semibold text-amber-950">{money(interestTotal)}</div>
                   <div className="text-[11px] text-amber-700">
-                    {Number(detailLoan.interest_rate || 0)}% p.a.
+                    {Number(detailLoan.interest_rate || 0)}% p.a. ·{" "}
+                    {interestTypeLabel(detailLoan.interest_type)}
                   </div>
                 </div>
                 <div className="rounded-md border p-3">
@@ -983,10 +1044,10 @@ export default function PayrollLoansPage() {
                       <TableRow>
                         <TableHead>#</TableHead>
                         <TableHead>Due</TableHead>
-                        <TableHead className="text-right">Payment</TableHead>
+                        <TableHead className="text-right">monthly Due</TableHead>
                         <TableHead className="text-right">Principal</TableHead>
                         <TableHead className="text-right">Interest</TableHead>
-                        <TableHead className="text-right">Paid</TableHead>
+                        <TableHead className="text-right">Loan Paid</TableHead>
                         <TableHead className="text-right">Balance</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>

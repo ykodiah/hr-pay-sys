@@ -2,7 +2,7 @@ import { BaseService } from "./base-service"
 import type { PayrollRun, PayrollItem, CreatePayrollRunInput, UpdatePayrollRunInput, ServiceResponse } from "./types"
 import { calculateEmployeeTax, getTaxRates } from "@/lib/ghana-tax/tax-config-service"
 import type { EmployeePayInput, TaxCalculationResult } from "@/lib/ghana-tax/engine"
-import { sumCompLines } from "@/lib/payroll/employee-comp-extras"
+import { expandCompLines, sumCompLines } from "@/lib/payroll/employee-comp-extras"
 
 export class PayrollService extends BaseService {
   async getPayrollRuns(
@@ -166,7 +166,11 @@ export class PayrollService extends BaseService {
     payrollRunId: string,
     employeeId: string,
     companyId: string,
-    input: EmployeePayInput
+    input: EmployeePayInput,
+    lineItems?: {
+      allowance_lines?: Array<{ label: string; code?: string | null; amount: number }>
+      deduction_lines?: Array<{ label: string; code?: string | null; amount: number }>
+    },
   ): Promise<ServiceResponse<{ payrollItem: PayrollItem; taxResult: TaxCalculationResult }>> {
     return this.handleRequest(async (client) => {
       const taxYear = new Date().getFullYear()
@@ -176,7 +180,13 @@ export class PayrollService extends BaseService {
         employee_id: employeeId,
         payroll_run_id: payrollRunId,
         basic_salary: taxResult.monthly_basic,
-        allowances: input.monthly_allowances,
+        allowances: {
+          ...input.monthly_allowances,
+          lines: lineItems?.allowance_lines ?? [],
+        },
+        deductions_detail: {
+          lines: lineItems?.deduction_lines ?? [],
+        },
         gross_pay: taxResult.monthly_gross + taxResult.monthly_overtime + taxResult.monthly_bonus,
         ssnit_employee: taxResult.monthly_ssnit_employee,
         ssnit_employer: taxResult.monthly_ssnit_employer,
@@ -197,6 +207,8 @@ export class PayrollService extends BaseService {
         tax_year: taxYear,
         calculation_breakdown: {
           ...taxResult,
+          allowance_lines: lineItems?.allowance_lines ?? [],
+          deduction_lines: lineItems?.deduction_lines ?? [],
           calculated_at: new Date().toISOString(),
         },
         updated_at: new Date().toISOString(),
@@ -271,7 +283,7 @@ export class PayrollService extends BaseService {
 
       // Payslip is best-effort — do not fail the whole employee if vault/table drifts
       try {
-        await this.upsertPayslip(client, payrollItem, taxResult, companyId)
+        await this.upsertPayslip(client, payrollItem, taxResult, companyId, lineItems)
       } catch (slipErr) {
         console.warn(
           "[payroll] payslip upsert failed:",
@@ -328,16 +340,16 @@ export class PayrollService extends BaseService {
           .eq("pay_period", payPeriod),
         client
           .from("employee_loans")
-          .select("employee_id, monthly_payment, status, auto_deduct")
+          .select("employee_id, monthly_payment, monthly_installment, remaining_balance, status, auto_deduct")
           .eq("company_id", companyId)
           .in("status", ["active", "approved"]),
         client
           .from("employee_allowances")
-          .select("employee_id, amount, percentage, calculation_type, effective_date, end_date, is_active, recurring")
+          .select("employee_id, amount, percentage, calculation_type, effective_date, end_date, is_active, recurring, code, description")
           .eq("is_active", true),
         client
           .from("employee_deductions")
-          .select("employee_id, amount, percentage, calculation_type, effective_date, end_date, is_active, recurring")
+          .select("employee_id, amount, percentage, calculation_type, effective_date, end_date, is_active, recurring, code, description")
           .eq("is_active", true),
       ])
 
@@ -351,7 +363,8 @@ export class PayrollService extends BaseService {
       for (const loan of loansRes.data ?? []) {
         if (loan.auto_deduct === false) continue
         const prev = loansByEmployee.get(loan.employee_id) ?? 0
-        loansByEmployee.set(loan.employee_id, prev + Number(loan.monthly_payment ?? 0))
+        const charge = Number(loan.monthly_payment ?? loan.monthly_installment ?? 0)
+        loansByEmployee.set(loan.employee_id, prev + charge)
       }
 
       const cardAllowByEmp = new Map<string, any[]>()
@@ -387,12 +400,24 @@ export class PayrollService extends BaseService {
             override != null && override !== "" ? Number(override) : Number(master ?? 0)
 
           const monthlyBasic = pick(period?.basic_salary, fin.monthly_salary)
+          const cardAllowLines = expandCompLines(cardAllowByEmp.get(emp.id), monthlyBasic, asOf, "Allowance")
+          const cardDedLines = expandCompLines(cardDedByEmp.get(emp.id), monthlyBasic, asOf, "Deduction")
           const cardAllowTotal = sumCompLines(cardAllowByEmp.get(emp.id), monthlyBasic, asOf)
           const cardDedTotal = sumCompLines(cardDedByEmp.get(emp.id), monthlyBasic, asOf)
 
           // Period override for other_allowances replaces master; card allowances always add
           const masterOther = pick(period?.other_allowances, fin.other_allowances)
           const periodOtherDed = Number(period?.other_deductions ?? 0)
+          const allowanceLines = [
+            ...cardAllowLines,
+            ...(masterOther > 0 ? [{ label: "Other Allowances", code: "OTHER", amount: masterOther }] : []),
+          ]
+          const deductionLines = [
+            ...cardDedLines,
+            ...(periodOtherDed > 0
+              ? [{ label: "Other Deductions", code: "OTHER", amount: periodOtherDed }]
+              : []),
+          ]
 
           const input: EmployeePayInput = {
             monthly_basic: monthlyBasic,
@@ -432,6 +457,7 @@ export class PayrollService extends BaseService {
             emp.id,
             companyId,
             input,
+            { allowance_lines: allowanceLines, deduction_lines: deductionLines },
           )
           if (!saveResult.success) {
             errors.push(
@@ -498,7 +524,11 @@ export class PayrollService extends BaseService {
     client: any,
     payrollItem: PayrollItem,
     tax: TaxCalculationResult,
-    companyId: string
+    companyId: string,
+    lineItems?: {
+      allowance_lines?: Array<{ label: string; code?: string | null; amount: number }>
+      deduction_lines?: Array<{ label: string; code?: string | null; amount: number }>
+    },
   ) {
     // Get payroll run details for pay period fields
     const { data: run } = await client
@@ -555,6 +585,8 @@ export class PayrollService extends BaseService {
       meal_allowance: (payrollItem.allowances as any)?.meal ?? 0,
       communication_allowance: (payrollItem.allowances as any)?.communication ?? 0,
       other_allowances: (payrollItem.allowances as any)?.other ?? 0,
+      allowance_lines: lineItems?.allowance_lines ?? (payrollItem.allowances as any)?.lines ?? [],
+      deduction_lines: lineItems?.deduction_lines ?? [],
       overtime_pay: tax.monthly_overtime,
       bonus_pay: tax.monthly_bonus,
       gross_pay: tax.monthly_gross + tax.monthly_overtime + tax.monthly_bonus,
@@ -575,7 +607,12 @@ export class PayrollService extends BaseService {
       total_deductions: tax.monthly_total_employee_deductions,
       net_pay: tax.monthly_net_pay,
       total_employer_cost: tax.monthly_total_employer_cost,
-      calculation_breakdown: { ...tax, calculated_at: new Date().toISOString() },
+      calculation_breakdown: {
+        ...tax,
+        allowance_lines: lineItems?.allowance_lines ?? [],
+        deduction_lines: lineItems?.deduction_lines ?? [],
+        calculated_at: new Date().toISOString(),
+      },
       status: "draft",
       updated_at: new Date().toISOString(),
     }

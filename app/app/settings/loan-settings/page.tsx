@@ -8,6 +8,7 @@ import { LoanTypeForm } from "@/components/loans/loan-type-form"
 import { useToast } from "@/hooks/use-toast"
 import { resolveClientCompanyId } from "@/lib/tenant/resolve-company-client"
 import type { LoanType } from "@/lib/services/loan-advanced-service"
+import { interestTypeLabel } from "@/lib/services/loan-calculations"
 import { Plus, Edit2, Trash2, ArrowLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
 
@@ -196,65 +197,73 @@ export default function LoanSettingsPage() {
                 </CardContent>
               </Card>
             ) : (
-              loanTypes.map((loanType) => (
-                <Card key={loanType.id}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle>{loanType.name}</CardTitle>
-                        <CardDescription>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {loanTypes.map((loanType) => (
+                <Card key={loanType.id} className="shadow-sm">
+                  <CardHeader className="space-y-1 p-4 pb-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <CardTitle className="text-base leading-tight">{loanType.name}</CardTitle>
+                        <CardDescription className="text-xs">
                           {loanType.code}
                           {loanType.description ? ` · ${loanType.description}` : ""}
                         </CardDescription>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex shrink-0 gap-1">
                         <Button
                           variant="outline"
                           size="sm"
+                          className="h-8 w-8 p-0"
                           onClick={() => {
                             setSelectedLoanType(loanType)
                             setActiveTab("create")
                           }}
                         >
-                          <Edit2 className="h-4 w-4" />
+                          <Edit2 className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           variant="destructive"
                           size="sm"
+                          className="h-8 w-8 p-0"
                           onClick={() => void handleDeleteLoanType(loanType.id)}
                           disabled={isLoading}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
+                  <CardContent className="p-4 pt-2">
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
                       <div>
-                        <p className="text-gray-600">Interest Rate</p>
-                        <p className="font-semibold">{loanType.annual_interest_rate}%</p>
+                        <p className="text-gray-500">Interest Type</p>
+                        <p className="font-semibold text-sm">{interestTypeLabel(loanType.interest_type)}</p>
                       </div>
                       <div>
-                        <p className="text-gray-600">Amount Range</p>
-                        <p className="font-semibold">
+                        <p className="text-gray-500">Interest Rate</p>
+                        <p className="font-semibold text-sm">{loanType.annual_interest_rate}%</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Amount Range</p>
+                        <p className="font-semibold text-sm">
                           {loanType.min_amount} - {loanType.max_amount}
                         </p>
                       </div>
                       <div>
-                        <p className="text-gray-600">Tenure Range</p>
-                        <p className="font-semibold">
-                          {loanType.min_tenure_months} - {loanType.max_tenure_months} months
+                        <p className="text-gray-500">Tenure Range</p>
+                        <p className="font-semibold text-sm">
+                          {loanType.min_tenure_months} - {loanType.max_tenure_months} mo
                         </p>
                       </div>
-                      <div>
-                        <p className="text-gray-600">Status</p>
-                        <p className="font-semibold">{loanType.is_active ? "Active" : "Inactive"}</p>
+                      <div className="col-span-2">
+                        <p className="text-gray-500">Status</p>
+                        <p className="font-semibold text-sm">{loanType.is_active ? "Active" : "Inactive"}</p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-              ))
+              ))}
+              </div>
             )}
           </div>
         </TabsContent>

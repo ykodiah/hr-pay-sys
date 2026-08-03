@@ -1,8 +1,20 @@
 import { createClient } from "@/lib/supabase/server"
-import { buildAmortizationPreview, calcMonthlyPayment } from "@/lib/services/loan-calculations"
+import {
+  buildAmortizationForInterestType,
+  buildAmortizationPreview,
+  calcMonthlyPayment,
+  normalizeInterestType,
+  type InterestType,
+} from "@/lib/services/loan-calculations"
 
-export { calcMonthlyPayment, buildAmortizationPreview } from "@/lib/services/loan-calculations"
-export type { AmortizationPreviewRow } from "@/lib/services/loan-calculations"
+export {
+  calcMonthlyPayment,
+  buildAmortizationPreview,
+  buildAmortizationForInterestType,
+  normalizeInterestType,
+  interestTypeLabel,
+} from "@/lib/services/loan-calculations"
+export type { AmortizationPreviewRow, InterestType } from "@/lib/services/loan-calculations"
 
 export type LoanStatus =
   | "pending"
@@ -18,11 +30,14 @@ export interface EmployeeLoan {
   company_id: string
   employee_id: string
   loan_type: string
+  loan_type_id?: string | null
   purpose: string | null
   principal: number
   interest_rate: number
+  interest_type?: InterestType | string | null
   repayment_months: number
   monthly_payment: number
+  monthly_installment?: number | null
   amount_paid: number
   remaining_balance: number
   expected_total_payment?: number | null
@@ -73,6 +88,7 @@ export interface CreateLoanInput {
   purpose?: string
   principal: number
   interest_rate?: number
+  interest_type?: string | null
   repayment_months: number
   start_date?: string
   auto_deduct?: boolean
@@ -80,6 +96,29 @@ export interface CreateLoanInput {
   created_by?: string
   /** When true (admin create), activate immediately so payroll can deduct. */
   activate?: boolean
+}
+
+function round2(n: number): number {
+  return Math.round((Number(n) + Number.EPSILON) * 100) / 100
+}
+
+/** Monthly installment from either payroll or advanced column. */
+export function loanMonthlyCharge(loan: {
+  monthly_payment?: number | null
+  monthly_installment?: number | null
+}): number {
+  return round2(Number(loan.monthly_payment ?? loan.monthly_installment ?? 0))
+}
+
+/** Total amount the employee must repay (principal + interest). */
+export function loanTotalPayable(loan: {
+  expected_total_payment?: number | null
+  principal?: number | null
+  total_interest?: number | null
+}): number {
+  const expected = Number(loan.expected_total_payment || 0)
+  if (expected > 0) return round2(expected)
+  return round2(Number(loan.principal || 0) + Number(loan.total_interest || 0))
 }
 
 async function enrichLoansWithEmployees(loans: any[]): Promise<EmployeeLoan[]> {
@@ -104,6 +143,15 @@ async function enrichLoansWithEmployees(loans: any[]): Promise<EmployeeLoan[]> {
     const emp = row.employees ?? employeeMap.get(row.employee_id) ?? null
     return {
       ...row,
+      interest_type: normalizeInterestType(row.interest_type),
+      monthly_payment: loanMonthlyCharge(row),
+      expected_total_payment: loanTotalPayable(row),
+      remaining_balance: round2(
+        Number(
+          row.remaining_balance ??
+            Math.max(0, loanTotalPayable(row) - Number(row.amount_paid || 0)),
+        ),
+      ),
       employee_name: emp ? `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim() : null,
       employee_id_no: emp?.employee_id ?? null,
       department: emp?.department ?? null,
@@ -113,21 +161,28 @@ async function enrichLoansWithEmployees(loans: any[]): Promise<EmployeeLoan[]> {
 
 async function persistAmortizationSchedule(loan: {
   id: string
+  company_id?: string
+  employee_id?: string
   principal: number
   interest_rate: number
+  interest_type?: string | null
   repayment_months: number
   start_date: string | null
 }): Promise<void> {
   const supabase = await createClient()
   const startDate = loan.start_date ?? new Date().toISOString().split("T")[0]
-  const preview = buildAmortizationPreview(
-    Number(loan.principal),
-    Number(loan.interest_rate ?? 0),
-    Number(loan.repayment_months),
+  const preview = buildAmortizationForInterestType({
+    principal: Number(loan.principal),
+    annualRatePercent: Number(loan.interest_rate ?? 0),
+    tenureMonths: Number(loan.repayment_months),
+    interestType: loan.interest_type,
     startDate,
-  )
+  })
 
-  const rows = preview.map((row) => ({
+  // Clear any prior schedule rows before regenerating
+  await supabase.from("loan_amortization_schedule").delete().eq("loan_id", loan.id)
+
+  const rows = preview.rows.map((row) => ({
     loan_id: loan.id,
     month_number: row.month_number,
     due_date: row.due_date,
@@ -141,23 +196,54 @@ async function persistAmortizationSchedule(loan: {
     payslip_id: null,
   }))
 
-  // Prefer loan_amortization_schedule (legacy service name); fall back to loan_schedules shape.
   const { error } = await supabase.from("loan_amortization_schedule").insert(rows)
-  if (!error) return
+  if (error) {
+    console.warn("[loans] Could not persist amortization schedule:", error.message)
+  }
 
-  // Soft-fail when schedule table is missing — loan itself is still usable for payroll.
-  console.warn("[loans] Could not persist amortization schedule:", error.message)
+  // Keep advanced loan_schedules in sync when that table exists
+  if (loan.company_id && loan.employee_id) {
+    await supabase.from("loan_schedules").delete().eq("employee_loan_id", loan.id)
+    const advancedRows = preview.rows.map((row) => ({
+      company_id: loan.company_id,
+      employee_loan_id: loan.id,
+      employee_id: loan.employee_id,
+      payment_number: row.month_number,
+      due_date: row.due_date,
+      principal_amount: row.principal_portion,
+      interest_amount: row.interest_portion,
+      total_payment: row.payment_amount,
+      remaining_principal: row.balance_remaining,
+      remaining_total: row.balance_remaining,
+      amount_paid: 0,
+      payment_status: "pending",
+    }))
+    const { error: advErr } = await supabase.from("loan_schedules").insert(advancedRows)
+    if (advErr) {
+      console.warn("[loans] Could not persist loan_schedules:", advErr.message)
+    }
+  }
 }
 
 /** Create a new loan application (and optionally activate for payroll deduction). */
 export async function createLoan(input: CreateLoanInput): Promise<EmployeeLoan> {
   const supabase = await createClient()
 
-  const monthly_payment = calcMonthlyPayment(
-    input.principal,
-    input.interest_rate ?? 0,
-    input.repayment_months,
-  )
+  let interestType = normalizeInterestType(input.interest_type)
+  let interestRate = Number(input.interest_rate ?? 0)
+
+  // Resolve interest method + rate from loan type when available
+  if (input.loan_type_id) {
+    const { data: typeRow } = await supabase
+      .from("loan_types")
+      .select("interest_type, annual_interest_rate")
+      .eq("id", input.loan_type_id)
+      .maybeSingle()
+    if (typeRow) {
+      if (!input.interest_type) interestType = normalizeInterestType(typeRow.interest_type)
+      if (input.interest_rate == null) interestRate = Number(typeRow.annual_interest_rate ?? 0)
+    }
+  }
 
   const startDate = input.start_date ?? new Date().toISOString().split("T")[0]
   const endDate = new Date(
@@ -166,16 +252,20 @@ export async function createLoan(input: CreateLoanInput): Promise<EmployeeLoan> 
     .toISOString()
     .split("T")[0]
 
+  const preview = buildAmortizationForInterestType({
+    principal: input.principal,
+    annualRatePercent: interestRate,
+    tenureMonths: input.repayment_months,
+    interestType,
+    startDate,
+  })
+
+  const monthly_payment = preview.monthly_payment
+  const expectedTotalPayment = preview.total_payable
+  const totalInterest = preview.total_interest
+
   const activate = Boolean(input.activate)
   const now = new Date().toISOString()
-  const preview = buildAmortizationPreview(
-    input.principal,
-    input.interest_rate ?? 0,
-    input.repayment_months,
-    startDate,
-  )
-  const expectedTotalPayment = preview.reduce((s, r) => s + Number(r.payment_amount || 0), 0)
-  const totalInterest = preview.reduce((s, r) => s + Number(r.interest_portion || 0), 0)
 
   const insertRow: Record<string, unknown> = {
     company_id: input.company_id,
@@ -183,13 +273,19 @@ export async function createLoan(input: CreateLoanInput): Promise<EmployeeLoan> 
     loan_type: input.loan_type,
     purpose: input.purpose ?? null,
     principal: input.principal,
-    interest_rate: input.interest_rate ?? 0,
+    principal_amount: input.principal,
+    interest_rate: interestRate,
+    interest_type: interestType,
     repayment_months: input.repayment_months,
+    tenure_months: input.repayment_months,
     monthly_payment,
-    remaining_balance: input.principal,
+    monthly_installment: monthly_payment,
+    // Remaining tracks total amount still to pay (principal + interest − paid)
+    remaining_balance: expectedTotalPayment,
+    outstanding_balance: expectedTotalPayment,
     amount_paid: 0,
-    expected_total_payment: Math.round(expectedTotalPayment * 100) / 100,
-    total_interest: Math.round(totalInterest * 100) / 100,
+    expected_total_payment: expectedTotalPayment,
+    total_interest: totalInterest,
     start_date: startDate,
     end_date: endDate,
     auto_deduct: input.auto_deduct ?? true,
@@ -213,7 +309,16 @@ export async function createLoan(input: CreateLoanInput): Promise<EmployeeLoan> 
   if (error) throw new Error(error.message)
 
   if (activate) {
-    await persistAmortizationSchedule(data)
+    await persistAmortizationSchedule({
+      id: data.id,
+      company_id: data.company_id,
+      employee_id: data.employee_id,
+      principal: data.principal,
+      interest_rate: data.interest_rate,
+      interest_type: data.interest_type ?? interestType,
+      repayment_months: data.repayment_months,
+      start_date: data.start_date,
+    })
   }
 
   const [enriched] = await enrichLoansWithEmployees([data])
@@ -256,6 +361,7 @@ export async function getLoanWithSchedule(loanId: string): Promise<{
   if (le) throw new Error(le.message)
 
   const [loanMapped] = await enrichLoansWithEmployees([loan])
+  const interestType = normalizeInterestType(loan.interest_type)
 
   let schedule: AmortizationRow[] = []
   const { data: scheduleRows, error: se } = await supabase
@@ -267,34 +373,165 @@ export async function getLoanWithSchedule(loanId: string): Promise<{
   if (!se && scheduleRows?.length) {
     schedule = scheduleRows as AmortizationRow[]
   } else {
-    // Fallback preview when schedule table is empty/missing —
-    // mark early installments paid from loan.amount_paid so UI stays live.
-    const startDate = loan.start_date ?? new Date().toISOString().split("T")[0]
-    let remainingPaid = Number(loan.amount_paid || 0)
-    schedule = buildAmortizationPreview(
-      Number(loan.principal),
-      Number(loan.interest_rate ?? 0),
-      Number(loan.repayment_months || 1),
-      startDate,
-    ).map((row, idx) => {
-      const due = Number(row.payment_amount || 0)
-      const paidHere = Math.min(remainingPaid, due)
-      remainingPaid = Math.max(0, remainingPaid - paidHere)
-      return {
-        id: `preview-${loanId}-${idx + 1}`,
+    // Fall back to advanced loan_schedules table
+    const { data: advRows } = await supabase
+      .from("loan_schedules")
+      .select("*")
+      .eq("employee_loan_id", loanId)
+      .order("payment_number")
+
+    if (advRows?.length) {
+      schedule = advRows.map((row: any) => ({
+        id: row.id,
         loan_id: loanId,
-        month_number: row.month_number,
+        month_number: Number(row.payment_number || 0),
         due_date: row.due_date,
-        payment_amount: row.payment_amount,
-        principal_portion: row.principal_portion,
-        interest_portion: row.interest_portion,
-        balance_remaining: row.balance_remaining,
-        paid_amount: paidHere,
-        paid_date: paidHere > 0 ? (loan.last_payment_date ?? startDate) : null,
-        status: paidHere + 0.009 >= due ? ("paid" as const) : ("pending" as const),
-        payslip_id: null,
-      }
+        payment_amount: Number(row.total_payment || 0),
+        principal_portion: Number(row.principal_amount || 0),
+        interest_portion: Number(row.interest_amount || 0),
+        balance_remaining: Number(row.remaining_total ?? row.remaining_principal ?? 0),
+        paid_amount: Number(row.amount_paid || 0),
+        paid_date: row.paid_date ?? null,
+        status:
+          String(row.payment_status || "pending") === "paid"
+            ? ("paid" as const)
+            : ("pending" as const),
+        payslip_id: row.payslip_id ?? null,
+      }))
+    } else {
+      // Preview fallback — mark installments paid from loan.amount_paid
+      const startDate = loan.start_date ?? new Date().toISOString().split("T")[0]
+      let remainingPaid = Number(loan.amount_paid || 0)
+      schedule = buildAmortizationForInterestType({
+        principal: Number(loan.principal),
+        annualRatePercent: Number(loan.interest_rate ?? 0),
+        tenureMonths: Number(loan.repayment_months || 1),
+        interestType,
+        startDate,
+      }).rows.map((row, idx) => {
+        const due = Number(row.payment_amount || 0)
+        const paidHere = Math.min(remainingPaid, due)
+        remainingPaid = Math.max(0, remainingPaid - paidHere)
+        return {
+          id: `preview-${loanId}-${idx + 1}`,
+          loan_id: loanId,
+          month_number: row.month_number,
+          due_date: row.due_date,
+          payment_amount: row.payment_amount,
+          principal_portion: row.principal_portion,
+          interest_portion: row.interest_portion,
+          balance_remaining: row.balance_remaining,
+          paid_amount: paidHere,
+          paid_date: paidHere > 0 ? (loan.last_payment_date ?? startDate) : null,
+          status: paidHere + 0.009 >= due ? ("paid" as const) : ("pending" as const),
+          payslip_id: null,
+        }
+      })
+    }
+  }
+
+  // Rebuild unpaid schedules when stored rows don't match the loan's interest method
+  // (fixes loans created before interest_type was wired, e.g. fixed shown as reducing).
+  const scheduleHasPayments = schedule.some(
+    (r) => Number(r.paid_amount || 0) > 0.009 || String(r.status) === "paid",
+  )
+  const unpaidLoan = Number(loan.amount_paid || 0) <= 0.009
+  if (unpaidLoan && !scheduleHasPayments && ["active", "approved", "pending"].includes(String(loan.status))) {
+    const startDate = loan.start_date ?? new Date().toISOString().split("T")[0]
+    const recomputed = buildAmortizationForInterestType({
+      principal: Number(loan.principal),
+      annualRatePercent: Number(loan.interest_rate ?? 0),
+      tenureMonths: Number(loan.repayment_months || 1),
+      interestType,
+      startDate,
     })
+    const storedInterest0 = Number(schedule[0]?.interest_portion || 0)
+    const expectedInterest0 = Number(recomputed.rows[0]?.interest_portion || 0)
+    const totalsMismatch =
+      Math.abs(recomputed.total_interest - Number(loan.total_interest || 0)) > 0.05 ||
+      Math.abs(recomputed.total_payable - Number(loan.expected_total_payment || 0)) > 0.05 ||
+      (schedule.length > 0 && Math.abs(storedInterest0 - expectedInterest0) > 0.05) ||
+      schedule.length === 0
+
+    if (totalsMismatch) {
+      await persistAmortizationSchedule({
+        id: loan.id,
+        company_id: loan.company_id,
+        employee_id: loan.employee_id,
+        principal: Number(loan.principal),
+        interest_rate: Number(loan.interest_rate ?? 0),
+        interest_type: interestType,
+        repayment_months: Number(loan.repayment_months || 1),
+        start_date: loan.start_date,
+      })
+      await supabase
+        .from("employee_loans")
+        .update({
+          interest_type: interestType,
+          monthly_payment: recomputed.monthly_payment,
+          monthly_installment: recomputed.monthly_payment,
+          expected_total_payment: recomputed.total_payable,
+          total_interest: recomputed.total_interest,
+          remaining_balance: recomputed.total_payable,
+          outstanding_balance: recomputed.total_payable,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", loanId)
+
+      const { data: rebuilt } = await supabase
+        .from("loan_amortization_schedule")
+        .select("*")
+        .eq("loan_id", loanId)
+        .order("month_number")
+      if (rebuilt?.length) schedule = rebuilt as AmortizationRow[]
+
+      const [refreshed] = await enrichLoansWithEmployees([
+        {
+          ...loan,
+          interest_type: interestType,
+          monthly_payment: recomputed.monthly_payment,
+          monthly_installment: recomputed.monthly_payment,
+          expected_total_payment: recomputed.total_payable,
+          total_interest: recomputed.total_interest,
+          remaining_balance: recomputed.total_payable,
+        },
+      ])
+      return { loan: refreshed, schedule }
+    }
+  }
+
+  // Keep installment paid/status in sync with cumulative amount_paid when schedule rows lag
+  if (Number(loan.amount_paid || 0) > 0.009 && schedule.length) {
+    const schedulePaid = schedule.reduce((s, r) => s + Number(r.paid_amount || 0), 0)
+    if (schedulePaid + 0.05 < Number(loan.amount_paid || 0)) {
+      let remainingPaid = Number(loan.amount_paid || 0)
+      const synced: AmortizationRow[] = []
+      for (const row of schedule) {
+        const due = Number(row.payment_amount || 0)
+        const paidHere = Math.min(remainingPaid, due)
+        remainingPaid = Math.max(0, round2(remainingPaid - paidHere))
+        const fullyPaid = paidHere + 0.009 >= due && due > 0
+        const next: AmortizationRow = {
+          ...row,
+          paid_amount: paidHere,
+          paid_date: paidHere > 0 ? row.paid_date || loan.last_payment_date || null : null,
+          status: fullyPaid ? "paid" : row.status === "overdue" ? "overdue" : "pending",
+        }
+        synced.push(next)
+        if (row.id && !String(row.id).startsWith("preview-")) {
+          await supabase
+            .from("loan_amortization_schedule")
+            .update({
+              paid_amount: next.paid_amount,
+              paid_date: next.paid_date,
+              status: next.status,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", row.id)
+        }
+      }
+      schedule = synced
+    }
   }
 
   return { loan: loanMapped, schedule }
@@ -306,7 +543,9 @@ export async function approveLoan(loanId: string, approverId: string): Promise<v
 
   const { data: loan, error: fetchError } = await supabase
     .from("employee_loans")
-    .select("id, principal, interest_rate, repayment_months, start_date, status")
+    .select(
+      "id, company_id, employee_id, principal, interest_rate, interest_type, repayment_months, start_date, status, expected_total_payment, total_interest",
+    )
     .eq("id", loanId)
     .single()
 
@@ -316,6 +555,8 @@ export async function approveLoan(loanId: string, approverId: string): Promise<v
     throw new Error(`Cannot approve loan in status "${loan.status}"`)
   }
 
+  const totalPayable = loanTotalPayable(loan)
+
   const { error } = await supabase
     .from("employee_loans")
     .update({
@@ -323,6 +564,7 @@ export async function approveLoan(loanId: string, approverId: string): Promise<v
       approved_by: approverId,
       approved_at: new Date().toISOString(),
       disbursed_at: new Date().toISOString(),
+      remaining_balance: totalPayable > 0 ? totalPayable : Number(loan.principal || 0),
       updated_at: new Date().toISOString(),
     })
     .eq("id", loanId)
@@ -386,7 +628,7 @@ export async function applyLoanPayrollPayment(input: {
   payPeriod?: string | null
   paymentDate?: string
 }): Promise<PayrollLoanPaymentResult | null> {
-  const amount = Math.round(Number(input.amount || 0) * 100) / 100
+  const amount = round2(Number(input.amount || 0))
   if (amount <= 0) return null
 
   const supabase = await createClient()
@@ -405,15 +647,25 @@ export async function applyLoanPayrollPayment(input: {
 
   const { data: loan, error: loanError } = await supabase
     .from("employee_loans")
-    .select("id, amount_paid, remaining_balance, principal, monthly_payment, status")
+    .select(
+      "id, amount_paid, remaining_balance, principal, monthly_payment, monthly_installment, expected_total_payment, total_interest, status",
+    )
     .eq("id", input.loanId)
     .eq("company_id", input.companyId)
     .single()
 
   if (loanError || !loan) throw new Error(loanError?.message || "Loan not found")
 
-  const balanceBefore = Number(loan.remaining_balance ?? loan.principal ?? 0)
-  const pay = Math.min(amount, balanceBefore)
+  const totalPayable = loanTotalPayable(loan)
+  const amountPaidBefore = Number(loan.amount_paid ?? 0)
+  const balanceBefore = round2(
+    Number(
+      loan.remaining_balance != null && loan.remaining_balance !== ""
+        ? loan.remaining_balance
+        : Math.max(0, totalPayable - amountPaidBefore),
+    ),
+  )
+  const pay = Math.min(amount, balanceBefore > 0 ? balanceBefore : amount)
   if (pay <= 0) return null
 
   // Mark next pending schedule installment (or partial if needed)
@@ -423,7 +675,7 @@ export async function applyLoanPayrollPayment(input: {
 
   const { data: nextRow } = await supabase
     .from("loan_amortization_schedule")
-    .select("id, payment_amount, principal_portion, interest_portion, paid_amount, status")
+    .select("id, payment_amount, principal_portion, interest_portion, paid_amount, status, month_number")
     .eq("loan_id", input.loanId)
     .in("status", ["pending", "overdue"])
     .order("month_number", { ascending: true })
@@ -436,9 +688,9 @@ export async function applyLoanPayrollPayment(input: {
     const prevPaid = Number(nextRow.paid_amount || 0)
     const installmentPay = Math.min(pay, Math.max(0, due - prevPaid))
     const ratio = due > 0 ? installmentPay / due : 1
-    principalPortion = Math.round(Number(nextRow.principal_portion || pay) * ratio * 100) / 100
-    interestPortion = Math.round(Number(nextRow.interest_portion || 0) * ratio * 100) / 100
-    const newPaidAmount = prevPaid + installmentPay
+    principalPortion = round2(Number(nextRow.principal_portion || pay) * ratio)
+    interestPortion = round2(Number(nextRow.interest_portion || 0) * ratio)
+    const newPaidAmount = round2(prevPaid + installmentPay)
     const fullyPaid = newPaidAmount + 0.009 >= due
 
     await supabase
@@ -452,19 +704,67 @@ export async function applyLoanPayrollPayment(input: {
         updated_at: new Date().toISOString(),
       })
       .eq("id", nextRow.id)
+
+    // Mirror onto advanced loan_schedules when present
+    if (nextRow.month_number != null) {
+      await supabase
+        .from("loan_schedules")
+        .update({
+          amount_paid: newPaidAmount,
+          paid_date: today,
+          payment_status: fullyPaid ? "paid" : "pending",
+          payslip_id: input.payslipId ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("employee_loan_id", input.loanId)
+        .eq("payment_number", nextRow.month_number)
+    }
+  } else {
+    // Try advanced schedule table if amortization table empty
+    const { data: advNext } = await supabase
+      .from("loan_schedules")
+      .select("id, total_payment, principal_amount, interest_amount, amount_paid, payment_status, payment_number")
+      .eq("employee_loan_id", input.loanId)
+      .in("payment_status", ["pending", "overdue"])
+      .order("payment_number", { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    if (advNext?.id) {
+      scheduleId = advNext.id
+      const due = Number(advNext.total_payment || pay)
+      const prevPaid = Number(advNext.amount_paid || 0)
+      const installmentPay = Math.min(pay, Math.max(0, due - prevPaid))
+      const ratio = due > 0 ? installmentPay / due : 1
+      principalPortion = round2(Number(advNext.principal_amount || pay) * ratio)
+      interestPortion = round2(Number(advNext.interest_amount || 0) * ratio)
+      const newPaidAmount = round2(prevPaid + installmentPay)
+      const fullyPaid = newPaidAmount + 0.009 >= due
+
+      await supabase
+        .from("loan_schedules")
+        .update({
+          amount_paid: newPaidAmount,
+          paid_date: today,
+          payment_status: fullyPaid ? "paid" : "pending",
+          payslip_id: input.payslipId ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", advNext.id)
+    }
   }
 
-  const amountPaid = Number(loan.amount_paid ?? 0) + pay
-  // Remaining balance tracks outstanding principal; prefer schedule principal portion
-  const principalReduction = scheduleId ? Math.min(principalPortion || pay, balanceBefore) : pay
-  const balanceAfter = Math.max(0, Math.round((balanceBefore - principalReduction) * 100) / 100)
-  const status: LoanStatus = balanceAfter <= 0 ? "completed" : "active"
+  const amountPaid = round2(amountPaidBefore + pay)
+  // Remaining = total payable − cumulative paid (matches register e − g)
+  const balanceAfter = round2(Math.max(0, (totalPayable > 0 ? totalPayable : balanceBefore + amountPaidBefore) - amountPaid))
+  const status: LoanStatus = balanceAfter <= 0.009 ? "completed" : "active"
 
   const { error: updateError } = await supabase
     .from("employee_loans")
     .update({
       amount_paid: amountPaid,
       remaining_balance: balanceAfter,
+      outstanding_balance: balanceAfter,
       status,
       last_payment_date: today,
       last_payment_amount: pay,
@@ -517,13 +817,15 @@ export async function applyEmployeePayrollLoanDeduction(input: {
   payPeriod?: string | null
   paymentDate?: string
 }): Promise<PayrollLoanPaymentResult[]> {
-  const total = Math.round(Number(input.totalDeduction || 0) * 100) / 100
+  const total = round2(Number(input.totalDeduction || 0))
   if (total <= 0) return []
 
   const supabase = await createClient()
   const { data: loans, error } = await supabase
     .from("employee_loans")
-    .select("id, monthly_payment, remaining_balance, amount_paid, status, created_at")
+    .select(
+      "id, monthly_payment, monthly_installment, remaining_balance, amount_paid, expected_total_payment, total_interest, principal, status, created_at, auto_deduct",
+    )
     .eq("company_id", input.companyId)
     .eq("employee_id", input.employeeId)
     .in("status", ["active", "approved"])
@@ -531,17 +833,25 @@ export async function applyEmployeePayrollLoanDeduction(input: {
 
   if (error) throw new Error(error.message)
 
+  const activeLoans = (loans ?? []).filter((l) => l.auto_deduct !== false)
+
   let remaining = total
   const results: PayrollLoanPaymentResult[] = []
 
-  for (const loan of loans ?? []) {
-    if (remaining <= 0) break
-    const expected = Math.min(
-      Number(loan.monthly_payment || remaining),
-      Number(loan.remaining_balance || 0),
+  // First pass: apply each loan's own monthly charge respectively (never steal another loan's share)
+  for (const loan of activeLoans) {
+    if (remaining <= 0.009) break
+    const charge = loanMonthlyCharge(loan)
+    const bal = round2(
+      Number(
+        loan.remaining_balance ??
+          Math.max(0, loanTotalPayable(loan) - Number(loan.amount_paid || 0)),
+      ),
     )
-    if (expected <= 0) continue
-    const pay = Math.min(expected, remaining)
+    // Skip loans with no configured charge — leftover is handled in the second pass
+    if (charge <= 0.009 || bal <= 0.009) continue
+    const pay = Math.min(charge, bal, remaining)
+    if (pay <= 0.009) continue
     const applied = await applyLoanPayrollPayment({
       companyId: input.companyId,
       employeeId: input.employeeId,
@@ -554,63 +864,99 @@ export async function applyEmployeePayrollLoanDeduction(input: {
     })
     if (applied) {
       results.push(applied)
-      remaining = Math.round((remaining - applied.amount) * 100) / 100
+      remaining = round2(remaining - applied.amount)
     }
   }
 
-  // If deduction exceeds sum of expected installments (manual override), apply remainder FIFO
-  if (remaining > 0) {
-    for (const loan of loans ?? []) {
-      if (remaining <= 0) break
+  // Second pass: leftover deduction (manual override) FIFO across remaining balances
+  if (remaining > 0.009) {
+    for (const loan of activeLoans) {
+      if (remaining <= 0.009) break
       const already = results.find((r) => r.loan_id === loan.id)
       const bal = already
         ? already.balance_after
-        : Number(loan.remaining_balance || 0)
-      if (bal <= 0) continue
+        : round2(
+            Number(
+              loan.remaining_balance ??
+                Math.max(0, loanTotalPayable(loan) - Number(loan.amount_paid || 0)),
+            ),
+          )
+      if (bal <= 0.009) continue
       const pay = Math.min(bal, remaining)
-      const applied = await applyLoanPayrollPayment({
-        companyId: input.companyId,
-        employeeId: input.employeeId,
-        loanId: loan.id,
-        amount: pay,
-        payrollRunId: already ? null : input.payrollRunId, // avoid unique clash; second payment uses null run id
-        payslipId: input.payslipId,
-        payPeriod: input.payPeriod,
-        paymentDate: input.paymentDate,
-      })
-      // If unique(run, loan) blocked second payment, fall through with direct update path below
-      if (applied) {
-        results.push(applied)
-        remaining = Math.round((remaining - applied.amount) * 100) / 100
-      } else if (already && bal > 0) {
-        // Same run already recorded once — top up loan balance directly
-        const topUp = Math.min(bal, remaining)
-        const { data: current } = await supabase
-          .from("employee_loans")
-          .select("amount_paid, remaining_balance")
-          .eq("id", loan.id)
-          .single()
-        if (current) {
-          const amountPaid = Number(current.amount_paid || 0) + topUp
-          const balanceAfter = Math.max(0, Number(current.remaining_balance || 0) - topUp)
-          await supabase
-            .from("employee_loans")
-            .update({
-              amount_paid: amountPaid,
-              remaining_balance: balanceAfter,
-              status: balanceAfter <= 0 ? "completed" : "active",
-              last_payment_amount: Number(current.amount_paid || 0) > 0
-                ? Number(already.amount) + topUp
-                : topUp,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", loan.id)
-          already.amount += topUp
-          already.balance_after = balanceAfter
-          already.status = balanceAfter <= 0 ? "completed" : "active"
-          remaining = Math.round((remaining - topUp) * 100) / 100
+
+      if (!already) {
+        const applied = await applyLoanPayrollPayment({
+          companyId: input.companyId,
+          employeeId: input.employeeId,
+          loanId: loan.id,
+          amount: pay,
+          payrollRunId: input.payrollRunId,
+          payslipId: input.payslipId,
+          payPeriod: input.payPeriod,
+          paymentDate: input.paymentDate,
+        })
+        if (applied) {
+          results.push(applied)
+          remaining = round2(remaining - applied.amount)
         }
+        continue
       }
+
+      // Same run already recorded — top up loan + next pending schedule row
+      const topUp = pay
+      const { data: current } = await supabase
+        .from("employee_loans")
+        .select("amount_paid, remaining_balance, expected_total_payment, total_interest, principal")
+        .eq("id", loan.id)
+        .single()
+      if (!current) continue
+
+      const amountPaid = round2(Number(current.amount_paid || 0) + topUp)
+      const totalPayable = loanTotalPayable(current)
+      const balanceAfter = round2(Math.max(0, (totalPayable || Number(current.remaining_balance || 0) + topUp) - amountPaid))
+
+      const { data: nextRow } = await supabase
+        .from("loan_amortization_schedule")
+        .select("id, payment_amount, paid_amount, month_number")
+        .eq("loan_id", loan.id)
+        .in("status", ["pending", "overdue"])
+        .order("month_number", { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      if (nextRow?.id) {
+        const due = Number(nextRow.payment_amount || topUp)
+        const prevPaid = Number(nextRow.paid_amount || 0)
+        const installmentPay = Math.min(topUp, Math.max(0, due - prevPaid))
+        const newPaidAmount = round2(prevPaid + installmentPay)
+        const fullyPaid = newPaidAmount + 0.009 >= due
+        await supabase
+          .from("loan_amortization_schedule")
+          .update({
+            paid_amount: newPaidAmount,
+            paid_date: input.paymentDate || new Date().toISOString().split("T")[0],
+            status: fullyPaid ? "paid" : "pending",
+            payslip_id: input.payslipId ?? null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", nextRow.id)
+      }
+
+      await supabase
+        .from("employee_loans")
+        .update({
+          amount_paid: amountPaid,
+          remaining_balance: balanceAfter,
+          status: balanceAfter <= 0.009 ? "completed" : "active",
+          last_payment_amount: round2(Number(already.amount) + topUp),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", loan.id)
+
+      already.amount = round2(already.amount + topUp)
+      already.balance_after = balanceAfter
+      already.status = balanceAfter <= 0.009 ? "completed" : "active"
+      remaining = round2(remaining - topUp)
     }
   }
 
@@ -638,34 +984,27 @@ export async function recordLoanPayment(
         payslip_id: payslipId ?? null,
       })
       .eq("id", scheduleId)
-      .select("loan_id, principal_portion, company_id")
+      .select("loan_id, principal_portion")
       .maybeSingle()
 
     if (!re && scheduleRow?.loan_id) {
       const { data: loan } = await supabase
         .from("employee_loans")
-        .select("id, company_id, employee_id, amount_paid, remaining_balance, principal")
+        .select(
+          "id, company_id, employee_id, amount_paid, remaining_balance, principal, expected_total_payment, total_interest",
+        )
         .eq("id", scheduleRow.loan_id)
         .single()
 
       if (loan) {
-        const newPaid = Number(loan.amount_paid ?? 0) + payAmount
-        const newBalance = Math.max(
-          0,
-          Number(loan.remaining_balance ?? loan.principal) - Number(scheduleRow.principal_portion ?? payAmount),
-        )
-
-        await supabase
-          .from("employee_loans")
-          .update({
-            amount_paid: newPaid,
-            remaining_balance: newBalance,
-            status: newBalance <= 0 ? "completed" : "active",
-            last_payment_date: today,
-            last_payment_amount: payAmount,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", scheduleRow.loan_id)
+        await applyLoanPayrollPayment({
+          companyId: loan.company_id,
+          employeeId: loan.employee_id,
+          loanId: loan.id,
+          amount: payAmount,
+          payslipId,
+          paymentDate: today,
+        })
       }
       return
     }

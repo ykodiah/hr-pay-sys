@@ -8,6 +8,11 @@ import { createClient } from "@/lib/supabase/server"
 import { requireApiUser } from "@/lib/auth/api-user"
 import { getPayslipById } from "@/lib/services/payslip-service"
 import { loadCompanyBrand, AKWAABA_BRAND_FOOTER } from "@/lib/exports/company-branding"
+import {
+  buildPayslipDeductionLines,
+  buildPayslipEarningsLines,
+  buildPayslipLoanSummaryRows,
+} from "@/lib/payroll/payslip-lines"
 
 function money(n: number | null | undefined) {
   return `GHS ${Number(n || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -68,53 +73,63 @@ export async function GET(
     )
     const loan = loans[0] || null
 
-    const earnings: [string, number][] = [
-      ["Basic Salary",            Number(data.basic_salary)],
-      ["Transport Allowance",     Number(data.transport_allowance)],
-      ["Housing Allowance",       Number(data.housing_allowance)],
-      ["Medical Allowance",       Number(data.medical_allowance)],
-      ["Meal Allowance",          Number(data.meal_allowance)],
-      ["Communication Allowance", Number(data.communication_allowance)],
-      ["Other Allowances",        Number(data.other_allowances)],
-      ["Overtime",                Number(data.overtime_pay)],
-      ["Bonus",                   Number(data.bonus_pay)],
-    ].filter(([, v]) => v > 0)
+    const earnings = buildPayslipEarningsLines(data as any).map((e) => [e.label, e.amount] as [string, number])
+    const deductions = buildPayslipDeductionLines(data as any).map((d) => [d.label, d.amount] as [string, number])
 
-    const deductions: [string, number][] = [
-      ["SSNIT (Employee 5.5%)",   Number(data.ssnit_employee)],
-      ["Tier 3 / Provident Fund", Number(data.tier3_employee)],
-      ["PAYE Tax",                Number(data.paye_tax)],
-      ["Loan Repayment",          Number(data.loan_deduction)],
-      ["Advance Deduction",       Number(data.advance_deduction)],
-      ["Other Deductions",        Number(data.other_deductions)],
-    ].filter(([, v]) => v > 0)
-
-    const hasLoan = loans.length > 0 || Number(data.loan_deduction) > 0
-    const totalRemaining = loans.reduce((s, l) => s + Number(l.remaining_balance || 0), 0)
-    const loanBalance = totalRemaining || data.loan_balance || 0
+    const loansForSummary = loans.map((l) => ({
+      ...l,
+      this_month_paid: Number(monthPaid.get(l.id) || l.last_payment_amount || 0),
+    }))
+    const loanSummary = buildPayslipLoanSummaryRows(loansForSummary)
+    const hasLoan = loanSummary.length > 0 || Number(data.loan_deduction) > 0
+    const loanTotals = loanSummary.reduce(
+      (acc, r) => ({
+        opening: acc.opening + r.opening_balance,
+        thisMonth: acc.thisMonth + r.this_month,
+        closing: acc.closing + r.closing_balance,
+      }),
+      { opening: 0, thisMonth: 0, closing: 0 },
+    )
     const ytd = Number((data as any).ytd_gross ?? 0)
-    const loanRowsHtml = loans
-      .map((l) => {
-        const pct = Math.min(
-          100,
-          Math.round(
-            ((Number(l.principal) - Number(l.remaining_balance)) / Math.max(Number(l.principal) || 1, 1)) * 100,
-          ),
-        )
-        const paidMonth = Number(monthPaid.get(l.id) || l.last_payment_amount || 0)
-        return `<div class="ln-loan">
-          <div class="ln-loan-head"><span>${esc(l.loan_type || "Loan")}</span><span class="ln-status">${esc(l.status || "active")}</span></div>
-          <div class="ln-grid">
-            <div class="ln-cell"><span class="ln-lbl">Expected</span><span class="ln-val">${money(l.monthly_payment)}</span></div>
-            <div class="ln-cell"><span class="ln-lbl">This Month</span><span class="ln-val amber">${money(paidMonth)}</span></div>
-            <div class="ln-cell"><span class="ln-lbl">Paid so far</span><span class="ln-val green">${money(l.amount_paid)}</span></div>
-            <div class="ln-cell"><span class="ln-lbl">Remaining</span><span class="ln-val">${money(l.remaining_balance)}</span></div>
-          </div>
-          <div class="pr-row"><span>Progress</span><span>${pct}%</span></div>
-          <div class="pr-bar"><div class="pr-fill" style="width:${pct}%"></div></div>
-        </div>`
-      })
-      .join("")
+    const loanRowsHtml = loanSummary.length
+      ? `<table class="loan-table">
+          <thead><tr><th>Loan Type</th><th class="r">Opening Balance</th><th class="r">This month</th><th class="r">Closing balance</th></tr></thead>
+          <tbody>
+            ${loanSummary
+              .map(
+                (r) => `<tr>
+              <td>${esc(r.loan_type)}</td>
+              <td class="r">${money(r.opening_balance)}</td>
+              <td class="r">${money(r.this_month)}</td>
+              <td class="r">${money(r.closing_balance)}</td>
+            </tr>`,
+              )
+              .join("")}
+            <tr class="tr">
+              <td>Total</td>
+              <td class="r">${money(loanTotals.opening)}</td>
+              <td class="r">${money(loanTotals.thisMonth)}</td>
+              <td class="r">${money(loanTotals.closing)}</td>
+            </tr>
+          </tbody>
+        </table>`
+      : `<table class="loan-table">
+          <thead><tr><th>Loan Type</th><th class="r">Opening Balance</th><th class="r">This month</th><th class="r">Closing balance</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Loan Repayment</td>
+              <td class="r">${money(Number(data.loan_balance || 0) + Number(data.loan_deduction || 0))}</td>
+              <td class="r">${money(data.loan_deduction)}</td>
+              <td class="r">${money(data.loan_balance)}</td>
+            </tr>
+            <tr class="tr">
+              <td>Total</td>
+              <td class="r">${money(Number(data.loan_balance || 0) + Number(data.loan_deduction || 0))}</td>
+              <td class="r">${money(data.loan_deduction)}</td>
+              <td class="r">${money(data.loan_balance)}</td>
+            </tr>
+          </tbody>
+        </table>`
 
     const html = `<!DOCTYPE html>
 <html>
@@ -145,33 +160,25 @@ export async function GET(
     .t-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
     .th { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; padding:5px 8px; border-radius:4px 4px 0 0; }
     .th-e { background:#ecfdf5; color:#065f46; }
-    .th-d { background:#fef2f2; color:#991b1b; }
+    .th-d { background:#f3f4f6; color:#111827; }
     table { width:100%; border-collapse:collapse; }
     td { padding:4.5px 8px; font-size:11px; border-bottom:1px solid #f3f4f6; }
     .r { text-align:right; white-space:nowrap; }
-    .red { color:#b91c1c; }
+    .red { color:#111827; }
     .tr td { font-weight:700; background:#f9fafb; border-top:1.5px solid var(--line); }
-    /* Net pay */
-    .net { background:linear-gradient(135deg,#111827,#1f2937); color:#fff; border-radius:8px; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
-    .nl { font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:rgba(255,255,255,.6); }
-    .na { font-size:22px; font-weight:700; letter-spacing:-.02em; }
-    .nd { text-align:right; font-size:11px; color:rgba(255,255,255,.8); }
-    /* Loan — compact multi-loan summary */
+    /* Net pay — light background for readability */
+    .net { background:#f9fafb; color:#111827; border:1px solid var(--line); border-radius:8px; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .nl { font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:#6b7280; }
+    .na { font-size:22px; font-weight:700; letter-spacing:-.02em; color:#111827; }
+    .nd { text-align:right; font-size:11px; color:#374151; }
+    /* Loan summary table */
     .loan-box { background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:8px 10px; margin-bottom:10px; }
-    .ln-title { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#92400e; margin-bottom:6px; display:flex; justify-content:space-between; }
-    .ln-loan { background:#fff; border:1px solid #fde68a; border-radius:5px; padding:5px 7px; margin-bottom:5px; }
-    .ln-loan-head { display:flex; justify-content:space-between; align-items:center; font-size:10px; font-weight:700; color:#1c1917; margin-bottom:4px; }
-    .ln-status { font-size:8px; text-transform:uppercase; background:#fef3c7; color:#92400e; padding:1px 5px; border-radius:9999px; }
-    .ln-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; }
-    .ln-cell { background:#fffbeb; border:1px solid #fde68a; border-radius:4px; padding:3px 5px; }
-    .ln-lbl { display:block; font-size:8px; color:#78716c; text-transform:uppercase; }
-    .ln-val { display:block; font-size:9px; font-weight:600; color:#1c1917; margin-top:1px; }
-    .ln-tot { display:grid; grid-template-columns:repeat(2,1fr); gap:4px; margin-top:4px; }
+    .ln-title { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#92400e; margin-bottom:6px; }
+    .loan-table { width:100%; border-collapse:collapse; background:#fff; }
+    .loan-table th, .loan-table td { border:1px solid #fde68a; padding:5px 7px; font-size:10px; }
+    .loan-table th { background:#fffbeb; color:#92400e; }
     .amber { color:#b45309; }
     .green { color:#065f46; }
-    .pr-row { display:flex; justify-content:space-between; font-size:8px; color:#92400e; margin-top:4px; margin-bottom:2px; }
-    .pr-bar { background:#fde68a; border-radius:9999px; height:3px; }
-    .pr-fill { background:#d97706; height:3px; border-radius:9999px; }
     /* YTD */
     .ytd-row { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:10px; }
     .ytd-c { background:#f9fafb; border:1px solid #e5e7eb; border-radius:5px; padding:5px 8px; }
@@ -214,8 +221,8 @@ export async function GET(
     <div>
       <div class="th th-d">Deductions</div>
       <table><tbody>
-        ${deductions.map(([l, v]) => `<tr><td>${esc(l)}</td><td class="r red">${money(v)}</td></tr>`).join("")}
-        <tr class="tr"><td>Total Deductions</td><td class="r red">${money(data.total_deductions)}</td></tr>
+        ${deductions.map(([l, v]) => `<tr><td>${esc(l)}</td><td class="r">${money(v)}</td></tr>`).join("")}
+        <tr class="tr"><td>Total Deductions</td><td class="r">${money(data.total_deductions)}</td></tr>
       </tbody></table>
     </div>
   </div>
@@ -227,12 +234,8 @@ export async function GET(
 
   ${hasLoan ? `
   <div class="loan-box">
-    <div class="ln-title"><span>Loan Summary</span><span>${loans.length} loan${loans.length === 1 ? "" : "s"}</span></div>
+    <div class="ln-title">Loan Summary</div>
     ${loanRowsHtml}
-    <div class="ln-tot">
-      <div class="ln-cell"><span class="ln-lbl">This Month Deducted</span><span class="ln-val amber">${money(data.loan_deduction)}</span></div>
-      <div class="ln-cell"><span class="ln-lbl">Total Remaining</span><span class="ln-val amber">${money(loanBalance)}</span></div>
-    </div>
   </div>` : ""}
 
   ${ytd > 0 ? `

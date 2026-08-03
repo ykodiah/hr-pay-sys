@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
         .eq("pay_period", payPeriod),
       supabase
         .from("employee_loans")
-        .select("employee_id, monthly_payment, remaining_balance, status, auto_deduct")
+        .select("employee_id, monthly_payment, monthly_installment, remaining_balance, status, auto_deduct")
         .eq("company_id", companyId)
         .in("status", ["active", "approved"]),
       empIds.length
@@ -104,8 +104,9 @@ export async function GET(request: NextRequest) {
     for (const loan of loansRes.data ?? []) {
       if (loan.auto_deduct === false) continue
       const prev = loansByEmployee.get(loan.employee_id) ?? { payment: 0, balance: 0 }
+      const charge = Number(loan.monthly_payment ?? loan.monthly_installment ?? 0)
       loansByEmployee.set(loan.employee_id, {
-        payment: prev.payment + Number(loan.monthly_payment ?? 0),
+        payment: prev.payment + charge,
         balance: prev.balance + Number(loan.remaining_balance ?? 0),
       })
     }
