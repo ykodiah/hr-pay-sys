@@ -24,7 +24,7 @@ import {
   RefreshCw,
   BookOpen,
 } from "lucide-react"
-import { HrFormulaCheatSheet } from "@/components/analytics/hr-formula-cheat-sheet"
+import { HrFormulaReportsPanel } from "@/components/analytics/hr-formula-reports-panel"
 
 type DashboardData = {
   totalEmployees: number
@@ -342,13 +342,16 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
             <BookOpen className="h-4 w-4" />
-            HR Formula Snapshot
+            HR Formula Reports
           </h2>
           <Button asChild variant="link" className="h-auto px-0 text-teal-700">
-            <Link href="/app/analytics">Full cheat sheet →</Link>
+            <Link href="/app/analytics?tab=formulas">All formula reports →</Link>
           </Button>
         </div>
-        <HrFormulaCheatSheet compact />
+        <HrFormulaReportsPanel
+          compact
+          categoryFilter={["workforce", "attendance", "recruitment", "compensation"]}
+        />
       </div>
     </div>
   )
