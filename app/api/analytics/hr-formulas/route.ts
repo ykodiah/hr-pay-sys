@@ -9,6 +9,9 @@ import {
   computeHrFormulaReports,
   persistHrFormulaReport,
 } from "@/lib/services/hr-formula-reports"
+import { buildCategoryAiMlInsights } from "@/lib/services/hr-formula-ai-insights"
+import { renderHrFormulaReportPdfHtml } from "@/lib/services/hr-formula-report-pdf"
+import { loadCompanyBrand } from "@/lib/exports/company-branding"
 
 function defaultPeriod() {
   const now = new Date()
@@ -17,6 +20,50 @@ function defaultPeriod() {
   return {
     periodStart: start.toISOString().slice(0, 10),
     periodEnd: end.toISOString().slice(0, 10),
+  }
+}
+
+async function persistInsights(input: {
+  companyId: string
+  runId?: string | null
+  insights: Awaited<ReturnType<typeof buildCategoryAiMlInsights>>
+  service: any
+}) {
+  try {
+    if (input.runId) {
+      await input.service
+        .from("hr_formula_report_runs")
+        .update({
+          health_score: input.insights.healthScore,
+          health_label: input.insights.healthLabel,
+          executive_brief: input.insights.executiveBrief,
+          ai_narrative: input.insights.narrative,
+          ml_model: input.insights.mlModel,
+          ai_model: input.insights.aiModel,
+          insights_json: input.insights,
+          export_formats: ["csv", "pdf"],
+        })
+        .eq("id", input.runId)
+    }
+
+    await input.service.from("hr_formula_ai_insights").insert({
+      run_id: input.runId || null,
+      company_id: input.companyId,
+      category_id: input.insights.categoryId,
+      period_start: input.insights.periodStart,
+      period_end: input.insights.periodEnd,
+      health_score: input.insights.healthScore,
+      health_label: input.insights.healthLabel,
+      executive_brief: input.insights.executiveBrief,
+      narrative: input.insights.narrative,
+      blocks: input.insights.blocks,
+      ml_model: input.insights.mlModel,
+      ai_model: input.insights.aiModel,
+      source: input.insights.source,
+      generated_at: input.insights.generatedAt,
+    })
+  } catch (err) {
+    console.warn("[hr-formulas] insight persist skipped:", err)
   }
 }
 
@@ -34,6 +81,8 @@ export async function GET(request: NextRequest) {
     const periodEnd = searchParams.get("period_end") || defaults.periodEnd
     const categoryId = searchParams.get("category") || undefined
     const format = searchParams.get("format")
+    const includeAi = searchParams.get("include_ai") !== "0"
+    const withInsights = searchParams.get("insights") === "1" || format === "pdf"
 
     const bundle = await computeHrFormulaReports({
       companyId: ctx.companyId,
@@ -54,6 +103,45 @@ export async function GET(request: NextRequest) {
           "Content-Disposition": `attachment; filename="hr-${categoryId}-${periodStart}.csv"`,
         },
       })
+    }
+
+    if (format === "pdf") {
+      const category = categoryId
+        ? bundle.categories[0]
+        : bundle.categories[0]
+      if (!category) {
+        return NextResponse.json({ error: "Category not found" }, { status: 404 })
+      }
+      const insights = await buildCategoryAiMlInsights({
+        category,
+        periodStart,
+        periodEnd,
+        includeAi,
+      })
+      const company = await loadCompanyBrand(ctx.service, ctx.companyId)
+      const html = renderHrFormulaReportPdfHtml({
+        category,
+        insights,
+        company,
+        periodStart,
+        periodEnd,
+      })
+      return new NextResponse(html, {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Content-Disposition": `inline; filename="hr-${category.id}-${periodStart}.pdf.html"`,
+        },
+      })
+    }
+
+    if (withInsights && categoryId && bundle.categories[0]) {
+      const insights = await buildCategoryAiMlInsights({
+        category: bundle.categories[0],
+        periodStart,
+        periodEnd,
+        includeAi,
+      })
+      return NextResponse.json({ ...bundle, insights })
     }
 
     return NextResponse.json(bundle)
@@ -77,6 +165,8 @@ export async function POST(request: NextRequest) {
     const periodEnd = body.period_end || defaults.periodEnd
     const categoryId = body.category || undefined
     const persist = body.persist !== false
+    const includeAi = body.include_ai !== false
+    const wantInsights = body.insights !== false
 
     const bundle = await computeHrFormulaReports({
       companyId: ctx.companyId,
@@ -94,12 +184,29 @@ export async function POST(request: NextRequest) {
         })
         runId = saved.runId
       } catch (err) {
-        // Still return computed report if persist tables are missing
         console.warn("[hr-formulas] persist skipped:", err)
       }
     }
 
-    return NextResponse.json({ ...bundle, runId })
+    let insights = null
+    if (wantInsights && bundle.categories[0]) {
+      insights = await buildCategoryAiMlInsights({
+        category: bundle.categories[0],
+        periodStart,
+        periodEnd,
+        includeAi,
+      })
+      if (persist) {
+        await persistInsights({
+          companyId: ctx.companyId,
+          runId,
+          insights,
+          service: ctx.service,
+        })
+      }
+    }
+
+    return NextResponse.json({ ...bundle, runId, insights })
   } catch (error) {
     console.error("[hr-formulas] POST error:", error)
     return jsonError(error, "Failed to generate HR formula report")
