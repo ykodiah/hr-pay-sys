@@ -1003,18 +1003,35 @@ export async function ensurePayslipLoanPayments(input: {
   const supabase = await createClient()
   const period = toPayPeriod(input.payPeriod)
 
-  let payQuery = supabase
-    .from("payroll_loan_payments")
-    .select("id, loan_id, amount, schedule_id, balance_before, balance_after, payslip_id, payroll_run_id, pay_period")
-    .eq("company_id", input.companyId)
-    .eq("employee_id", input.employeeId)
-
-  if (input.payslipId) payQuery = payQuery.eq("payslip_id", input.payslipId)
-  else if (input.payrollRunId) payQuery = payQuery.eq("payroll_run_id", input.payrollRunId)
-  else if (period) payQuery = payQuery.eq("pay_period", period)
-
-  const { data: existing } = await payQuery
-  const existingRows = existing ?? []
+  let existingRows: any[] = []
+  if (input.payslipId) {
+    const { data } = await supabase
+      .from("payroll_loan_payments")
+      .select("id, loan_id, amount, schedule_id, balance_before, balance_after, payslip_id, payroll_run_id, pay_period")
+      .eq("company_id", input.companyId)
+      .eq("employee_id", input.employeeId)
+      .eq("payslip_id", input.payslipId)
+    existingRows = data ?? []
+  }
+  // Older rows may have payroll_run_id but null payslip_id — still treat as this run
+  if (!existingRows.length && input.payrollRunId) {
+    const { data } = await supabase
+      .from("payroll_loan_payments")
+      .select("id, loan_id, amount, schedule_id, balance_before, balance_after, payslip_id, payroll_run_id, pay_period")
+      .eq("company_id", input.companyId)
+      .eq("employee_id", input.employeeId)
+      .eq("payroll_run_id", input.payrollRunId)
+    existingRows = data ?? []
+  }
+  if (!existingRows.length && period) {
+    const { data } = await supabase
+      .from("payroll_loan_payments")
+      .select("id, loan_id, amount, schedule_id, balance_before, balance_after, payslip_id, payroll_run_id, pay_period")
+      .eq("company_id", input.companyId)
+      .eq("employee_id", input.employeeId)
+      .eq("pay_period", period)
+    existingRows = data ?? []
+  }
 
   const { data: loans, error } = await supabase
     .from("employee_loans")

@@ -9,6 +9,7 @@ import { toast } from "@/hooks/use-toast"
 import { resolveClientCompanyId } from "@/lib/tenant/resolve-company-client"
 import { TrendingUp, Users, DollarSign, Calculator, Download, RefreshCw } from "lucide-react"
 import type { ReportType } from "@/lib/services/reports/types"
+import { HrFormulaCheatSheet } from "@/components/analytics/hr-formula-cheat-sheet"
 
 const simpleReports: {
   id: number
@@ -196,8 +197,9 @@ export default function AnalyticsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="formulas">HR Formulas</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
@@ -286,26 +288,38 @@ export default function AnalyticsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Department Overview</CardTitle>
+                <CardTitle>Key HR Formulas</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                    <span className="font-medium">Technology</span>
-                    <Badge>18 employees</Badge>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                    <span className="font-medium">Operations</span>
-                    <Badge>15 employees</Badge>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                    <span className="font-medium">Sales</span>
-                    <Badge>12 employees</Badge>
-                  </div>
+              <CardContent className="space-y-3 text-sm">
+                <div className="rounded-lg border bg-slate-50 p-3">
+                  <p className="font-semibold text-slate-800">Average Salary</p>
+                  <p className="font-mono text-xs text-slate-600">Total Salary Paid ÷ Total Employees</p>
+                  <p className="mt-1 text-emerald-700">
+                    GHS {basicMetrics.avgSalary.toLocaleString()}
+                  </p>
                 </div>
+                <div className="rounded-lg border bg-slate-50 p-3">
+                  <p className="font-semibold text-slate-800">Workforce Growth Rate (%)</p>
+                  <p className="font-mono text-xs text-slate-600">
+                    ((End − Start Headcount) ÷ Start Headcount) × 100
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-slate-50 p-3">
+                  <p className="font-semibold text-slate-800">Payroll Cost to Company (%)</p>
+                  <p className="font-mono text-xs text-slate-600">
+                    (Total Payroll Cost ÷ Total Revenue) × 100
+                  </p>
+                </div>
+                <Button variant="link" className="h-auto px-0" onClick={() => setActiveTab("formulas")}>
+                  Open full cheat sheet →
+                </Button>
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="formulas" className="space-y-6">
+          <HrFormulaCheatSheet />
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-6">

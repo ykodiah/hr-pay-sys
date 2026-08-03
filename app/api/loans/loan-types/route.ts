@@ -14,8 +14,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     }
     const { companyId } = ctx
+    const includeInactive =
+      request.nextUrl.searchParams.get("include_inactive") === "1" ||
+      request.nextUrl.searchParams.get("include_inactive") === "true"
 
-    const loanTypes = await getLoanTypes(companyId)
+    const loanTypes = await getLoanTypes(companyId, { includeInactive })
     return NextResponse.json(loanTypes)
   } catch (error) {
     console.error("[v0] Loan types error:", error)

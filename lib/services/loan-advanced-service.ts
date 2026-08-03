@@ -191,15 +191,24 @@ function mapLoanTypeDbError(error: any): Error {
   return new Error(message)
 }
 
-export async function getLoanTypes(companyId: string): Promise<LoanType[]> {
+export async function getLoanTypes(
+  companyId: string,
+  options?: { includeInactive?: boolean },
+): Promise<LoanType[]> {
   const supabase = await getDb()
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("loan_types")
     .select("*")
     .eq("company_id", companyId)
-    .eq("is_active", true)
+    .order("is_active", { ascending: false })
     .order("created_at", { ascending: false })
+
+  if (!options?.includeInactive) {
+    query = query.eq("is_active", true)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     if (/relation .*loan_types.* does not exist/i.test(error.message)) return []
@@ -243,7 +252,8 @@ export async function createLoanType(
   const row: Record<string, any> = {
     ...payload,
     company_id: companyId,
-    is_active: true,
+    // Honor form value (defaults to active via sanitizeLoanTypePayload)
+    is_active: payload.is_active !== false,
     updated_at: new Date().toISOString(),
   }
 
