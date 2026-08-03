@@ -146,8 +146,8 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Apply loan deductions to each employee loan + amortization schedule
-        const { applyEmployeePayrollLoanDeduction } = await import("@/lib/services/loan-service")
+        // Apply loan deductions per loan type (repairs mis-allocated prior posts for this run)
+        const { ensurePayslipLoanPayments } = await import("@/lib/services/loan-service")
         const { data: items } = await supabase
           .from("payroll_items")
           .select("employee_id, loan_deduction")
@@ -155,24 +155,28 @@ export async function POST(request: NextRequest) {
 
         const { data: slips } = await supabase
           .from("payslips")
-          .select("id, employee_id, pay_period")
+          .select("id, employee_id, pay_period, loan_deduction")
           .eq("payroll_run_id", payroll_run_id)
           .eq("company_id", companyId)
 
-        const slipByEmployee = new Map<string, { id: string; pay_period?: string }>()
+        const slipByEmployee = new Map<string, { id: string; pay_period?: string; loan_deduction?: number }>()
         for (const slip of slips ?? []) {
-          slipByEmployee.set(slip.employee_id, { id: slip.id, pay_period: slip.pay_period })
+          slipByEmployee.set(slip.employee_id, {
+            id: slip.id,
+            pay_period: slip.pay_period,
+            loan_deduction: Number(slip.loan_deduction || 0),
+          })
         }
 
         const payPeriod =
           run.pay_period_start ? String(run.pay_period_start).slice(0, 7) : null
 
         for (const item of items ?? []) {
-          const loanAmt = Number(item.loan_deduction ?? 0)
-          if (loanAmt <= 0) continue
           const slip = slipByEmployee.get(item.employee_id)
+          const loanAmt = Number(item.loan_deduction ?? slip?.loan_deduction ?? 0)
+          if (loanAmt <= 0) continue
           try {
-            await applyEmployeePayrollLoanDeduction({
+            await ensurePayslipLoanPayments({
               companyId,
               employeeId: item.employee_id,
               totalDeduction: loanAmt,

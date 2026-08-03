@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
         .eq("pay_period", payPeriod),
       supabase
         .from("employee_loans")
-        .select("employee_id, monthly_payment, monthly_installment, remaining_balance, status, auto_deduct")
+        .select("employee_id, monthly_payment, monthly_installment, remaining_balance, status, auto_deduct, start_date, approved_at, disbursed_at, created_at, end_date")
         .eq("company_id", companyId)
         .in("status", ["active", "approved"]),
       empIds.length
@@ -100,9 +100,12 @@ export async function GET(request: NextRequest) {
     const inputsByEmployee = new Map(
       (inputsRes.data ?? []).map((row) => [row.employee_id, row]),
     )
+    const { isLoanInPayPeriod } = await import("@/lib/payroll/loan-summary")
     const loansByEmployee = new Map<string, { payment: number; balance: number }>()
     for (const loan of loansRes.data ?? []) {
       if (loan.auto_deduct === false) continue
+      // Do not pull loans into payroll before their start / approval month
+      if (!isLoanInPayPeriod(loan, payPeriod)) continue
       const prev = loansByEmployee.get(loan.employee_id) ?? { payment: 0, balance: 0 }
       const charge = Number(loan.monthly_payment ?? loan.monthly_installment ?? 0)
       loansByEmployee.set(loan.employee_id, {

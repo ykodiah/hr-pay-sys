@@ -628,16 +628,10 @@ export default function PayrollLoansPage() {
                     <TableHead>Type</TableHead>
                     <TableHead className="text-right">Principal</TableHead>
                     <TableHead className="text-right">Interest</TableHead>
-                    <TableHead className="text-right">
-                      Total Amount to Pay
-                      <div className="text-[10px] font-normal text-muted-foreground">c+d</div>
-                    </TableHead>
+                    <TableHead className="text-right">Total Amount to Pay</TableHead>
                     <TableHead className="text-right">Monthly Charge</TableHead>
                     <TableHead className="text-right">Loan Paid</TableHead>
-                    <TableHead className="text-right">
-                      Remaining Balance
-                      <div className="text-[10px] font-normal text-muted-foreground">e−g</div>
-                    </TableHead>
+                    <TableHead className="text-right">Remaining Balance</TableHead>
                     <TableHead>Tenure</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -645,12 +639,10 @@ export default function PayrollLoansPage() {
                 </TableHeader>
                 <TableBody>
                   {filtered.map((loan) => {
-                    const interestAmt = Number(
-                      loan.total_interest ??
-                        Math.max(
-                          0,
-                          Number(loan.expected_total_payment || 0) - Number(loan.principal || 0),
-                        ),
+                    const interestAmt = Math.max(
+                      0,
+                      Number(loan.total_interest || 0) ||
+                        Number(loan.expected_total_payment || 0) - Number(loan.principal || 0),
                     )
                     const totalToPay =
                       Number(loan.expected_total_payment || 0) ||

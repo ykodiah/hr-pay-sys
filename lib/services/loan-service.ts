@@ -6,6 +6,7 @@ import {
   normalizeInterestType,
   type InterestType,
 } from "@/lib/services/loan-calculations"
+import { isLoanInPayPeriod, toPayPeriod } from "@/lib/payroll/loan-summary"
 
 export {
   calcMonthlyPayment,
@@ -141,17 +142,52 @@ async function enrichLoansWithEmployees(loans: any[]): Promise<EmployeeLoan[]> {
 
   return loans.map((row) => {
     const emp = row.employees ?? employeeMap.get(row.employee_id) ?? null
+    const interestType = normalizeInterestType(row.interest_type)
+    const principal = Number(row.principal || 0)
+    const rate = Number(row.interest_rate || 0)
+    const months = Math.max(1, Number(row.repayment_months || 1))
+    let totalInterest = Number(row.total_interest || 0)
+    let expectedTotal = Number(row.expected_total_payment || 0)
+
+    // Recompute interest when rate is set but totals were never persisted (common for older loans)
+    if (rate > 0 && (totalInterest <= 0.009 || expectedTotal <= principal + 0.009)) {
+      const preview = buildAmortizationForInterestType({
+        principal,
+        annualRatePercent: rate,
+        tenureMonths: months,
+        interestType,
+        startDate: row.start_date || new Date().toISOString().split("T")[0],
+      })
+      totalInterest = preview.total_interest
+      expectedTotal = preview.total_payable
+    } else if (expectedTotal > principal + 0.009 && totalInterest <= 0.009) {
+      totalInterest = round2(expectedTotal - principal)
+    } else if (totalInterest > 0 && expectedTotal <= principal + 0.009) {
+      expectedTotal = round2(principal + totalInterest)
+    } else {
+      expectedTotal = loanTotalPayable({
+        expected_total_payment: expectedTotal,
+        principal,
+        total_interest: totalInterest,
+      })
+    }
+
+    const amountPaid = Number(row.amount_paid || 0)
+    const remaining = round2(
+      Number(
+        row.remaining_balance != null && row.remaining_balance !== ""
+          ? row.remaining_balance
+          : Math.max(0, expectedTotal - amountPaid),
+      ),
+    )
+
     return {
       ...row,
-      interest_type: normalizeInterestType(row.interest_type),
+      interest_type: interestType,
       monthly_payment: loanMonthlyCharge(row),
-      expected_total_payment: loanTotalPayable(row),
-      remaining_balance: round2(
-        Number(
-          row.remaining_balance ??
-            Math.max(0, loanTotalPayable(row) - Number(row.amount_paid || 0)),
-        ),
-      ),
+      total_interest: totalInterest,
+      expected_total_payment: expectedTotal,
+      remaining_balance: remaining,
       employee_name: emp ? `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim() : null,
       employee_id_no: emp?.employee_id ?? null,
       department: emp?.department ?? null,
@@ -342,7 +378,29 @@ export async function listLoans(options: {
   const { data, error } = await query
   if (error) throw new Error(error.message)
 
-  return enrichLoansWithEmployees(data ?? [])
+  const enriched = await enrichLoansWithEmployees(data ?? [])
+
+  // Persist recomputed interest totals when older rows stored 0 interest despite a rate
+  for (const loan of enriched) {
+    const original = (data ?? []).find((r: any) => r.id === loan.id)
+    if (!original) continue
+    const rate = Number(loan.interest_rate || 0)
+    const storedInterest = Number(original.total_interest || 0)
+    const nextInterest = Number(loan.total_interest || 0)
+    if (rate > 0 && storedInterest <= 0.009 && nextInterest > 0.009) {
+      void supabase
+        .from("employee_loans")
+        .update({
+          total_interest: nextInterest,
+          expected_total_payment: loan.expected_total_payment,
+          interest_type: loan.interest_type,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", loan.id)
+    }
+  }
+
+  return enriched
 }
 
 /** Get a single loan with its amortization schedule. */
@@ -805,8 +863,288 @@ export async function applyLoanPayrollPayment(input: {
 }
 
 /**
+ * Reverse a single payroll_loan_payments row and roll loan/schedule balances back.
+ */
+async function reversePayrollLoanPayment(payment: {
+  id: string
+  loan_id: string
+  amount: number
+  schedule_id?: string | null
+  balance_before?: number | null
+}): Promise<void> {
+  const supabase = await createClient()
+  const amount = round2(Number(payment.amount || 0))
+  if (amount <= 0) {
+    await supabase.from("payroll_loan_payments").delete().eq("id", payment.id)
+    return
+  }
+
+  const { data: loan } = await supabase
+    .from("employee_loans")
+    .select("id, amount_paid, remaining_balance, expected_total_payment, total_interest, principal, status")
+    .eq("id", payment.loan_id)
+    .maybeSingle()
+
+  if (loan) {
+    const amountPaid = round2(Math.max(0, Number(loan.amount_paid || 0) - amount))
+    const totalPayable = loanTotalPayable(loan)
+    const remaining = round2(
+      payment.balance_before != null
+        ? Number(payment.balance_before)
+        : Math.max(0, totalPayable - amountPaid),
+    )
+    await supabase
+      .from("employee_loans")
+      .update({
+        amount_paid: amountPaid,
+        remaining_balance: remaining,
+        outstanding_balance: remaining,
+        status: remaining <= 0.009 ? "completed" : "active",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", loan.id)
+  }
+
+  if (payment.schedule_id) {
+    const { data: sched } = await supabase
+      .from("loan_amortization_schedule")
+      .select("id, payment_amount, paid_amount")
+      .eq("id", payment.schedule_id)
+      .maybeSingle()
+    if (sched?.id) {
+      const newPaid = round2(Math.max(0, Number(sched.paid_amount || 0) - amount))
+      const due = Number(sched.payment_amount || 0)
+      const schedUpdate: Record<string, unknown> = {
+        paid_amount: newPaid,
+        status: newPaid + 0.009 >= due && due > 0 ? "paid" : "pending",
+        payslip_id: null,
+        payroll_run_id: null,
+        updated_at: new Date().toISOString(),
+      }
+      if (newPaid <= 0.009) schedUpdate.paid_date = null
+      await supabase.from("loan_amortization_schedule").update(schedUpdate).eq("id", sched.id)
+    }
+  }
+
+  await supabase.from("payroll_loan_payments").delete().eq("id", payment.id)
+}
+
+function computeLoanAllocation(
+  loans: Array<{
+    id: string
+    monthly_payment?: number | null
+    monthly_installment?: number | null
+    remaining_balance?: number | null
+    amount_paid?: number | null
+    expected_total_payment?: number | null
+    total_interest?: number | null
+    principal?: number | null
+  }>,
+  totalDeduction: number,
+): Array<{ loanId: string; amount: number }> {
+  let remaining = round2(totalDeduction)
+  const allocation: Array<{ loanId: string; amount: number }> = []
+
+  for (const loan of loans) {
+    if (remaining <= 0.009) break
+    const charge = loanMonthlyCharge(loan)
+    const bal = round2(
+      Number(
+        loan.remaining_balance ??
+          Math.max(0, loanTotalPayable(loan) - Number(loan.amount_paid || 0)),
+      ),
+    )
+    if (charge <= 0.009 || bal <= 0.009) continue
+    const pay = Math.min(charge, bal, remaining)
+    if (pay <= 0.009) continue
+    allocation.push({ loanId: loan.id, amount: pay })
+    remaining = round2(remaining - pay)
+  }
+
+  if (remaining > 0.009) {
+    for (const loan of loans) {
+      if (remaining <= 0.009) break
+      const already = allocation.find((a) => a.loanId === loan.id)?.amount || 0
+      const bal = round2(
+        Number(
+          loan.remaining_balance ??
+            Math.max(0, loanTotalPayable(loan) - Number(loan.amount_paid || 0)),
+        ) - already,
+      )
+      if (bal <= 0.009) continue
+      const pay = Math.min(bal, remaining)
+      if (pay <= 0.009) continue
+      const row = allocation.find((a) => a.loanId === loan.id)
+      if (row) row.amount = round2(row.amount + pay)
+      else allocation.push({ loanId: loan.id, amount: pay })
+      remaining = round2(remaining - pay)
+    }
+  }
+
+  return allocation
+}
+
+/**
+ * Ensure payslip/run loan payments exist and match each loan's monthly charge.
+ * Repairs older runs that dumped the full deduction onto one loan type.
+ */
+export async function ensurePayslipLoanPayments(input: {
+  companyId: string
+  employeeId: string
+  totalDeduction: number
+  payrollRunId?: string | null
+  payslipId?: string | null
+  payPeriod?: string | null
+  paymentDate?: string
+}): Promise<PayrollLoanPaymentResult[]> {
+  const total = round2(Number(input.totalDeduction || 0))
+  if (total <= 0) return []
+
+  const supabase = await createClient()
+  const period = toPayPeriod(input.payPeriod)
+
+  let payQuery = supabase
+    .from("payroll_loan_payments")
+    .select("id, loan_id, amount, schedule_id, balance_before, balance_after, payslip_id, payroll_run_id, pay_period")
+    .eq("company_id", input.companyId)
+    .eq("employee_id", input.employeeId)
+
+  if (input.payslipId) payQuery = payQuery.eq("payslip_id", input.payslipId)
+  else if (input.payrollRunId) payQuery = payQuery.eq("payroll_run_id", input.payrollRunId)
+  else if (period) payQuery = payQuery.eq("pay_period", period)
+
+  const { data: existing } = await payQuery
+  const existingRows = existing ?? []
+
+  const { data: loans, error } = await supabase
+    .from("employee_loans")
+    .select(
+      "id, monthly_payment, monthly_installment, remaining_balance, amount_paid, expected_total_payment, total_interest, principal, status, created_at, auto_deduct, start_date, approved_at, disbursed_at, end_date",
+    )
+    .eq("company_id", input.companyId)
+    .eq("employee_id", input.employeeId)
+    .in("status", ["active", "approved"])
+    .order("created_at", { ascending: true })
+
+  if (error) throw new Error(error.message)
+
+  const activeLoans = (loans ?? []).filter(
+    (l) => l.auto_deduct !== false && (!period || isLoanInPayPeriod(l, period)),
+  )
+
+  const expected = computeLoanAllocation(activeLoans, total)
+  const existingByLoan = new Map<string, number>()
+  for (const p of existingRows) {
+    existingByLoan.set(p.loan_id, round2(Number(existingByLoan.get(p.loan_id) || 0) + Number(p.amount || 0)))
+  }
+
+  const expectedByLoan = new Map(expected.map((e) => [e.loanId, e.amount]))
+  let allocationOk =
+    existingRows.length > 0 &&
+    expected.every((e) => Math.abs((existingByLoan.get(e.loanId) || 0) - e.amount) <= 0.05) &&
+    Math.abs(
+      round2(existingRows.reduce((s, p) => s + Number(p.amount || 0), 0)) - total,
+    ) <= 0.05
+
+  // Detect classic bug: one loan absorbed the full deduction while another loan's charge was skipped
+  if (allocationOk === false && existingRows.length > 0) {
+    const overpaid = activeLoans.some((l) => {
+      const charge = loanMonthlyCharge(l)
+      const paid = existingByLoan.get(l.id) || 0
+      return charge > 0.009 && paid > charge + 0.05
+    })
+    const underpaid = activeLoans.some((l) => {
+      const charge = loanMonthlyCharge(l)
+      const paid = existingByLoan.get(l.id) || 0
+      return charge > 0.009 && paid < 0.05 && (expectedByLoan.get(l.id) || 0) > 0.05
+    })
+    if (overpaid && underpaid) allocationOk = false
+  }
+
+  if (allocationOk) {
+    const mapped = existingRows.map((p) => ({
+      loan_id: p.loan_id,
+      amount: round2(Number(p.amount || 0)),
+      principal_portion: 0,
+      interest_portion: 0,
+      balance_before: round2(Number(p.balance_before || 0)),
+      balance_after: round2(Number(p.balance_after || 0)),
+      schedule_id: p.schedule_id ?? null,
+      status: "active" as LoanStatus,
+    }))
+    if (input.payslipId) {
+      const { data: typed } = await supabase
+        .from("employee_loans")
+        .select("id, loan_type")
+        .in(
+          "id",
+          mapped.map((r) => r.loan_id),
+        )
+      const typeMap = new Map((typed ?? []).map((l) => [l.id, l.loan_type]))
+      await supabase
+        .from("payslips")
+        .update({
+          loan_summary_lines: mapped.map((r) => ({
+            loan_id: r.loan_id,
+            loan_type: typeMap.get(r.loan_id) || "Loan",
+            opening_balance: r.balance_before,
+            this_month: r.amount,
+            closing_balance: r.balance_after,
+          })),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", input.payslipId)
+    }
+    return mapped
+  }
+
+  // Reverse incorrect / partial rows for this payslip or run, then re-apply correctly
+  for (const p of existingRows) {
+    await reversePayrollLoanPayment(p)
+  }
+
+  const results = await applyEmployeePayrollLoanDeduction(input)
+
+  if (input.payslipId && results.length) {
+    const summary = results.map((r) => {
+      const loan = activeLoans.find((l) => l.id === r.loan_id)
+      return {
+        loan_id: r.loan_id,
+        loan_type: (loan as any)?.loan_type || "Loan",
+        opening_balance: r.balance_before,
+        this_month: r.amount,
+        closing_balance: r.balance_after,
+      }
+    })
+    // Reload loan types for labels
+    const { data: typed } = await supabase
+      .from("employee_loans")
+      .select("id, loan_type")
+      .in(
+        "id",
+        results.map((r) => r.loan_id),
+      )
+    const typeMap = new Map((typed ?? []).map((l) => [l.id, l.loan_type]))
+    const lines = summary.map((s) => ({
+      ...s,
+      loan_type: typeMap.get(s.loan_id) || s.loan_type,
+    }))
+    await supabase
+      .from("payslips")
+      .update({
+        loan_summary_lines: lines,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", input.payslipId)
+  }
+
+  return results
+}
+
+/**
  * Allocate a payroll loan_deduction across an employee's active loans.
  * Each loan is paid up to its expected monthly installment / remaining balance.
+ * Only loans whose start month is on/before the pay period are included.
  */
 export async function applyEmployeePayrollLoanDeduction(input: {
   companyId: string
@@ -821,10 +1159,11 @@ export async function applyEmployeePayrollLoanDeduction(input: {
   if (total <= 0) return []
 
   const supabase = await createClient()
+  const period = toPayPeriod(input.payPeriod)
   const { data: loans, error } = await supabase
     .from("employee_loans")
     .select(
-      "id, monthly_payment, monthly_installment, remaining_balance, amount_paid, expected_total_payment, total_interest, principal, status, created_at, auto_deduct",
+      "id, monthly_payment, monthly_installment, remaining_balance, amount_paid, expected_total_payment, total_interest, principal, status, created_at, auto_deduct, start_date, approved_at, disbursed_at, end_date",
     )
     .eq("company_id", input.companyId)
     .eq("employee_id", input.employeeId)
@@ -833,7 +1172,9 @@ export async function applyEmployeePayrollLoanDeduction(input: {
 
   if (error) throw new Error(error.message)
 
-  const activeLoans = (loans ?? []).filter((l) => l.auto_deduct !== false)
+  const activeLoans = (loans ?? []).filter(
+    (l) => l.auto_deduct !== false && (!period || isLoanInPayPeriod(l, period)),
+  )
 
   let remaining = total
   const results: PayrollLoanPaymentResult[] = []

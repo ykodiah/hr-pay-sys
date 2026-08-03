@@ -11,8 +11,13 @@ import { loadCompanyBrand, AKWAABA_BRAND_FOOTER } from "@/lib/exports/company-br
 import {
   buildPayslipDeductionLines,
   buildPayslipEarningsLines,
-  buildPayslipLoanSummaryRows,
 } from "@/lib/payroll/payslip-lines"
+import {
+  buildPayslipLoanSummaryRows,
+  isLoanInPayPeriod,
+  toPayPeriod,
+} from "@/lib/payroll/loan-summary"
+import { ensurePayslipLoanPayments } from "@/lib/services/loan-service"
 
 function money(n: number | null | undefined) {
   return `GHS ${Number(n || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -41,8 +46,25 @@ export async function GET(
     }
 
     const client = await createClient()
+    const period = toPayPeriod(data.pay_period)
 
-    // Load company branding and all active loans (+ this-period payments)
+    if (Number(data.loan_deduction || 0) > 0) {
+      try {
+        await ensurePayslipLoanPayments({
+          companyId: data.company_id,
+          employeeId: data.employee_id,
+          totalDeduction: Number(data.loan_deduction || 0),
+          payrollRunId: data.payroll_run_id ?? null,
+          payslipId: data.id,
+          payPeriod: period,
+          paymentDate: data.pay_date || new Date().toISOString().slice(0, 10),
+        })
+      } catch (e) {
+        console.warn("[payslip-pdf] loan sync failed:", e)
+      }
+    }
+
+    // Load company branding and loans active in this pay period (+ this-slip payments)
     const [company, loanRes, paymentRes] = await Promise.all([
       loadCompanyBrand(client, data.company_id),
       client
@@ -54,33 +76,27 @@ export async function GET(
         .order("created_at", { ascending: true }),
       client
         .from("payroll_loan_payments")
-        .select("loan_id, amount")
+        .select("loan_id, amount, balance_before, balance_after, payslip_id, pay_period")
         .eq("employee_id", data.employee_id)
         .eq("company_id", data.company_id)
-        .eq("pay_period", data.pay_period),
+        .or(`payslip_id.eq.${data.id},pay_period.eq.${period}`),
     ])
 
     const companyName = company?.name || data.snapshot_company_name || "Company"
     const logoUrl = company?.logo_url || ""
-    const monthPaid = new Map<string, number>()
-    for (const p of paymentRes.data ?? []) {
-      monthPaid.set(p.loan_id, Number(monthPaid.get(p.loan_id) || 0) + Number(p.amount || 0))
-    }
+    const payments = paymentRes.data ?? []
+    const paidLoanIds = new Set(payments.map((p) => p.loan_id))
     const loans = ((loanRes.data ?? []) as any[]).filter(
-      (l) =>
-        ["active", "approved"].includes(String(l.status)) ||
-        Number(monthPaid.get(l.id) || 0) > 0,
+      (l) => paidLoanIds.has(l.id) || (["active", "approved"].includes(String(l.status)) && isLoanInPayPeriod(l, period)),
     )
-    const loan = loans[0] || null
 
     const earnings = buildPayslipEarningsLines(data as any).map((e) => [e.label, e.amount] as [string, number])
     const deductions = buildPayslipDeductionLines(data as any).map((d) => [d.label, d.amount] as [string, number])
 
-    const loansForSummary = loans.map((l) => ({
-      ...l,
-      this_month_paid: Number(monthPaid.get(l.id) || l.last_payment_amount || 0),
-    }))
-    const loanSummary = buildPayslipLoanSummaryRows(loansForSummary)
+    const loanSummary =
+      Array.isArray((data as any).loan_summary_lines) && (data as any).loan_summary_lines.length
+        ? (data as any).loan_summary_lines
+        : buildPayslipLoanSummaryRows(loans, payments)
     const hasLoan = loanSummary.length > 0 || Number(data.loan_deduction) > 0
     const loanTotals = loanSummary.reduce(
       (acc, r) => ({

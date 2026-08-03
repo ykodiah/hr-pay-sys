@@ -61,30 +61,9 @@ export function buildPayslipDeductionLines(slip: Record<string, any>): PayslipMo
   return standard
 }
 
-/** Loan summary rows for payslip table remodel. */
-export function buildPayslipLoanSummaryRows(
-  loans: Array<Record<string, any>>,
-  slip?: Record<string, any>,
-): Array<{
-  loan_type: string
-  opening_balance: number
-  this_month: number
-  closing_balance: number
-}> {
-  return (loans || []).map((l) => {
-    const thisMonth = n(l.this_month_paid ?? l.last_payment_amount ?? 0)
-    const closing = n(l.remaining_balance)
-    const totalPayable = n(l.expected_total_payment) || n(l.principal) + n(l.total_interest)
-    // Opening = prior closing = current closing + this month, or total payable when no payments yet
-    const opening =
-      thisMonth > 0 || closing > 0
-        ? Math.round((closing + thisMonth + Number.EPSILON) * 100) / 100
-        : totalPayable
-    return {
-      loan_type: String(l.loan_type || "Loan"),
-      opening_balance: opening > 0 ? opening : totalPayable,
-      this_month: thisMonth,
-      closing_balance: closing,
-    }
-  })
-}
+export {
+  buildPayslipLoanSummaryRows,
+  isLoanInPayPeriod,
+  toPayPeriod,
+  type PayslipLoanSummaryRow,
+} from "@/lib/payroll/loan-summary"

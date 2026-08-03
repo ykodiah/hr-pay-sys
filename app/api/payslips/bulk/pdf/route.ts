@@ -14,8 +14,12 @@ import type { PayslipRow } from "@/lib/services/payslip-service"
 import {
   buildPayslipDeductionLines,
   buildPayslipEarningsLines,
-  buildPayslipLoanSummaryRows,
 } from "@/lib/payroll/payslip-lines"
+import {
+  buildPayslipLoanSummaryRows,
+  isLoanInPayPeriod,
+  toPayPeriod,
+} from "@/lib/payroll/loan-summary"
 
 function money(n: number | null | undefined) {
   return Number(n || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -42,18 +46,17 @@ function renderOneSlip(slip: PayslipRow & { loan?: any }, company: any): string 
   const earnings = buildPayslipEarningsLines(slip as any).map((e) => [e.label, e.amount] as [string, number])
   const deductions = buildPayslipDeductionLines(slip as any).map((d) => [d.label, d.amount] as [string, number])
 
-  const loans: any[] = Array.isArray(slip.loans)
-    ? slip.loans
-    : slip.loan
-      ? [slip.loan]
-      : []
-  const loanSummary = buildPayslipLoanSummaryRows(loans)
+  const loanSummary = Array.isArray((slip as any).loan_summary_lines) && (slip as any).loan_summary_lines.length
+    ? (slip as any).loan_summary_lines
+    : buildPayslipLoanSummaryRows(
+        Array.isArray(slip.loans) ? slip.loans : slip.loan ? [slip.loan] : [],
+      )
   const hasLoan = loanSummary.length > 0 || Number(slip.loan_deduction) > 0
   const loanTotals = loanSummary.reduce(
-    (acc, r) => ({
-      opening: acc.opening + r.opening_balance,
-      thisMonth: acc.thisMonth + r.this_month,
-      closing: acc.closing + r.closing_balance,
+    (acc: any, r: any) => ({
+      opening: acc.opening + Number(r.opening_balance || 0),
+      thisMonth: acc.thisMonth + Number(r.this_month || 0),
+      closing: acc.closing + Number(r.closing_balance || 0),
     }),
     { opening: 0, thisMonth: 0, closing: 0 },
   )
@@ -63,7 +66,7 @@ function renderOneSlip(slip: PayslipRow & { loan?: any }, company: any): string 
         <tbody>
           ${loanSummary
             .map(
-              (r) => `<tr>
+              (r: any) => `<tr>
             <td>${esc(r.loan_type)}</td>
             <td class="right">GHS ${money(r.opening_balance)}</td>
             <td class="right">GHS ${money(r.this_month)}</td>
@@ -207,15 +210,16 @@ export async function GET(request: NextRequest) {
         .in("pay_period", periods.length ? periods : ["__none__"]),
     ])
 
-    const monthPaid = new Map<string, number>()
+    const paymentsByKey = new Map<string, any[]>()
     for (const p of payments ?? []) {
-      const key = `${p.employee_id}:${p.pay_period}:${p.loan_id}`
-      monthPaid.set(key, Number(monthPaid.get(key) || 0) + Number(p.amount || 0))
+      const key = `${p.employee_id}:${p.pay_period}`
+      const list = paymentsByKey.get(key) || []
+      list.push(p)
+      paymentsByKey.set(key, list)
     }
 
     const loansByEmp = new Map<string, any[]>()
     for (const loan of loans ?? []) {
-      if (!["active", "approved"].includes(String(loan.status))) continue
       const list = loansByEmp.get(loan.employee_id) || []
       list.push(loan)
       loansByEmp.set(loan.employee_id, list)
@@ -227,11 +231,22 @@ export async function GET(request: NextRequest) {
     // Render all slips
     const slipHtml = slips
       .map((s) => {
-        const empLoans = (loansByEmp.get(s.employee_id) || []).map((l) => ({
-          ...l,
-          this_month_paid: monthPaid.get(`${s.employee_id}:${s.pay_period}:${l.id}`) || 0,
-        }))
-        return renderOneSlip({ ...s, loans: empLoans, loan: empLoans[0] || null }, company)
+        const period = toPayPeriod(s.pay_period)
+        const periodPayments = paymentsByKey.get(`${s.employee_id}:${s.pay_period}`) || []
+        const paidIds = new Set(periodPayments.map((p) => p.loan_id))
+        const empLoans = (loansByEmp.get(s.employee_id) || []).filter(
+          (l) =>
+            paidIds.has(l.id) ||
+            (["active", "approved"].includes(String(l.status)) && isLoanInPayPeriod(l, period)),
+        )
+        const summary =
+          Array.isArray((s as any).loan_summary_lines) && (s as any).loan_summary_lines.length
+            ? (s as any).loan_summary_lines
+            : buildPayslipLoanSummaryRows(empLoans, periodPayments)
+        return renderOneSlip(
+          { ...s, loans: empLoans, loan: empLoans[0] || null, loan_summary_lines: summary } as any,
+          company,
+        )
       })
       .join("\n")
     const period = fmtPeriod(slips[0]?.pay_period)

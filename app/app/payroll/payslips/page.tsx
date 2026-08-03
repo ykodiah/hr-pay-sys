@@ -18,8 +18,12 @@ import { normalizePayrollCashRow, normalizePayrollCashRows } from "@/lib/payroll
 import {
   buildPayslipDeductionLines,
   buildPayslipEarningsLines,
-  buildPayslipLoanSummaryRows,
 } from "@/lib/payroll/payslip-lines"
+import {
+  buildPayslipLoanSummaryRows,
+  isLoanInPayPeriod,
+  toPayPeriod,
+} from "@/lib/payroll/loan-summary"
 import {
   Search,
   Download,
@@ -82,6 +86,13 @@ interface PayslipRow {
   paye_taxable_income: number
   paye_tax: number
   loan_deduction: number
+  loan_summary_lines?: Array<{
+    loan_id?: string
+    loan_type: string
+    opening_balance: number
+    this_month: number
+    closing_balance: number
+  }>
   advance_deduction: number
   other_deductions: number
   total_deductions: number
@@ -120,6 +131,8 @@ interface ActiveLoan {
   monthly_payment: number
   remaining_balance: number
   amount_paid: number
+  expected_total_payment?: number | null
+  total_interest?: number | null
   start_date: string
   end_date: string
   purpose: string | null
@@ -182,13 +195,33 @@ function PayslipPreview({
     label: d.label,
     val: d.amount,
   }))
-  const loanSummaryRows = buildPayslipLoanSummaryRows(loanList as any[])
-  const hasLoan = loanList.length > 0 || normalized.loan_deduction > 0
+  const storedSummary = Array.isArray((normalized as any).loan_summary_lines)
+    ? (normalized as any).loan_summary_lines
+    : []
+  const loanSummaryRows =
+    storedSummary.length > 0
+      ? storedSummary.map((r: any) => ({
+          loan_type: String(r.loan_type || "Loan"),
+          opening_balance: Number(r.opening_balance || 0),
+          this_month: Number(r.this_month || 0),
+          closing_balance: Number(r.closing_balance || 0),
+        }))
+      : buildPayslipLoanSummaryRows(
+          loanList as any[],
+          (loanList as any[]).map((l) => ({
+            loan_id: l.id,
+            amount: Number(l.this_month_paid || 0),
+            balance_before:
+              Number(l.remaining_balance || 0) + Number(l.this_month_paid || 0),
+            balance_after: Number(l.remaining_balance || 0),
+          })),
+        )
+  const hasLoan = loanSummaryRows.length > 0 || normalized.loan_deduction > 0
   const loanTotals = loanSummaryRows.reduce(
-    (acc, r) => ({
-      opening: acc.opening + r.opening_balance,
-      thisMonth: acc.thisMonth + r.this_month,
-      closing: acc.closing + r.closing_balance,
+    (acc: any, r: any) => ({
+      opening: acc.opening + Number(r.opening_balance || 0),
+      thisMonth: acc.thisMonth + Number(r.this_month || 0),
+      closing: acc.closing + Number(r.closing_balance || 0),
     }),
     { opening: 0, thisMonth: 0, closing: 0 },
   )
@@ -608,45 +641,57 @@ export default function PayslipsPage() {
         .eq("employee_id", empId)
         .order("pay_period", { ascending: false })
         .limit(8)
-      let paymentsQ = supabase
-        .from("payroll_loan_payments")
-        .select("loan_id, amount, pay_period, payment_date")
-        .eq("employee_id", empId)
-        .eq("pay_period", period)
       if (cid) {
         slipQ = slipQ.eq("company_id", cid)
         loanQ = loanQ.eq("company_id", cid)
         recentQ = recentQ.eq("company_id", cid)
-        paymentsQ = paymentsQ.eq("company_id", cid)
       }
-      const [slipRes, loanRes, recentRes, paymentsRes] = await Promise.all([
+      const [slipRes, loanRes, recentRes] = await Promise.all([
         slipQ.maybeSingle(),
         loanQ,
         recentQ,
-        paymentsQ,
       ])
 
-      if (slipRes.data) setIndivSlip(normalizePayrollCashRow(slipRes.data as PayslipRow) as PayslipRow)
+      let slipRow = slipRes.data
+        ? (normalizePayrollCashRow(slipRes.data as PayslipRow) as PayslipRow)
+        : null
 
-      const monthPaidByLoan = new Map<string, number>()
-      for (const p of paymentsRes.data ?? []) {
-        monthPaidByLoan.set(
-          p.loan_id,
-          Number(monthPaidByLoan.get(p.loan_id) || 0) + Number(p.amount || 0),
-        )
+      // Sync / repair per-loan payments for this payslip so "This month" is correct
+      if (slipRow?.id && Number(slipRow.loan_deduction || 0) > 0) {
+        try {
+          const syncRes = await fetch(`/api/payslips/${slipRow.id}/sync-loans`, {
+            method: "POST",
+            credentials: "include",
+          })
+          if (syncRes.ok) {
+            const syncJson = await syncRes.json()
+            const summary = Array.isArray(syncJson.summary) ? syncJson.summary : []
+            slipRow = {
+              ...slipRow,
+              loan_summary_lines: summary,
+            } as PayslipRow
+            const syncedLoans = (syncJson.loans || []) as ActiveLoan[]
+            setActiveLoans(syncedLoans)
+            setActiveLoan(syncedLoans[0] ?? null)
+            setIndivSlip(slipRow)
+            setRecentSlips(normalizePayrollCashRows((recentRes.data ?? []) as PayslipRow[]) as PayslipRow[])
+            return
+          }
+        } catch {
+          // fall through to local filter
+        }
       }
 
-      const loans = ((loanRes.data ?? []) as ActiveLoan[])
-        .filter((l) => l.status !== "completed" || Number(monthPaidByLoan.get(l.id) || 0) > 0 || Number(l.amount_paid || 0) > 0)
-        .map((l) => ({
-          ...l,
-          this_month_paid: monthPaidByLoan.get(l.id) ?? (l.status === "active" ? null : 0),
-        }))
+      if (slipRow) setIndivSlip(slipRow)
 
-      // Prefer currently active/approved loans for the summary; keep completed only if paid this period
-      const visible = loans.filter(
-        (l) => ["active", "approved"].includes(String(l.status || "active")) || Number(l.this_month_paid || 0) > 0,
-      )
+      const periodKey = toPayPeriod(period)
+      const visible = ((loanRes.data ?? []) as ActiveLoan[])
+        .filter((l) => {
+          const inPeriod = isLoanInPayPeriod(l as any, periodKey)
+          return inPeriod && ["active", "approved"].includes(String(l.status || "active"))
+        })
+        .map((l) => ({ ...l, this_month_paid: 0 }))
+
       setActiveLoans(visible)
       setActiveLoan(visible[0] ?? null)
       setRecentSlips(normalizePayrollCashRows((recentRes.data ?? []) as PayslipRow[]) as PayslipRow[])

@@ -57,7 +57,15 @@ function addMonths(startDate: string, offset: number): string {
   return next.toISOString().split("T")[0]
 }
 
-/** Fixed interest: interest on original principal only; equal principal + equal interest split. */
+/**
+ * Fixed (flat) interest:
+ *   monthlyRate = annualRate% / 12
+ *   totalInterest = principal × monthlyRate × tenureMonths
+ *   totalPayable  = principal + totalInterest
+ *   monthlyDue    = totalPayable / tenureMonths
+ * Principal and interest portions are split evenly across months (not reducing).
+ * Example: GHS 10,000 @ 10% p.a. for 10 months → totalInterest = 10,000 × 0.10/12 × 10 = 833.33.
+ */
 function buildFixedAmortization(
   principal: number,
   annualRate: number,
@@ -108,7 +116,13 @@ function buildFixedAmortization(
   }
 }
 
-/** Reducing balance: standard amortization (PMT) with interest on remaining principal. */
+/**
+ * Reducing balance:
+ *   monthly payment from standard PMT on outstanding principal
+ *   each month: interest = remainingPrincipal × (annualRate%/12)
+ *   principal portion = payment − interest (rises over time as interest falls)
+ * Total interest is lower than fixed for the same rate/tenure.
+ */
 function buildReducingAmortization(
   principal: number,
   annualRate: number,
@@ -155,8 +169,11 @@ function buildReducingAmortization(
 }
 
 /**
- * Daily compound: interest accrues daily on outstanding principal;
- * monthly due = (principal + accrued interest for month) amortized toward payoff.
+ * Daily compound:
+ *   dailyRate = annualRate% / 365
+ *   each month accrues interest for ~30 days on the outstanding principal (compounded daily)
+ *   principal is reduced by an equal target share of original principal (last month clears remainder)
+ *   monthly due = principal portion + that month's accrued interest
  */
 function buildDailyCompoundAmortization(
   principal: number,
