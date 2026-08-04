@@ -1,464 +1,293 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
-import {
-  DoorOpen,
-  FileText,
-  CheckCircle,
-  Clock,
-  AlertCircle,
-  Download,
-  MessageSquare,
-  Calendar,
-  Package,
-} from "lucide-react"
-
-interface ExitProcess {
-  id: string
-  status: "not-initiated" | "initiated" | "in-progress" | "completed"
-  lastWorkingDay?: string
-  reason?: string
-  exitInterviewCompleted: boolean
-  assetsReturned: boolean
-  documentsSubmitted: boolean
-  finalSettlement?: number
-}
-
-interface Asset {
-  id: string
-  name: string
-  type: string
-  serialNumber: string
-  returned: boolean
-}
+import { CheckCircle, Clock, DoorOpen, Package, RefreshCw, Wallet } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
 
 export default function ExitProcessPage() {
-  const [activeTab, setActiveTab] = useState("overview")
-  const [showInitiateDialog, setShowInitiateDialog] = useState(false)
-  const [exitFormData, setExitFormData] = useState({
-    lastWorkingDay: "",
-    reason: "",
-    comments: "",
-  })
+  const [tab, setTab] = useState("overview")
+  const [open, setOpen] = useState(false)
+  const [interviewOpen, setInterviewOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [employeeId, setEmployeeId] = useState<string | null>(null)
+  const [caseRow, setCaseRow] = useState<any | null>(null)
+  const [form, setForm] = useState({ lastWorkingDay: "", reason: "resignation", notes: "" })
+  const [interview, setInterview] = useState({ feedback: "", wouldRecommend: "true", rehireEligible: "true" })
 
-  // Mock data
-  const exitProcess: ExitProcess = {
-    id: "EXIT001",
-    status: "not-initiated",
-    exitInterviewCompleted: false,
-    assetsReturned: false,
-    documentsSubmitted: false,
-  }
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const meRes = await fetch("/api/self-service/me", { credentials: "include", cache: "no-store" })
+      const me = await meRes.json().catch(() => ({}))
+      const eid = me?.employee?.id || me?.data?.employee?.id || null
+      setEmployeeId(eid)
 
-  const assets: Asset[] = [
-    {
-      id: "AST001",
-      name: "MacBook Pro",
-      type: "Laptop",
-      serialNumber: "MBP2023001",
-      returned: false,
-    },
-    {
-      id: "AST002",
-      name: "iPhone 14",
-      type: "Mobile Phone",
-      serialNumber: "IP14001",
-      returned: false,
-    },
-    {
-      id: "AST003",
-      name: "Office Key Card",
-      type: "Access Card",
-      serialNumber: "KEY001",
-      returned: false,
-    },
-  ]
+      const res = await fetch("/api/offboarding", { credentials: "include", cache: "no-store" })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Failed to load")
+      const mine = (json.cases || []).find((c: any) => c.employee_id === eid) || null
+      setCaseRow(mine)
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed to load", variant: "destructive" })
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
-  const exitInterviewQuestions = [
-    "What prompted your decision to leave?",
-    "How would you rate your overall experience working here?",
-    "Did you feel supported by your manager and team?",
-    "What could the company have done to retain you?",
-    "Would you recommend this company as a place to work?",
-    "Any additional feedback or suggestions?",
-  ]
+  useEffect(() => {
+    void load()
+  }, [load])
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "not-initiated":
-        return "bg-gray-100 text-gray-800"
-      case "initiated":
-        return "bg-blue-100 text-blue-800"
-      case "in-progress":
-        return "bg-yellow-100 text-yellow-800"
-      case "completed":
-        return "bg-green-100 text-green-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+  async function initiate() {
+    if (!employeeId || !form.lastWorkingDay) return
+    setSaving(true)
+    try {
+      const res = await fetch("/api/offboarding", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "case",
+          employeeId,
+          lastWorkingDay: form.lastWorkingDay,
+          reason: form.reason,
+          notes: form.notes,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Failed")
+      toast({ title: "Exit process initiated" })
+      setOpen(false)
+      await load()
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed", variant: "destructive" })
+    } finally {
+      setSaving(false)
     }
   }
 
-  const handleInitiateExit = () => {
-    console.log("Initiating exit process:", exitFormData)
-    setShowInitiateDialog(false)
-    alert("Exit process initiated successfully! HR will contact you within 24 hours.")
+  async function saveInterview() {
+    if (!caseRow?.id) return
+    setSaving(true)
+    try {
+      const res = await fetch("/api/offboarding", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "interview",
+          caseId: caseRow.id,
+          employeeId,
+          status: "completed",
+          feedback: interview.feedback,
+          wouldRecommend: interview.wouldRecommend === "true",
+          rehireEligible: interview.rehireEligible === "true",
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Failed")
+      toast({ title: "Exit interview saved" })
+      setInterviewOpen(false)
+      await load()
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed", variant: "destructive" })
+    } finally {
+      setSaving(false)
+    }
   }
+
+  const progress = Number(caseRow?.checklist_progress || 0)
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Exit Process</h1>
-          <p className="text-gray-600">Manage your departure process and requirements</p>
+          <h1 className="text-2xl font-bold">Exit process</h1>
+          <p className="text-sm text-muted-foreground">Track your offboarding checklist, interview, and assets.</p>
         </div>
-        {exitProcess.status === "not-initiated" && (
-          <Dialog open={showInitiateDialog} onOpenChange={setShowInitiateDialog}>
-            <DialogTrigger asChild>
-              <Button className="bg-emerald-600 hover:bg-emerald-700">
-                <DoorOpen className="w-4 h-4 mr-2" />
-                Initiate Exit Process
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Initiate Exit Process</DialogTitle>
-                <DialogDescription>
-                  Start your departure process. HR will guide you through all necessary steps.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="lastWorkingDay">Intended Last Working Day</Label>
-                    <Input
-                      id="lastWorkingDay"
-                      type="date"
-                      value={exitFormData.lastWorkingDay}
-                      onChange={(e) => setExitFormData({ ...exitFormData, lastWorkingDay: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="reason">Reason for Leaving</Label>
-                    <Select
-                      value={exitFormData.reason}
-                      onValueChange={(value) => setExitFormData({ ...exitFormData, reason: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select reason" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="resignation">Resignation</SelectItem>
-                        <SelectItem value="better-opportunity">Better Opportunity</SelectItem>
-                        <SelectItem value="relocation">Relocation</SelectItem>
-                        <SelectItem value="personal-reasons">Personal Reasons</SelectItem>
-                        <SelectItem value="career-change">Career Change</SelectItem>
-                        <SelectItem value="retirement">Retirement</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="comments">Additional Comments (Optional)</Label>
-                  <Textarea
-                    id="comments"
-                    value={exitFormData.comments}
-                    onChange={(e) => setExitFormData({ ...exitFormData, comments: e.target.value })}
-                    placeholder="Any additional information you'd like to share..."
-                    rows={4}
-                  />
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button variant="outline" onClick={() => setShowInitiateDialog(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleInitiateExit} className="bg-emerald-600 hover:bg-emerald-700">
-                    Initiate Process
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => void load()} disabled={loading}>
+            <RefreshCw className="mr-2 h-4 w-4" /> Refresh
+          </Button>
+          {!caseRow && (
+            <Button className="bg-teal-700 text-white hover:bg-teal-800" onClick={() => setOpen(true)}>
+              <DoorOpen className="mr-2 h-4 w-4" /> Initiate exit
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Status Overview */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <DoorOpen className="w-5 h-5" />
-            <span>Exit Process Status</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div>
-              <Badge className={getStatusColor(exitProcess.status)}>
-                {exitProcess.status.replace("-", " ").toUpperCase()}
-              </Badge>
-              <p className="text-sm text-gray-600 mt-2">
-                {exitProcess.status === "not-initiated"
-                  ? "You haven't initiated the exit process yet."
-                  : "Your exit process is currently in progress."}
-              </p>
-            </div>
-            {exitProcess.lastWorkingDay && (
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">Last Working Day</p>
-                <p className="text-lg font-bold text-emerald-600">
-                  {new Date(exitProcess.lastWorkingDay).toLocaleDateString()}
+      {!caseRow ? (
+        <div className="rounded-2xl border border-dashed py-16 text-center text-muted-foreground">
+          No active exit process. Initiate when you are ready to resign or have been notified of an exit.
+        </div>
+      ) : (
+        <>
+          <div className="rounded-2xl border bg-gradient-to-br from-teal-50/50 to-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="font-semibold capitalize">{String(caseRow.status).replace(/_/g, " ")}</p>
+                <p className="text-sm text-muted-foreground">
+                  Last day {caseRow.last_working_day} · {String(caseRow.reason).replace(/_/g, " ")}
                 </p>
               </div>
-            )}
+              <Badge variant="outline">GHS {Number(caseRow.settlement_amount || 0).toLocaleString()} settlement</Badge>
+            </div>
+            <Progress value={progress} className="mt-4 h-2" />
+            <p className="mt-1 text-right text-xs tabular-nums text-teal-800">{progress}% complete</p>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Progress Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Exit Interview</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center space-x-2">
-              {exitProcess.exitInterviewCompleted ? (
-                <CheckCircle className="w-5 h-5 text-green-600" />
-              ) : (
-                <Clock className="w-5 h-5 text-yellow-600" />
-              )}
-              <span className="text-sm">{exitProcess.exitInterviewCompleted ? "Completed" : "Pending"}</span>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Asset Return</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center space-x-2">
-              {exitProcess.assetsReturned ? (
-                <CheckCircle className="w-5 h-5 text-green-600" />
-              ) : (
-                <AlertCircle className="w-5 h-5 text-red-600" />
-              )}
-              <span className="text-sm">{exitProcess.assetsReturned ? "Completed" : "Pending"}</span>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Documents</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center space-x-2">
-              {exitProcess.documentsSubmitted ? (
-                <CheckCircle className="w-5 h-5 text-green-600" />
-              ) : (
-                <Clock className="w-5 h-5 text-yellow-600" />
-              )}
-              <span className="text-sm">{exitProcess.documentsSubmitted ? "Submitted" : "Pending"}</span>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Final Settlement</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center space-x-2">
-              {exitProcess.finalSettlement ? (
-                <CheckCircle className="w-5 h-5 text-green-600" />
-              ) : (
-                <Clock className="w-5 h-5 text-yellow-600" />
-              )}
-              <span className="text-sm">{exitProcess.finalSettlement ? "Processed" : "Pending"}</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList>
+              <TabsTrigger value="overview">Checklist</TabsTrigger>
+              <TabsTrigger value="interview">Exit interview</TabsTrigger>
+              <TabsTrigger value="assets">Assets</TabsTrigger>
+              <TabsTrigger value="settlement">Settlement</TabsTrigger>
+            </TabsList>
 
-      {/* Main Content */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="exit-interview">Exit Interview</TabsTrigger>
-          <TabsTrigger value="assets">Assets</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
-        </TabsList>
+            <TabsContent value="overview" className="mt-4 space-y-2">
+              {(caseRow.checklist || []).map((item: any) => (
+                <div key={item.id} className="flex items-center justify-between rounded-xl border px-4 py-3">
+                  <div>
+                    <p className={item.is_done ? "text-muted-foreground line-through" : "font-medium"}>{item.label}</p>
+                    <p className="text-[10px] uppercase text-muted-foreground">{item.category}</p>
+                  </div>
+                  {item.is_done ? (
+                    <CheckCircle className="h-5 w-5 text-emerald-600" />
+                  ) : (
+                    <Clock className="h-5 w-5 text-amber-500" />
+                  )}
+                </div>
+              ))}
+            </TabsContent>
 
-        <TabsContent value="overview" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Exit Process Checklist</CardTitle>
-              <CardDescription>Complete these steps for a smooth departure</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <Checkbox checked={exitProcess.status !== "not-initiated"} />
-                  <span className="text-sm">Initiate exit process with HR</span>
+            <TabsContent value="interview" className="mt-4">
+              {caseRow.exit_interview_completed ? (
+                <div className="rounded-2xl border p-4 text-sm">
+                  <p className="font-semibold text-emerald-800">Interview completed</p>
+                  <p className="mt-2 text-muted-foreground">{caseRow.interview?.feedback || "Thank you for your feedback."}</p>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <Checkbox checked={exitProcess.exitInterviewCompleted} />
-                  <span className="text-sm">Complete exit interview</span>
+              ) : (
+                <div className="rounded-2xl border p-4">
+                  <p className="text-sm text-muted-foreground mb-3">Share feedback before your last working day.</p>
+                  <Button className="bg-teal-700 text-white hover:bg-teal-800" onClick={() => setInterviewOpen(true)}>
+                    Complete exit interview
+                  </Button>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <Checkbox checked={exitProcess.assetsReturned} />
-                  <span className="text-sm">Return all company assets</span>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Checkbox checked={exitProcess.documentsSubmitted} />
-                  <span className="text-sm">Submit required documents</span>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Checkbox checked={!!exitProcess.finalSettlement} />
-                  <span className="text-sm">Receive final settlement</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              )}
+            </TabsContent>
 
-        <TabsContent value="exit-interview" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Exit Interview</CardTitle>
-              <CardDescription>
-                {exitProcess.exitInterviewCompleted
-                  ? "You have completed your exit interview."
-                  : "Complete your exit interview to provide valuable feedback."}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!exitProcess.exitInterviewCompleted ? (
-                <div className="space-y-4">
-                  <p className="text-sm text-gray-600 mb-4">
-                    Please answer the following questions honestly. Your feedback helps us improve the workplace for
-                    others.
-                  </p>
-                  {exitInterviewQuestions.map((question, index) => (
-                    <div key={index} className="space-y-2">
-                      <Label>
-                        {index + 1}. {question}
-                      </Label>
-                      <Textarea placeholder="Your response..." rows={3} />
+            <TabsContent value="assets" className="mt-4 space-y-2">
+              {(caseRow.assets || []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">No assets listed yet. HR will add items to return.</p>
+              ) : (
+                (caseRow.assets || []).map((a: any) => (
+                  <div key={a.id} className="flex items-center justify-between rounded-xl border px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4 text-teal-700" />
+                      <div>
+                        <p className="font-medium">{a.name}</p>
+                        <p className="text-xs text-muted-foreground">{a.asset_type} · {a.serial_number || "no serial"}</p>
+                      </div>
                     </div>
+                    <Badge variant={a.returned ? "default" : "outline"}>{a.returned ? "Returned" : "Outstanding"}</Badge>
+                  </div>
+                ))
+              )}
+            </TabsContent>
+
+            <TabsContent value="settlement" className="mt-4">
+              <div className="rounded-2xl border p-4">
+                <div className="flex items-center gap-2">
+                  <Wallet className="h-5 w-5 text-teal-700" />
+                  <p className="font-semibold">Final settlement</p>
+                </div>
+                <p className="mt-2 text-2xl font-bold tabular-nums">
+                  GHS {Number(caseRow.settlement_amount || 0).toLocaleString()}
+                </p>
+                <p className="text-sm capitalize text-muted-foreground">Status: {caseRow.settlement_status}</p>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </>
+      )}
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Initiate exit process</DialogTitle></DialogHeader>
+          <div className="grid gap-3">
+            <div className="space-y-1.5">
+              <Label>Last working day</Label>
+              <Input type="date" value={form.lastWorkingDay} onChange={(e) => setForm((f) => ({ ...f, lastWorkingDay: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Reason</Label>
+              <Select value={form.reason} onValueChange={(v) => setForm((f) => ({ ...f, reason: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["resignation", "retirement", "contract_end", "other"].map((r) => (
+                    <SelectItem key={r} value={r} className="capitalize">{r.replace(/_/g, " ")}</SelectItem>
                   ))}
-                  <Button className="bg-emerald-600 hover:bg-emerald-700">Submit Exit Interview</Button>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900">Interview Completed</h3>
-                  <p className="text-gray-600">Thank you for your valuable feedback.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Comments</Label>
+              <Textarea rows={3} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button className="bg-teal-700 text-white hover:bg-teal-800" disabled={saving || !form.lastWorkingDay} onClick={() => void initiate()}>
+              Submit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-        <TabsContent value="assets" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Company Assets</CardTitle>
-              <CardDescription>Return all company property before your last working day</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {assets.map((asset) => (
-                  <div key={asset.id} className="flex justify-between items-center p-4 border rounded-lg">
-                    <div>
-                      <p className="font-medium">{asset.name}</p>
-                      <p className="text-sm text-gray-600">
-                        {asset.type} • Serial: {asset.serialNumber}
-                      </p>
-                    </div>
-                    <Badge className={asset.returned ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                      {asset.returned ? "Returned" : "Pending Return"}
-                    </Badge>
-                  </div>
-                ))}
-                <div className="mt-6 p-4 bg-yellow-50 rounded-lg">
-                  <div className="flex items-center space-x-2">
-                    <AlertCircle className="w-5 h-5 text-yellow-600" />
-                    <p className="text-sm font-medium text-yellow-800">Important</p>
-                  </div>
-                  <p className="text-sm text-yellow-700 mt-1">
-                    Please return all assets to the IT department before your last working day. Contact IT at
-                    it@company.com to schedule a return appointment.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="documents" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Required Documents</CardTitle>
-              <CardDescription>Download and submit these documents as part of your exit process</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">Resignation Letter Template</p>
-                    <p className="text-sm text-gray-600">Formal resignation letter template</p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    <Download className="w-4 h-4 mr-2" />
-                    Download
-                  </Button>
-                </div>
-                <div className="flex justify-between items-center p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">Handover Checklist</p>
-                    <p className="text-sm text-gray-600">Tasks and responsibilities handover form</p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    <Download className="w-4 h-4 mr-2" />
-                    Download
-                  </Button>
-                </div>
-                <div className="flex justify-between items-center p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">Final Settlement Form</p>
-                    <p className="text-sm text-gray-600">Bank details for final payment</p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    <Download className="w-4 h-4 mr-2" />
-                    Download
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      <Dialog open={interviewOpen} onOpenChange={setInterviewOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Exit interview</DialogTitle></DialogHeader>
+          <div className="grid gap-3">
+            <div className="space-y-1.5">
+              <Label>Would you recommend this employer?</Label>
+              <Select value={interview.wouldRecommend} onValueChange={(v) => setInterview((f) => ({ ...f, wouldRecommend: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Yes</SelectItem>
+                  <SelectItem value="false">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Feedback</Label>
+              <Textarea rows={4} value={interview.feedback} onChange={(e) => setInterview((f) => ({ ...f, feedback: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setInterviewOpen(false)}>Cancel</Button>
+            <Button className="bg-teal-700 text-white hover:bg-teal-800" disabled={saving} onClick={() => void saveInterview()}>
+              Submit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
