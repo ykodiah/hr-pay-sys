@@ -511,44 +511,60 @@ export async function createLoan(request: CreateLoanRequest): Promise<{ loan: Em
   const outstanding = request.principalAmount // principal-only outstanding for payroll deductions
 
   // Create loan (write both advanced + payroll columns for sync compatibility)
-  const { data: loanData, error: loanError } = await supabase
+  const loanInsert: Record<string, unknown> = {
+    company_id: request.companyId,
+    employee_id: request.employeeId,
+    loan_type_id: request.loanTypeId,
+    loan_type: loanType.name,
+    purpose: request.reason ?? null,
+    principal_amount: request.principalAmount,
+    principal: request.principalAmount,
+    tenure_months: request.tenureMonths,
+    repayment_months: request.tenureMonths,
+    interest_rate: loanType.annual_interest_rate,
+    interest_type: loanType.interest_type,
+    monthly_installment: calculation.monthlyPayment,
+    monthly_payment: calculation.monthlyPayment,
+    outstanding_balance: outstanding,
+    remaining_balance: outstanding,
+    amount_paid: 0,
+    total_interest: calculation.totalInterest,
+    processing_fee: processingFee,
+    insurance_fee: insuranceFee,
+    admin_fee: adminFee,
+    total_charges: totalCharges,
+    approval_status: approvalStatus,
+    status,
+    auto_deduct: true,
+    initiated_by: request.initiatedById,
+    initiated_by_role: request.initiatedByRole,
+    created_by: request.initiatedById,
+    approved_by: requiresApproval ? null : request.initiatedById,
+    approved_at: requiresApproval ? null : new Date().toISOString(),
+    disbursed_at: requiresApproval ? null : new Date().toISOString(),
+  }
+
+  let { data: loanData, error: loanError } = await supabase
     .from("employee_loans")
-    .insert([
-      {
-        company_id: request.companyId,
-        employee_id: request.employeeId,
-        loan_type_id: request.loanTypeId,
-        loan_type: loanType.name,
-        purpose: request.reason ?? null,
-        principal_amount: request.principalAmount,
-        principal: request.principalAmount,
-        tenure_months: request.tenureMonths,
-        repayment_months: request.tenureMonths,
-        interest_rate: loanType.annual_interest_rate,
-        interest_type: loanType.interest_type,
-        monthly_installment: calculation.monthlyPayment,
-        monthly_payment: calculation.monthlyPayment,
-        outstanding_balance: outstanding,
-        remaining_balance: outstanding,
-        amount_paid: 0,
-        total_interest: calculation.totalInterest,
-        processing_fee: processingFee,
-        insurance_fee: insuranceFee,
-        admin_fee: adminFee,
-        total_charges: totalCharges,
-        approval_status: approvalStatus,
-        status,
-        auto_deduct: true,
-        initiated_by: request.initiatedById,
-        initiated_by_role: request.initiatedByRole,
-        created_by: request.initiatedById,
-        approved_by: requiresApproval ? null : request.initiatedById,
-        approved_at: requiresApproval ? null : new Date().toISOString(),
-        disbursed_at: requiresApproval ? null : new Date().toISOString(),
-      },
-    ])
+    .insert([loanInsert])
     .select()
     .single()
+
+  if (loanError && /column|schema cache/i.test(String(loanError.message || ""))) {
+    const msg = String(loanError.message || "")
+    const stripped = { ...loanInsert }
+    for (const col of Object.keys(stripped)) {
+      if (msg.includes(`'${col}'`) || msg.includes(`"${col}"`)) delete stripped[col]
+    }
+    // Always keep payroll core
+    stripped.principal = request.principalAmount
+    stripped.remaining_balance = outstanding
+    stripped.monthly_payment = calculation.monthlyPayment
+    stripped.repayment_months = request.tenureMonths
+    const retry = await supabase.from("employee_loans").insert([stripped]).select().single()
+    loanData = retry.data
+    loanError = retry.error
+  }
 
   if (loanError) throw loanError
 
