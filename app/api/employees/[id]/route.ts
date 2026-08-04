@@ -10,6 +10,12 @@ import { requireApiUser } from "@/lib/auth/api-user"
 import { normalizeEmployeeStatus } from "@/lib/employees/status"
 import { mapEmployeeRow } from "@/lib/employees/dto"
 import { persistVaultDocument } from "@/lib/employees/persist-vault-document"
+import {
+  EMPLOYEE_UPDATE_FIELDS,
+  FINANCIAL_UPDATE_FIELDS,
+  buildDiffs,
+} from "@/lib/employees/audit-fields"
+import { recordEmployeeAudit } from "@/lib/services/employee-audit-service"
 
 async function loadEmployeeExtras(client: any, id: string) {
   const [allowances, deductions, documents] = await Promise.all([
@@ -87,6 +93,35 @@ export async function PATCH(
     const body = await req.json()
     const client = await createClient()
 
+    // Org moves must use Transfer Employee — never silent edit
+    const orgKeys = ["department", "division", "location", "subsidiary_id"] as const
+    const attemptedOrg = orgKeys.filter((k) => body[k] !== undefined)
+    if (attemptedOrg.length && body.allow_org_fields !== true) {
+      // Only reject if values actually differ from current
+      const { data: current } = await client.from("employees").select("*").eq("id", id).maybeSingle()
+      const changing = attemptedOrg.filter((k) => {
+        const next = body[k] === "" || body[k] === undefined ? null : body[k]
+        const prev = current?.[k] ?? null
+        return String(next ?? "") !== String(prev ?? "")
+      })
+      if (changing.length) {
+        return NextResponse.json(
+          {
+            error: `Organisational fields (${changing.join(", ")}) must be changed via Transfer Employee.`,
+            use: "/app/employees/transfer",
+          },
+          { status: 400 },
+        )
+      }
+    }
+
+    const { data: beforeRow } = await client.from("employees").select("*").eq("id", id).maybeSingle()
+    const { data: beforeFin } = await client
+      .from("employee_financial")
+      .select("*")
+      .eq("employee_id", id)
+      .maybeSingle()
+
     const employeePatch: Record<string, unknown> = { updated_at: new Date().toISOString() }
     const fields = [
       "prefix",
@@ -99,11 +134,8 @@ export async function PATCH(
       "corporate_email",
       "phone",
       "position",
-      "department",
-      "division",
-      "location",
+      // department / division / location / subsidiary_id excluded — use Transfer
       "special_role",
-      "subsidiary_id",
       "contract_type",
       "date_of_joining",
       "date_of_exit",
@@ -329,6 +361,29 @@ export async function PATCH(
       .maybeSingle()
     const extras = await loadEmployeeExtras(client, id)
 
+    // Best-effort audit trail for legacy edit path
+    try {
+      if (beforeRow?.company_id) {
+        const empDiffs = buildDiffs(beforeRow, updated || {}, EMPLOYEE_UPDATE_FIELDS, "employee")
+        const finDiffs = buildDiffs(beforeFin || {}, fin || {}, FINANCIAL_UPDATE_FIELDS, "financial")
+        const diffs = [...empDiffs, ...finDiffs]
+        if (diffs.length) {
+          await recordEmployeeAudit({
+            companyId: beforeRow.company_id,
+            employeeId: id,
+            eventType: "update",
+            source: "legacy_edit",
+            reason: body.reason || "Updated via employee edit",
+            actor: { userId: user.id, email: user.email },
+            diffs,
+            summary: `Legacy edit: ${diffs.length} field(s)`,
+          })
+        }
+      }
+    } catch (auditErr) {
+      console.warn("[employees] audit log failed:", auditErr)
+    }
+
     return NextResponse.json({
       success: true,
       employee: mapEmployeeRow({ ...updated, financial: fin }, true, extras),
@@ -382,6 +437,32 @@ export async function DELETE(
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    try {
+      if (existing.company_id) {
+        await recordEmployeeAudit({
+          companyId: existing.company_id,
+          employeeId: id,
+          eventType: "deactivate",
+          source: "legacy_edit",
+          reason: "Deactivated via employee module",
+          actor: { userId: user.id, email: user.email },
+          diffs: [
+            {
+              entity: "employee",
+              field_name: "status",
+              field_label: "Status",
+              old_value: String(existing.status || ""),
+              new_value: "Inactive",
+              sensitivity: "hard",
+            },
+          ],
+          summary: "Employee deactivated",
+        })
+      }
+    } catch (auditErr) {
+      console.warn("[employees] deactivate audit failed:", auditErr)
+    }
 
     return NextResponse.json({
       success: true,

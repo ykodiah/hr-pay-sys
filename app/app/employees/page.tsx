@@ -6,6 +6,7 @@ import { DialogDescription } from "@/components/ui/dialog"
 import type React from "react"
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useSearchParams } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -33,6 +34,9 @@ import {
   X,
   CheckCircle,
   FileText,
+  PencilLine,
+  ArrowRightLeft,
+  FileSearch,
 } from "lucide-react"
 
 import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
@@ -1282,7 +1286,25 @@ export default function EmployeesPage() {
           <h1 className="text-3xl font-bold text-gray-900">Employees</h1>
           <p className="text-gray-600 mt-1">Manage your workforce and employee information</p>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button asChild variant="outline" className="bg-transparent">
+            <Link href="/app/employees/update">
+              <PencilLine className="w-4 h-4 mr-2" />
+              Update data
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="bg-transparent">
+            <Link href="/app/employees/transfer">
+              <ArrowRightLeft className="w-4 h-4 mr-2" />
+              Transfer
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="bg-transparent">
+            <Link href="/app/employees/audit">
+              <FileSearch className="w-4 h-4 mr-2" />
+              Audit trail
+            </Link>
+          </Button>
           <Button variant="outline" className="bg-transparent">
             <Download className="w-4 h-4 mr-2" />
             Export
