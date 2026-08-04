@@ -18,6 +18,12 @@ const LEAVE_TYPE_FIELDS = [
   "requires_documentation",
   "is_paid",
   "payment_percentage",
+  "pay_mode",
+  "has_leave_allowance",
+  "leave_allowance_type",
+  "leave_allowance_amount",
+  "leave_allowance_once_per_year",
+  "leave_allowance_notes",
   "allow_carry_over",
   "max_carry_over_days",
   "is_active",
@@ -32,16 +38,27 @@ function coerceField(key: string, value: any) {
     case "name":
       return String(value || "").trim()
     case "description":
+    case "leave_allowance_notes":
       return value != null ? String(value) : null
     case "category":
       return value || "general"
     case "entitlement_type":
       return value || "annual"
+    case "pay_mode": {
+      const m = String(value || "prorate").toLowerCase()
+      return m === "full_salary" ? "full_salary" : "prorate"
+    }
+    case "leave_allowance_type": {
+      const t = String(value || "fixed").toLowerCase()
+      if (t === "days_of_pay" || t === "percent_monthly") return t
+      return "fixed"
+    }
     case "entitlement_amount":
     case "max_days_per_year":
     case "max_carry_over_days":
     case "payment_percentage":
     case "auto_approve_threshold":
+    case "leave_allowance_amount":
       return value == null || value === "" ? null : Number(value)
     case "max_consecutive_days":
     case "min_service_months":
@@ -53,6 +70,8 @@ function coerceField(key: string, value: any) {
     case "is_paid":
     case "allow_carry_over":
     case "is_active":
+    case "has_leave_allowance":
+    case "leave_allowance_once_per_year":
       return Boolean(value)
     default:
       return value
@@ -77,7 +96,12 @@ function sanitizeCreate(body: Record<string, any>) {
   out.max_carry_over_days = Number(out.max_carry_over_days ?? 0)
   out.min_notice_days = Math.max(0, Math.floor(Number(out.min_notice_days ?? 0)))
   out.approval_levels = Math.max(1, Math.floor(Number(out.approval_levels ?? 1)))
-  out.payment_percentage = Number(out.payment_percentage ?? 100)
+  out.payment_percentage = out.is_paid ? Number(out.payment_percentage ?? 100) : 0
+  out.pay_mode = out.is_paid ? out.pay_mode || "prorate" : "prorate"
+  out.has_leave_allowance = Boolean(out.has_leave_allowance)
+  out.leave_allowance_type = out.leave_allowance_type || "fixed"
+  out.leave_allowance_amount = Number(out.leave_allowance_amount ?? 0)
+  out.leave_allowance_once_per_year = out.leave_allowance_once_per_year !== false
   return out
 }
 

@@ -4,7 +4,7 @@ import {
   computeLeavePay,
   debitLeaveBalance,
   markAttendanceLeave,
-  syncLeaveDeductionToPayroll,
+  syncLeavePayToPayroll,
 } from "@/lib/services/leave-ops-service"
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -47,10 +47,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         approved_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         is_paid_leave: pay.is_paid,
+        pay_mode_applied: pay.pay_mode,
         payment_percentage_applied: pay.payment_percentage,
         daily_rate_used: pay.daily_rate,
         paid_amount: pay.paid_amount,
         unpaid_deduction: pay.unpaid_deduction,
+        leave_allowance_amount: pay.leave_allowance_amount,
+        leave_allowance_type: pay.leave_allowance_type,
+        leave_allowance_paid: pay.leave_allowance_amount > 0,
+        leave_pay_formula: pay.formula,
         days_requested: pay.days,
       }
       if (userId && !String(userId).startsWith("demo-")) update.approved_by = userId
@@ -82,13 +87,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           existing.leave_type_id,
           Number(pay.days || 0),
         )
-        if (pay.unpaid_deduction > 0) {
-          await syncLeaveDeductionToPayroll({
+        if (pay.unpaid_deduction > 0 || pay.leave_allowance_amount > 0) {
+          await syncLeavePayToPayroll({
             service,
             companyId,
             employeeId: existing.employee_id,
+            leaveRequestId: id,
+            leaveTypeId: existing.leave_type_id,
             startDate: existing.start_date,
             unpaidDeduction: pay.unpaid_deduction,
+            leaveAllowance: pay.leave_allowance_amount,
+            leaveAllowanceType: pay.leave_allowance_type,
+            notes: pay.formula,
           })
         }
       } catch (e) {

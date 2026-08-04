@@ -105,6 +105,8 @@ export default function AttendancePage() {
   const [shifts, setShifts] = useState<any[]>([])
   const [devices, setDevices] = useState<any[]>([])
   const [busy, setBusy] = useState(false)
+  const [analytics, setAnalytics] = useState<any>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
 
   // Manual mark dialog
   const [markOpen, setMarkOpen] = useState(false)
@@ -182,6 +184,32 @@ export default function AttendancePage() {
   useEffect(() => {
     void loadMeta()
   }, [loadMeta])
+
+  const loadAnalytics = useCallback(async () => {
+    setAnalyticsLoading(true)
+    try {
+      const qs = new URLSearchParams({ from, to })
+      const res = await fetch(`/api/attendance/analytics?${qs}`, {
+        credentials: "include",
+        cache: "no-store",
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to load analytics")
+      setAnalytics(data)
+    } catch (err) {
+      toast({
+        title: "Analytics failed",
+        description: err instanceof Error ? err.message : "Could not load",
+        variant: "destructive",
+      })
+    } finally {
+      setAnalyticsLoading(false)
+    }
+  }, [from, to])
+
+  useEffect(() => {
+    if (tab === "analytics") void loadAnalytics()
+  }, [tab, loadAnalytics])
 
   const chartData = useMemo(
     () => [
@@ -546,8 +574,9 @@ export default function AttendancePage() {
       </Card>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
+        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="records">Records</TabsTrigger>
           <TabsTrigger value="import">Biometric import</TabsTrigger>
           <TabsTrigger value="shifts">Shifts</TabsTrigger>
@@ -613,6 +642,156 @@ export default function AttendancePage() {
               </Button>
             </CardHeader>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-base font-semibold">Attendance analytics</h2>
+              <p className="text-sm text-muted-foreground">
+                Punctuality, absenteeism, department mix, and OT leaders for the selected period.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => void loadAnalytics()} disabled={analyticsLoading}>
+              {analyticsLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Refresh analytics
+            </Button>
+          </div>
+
+          {analyticsLoading && !analytics ? (
+            <div className="flex items-center gap-2 py-10 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading analytics…
+            </div>
+          ) : analytics ? (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  { label: "Attendance rate", value: `${analytics.kpis?.attendance_rate ?? 0}%` },
+                  { label: "Punctuality", value: `${analytics.kpis?.punctuality_rate ?? 0}%` },
+                  { label: "Absenteeism", value: `${analytics.kpis?.absenteeism_rate ?? 0}%` },
+                  { label: "OT hours", value: analytics.kpis?.overtime_hours ?? 0 },
+                ].map((k) => (
+                  <Card key={k.label} className="shadow-sm">
+                    <CardContent className="p-4">
+                      <p className="text-xs text-muted-foreground">{k.label}</p>
+                      <p className="text-2xl font-bold">{k.value}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Card className="shadow-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Daily trend</CardTitle>
+                    <CardDescription>Present / late / absent over the period</CardDescription>
+                  </CardHeader>
+                  <CardContent className="h-64">
+                    {analytics.trend?.length ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={analytics.trend}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                          <YAxis tick={{ fontSize: 11 }} />
+                          <Tooltip />
+                          <Bar dataKey="present" stackId="a" fill="#0d9488" />
+                          <Bar dataKey="late" stackId="a" fill="#f59e0b" />
+                          <Bar dataKey="absent" stackId="a" fill="#ef4444" />
+                          <Bar dataKey="leave" stackId="a" fill="#8b5cf6" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                        No trend data
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">By department</CardTitle>
+                    <CardDescription>Hours and punctuality</CardDescription>
+                  </CardHeader>
+                  <CardContent className="h-64">
+                    {analytics.departments?.length ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={analytics.departments}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis dataKey="department" tick={{ fontSize: 10 }} />
+                          <YAxis tick={{ fontSize: 11 }} />
+                          <Tooltip />
+                          <Bar dataKey="hours" fill="#0d9488" radius={[6, 6, 0, 0]} />
+                          <Bar dataKey="overtime" fill="#38bdf8" radius={[6, 6, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                        No department data
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-3">
+                <Card className="shadow-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Most late</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {(analytics.top_late || []).length === 0 && (
+                      <p className="text-sm text-muted-foreground">No late marks in period.</p>
+                    )}
+                    {(analytics.top_late || []).map((e: any) => (
+                      <div key={e.employee_id} className="flex justify-between text-sm">
+                        <span className="truncate">{e.employee_name}</span>
+                        <span className="font-medium text-amber-700">{e.late}×</span>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+                <Card className="shadow-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Top overtime</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {(analytics.top_overtime || []).length === 0 && (
+                      <p className="text-sm text-muted-foreground">No OT hours in period.</p>
+                    )}
+                    {(analytics.top_overtime || []).map((e: any) => (
+                      <div key={e.employee_id} className="flex justify-between text-sm">
+                        <span className="truncate">{e.employee_name}</span>
+                        <span className="font-medium text-teal-700">{e.overtime}h</span>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+                <Card className="shadow-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Most absent</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {(analytics.top_absent || []).length === 0 && (
+                      <p className="text-sm text-muted-foreground">No absences in period.</p>
+                    )}
+                    {(analytics.top_absent || []).map((e: any) => (
+                      <div key={e.employee_id} className="flex justify-between text-sm">
+                        <span className="truncate">{e.employee_name}</span>
+                        <span className="font-medium text-red-700">{e.absent}×</span>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          ) : (
+            <Card>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                Select a date range and refresh to load analytics.
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="records">

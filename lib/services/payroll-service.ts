@@ -431,7 +431,9 @@ export class PayrollService extends BaseService {
               other: masterOther + cardAllowTotal,
             },
             monthly_overtime: Number(period?.overtime_amount ?? 0),
-            monthly_bonus: Number(period?.bonus_amount ?? 0),
+            // Leave allowance (one-time) rides with bonus for PAYE; unpaid leave folds into other deductions
+            monthly_bonus:
+              Number(period?.bonus_amount ?? 0) + Number(period?.leave_allowance ?? 0),
             tier2_applicable: period?.tier2_applicable ?? true,
             tier3_applicable:
               period?.tier3_applicable ??

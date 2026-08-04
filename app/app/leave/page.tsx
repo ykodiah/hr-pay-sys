@@ -66,6 +66,11 @@ type LeaveType = {
   entitlement_amount?: number
   is_paid?: boolean
   payment_percentage?: number
+  pay_mode?: "full_salary" | "prorate"
+  has_leave_allowance?: boolean
+  leave_allowance_type?: string
+  leave_allowance_amount?: number
+  leave_allowance_once_per_year?: boolean
   requires_approval?: boolean
   allow_carry_over?: boolean
   max_carry_over_days?: number
@@ -83,6 +88,11 @@ const EMPTY_TYPE_FORM = {
   entitlement_amount: "21",
   is_paid: true,
   payment_percentage: "100",
+  pay_mode: "prorate" as "full_salary" | "prorate",
+  has_leave_allowance: false,
+  leave_allowance_type: "fixed",
+  leave_allowance_amount: "0",
+  leave_allowance_once_per_year: true,
   requires_approval: true,
   allow_carry_over: false,
   max_carry_over_days: "0",
@@ -278,6 +288,11 @@ export default function AdminLeavePage() {
       entitlement_amount: String(t.entitlement_amount ?? 0),
       is_paid: t.is_paid !== false,
       payment_percentage: String(t.payment_percentage ?? 100),
+      pay_mode: t.pay_mode === "full_salary" ? "full_salary" : "prorate",
+      has_leave_allowance: Boolean(t.has_leave_allowance),
+      leave_allowance_type: t.leave_allowance_type || "fixed",
+      leave_allowance_amount: String(t.leave_allowance_amount ?? 0),
+      leave_allowance_once_per_year: t.leave_allowance_once_per_year !== false,
       requires_approval: t.requires_approval !== false,
       allow_carry_over: Boolean(t.allow_carry_over),
       max_carry_over_days: String(t.max_carry_over_days ?? 0),
@@ -304,6 +319,11 @@ export default function AdminLeavePage() {
         entitlement_amount: Number(typeForm.entitlement_amount) || 0,
         is_paid: typeForm.is_paid,
         payment_percentage: typeForm.is_paid ? Number(typeForm.payment_percentage) || 100 : 0,
+        pay_mode: typeForm.is_paid ? typeForm.pay_mode : "prorate",
+        has_leave_allowance: typeForm.has_leave_allowance,
+        leave_allowance_type: typeForm.leave_allowance_type,
+        leave_allowance_amount: Number(typeForm.leave_allowance_amount) || 0,
+        leave_allowance_once_per_year: typeForm.leave_allowance_once_per_year,
         requires_approval: typeForm.requires_approval,
         allow_carry_over: typeForm.allow_carry_over,
         max_carry_over_days: Number(typeForm.max_carry_over_days) || 0,
@@ -579,8 +599,22 @@ export default function AdminLeavePage() {
                     <div className="flex flex-wrap gap-1.5 text-[11px]">
                       <Badge variant="secondary">{t.entitlement_amount ?? 0} days</Badge>
                       <Badge variant="secondary">
-                        {t.is_paid === false ? "Unpaid" : `Paid ${t.payment_percentage ?? 100}%`}
+                        {t.is_paid === false
+                          ? "Unpaid"
+                          : t.pay_mode === "full_salary"
+                            ? "Full salary"
+                            : `Prorate ${t.payment_percentage ?? 100}%`}
                       </Badge>
+                      {t.has_leave_allowance ? (
+                        <Badge variant="secondary">
+                          Allowance{" "}
+                          {t.leave_allowance_type === "fixed"
+                            ? `GHS ${t.leave_allowance_amount ?? 0}`
+                            : t.leave_allowance_type === "days_of_pay"
+                              ? `${t.leave_allowance_amount ?? 0} days`
+                              : `${t.leave_allowance_amount ?? 0}%`}
+                        </Badge>
+                      ) : null}
                       <Badge variant="secondary">{t.requires_approval === false ? "Auto" : "Approval"}</Badge>
                       {t.allow_carry_over ? <Badge variant="secondary">Carry-over</Badge> : null}
                     </div>
@@ -742,7 +776,7 @@ export default function AdminLeavePage() {
       </Dialog>
 
       <Dialog open={typeOpen} onOpenChange={setTypeOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingType ? "Edit leave type" : "Create leave type"}</DialogTitle>
           </DialogHeader>
@@ -808,32 +842,113 @@ export default function AdminLeavePage() {
                 />
               </div>
             </div>
-            <div className="space-y-2 rounded-lg border p-3">
+
+            <div className="space-y-3 rounded-lg border p-3">
               <div className="flex items-center justify-between">
                 <Label>Paid leave</Label>
                 <Switch checked={typeForm.is_paid} onCheckedChange={(v) => setTypeForm((f) => ({ ...f, is_paid: v }))} />
               </div>
               {typeForm.is_paid && (
-                <div>
-                  <Label>Payment % of daily rate</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={typeForm.payment_percentage}
-                    onChange={(e) => setTypeForm((f) => ({ ...f, payment_percentage: e.target.value }))}
-                  />
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    100% = full pay while on leave. 50% = half pay. Unpaid portion is added to payroll deductions on
-                    approve.
-                  </p>
-                </div>
+                <>
+                  <div className="space-y-1.5">
+                    <Label>Salary treatment while on leave</Label>
+                    <Select
+                      value={typeForm.pay_mode}
+                      onValueChange={(v) =>
+                        setTypeForm((f) => ({ ...f, pay_mode: v as "full_salary" | "prorate" }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="full_salary">Pay full monthly payroll</SelectItem>
+                        <SelectItem value="prorate">Prorate by leave days</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] text-muted-foreground">
+                      {typeForm.pay_mode === "full_salary"
+                        ? "Employee keeps their full monthly salary — no day-level deduction for leave."
+                        : "Only leave days are paid at the daily rate × payment %. Unpaid remainder becomes a payroll deduction."}
+                    </p>
+                  </div>
+                  {typeForm.pay_mode === "prorate" && (
+                    <div>
+                      <Label>Payment % of daily rate</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={typeForm.payment_percentage}
+                        onChange={(e) => setTypeForm((f) => ({ ...f, payment_percentage: e.target.value }))}
+                      />
+                    </div>
+                  )}
+                </>
               )}
               {!typeForm.is_paid && (
                 <p className="text-[11px] text-amber-800 bg-amber-50 rounded-md px-2 py-1.5">
                   Unpaid leave: on approve, days × (monthly basic ÷ 27) is written to pay inputs as a deduction.
                 </p>
               )}
+            </div>
+
+            <div className="space-y-3 rounded-lg border p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Leave allowance (one-time)</Label>
+                  <p className="text-[11px] text-muted-foreground">Extra payment when leave is approved</p>
+                </div>
+                <Switch
+                  checked={typeForm.has_leave_allowance}
+                  onCheckedChange={(v) => setTypeForm((f) => ({ ...f, has_leave_allowance: v }))}
+                />
+              </div>
+              {typeForm.has_leave_allowance && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label>Allowance type</Label>
+                    <Select
+                      value={typeForm.leave_allowance_type}
+                      onValueChange={(v) => setTypeForm((f) => ({ ...f, leave_allowance_type: v }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="fixed">Fixed amount (GHS)</SelectItem>
+                        <SelectItem value="days_of_pay">Days of pay × daily rate</SelectItem>
+                        <SelectItem value="percent_monthly">% of monthly basic</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>
+                      {typeForm.leave_allowance_type === "fixed"
+                        ? "Amount (GHS)"
+                        : typeForm.leave_allowance_type === "days_of_pay"
+                          ? "Number of days"
+                          : "Percent of monthly (%)"}
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={typeForm.leave_allowance_amount}
+                      onChange={(e) => setTypeForm((f) => ({ ...f, leave_allowance_amount: e.target.value }))}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Once per year only</Label>
+                    <Switch
+                      checked={typeForm.leave_allowance_once_per_year}
+                      onCheckedChange={(v) => setTypeForm((f) => ({ ...f, leave_allowance_once_per_year: v }))}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="space-y-2 rounded-lg border p-3">
               <div className="flex items-center justify-between">
                 <Label>Requires approval</Label>
                 <Switch
@@ -863,13 +978,6 @@ export default function AdminLeavePage() {
                 <Label>Active</Label>
                 <Switch checked={typeForm.is_active} onCheckedChange={(v) => setTypeForm((f) => ({ ...f, is_active: v }))} />
               </div>
-            </div>
-            <div className="rounded-lg border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground space-y-1">
-              <p className="font-medium text-foreground text-xs">How paid leave is computed</p>
-              <p>
-                daily rate = monthly basic ÷ 27 (GRA working days). Paid amount = leave days × daily rate × payment %.
-                Saved on the leave request and unpaid remainder syncs to payroll.
-              </p>
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
