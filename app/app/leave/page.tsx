@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -11,11 +11,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "@/hooks/use-toast"
 import {
   Calendar, CheckCircle, XCircle, AlertCircle,
-  Filter, Search, Eye, Download, Users, RefreshCw, Plus, Loader2,
+  Filter, Search, Eye, Download, Users, RefreshCw, Plus, Loader2, Settings2, Pencil,
 } from "lucide-react"
 
 interface LeaveRequest {
@@ -56,20 +57,54 @@ function initials(name: string | null) {
   return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
 }
 
-type LeaveType = { id: string; name: string; code?: string; entitlement_amount?: number }
+type LeaveType = {
+  id: string
+  name: string
+  code?: string
+  description?: string | null
+  category?: string
+  entitlement_amount?: number
+  is_paid?: boolean
+  requires_approval?: boolean
+  allow_carry_over?: boolean
+  max_carry_over_days?: number
+  min_notice_days?: number
+  is_active?: boolean
+}
+
 type EmployeeOpt = { id: string; first_name?: string; last_name?: string; employee_id?: string }
 
+const EMPTY_TYPE_FORM = {
+  code: "",
+  name: "",
+  description: "",
+  category: "general",
+  entitlement_amount: "21",
+  is_paid: true,
+  requires_approval: true,
+  allow_carry_over: false,
+  max_carry_over_days: "0",
+  min_notice_days: "0",
+  is_active: true,
+}
+
 export default function AdminLeavePage() {
+  const [mainTab, setMainTab] = useState("requests")
   const [requests, setRequests]               = useState<LeaveRequest[]>([])
   const [leaveTypes, setLeaveTypes]           = useState<LeaveType[]>([])
+  const [allLeaveTypes, setAllLeaveTypes]     = useState<LeaveType[]>([])
   const [employees, setEmployees]             = useState<EmployeeOpt[]>([])
   const [loading, setLoading]                 = useState(true)
+  const [typesLoading, setTypesLoading]       = useState(false)
   const [search, setSearch]                   = useState("")
   const [statusFilter, setStatusFilter]       = useState("all")
   const [departmentFilter, setDepartmentFilter] = useState("all")
   const [selected, setSelected]               = useState<LeaveRequest | null>(null)
   const [detailOpen, setDetailOpen]           = useState(false)
   const [createOpen, setCreateOpen]           = useState(false)
+  const [typeOpen, setTypeOpen]               = useState(false)
+  const [editingType, setEditingType]         = useState<LeaveType | null>(null)
+  const [typeForm, setTypeForm]               = useState(EMPTY_TYPE_FORM)
   const [rejectReason, setRejectReason]       = useState("")
   const [actionLoading, setActionLoading]     = useState(false)
   const [createForm, setCreateForm] = useState({
@@ -81,18 +116,49 @@ export default function AdminLeavePage() {
     auto_approve: false,
   })
 
+  const loadLeaveTypes = useCallback(async (silent = false) => {
+    if (!silent) setTypesLoading(true)
+    try {
+      const res = await fetch("/api/leave/types?include_inactive=true", {
+        credentials: "include",
+        cache: "no-store",
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to load leave types")
+      const list: LeaveType[] = data.leave_types || []
+      setAllLeaveTypes(list)
+      setLeaveTypes(list.filter((t) => t.is_active !== false))
+    } catch (err) {
+      toast({
+        title: "Leave types",
+        description: (err as Error).message,
+        variant: "destructive",
+      })
+    } finally {
+      setTypesLoading(false)
+    }
+  }, [])
+
   const loadRequests = useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
       if (statusFilter !== "all") params.set("status", statusFilter)
-      const res = await fetch(`/api/leave?${params}`, { credentials: "include", cache: "no-store" })
-      if (res.ok) {
-        const data = await res.json()
+      const [leaveRes, empRes] = await Promise.all([
+        fetch(`/api/leave?${params}`, { credentials: "include", cache: "no-store" }),
+        fetch("/api/employees?status=active&limit=2000&options=true", {
+          credentials: "include",
+          cache: "no-store",
+        }),
+      ])
+      if (leaveRes.ok) {
+        const data = await leaveRes.json()
         setRequests(data.requests ?? [])
-        setLeaveTypes(data.leave_types ?? [])
+        // Prefer dedicated types endpoint; fall back to leave API types for initiate dialog
+        if (Array.isArray(data.leave_types) && data.leave_types.length) {
+          setLeaveTypes((prev) => (prev.length ? prev : data.leave_types))
+        }
       }
-      const empRes = await fetch("/api/employees", { credentials: "include", cache: "no-store" })
       if (empRes.ok) {
         const empData = await empRes.json()
         const list = Array.isArray(empData) ? empData : empData.employees || empData.data || []
@@ -103,7 +169,8 @@ export default function AdminLeavePage() {
     }
   }, [statusFilter])
 
-  useEffect(() => { loadRequests() }, [loadRequests])
+  useEffect(() => { void loadRequests() }, [loadRequests])
+  useEffect(() => { void loadLeaveTypes() }, [loadLeaveTypes])
 
   const handleAction = async (id: string, action: "approve" | "reject", reason?: string) => {
     setActionLoading(true)
@@ -126,7 +193,7 @@ export default function AdminLeavePage() {
       })
       setDetailOpen(false)
       setRejectReason("")
-      loadRequests()
+      void loadRequests()
     } catch (err) {
       toast({ title: "Error", description: (err as Error).message, variant: "destructive" })
     } finally {
@@ -185,11 +252,91 @@ export default function AdminLeavePage() {
         reason: "",
         auto_approve: false,
       })
-      loadRequests()
+      void loadRequests()
     } catch (err) {
       toast({ title: "Error", description: (err as Error).message, variant: "destructive" })
     } finally {
       setActionLoading(false)
+    }
+  }
+
+  const openCreateType = () => {
+    setEditingType(null)
+    setTypeForm(EMPTY_TYPE_FORM)
+    setTypeOpen(true)
+  }
+
+  const openEditType = (t: LeaveType) => {
+    setEditingType(t)
+    setTypeForm({
+      code: t.code || "",
+      name: t.name || "",
+      description: t.description || "",
+      category: t.category || "general",
+      entitlement_amount: String(t.entitlement_amount ?? 0),
+      is_paid: t.is_paid !== false,
+      requires_approval: t.requires_approval !== false,
+      allow_carry_over: Boolean(t.allow_carry_over),
+      max_carry_over_days: String(t.max_carry_over_days ?? 0),
+      min_notice_days: String(t.min_notice_days ?? 0),
+      is_active: t.is_active !== false,
+    })
+    setTypeOpen(true)
+  }
+
+  const saveLeaveType = async () => {
+    if (!typeForm.code.trim() || !typeForm.name.trim()) {
+      toast({ title: "Code and name required", variant: "destructive" })
+      return
+    }
+    setActionLoading(true)
+    try {
+      const payload = {
+        ...(editingType ? { id: editingType.id } : {}),
+        code: typeForm.code,
+        name: typeForm.name,
+        description: typeForm.description || null,
+        category: typeForm.category,
+        entitlement_amount: Number(typeForm.entitlement_amount) || 0,
+        is_paid: typeForm.is_paid,
+        requires_approval: typeForm.requires_approval,
+        allow_carry_over: typeForm.allow_carry_over,
+        max_carry_over_days: Number(typeForm.max_carry_over_days) || 0,
+        min_notice_days: Number(typeForm.min_notice_days) || 0,
+        is_active: typeForm.is_active,
+      }
+      const res = await fetch("/api/leave/types", {
+        method: editingType ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to save leave type")
+      toast({ title: editingType ? "Leave type updated" : "Leave type created" })
+      setTypeOpen(false)
+      await loadLeaveTypes(true)
+      void loadRequests()
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const toggleTypeActive = async (t: LeaveType) => {
+    try {
+      const res = await fetch("/api/leave/types", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ id: t.id, is_active: !t.is_active }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to update")
+      await loadLeaveTypes(true)
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" })
     }
   }
 
@@ -210,14 +357,21 @@ export default function AdminLeavePage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Leave Management</h1>
-          <p className="text-muted-foreground">Review and manage employee leave requests</p>
+          <p className="text-muted-foreground">Review leave requests and configure leave types</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={loadRequests} disabled={loading}>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => {
+              void loadRequests()
+              void loadLeaveTypes(true)
+            }}
+            disabled={loading}
+          >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
           <Button variant="outline" onClick={downloadCSV}>
@@ -231,7 +385,6 @@ export default function AdminLeavePage() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Total", value: stats.total,    icon: Users,        color: "text-blue-600"   },
@@ -253,115 +406,195 @@ export default function AdminLeavePage() {
         ))}
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-5">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-48">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input placeholder="Search employee, type..."
-                className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-40">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="Department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                {departments.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="requests">Requests</TabsTrigger>
+          <TabsTrigger value="types">
+            <Settings2 className="w-3.5 h-3.5 mr-1.5" />
+            Leave Types
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Requests Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Leave Requests ({loading ? "…" : filtered.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Calendar className="w-10 h-10 mx-auto mb-3 opacity-40" />
-              <p className="font-medium">No leave requests found</p>
-              <p className="text-sm">Try adjusting your filters.</p>
-            </div>
-          ) : (
-            <div className="divide-y">
-              {filtered.map((req) => (
-                <div key={req.id} className="flex items-center justify-between py-4 gap-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Avatar className="w-9 h-9 shrink-0">
-                      <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                        {initials(req.employee_name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm truncate">{req.employee_name ?? "Unknown"}</p>
-                      <p className="text-xs text-muted-foreground">{req.department ?? req.employee_id_no}</p>
-                    </div>
-                  </div>
-
-                  <div className="hidden md:block">
-                    <p className="text-sm font-medium">{req.leave_type_name ?? "Leave"}</p>
-                    <p className="text-xs text-muted-foreground">{req.days_requested ?? "?"} day(s)</p>
-                  </div>
-
-                  <div className="hidden lg:block text-sm text-muted-foreground">
-                    {new Date(req.start_date).toLocaleDateString()} &ndash;{" "}
-                    {new Date(req.end_date).toLocaleDateString()}
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <StatusBadge status={req.status} />
-
-                    <Button variant="ghost" size="icon" onClick={() => { setSelected(req); setDetailOpen(true) }}>
-                      <Eye className="w-4 h-4" />
-                    </Button>
-
-                    {req.status === "pending" && (
-                      <>
-                        <Button size="sm" variant="outline"
-                          className="text-green-700 border-green-300 hover:bg-green-50"
-                          disabled={actionLoading}
-                          onClick={() => handleAction(req.id, "approve")}>
-                          <CheckCircle className="w-4 h-4 mr-1" /> Approve
-                        </Button>
-                        <Button size="sm" variant="outline"
-                          className="text-red-700 border-red-300 hover:bg-red-50"
-                          disabled={actionLoading}
-                          onClick={() => { setSelected(req); setDetailOpen(true) }}>
-                          <XCircle className="w-4 h-4 mr-1" /> Reject
-                        </Button>
-                      </>
-                    )}
-                  </div>
+        <TabsContent value="requests" className="space-y-4">
+          <Card>
+            <CardContent className="pt-5">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative flex-1 min-w-48">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input placeholder="Search employee, type..."
+                    className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
                 </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-40">
+                    <Filter className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                  <SelectTrigger className="w-44">
+                    <SelectValue placeholder="Department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departments</SelectItem>
+                    {departments.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Leave Requests ({loading ? "…" : filtered.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Calendar className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                  <p className="font-medium">No leave requests found</p>
+                  <p className="text-sm">Try adjusting your filters.</p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {filtered.map((req) => (
+                    <div key={req.id} className="flex items-center justify-between py-4 gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Avatar className="w-9 h-9 shrink-0">
+                          <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                            {initials(req.employee_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm truncate">{req.employee_name ?? "Unknown"}</p>
+                          <p className="text-xs text-muted-foreground">{req.department ?? req.employee_id_no}</p>
+                        </div>
+                      </div>
+
+                      <div className="hidden md:block">
+                        <p className="text-sm font-medium">{req.leave_type_name ?? "Leave"}</p>
+                        <p className="text-xs text-muted-foreground">{req.days_requested ?? "?"} day(s)</p>
+                      </div>
+
+                      <div className="hidden lg:block text-sm text-muted-foreground">
+                        {new Date(req.start_date).toLocaleDateString()} &ndash;{" "}
+                        {new Date(req.end_date).toLocaleDateString()}
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <StatusBadge status={req.status} />
+
+                        <Button variant="ghost" size="icon" onClick={() => { setSelected(req); setDetailOpen(true) }}>
+                          <Eye className="w-4 h-4" />
+                        </Button>
+
+                        {req.status === "pending" && (
+                          <>
+                            <Button size="sm" variant="outline"
+                              className="text-green-700 border-green-300 hover:bg-green-50"
+                              disabled={actionLoading}
+                              onClick={() => handleAction(req.id, "approve")}>
+                              <CheckCircle className="w-4 h-4 mr-1" /> Approve
+                            </Button>
+                            <Button size="sm" variant="outline"
+                              className="text-red-700 border-red-300 hover:bg-red-50"
+                              disabled={actionLoading}
+                              onClick={() => { setSelected(req); setDetailOpen(true) }}>
+                              <XCircle className="w-4 h-4 mr-1" /> Reject
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="types" className="space-y-4">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <h2 className="text-base font-semibold">Leave type settings</h2>
+              <p className="text-sm text-muted-foreground">
+                Configure entitlement, pay, approval, and carry-over rules. Changes sync immediately to the database.
+              </p>
+            </div>
+            <Button className="bg-teal-600 hover:bg-teal-700" onClick={openCreateType}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add leave type
+            </Button>
+          </div>
+
+          {typesLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
+            </div>
+          ) : allLeaveTypes.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <Settings2 className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                <p className="font-medium">No leave types yet</p>
+                <p className="text-sm mb-4">Create Annual, Sick, or Maternity leave types for your company.</p>
+                <Button className="bg-teal-600 hover:bg-teal-700" onClick={openCreateType}>
+                  Create first leave type
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {allLeaveTypes.map((t) => (
+                <Card key={t.id} className="shadow-sm">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <CardTitle className="text-base">{t.name}</CardTitle>
+                        <CardDescription className="font-mono text-xs">{t.code}</CardDescription>
+                      </div>
+                      <Badge variant={t.is_active === false ? "secondary" : "outline"}>
+                        {t.is_active === false ? "Inactive" : "Active"}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {t.description || `${t.category || "general"} · ${t.entitlement_amount ?? 0} days`}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 text-[11px]">
+                      <Badge variant="secondary">{t.entitlement_amount ?? 0} days</Badge>
+                      <Badge variant="secondary">{t.is_paid === false ? "Unpaid" : "Paid"}</Badge>
+                      <Badge variant="secondary">{t.requires_approval === false ? "Auto" : "Approval"}</Badge>
+                      {t.allow_carry_over ? <Badge variant="secondary">Carry-over</Badge> : null}
+                    </div>
+                    <div className="flex items-center justify-between pt-1">
+                      <div className="flex items-center gap-2">
+                        <Switch checked={t.is_active !== false} onCheckedChange={() => void toggleTypeActive(t)} />
+                        <span className="text-xs text-muted-foreground">Active</span>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => openEditType(t)}>
+                        <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                        Edit
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
 
-      {/* Detail / Reject Dialog */}
       <Dialog open={detailOpen} onOpenChange={(o) => { setDetailOpen(o); if (!o) setRejectReason("") }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -409,7 +642,6 @@ export default function AdminLeavePage() {
         </DialogContent>
       </Dialog>
 
-      {/* Admin initiate leave */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -417,20 +649,26 @@ export default function AdminLeavePage() {
           </DialogHeader>
           <div className="grid gap-3">
             <div>
-              <Label>Employee</Label>
+              <Label>Active employee</Label>
               <Select
                 value={createForm.employee_id}
                 onValueChange={(v) => setCreateForm((f) => ({ ...f, employee_id: v }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select employee" />
+                  <SelectValue placeholder="Select active employee" />
                 </SelectTrigger>
                 <SelectContent>
-                  {employees.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {`${e.first_name || ""} ${e.last_name || ""}`.trim()} {e.employee_id ? `(${e.employee_id})` : ""}
+                  {employees.length === 0 ? (
+                    <SelectItem value="__none" disabled>
+                      No active employees found
                     </SelectItem>
-                  ))}
+                  ) : (
+                    employees.map((e) => (
+                      <SelectItem key={e.id} value={e.id}>
+                        {`${e.first_name || ""} ${e.last_name || ""}`.trim()} {e.employee_id ? `(${e.employee_id})` : ""}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -491,6 +729,119 @@ export default function AdminLeavePage() {
             <Button className="bg-teal-600 hover:bg-teal-700" disabled={actionLoading} onClick={() => void createLeave()}>
               {actionLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
               Create leave
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={typeOpen} onOpenChange={setTypeOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingType ? "Edit leave type" : "Create leave type"}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Code</Label>
+                <Input
+                  value={typeForm.code}
+                  onChange={(e) => setTypeForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
+                  placeholder="AL"
+                  disabled={Boolean(editingType)}
+                />
+              </div>
+              <div>
+                <Label>Category</Label>
+                <Select value={typeForm.category} onValueChange={(v) => setTypeForm((f) => ({ ...f, category: v }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    <SelectItem value="medical">Medical</SelectItem>
+                    <SelectItem value="family">Family</SelectItem>
+                    <SelectItem value="emergency">Emergency</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Name</Label>
+              <Input
+                value={typeForm.name}
+                onChange={(e) => setTypeForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="Annual Leave"
+              />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea
+                value={typeForm.description}
+                onChange={(e) => setTypeForm((f) => ({ ...f, description: e.target.value }))}
+                rows={2}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Entitlement (days)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={typeForm.entitlement_amount}
+                  onChange={(e) => setTypeForm((f) => ({ ...f, entitlement_amount: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Min notice (days)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={typeForm.min_notice_days}
+                  onChange={(e) => setTypeForm((f) => ({ ...f, min_notice_days: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="space-y-2 rounded-lg border p-3">
+              <div className="flex items-center justify-between">
+                <Label>Paid leave</Label>
+                <Switch checked={typeForm.is_paid} onCheckedChange={(v) => setTypeForm((f) => ({ ...f, is_paid: v }))} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label>Requires approval</Label>
+                <Switch
+                  checked={typeForm.requires_approval}
+                  onCheckedChange={(v) => setTypeForm((f) => ({ ...f, requires_approval: v }))}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label>Allow carry-over</Label>
+                <Switch
+                  checked={typeForm.allow_carry_over}
+                  onCheckedChange={(v) => setTypeForm((f) => ({ ...f, allow_carry_over: v }))}
+                />
+              </div>
+              {typeForm.allow_carry_over && (
+                <div>
+                  <Label>Max carry-over days</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={typeForm.max_carry_over_days}
+                    onChange={(e) => setTypeForm((f) => ({ ...f, max_carry_over_days: e.target.value }))}
+                  />
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <Label>Active</Label>
+                <Switch checked={typeForm.is_active} onCheckedChange={(v) => setTypeForm((f) => ({ ...f, is_active: v }))} />
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setTypeOpen(false)}>Cancel</Button>
+            <Button className="bg-teal-600 hover:bg-teal-700" disabled={actionLoading} onClick={() => void saveLeaveType()}>
+              {actionLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              {editingType ? "Update type" : "Create type"}
             </Button>
           </div>
         </DialogContent>

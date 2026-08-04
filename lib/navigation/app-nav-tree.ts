@@ -181,7 +181,7 @@ export const APP_NAV_TREE: AppNavModule[] = [
     gates: ["attendance", "attendance_alerts", "leave", "overtime"],
     children: [
       { code: "attendance", label: "Attendance", href: "/app/attendance", gate: "attendance", type: "link" },
-      { code: "attendance_alerts", label: "Attendance Alerts", href: "/attendance/alerts", gate: "attendance_alerts", type: "link" },
+      { code: "attendance_alerts", label: "Attendance Alerts", href: "/app/attendance/alerts", gate: "attendance_alerts", type: "link" },
       { code: "leave", label: "Leave Management", href: "/app/leave", gate: "leave", type: "link" },
       { code: "overtime", label: "Overtime", href: "/app/overtime", gate: "overtime", type: "link" },
     ],

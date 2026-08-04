@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import {
-  BarChart3,
+  Bell,
   CalendarDays,
   CheckCircle2,
   Clock3,
@@ -13,9 +14,9 @@ import {
   RefreshCw,
   Search,
   Timer,
+  Trash2,
   Upload,
   UserCheck,
-  Users,
   Wifi,
   XCircle,
 } from "lucide-react"
@@ -348,6 +349,50 @@ export default function AttendancePage() {
     }
   }
 
+  const deactivateShift = async (id: string) => {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/attendance/shifts?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to deactivate shift")
+      toast({ title: "Shift deactivated" })
+      await loadMeta()
+    } catch (err) {
+      toast({
+        title: "Deactivate failed",
+        description: err instanceof Error ? err.message : "Error",
+        variant: "destructive",
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const deactivateDevice = async (id: string) => {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/attendance/devices?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to deactivate device")
+      toast({ title: "Device deactivated" })
+      await loadMeta()
+    } catch (err) {
+      toast({
+        title: "Deactivate failed",
+        description: err instanceof Error ? err.message : "Error",
+        variant: "destructive",
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const generateOt = async () => {
     setBusy(true)
     try {
@@ -416,6 +461,12 @@ export default function AttendancePage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link href="/app/attendance/alerts">
+              <Bell className="mr-2 h-4 w-4" />
+              Alerts
+            </Link>
+          </Button>
           <Button variant="outline" onClick={() => void loadAttendance()} disabled={loading}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             Refresh
@@ -692,6 +743,16 @@ export default function AttendancePage() {
                   <p className="text-xs text-slate-500">
                     Grace {s.grace_period_minutes ?? 15} min · Break {s.break_duration_minutes ?? 60} min
                   </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-red-700"
+                    disabled={busy}
+                    onClick={() => void deactivateShift(s.id)}
+                  >
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                    Deactivate
+                  </Button>
                 </CardContent>
               </Card>
             ))}
@@ -713,7 +774,7 @@ export default function AttendancePage() {
             </Button>
           </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {devices.map((d) => (
+            {devices.filter((d) => d.is_active !== false).map((d) => (
               <Card key={d.id} className="shadow-sm">
                 <CardContent className="space-y-3 p-4">
                   <div className="flex items-start justify-between gap-2">
@@ -731,9 +792,22 @@ export default function AttendancePage() {
                   <p className="text-xs text-slate-500">
                     Last sync: {d.last_sync ? new Date(d.last_sync).toLocaleString() : "Never"}
                   </p>
-                  <Button size="sm" variant="outline" onClick={() => void syncDevice(d.id)} disabled={busy}>
-                    Sync now
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" onClick={() => void syncDevice(d.id)} disabled={busy}>
+                      <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                      Sync now
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-red-700"
+                      onClick={() => void deactivateDevice(d.id)}
+                      disabled={busy}
+                    >
+                      <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                      Deactivate
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
