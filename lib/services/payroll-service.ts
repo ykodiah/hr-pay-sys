@@ -408,9 +408,13 @@ export class PayrollService extends BaseService {
           // Period override for other_allowances replaces master; card allowances always add
           const masterOther = pick(period?.other_allowances, fin.other_allowances)
           const periodOtherDed = Number(period?.other_deductions ?? 0)
+          const leaveAllowance = Number(period?.leave_allowance ?? 0)
           const allowanceLines = [
             ...cardAllowLines,
             ...(masterOther > 0 ? [{ label: "Other Allowances", code: "OTHER", amount: masterOther }] : []),
+            ...(leaveAllowance > 0
+              ? [{ label: "Leave Allowance", code: "LEAVE_ALLOW", amount: leaveAllowance }]
+              : []),
           ]
           const deductionLines = [
             ...cardDedLines,

@@ -1,8 +1,14 @@
 import { createServiceClient } from "@/lib/supabase/server"
+import {
+  detectAttendanceStatus,
+  parseTimeToMinutes,
+  resolveEmployeeShift,
+  type ShiftLike,
+} from "@/lib/services/attendance-geo-shift"
 
 /**
  * Evaluate active alert rules against recent attendance and create inbox alerts.
- * Tenant-scoped; skips duplicates for same employee+type+date.
+ * Late/early detection is shift-aware per employee assignment (not hardcoded 08:00).
  */
 export async function evaluateAttendanceAlerts(input: {
   companyId: string
@@ -32,7 +38,7 @@ export async function evaluateAttendanceAlerts(input: {
 
   const { data: records, error: recErr } = await service
     .from("attendance_records")
-    .select("id, employee_id, date, status, clock_in, clock_out, overtime_hours, company_id")
+    .select("id, employee_id, date, status, clock_in, clock_out, overtime_hours, company_id, shift_id")
     .eq("company_id", input.companyId)
     .gte("date", from)
     .lte("date", to)
@@ -45,6 +51,28 @@ export async function evaluateAttendanceAlerts(input: {
     .select("id, first_name, last_name, employee_id")
     .eq("company_id", input.companyId)
   const empMap = new Map((emps || []).map((e: any) => [e.id, e]))
+
+  // Cache shifts per employee+date
+  const shiftCache = new Map<string, ShiftLike | null>()
+  async function shiftFor(employeeId: string, date: string, shiftId?: string | null) {
+    const key = `${employeeId}:${date}`
+    if (shiftCache.has(key)) return shiftCache.get(key) || null
+    if (shiftId) {
+      const { data: s } = await service
+        .from("shifts")
+        .select("*")
+        .eq("id", shiftId)
+        .eq("company_id", input.companyId)
+        .maybeSingle()
+      if (s) {
+        shiftCache.set(key, s)
+        return s
+      }
+    }
+    const resolved = await resolveEmployeeShift(service, input.companyId, employeeId, date)
+    shiftCache.set(key, resolved)
+    return resolved
+  }
 
   let created = 0
   const errors: string[] = []
@@ -61,10 +89,18 @@ export async function evaluateAttendanceAlerts(input: {
       let match = false
       let title = rule.rule_name
       let message = ""
+      const shift = await shiftFor(rec.employee_id, rec.date, rec.shift_id)
+      const shiftLabel = shift?.name || shift?.start_time || "default shift"
 
-      if (category.includes("late") && (rec.status === "late" || isLateClockIn(rec.clock_in, threshold))) {
-        match = true
-        message = `Late arrival on ${rec.date}${rec.clock_in ? ` (in ${rec.clock_in})` : ""} — threshold ${threshold} min.`
+      if (category.includes("late")) {
+        const late =
+          rec.status === "late" ||
+          isLateVsShift(rec.clock_in, shift, threshold) ||
+          detectAttendanceStatus({ clockIn: rec.clock_in, shift, date: rec.date }) === "late"
+        if (late) {
+          match = true
+          message = `Late arrival on ${rec.date}${rec.clock_in ? ` (in ${rec.clock_in})` : ""} vs ${shiftLabel} (grace ${threshold} / shift ${shift?.grace_period_minutes ?? 15} min).`
+        }
       } else if (category.includes("absent") && rec.status === "absent") {
         match = true
         message = `Absence recorded on ${rec.date}.`
@@ -76,9 +112,9 @@ export async function evaluateAttendanceAlerts(input: {
       ) {
         match = true
         message = `Missed checkout on ${rec.date} (clocked in ${rec.clock_in}).`
-      } else if (category.includes("early") && isEarlyOut(rec.clock_out, threshold)) {
+      } else if (category.includes("early") && isEarlyVsShift(rec.clock_out, shift, threshold)) {
         match = true
-        message = `Early departure on ${rec.date}${rec.clock_out ? ` (out ${rec.clock_out})` : ""}.`
+        message = `Early departure on ${rec.date}${rec.clock_out ? ` (out ${rec.clock_out})` : ""} vs ${shiftLabel}.`
       } else if (category.includes("overtime") && Number(rec.overtime_hours || 0) > 0) {
         const otThreshold = Number(rule.trigger_condition?.threshold_hours ?? threshold)
         if (Number(rec.overtime_hours) >= otThreshold || category.includes("threshold")) {
@@ -92,7 +128,6 @@ export async function evaluateAttendanceAlerts(input: {
       const emp = empMap.get(rec.employee_id)
       const empName = emp ? `${emp.first_name || ""} ${emp.last_name || ""}`.trim() : "Employee"
 
-      // Dedupe: same employee + type + date already open
       const { data: recent } = await service
         .from("attendance_alerts")
         .select("id, metadata, message, title")
@@ -121,13 +156,14 @@ export async function evaluateAttendanceAlerts(input: {
           date: rec.date,
           attendance_record_id: rec.id,
           threshold_minutes: threshold,
+          shift_id: shift?.id || null,
+          shift_name: shift?.name || null,
         },
         status: "pending",
       }
 
       const { error } = await service.from("attendance_alerts").insert(insert)
       if (error) {
-        // Retry without metadata if needed
         if (/column|metadata|does not exist/i.test(error.message)) {
           const { error: e2 } = await service.from("attendance_alerts").insert({
             company_id: input.companyId,
@@ -149,26 +185,36 @@ export async function evaluateAttendanceAlerts(input: {
     }
   }
 
-  return { created, scanned: rows.length, from, to, errors, rules: rules.length }
+  return {
+    created,
+    scanned: rows.length,
+    from,
+    to,
+    errors,
+    rules: rules.length,
+    message: `Created ${created} alert(s) from ${rows.length} attendance row(s)`,
+  }
 }
 
-function parseMinutes(t?: string | null): number | null {
-  if (!t) return null
-  const m = String(t).match(/(\d{1,2}):(\d{2})/)
-  if (!m) return null
-  return Number(m[1]) * 60 + Number(m[2])
-}
-
-function isLateClockIn(clockIn?: string | null, graceMinutes = 15): boolean {
-  const mins = parseMinutes(clockIn)
+function isLateVsShift(
+  clockIn?: string | null,
+  shift?: ShiftLike | null,
+  graceOverride?: number,
+): boolean {
+  const mins = parseTimeToMinutes(clockIn)
   if (mins == null) return false
-  // Default shift start 08:00 + grace
-  return mins > 8 * 60 + graceMinutes
+  const start = parseTimeToMinutes(shift?.start_time || "08:00") ?? 8 * 60
+  const grace = Number(graceOverride ?? shift?.grace_period_minutes ?? 15)
+  return mins > start + grace
 }
 
-function isEarlyOut(clockOut?: string | null, earlyMinutes = 15): boolean {
-  const mins = parseMinutes(clockOut)
+function isEarlyVsShift(
+  clockOut?: string | null,
+  shift?: ShiftLike | null,
+  earlyMinutes = 15,
+): boolean {
+  const mins = parseTimeToMinutes(clockOut)
   if (mins == null) return false
-  // Default shift end 17:00 - early threshold
-  return mins < 17 * 60 - earlyMinutes
+  const end = parseTimeToMinutes(shift?.end_time || "17:00") ?? 17 * 60
+  return mins < end - earlyMinutes
 }

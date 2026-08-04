@@ -8,8 +8,10 @@ import {
   CheckCircle2,
   Clock3,
   Download,
+  FileText,
   Fingerprint,
   Loader2,
+  MapPinned,
   Plus,
   RefreshCw,
   Search,
@@ -17,9 +19,13 @@ import {
   Trash2,
   Upload,
   UserCheck,
+  Users,
   Wifi,
   XCircle,
 } from "lucide-react"
+import { AttendanceClockPanel } from "@/components/attendance/clock-panel"
+import { GeofencePanel } from "@/components/attendance/geofence-panel"
+import { ShiftAssignPanel } from "@/components/attendance/shift-assign-panel"
 import {
   Bar,
   BarChart,
@@ -490,6 +496,12 @@ export default function AttendancePage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline">
+            <Link href="/app/manager">
+              <Users className="mr-2 h-4 w-4" />
+              Manager approvals
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
             <Link href="/app/attendance/alerts">
               <Bell className="mr-2 h-4 w-4" />
               Alerts
@@ -574,12 +586,15 @@ export default function AttendancePage() {
       </Card>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="clock">GPS clock</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="records">Records</TabsTrigger>
           <TabsTrigger value="import">Biometric import</TabsTrigger>
           <TabsTrigger value="shifts">Shifts</TabsTrigger>
+          <TabsTrigger value="assign">Assign shifts</TabsTrigger>
+          <TabsTrigger value="geofences">Geofences</TabsTrigger>
           <TabsTrigger value="devices">Devices</TabsTrigger>
         </TabsList>
 
@@ -644,6 +659,10 @@ export default function AttendancePage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="clock" className="space-y-4">
+          <AttendanceClockPanel employees={employees} />
+        </TabsContent>
+
         <TabsContent value="analytics" className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
@@ -652,10 +671,23 @@ export default function AttendancePage() {
                 Punctuality, absenteeism, department mix, and OT leaders for the selected period.
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => void loadAnalytics()} disabled={analyticsLoading}>
-              {analyticsLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-              Refresh analytics
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => void loadAnalytics()} disabled={analyticsLoading}>
+                {analyticsLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                Refresh analytics
+              </Button>
+              <Button
+                size="sm"
+                className="bg-teal-600 hover:bg-teal-700"
+                onClick={() => {
+                  const qs = new URLSearchParams({ from, to })
+                  window.open(`/api/attendance/analytics/pdf?${qs}`, "_blank", "noopener,noreferrer")
+                }}
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Export HR PDF pack
+              </Button>
+            </div>
           </div>
 
           {analyticsLoading && !analytics ? (
@@ -901,8 +933,20 @@ export default function AttendancePage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="assign" className="space-y-4">
+          <ShiftAssignPanel employees={employees} shifts={shifts} />
+        </TabsContent>
+
+        <TabsContent value="geofences" className="space-y-4">
+          <GeofencePanel />
+        </TabsContent>
+
         <TabsContent value="shifts" className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+              <MapPinned className="h-3.5 w-3.5" />
+              Shift start + grace drives late detection once assigned to employees.
+            </p>
             <Button className="bg-teal-600 hover:bg-teal-700" onClick={() => setShiftOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               New shift

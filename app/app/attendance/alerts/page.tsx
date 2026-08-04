@@ -27,6 +27,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { AlertSchedulesPanel } from "@/components/attendance/alert-schedules-panel"
 
 type AlertRow = {
   id: string
@@ -311,7 +312,12 @@ export default function AttendanceAlertsPage() {
         <TabsList>
           <TabsTrigger value="inbox">Inbox</TabsTrigger>
           <TabsTrigger value="rules">Notification Rules</TabsTrigger>
+          <TabsTrigger value="schedules">Auto-schedule</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="schedules" className="space-y-4">
+          <AlertSchedulesPanel />
+        </TabsContent>
 
         <TabsContent value="inbox" className="space-y-4">
           <Card className="shadow-sm">

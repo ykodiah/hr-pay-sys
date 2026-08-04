@@ -128,6 +128,11 @@ export async function upsertManualAttendance(input: {
   notes?: string | null
   source?: string
   method?: string
+  shiftId?: string | null
+  gpsLat?: number | null
+  gpsLng?: number | null
+  geofenceId?: string | null
+  autoDetectStatus?: boolean
 }) {
   const supabase = await getDb()
   const { data: emp } = await supabase
@@ -138,12 +143,43 @@ export async function upsertManualAttendance(input: {
     .maybeSingle()
   if (!emp?.id) throw new Error("Employee not found in your company")
 
-  const { totalHours, overtimeHours } = computeHours(input.clockIn || null, input.clockOut || null)
-  const row = {
+  const { resolveEmployeeShift, detectAttendanceStatus, computeHoursWithShift } = await import(
+    "@/lib/services/attendance-geo-shift"
+  )
+
+  let shift =
+    input.shiftId
+      ? (
+          await supabase
+            .from("shifts")
+            .select("*")
+            .eq("id", input.shiftId)
+            .eq("company_id", input.companyId)
+            .maybeSingle()
+        ).data
+      : await resolveEmployeeShift(supabase, input.companyId, input.employeeId, input.date)
+
+  const { totalHours, overtimeHours } = computeHoursWithShift(
+    input.clockIn || null,
+    input.clockOut || null,
+    shift,
+  )
+
+  let status = input.status
+  if (input.autoDetectStatus !== false && input.clockIn && (status === "present" || !input.status)) {
+    status = detectAttendanceStatus({
+      clockIn: input.clockIn,
+      clockOut: input.clockOut,
+      shift,
+      date: input.date,
+    }) as AttendanceStatus
+  }
+
+  const row: Record<string, any> = {
     company_id: input.companyId,
     employee_id: input.employeeId,
     date: input.date,
-    status: input.status,
+    status,
     clock_in: input.clockIn || null,
     clock_out: input.clockOut || null,
     clock_in_method: input.method || "manual",
@@ -152,8 +188,12 @@ export async function upsertManualAttendance(input: {
     overtime_hours: overtimeHours,
     notes: input.notes || null,
     source: input.source || "manual",
+    shift_id: shift?.id || input.shiftId || null,
     updated_at: new Date().toISOString(),
   }
+  if (input.gpsLat != null) row.clock_in_gps_lat = input.gpsLat
+  if (input.gpsLng != null) row.clock_in_gps_lng = input.gpsLng
+  if (input.geofenceId) row.geofence_id = input.geofenceId
 
   const { data: existing } = await supabase
     .from("attendance_records")
@@ -170,12 +210,12 @@ export async function upsertManualAttendance(input: {
       .select()
       .single()
     if (error) throw new Error(error.message)
-    return data
+    return { ...data, shift }
   }
 
   const { data, error } = await supabase.from("attendance_records").insert(row).select().single()
   if (error) throw new Error(error.message)
-  return data
+  return { ...data, shift }
 }
 
 export async function bulkUpsertAttendance(

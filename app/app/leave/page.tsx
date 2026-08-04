@@ -18,6 +18,8 @@ import {
   Calendar, CheckCircle, XCircle, AlertCircle,
   Filter, Search, Eye, Download, Users, RefreshCw, Plus, Loader2, Settings2, Pencil,
 } from "lucide-react"
+import { LeaveCalendarHeatmap } from "@/components/leave/leave-calendar-heatmap"
+import Link from "next/link"
 
 interface LeaveRequest {
   id: string
@@ -403,6 +405,9 @@ export default function AdminLeavePage() {
             <Download className="w-4 h-4 mr-2" />
             Export CSV
           </Button>
+          <Button asChild variant="outline">
+            <Link href="/app/manager">Manager approvals</Link>
+          </Button>
           <Button className="bg-teal-600 hover:bg-teal-700" onClick={() => setCreateOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Initiate leave
@@ -434,11 +439,19 @@ export default function AdminLeavePage() {
       <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="requests">Requests</TabsTrigger>
+          <TabsTrigger value="calendar">
+            <Calendar className="w-3.5 h-3.5 mr-1.5" />
+            Heat map
+          </TabsTrigger>
           <TabsTrigger value="types">
             <Settings2 className="w-3.5 h-3.5 mr-1.5" />
             Leave Types
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="calendar" className="space-y-4">
+          <LeaveCalendarHeatmap />
+        </TabsContent>
 
         <TabsContent value="requests" className="space-y-4">
           <Card>
