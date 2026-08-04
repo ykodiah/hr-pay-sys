@@ -1,175 +1,119 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { useCallback, useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { BookOpen, Clock, Award, Play, CheckCircle } from "lucide-react"
+import { BookOpen, RefreshCw } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
 
-export default function CoursesPage() {
-  const [courses] = useState([
-    {
-      id: 1,
-      title: "Advanced React Development",
-      description: "Master advanced React concepts including hooks, context, and performance optimization",
-      instructor: "Sarah Johnson",
-      duration: "8 hours",
-      progress: 75,
-      status: "In Progress",
-      category: "Technical Skills",
-      completedLessons: 6,
-      totalLessons: 8,
-    },
-    {
-      id: 2,
-      title: "Leadership Fundamentals",
-      description: "Essential leadership skills for emerging managers and team leads",
-      instructor: "Michael Chen",
-      duration: "6 hours",
-      progress: 100,
-      status: "Completed",
-      category: "Leadership",
-      completedLessons: 6,
-      totalLessons: 6,
-    },
-    {
-      id: 3,
-      title: "Data Analysis with Python",
-      description: "Learn data analysis techniques using Python and popular libraries",
-      instructor: "Dr. Amina Osei",
-      duration: "12 hours",
-      progress: 0,
-      status: "Not Started",
-      category: "Data Science",
-      completedLessons: 0,
-      totalLessons: 10,
-    },
-  ])
+export default function MyCoursesPage() {
+  const [loading, setLoading] = useState(true)
+  const [employeeId, setEmployeeId] = useState<string | null>(null)
+  const [enrollments, setEnrollments] = useState<any[]>([])
+  const [catalog, setCatalog] = useState<any[]>([])
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Completed":
-        return "bg-green-100 text-green-800"
-      case "In Progress":
-        return "bg-blue-100 text-blue-800"
-      case "Not Started":
-        return "bg-gray-100 text-gray-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const meRes = await fetch("/api/self-service/me", { credentials: "include", cache: "no-store" })
+      const me = await meRes.json().catch(() => ({}))
+      const eid = me?.employee?.id || me?.data?.employee?.id || null
+      setEmployeeId(eid)
+
+      const res = await fetch("/api/learning", { credentials: "include", cache: "no-store" })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Failed to load")
+      setCatalog(json.courses || [])
+      setEnrollments((json.enrollments || []).filter((e: any) => e.employee_id === eid))
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed to load", variant: "destructive" })
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  async function enroll(courseId: string) {
+    if (!employeeId) return
+    try {
+      const res = await fetch("/api/learning", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "enrollment", employeeId, courseId }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Enroll failed")
+      toast({ title: "Enrolled" })
+      await load()
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed", variant: "destructive" })
     }
   }
 
+  const enrolledIds = new Set(enrollments.map((e) => e.course_id))
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">My Courses</h1>
-          <p className="text-gray-600 mt-1">Continue your learning journey</p>
+          <h1 className="text-2xl font-bold">My Courses</h1>
+          <p className="text-sm text-muted-foreground">Track enrollments and browse the learning catalog.</p>
         </div>
+        <Button variant="outline" onClick={() => void load()} disabled={loading}>
+          <RefreshCw className="mr-2 h-4 w-4" /> Refresh
+        </Button>
       </div>
 
-      {/* Learning Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <BookOpen className="w-8 h-8 text-emerald-600" />
-              <div>
-                <p className="text-2xl font-bold text-gray-900">3</p>
-                <p className="text-sm text-gray-600">Enrolled Courses</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <CheckCircle className="w-8 h-8 text-green-600" />
-              <div>
-                <p className="text-2xl font-bold text-gray-900">1</p>
-                <p className="text-sm text-gray-600">Completed</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <Clock className="w-8 h-8 text-blue-600" />
-              <div>
-                <p className="text-2xl font-bold text-gray-900">26</p>
-                <p className="text-sm text-gray-600">Hours Completed</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <Award className="w-8 h-8 text-yellow-600" />
-              <div>
-                <p className="text-2xl font-bold text-gray-900">2</p>
-                <p className="text-sm text-gray-600">Certificates Earned</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Courses List */}
-      <div className="space-y-4">
-        {courses.map((course) => (
-          <Card key={course.id}>
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <CardTitle className="text-xl">{course.title}</CardTitle>
-                  <CardDescription>{course.description}</CardDescription>
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-teal-800">My enrollments</h2>
+        {enrollments.length === 0 ? (
+          <div className="rounded-2xl border border-dashed py-10 text-center text-muted-foreground">No enrollments yet.</div>
+        ) : (
+          enrollments.map((e) => (
+            <div key={e.id} className="rounded-2xl border bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-teal-700" />
+                  <p className="font-semibold">{e.courseName}</p>
                 </div>
-                <Badge className={getStatusColor(course.status)}>{course.status}</Badge>
+                <Badge variant="outline" className="capitalize">{String(e.status).replace(/_/g, " ")}</Badge>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Progress</span>
-                <span className="font-medium">
-                  {course.completedLessons}/{course.totalLessons} lessons
-                </span>
-              </div>
-              <Progress value={course.progress} className="w-full" />
+              <Progress value={Number(e.progress) || 0} className="mt-3 h-2" />
+              <p className="mt-1 text-right text-xs tabular-nums">{e.progress || 0}%</p>
+            </div>
+          ))
+        )}
+      </section>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4 text-sm text-gray-600">
-                  <div className="flex items-center space-x-1">
-                    <Clock className="w-4 h-4" />
-                    <span>{course.duration}</span>
-                  </div>
-                  <span>by {course.instructor}</span>
-                  <Badge variant="outline">{course.category}</Badge>
-                </div>
-
-                <Button size="sm" className={course.status === "Completed" ? "bg-green-600 hover:bg-green-700" : ""}>
-                  {course.status === "Completed" ? (
-                    <>
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      View Certificate
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-4 h-4 mr-2" />
-                      {course.status === "Not Started" ? "Start Course" : "Continue"}
-                    </>
-                  )}
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-teal-800">Catalog</h2>
+        <div className="grid gap-3 md:grid-cols-2">
+          {catalog
+            .filter((c) => c.status === "active")
+            .map((c) => (
+              <div key={c.id} className="rounded-2xl border p-4">
+                <p className="font-semibold">{c.title}</p>
+                <p className="text-xs text-muted-foreground capitalize">
+                  {c.category} · {c.duration || c.duration_hours}h · {c.type || c.delivery_type}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{c.description}</p>
+                <Button
+                  size="sm"
+                  className="mt-3 bg-teal-700 text-white hover:bg-teal-800"
+                  disabled={enrolledIds.has(c.id) || !employeeId}
+                  onClick={() => void enroll(c.id)}
+                >
+                  {enrolledIds.has(c.id) ? "Enrolled" : "Enroll"}
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            ))}
+        </div>
+      </section>
     </div>
   )
 }
