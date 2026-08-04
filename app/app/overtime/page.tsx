@@ -60,6 +60,9 @@ export default function AdminOvertimePage() {
   const [rejectReason, setRejectReason] = useState("")
   const [generating, setGenerating] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [recalculating, setRecalculating] = useState(false)
+  const [graSyncing, setGraSyncing] = useState(false)
+  const [graInfo, setGraInfo] = useState<any>(null)
   const [otFrom, setOtFrom] = useState(() => new Date().toISOString().slice(0, 10))
   const [otTo, setOtTo] = useState(() => new Date().toISOString().slice(0, 10))
   const [reportPeriod, setReportPeriod] = useState(currentPeriod)
@@ -179,6 +182,64 @@ export default function AdminOvertimePage() {
       toast({ title: "Error", description: err.message, variant: "destructive" })
     } finally {
       setGenerating(false)
+    }
+  }
+
+  const syncGraRates = async () => {
+    setGraSyncing(true)
+    try {
+      const year = Number(String(reportPeriod).slice(0, 4)) || new Date().getFullYear()
+      const res = await fetch("/api/gra/labour-rates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action: "sync", year }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "GRA sync failed")
+      setGraInfo(json)
+      toast({
+        title: "GRA labour rates synced",
+        description: `NDMW ${money(json.rate?.daily_minimum_wage || 0)}/day · hourly floor ${money(json.derived?.hourly_minimum || 0)}.`,
+      })
+    } catch (err: any) {
+      toast({ title: "GRA sync failed", description: err.message, variant: "destructive" })
+    } finally {
+      setGraSyncing(false)
+    }
+  }
+
+  const recalculateEarnings = async () => {
+    setRecalculating(true)
+    try {
+      // Ensure GRA rates are present first
+      await fetch("/api/gra/labour-rates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          action: "sync",
+          year: Number(String(reportPeriod).slice(0, 4)) || new Date().getFullYear(),
+        }),
+      })
+      const res = await fetch("/api/overtime/recalculate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ period: reportPeriod }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Recalculate failed")
+      toast({
+        title: "OT earnings recalculated",
+        description: `Updated ${json.updated || 0} of ${json.total || 0} approved row(s).`,
+      })
+      void loadReport()
+      mutate("/api/overtime")
+    } catch (err: any) {
+      toast({ title: "Recalculate failed", description: err.message, variant: "destructive" })
+    } finally {
+      setRecalculating(false)
     }
   }
 
@@ -480,6 +541,14 @@ export default function AdminOvertimePage() {
                     onChange={(e) => setReportPeriod(e.target.value)}
                   />
                 </div>
+                <Button variant="outline" onClick={() => void syncGraRates()} disabled={graSyncing}>
+                  {graSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                  Sync GRA rates
+                </Button>
+                <Button variant="outline" onClick={() => void recalculateEarnings()} disabled={recalculating}>
+                  {recalculating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Timer className="mr-2 h-4 w-4" />}
+                  Recalculate earnings
+                </Button>
                 <Button variant="outline" onClick={() => void loadReport()} disabled={reportLoading}>
                   {reportLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
                   Refresh
@@ -495,7 +564,7 @@ export default function AdminOvertimePage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-4">
                 <div className="rounded-lg border p-3">
                   <p className="text-xs text-muted-foreground">Employees with OT</p>
                   <p className="text-xl font-semibold">{report?.employee_count ?? "—"}</p>
@@ -508,7 +577,24 @@ export default function AdminOvertimePage() {
                   <p className="text-xs text-muted-foreground">Total earned</p>
                   <p className="text-xl font-semibold">{report ? money(report.total_amount) : "—"}</p>
                 </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs text-muted-foreground">GRA hourly floor</p>
+                  <p className="text-xl font-semibold">
+                    {graInfo?.derived?.hourly_minimum != null
+                      ? money(graInfo.derived.hourly_minimum)
+                      : "Sync GRA"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    NDMW {graInfo?.rate?.daily_minimum_wage != null ? money(graInfo.rate.daily_minimum_wage) : "—"}/day
+                  </p>
+                </div>
               </div>
+              {report && Number(report.total_amount || 0) === 0 && Number(report.total_hours || 0) > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  Earnings are GH₵0 — click <strong>Sync GRA rates</strong> then <strong>Recalculate earnings</strong>{" "}
+                  to apply the National Daily Minimum Wage hourly floor (or employee basic ÷ 173.33).
+                </div>
+              )}
 
               {reportLoading ? (
                 <div className="flex items-center gap-2 py-8 text-muted-foreground">

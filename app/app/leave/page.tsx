@@ -65,6 +65,7 @@ type LeaveType = {
   category?: string
   entitlement_amount?: number
   is_paid?: boolean
+  payment_percentage?: number
   requires_approval?: boolean
   allow_carry_over?: boolean
   max_carry_over_days?: number
@@ -81,6 +82,7 @@ const EMPTY_TYPE_FORM = {
   category: "general",
   entitlement_amount: "21",
   is_paid: true,
+  payment_percentage: "100",
   requires_approval: true,
   allow_carry_over: false,
   max_carry_over_days: "0",
@@ -275,6 +277,7 @@ export default function AdminLeavePage() {
       category: t.category || "general",
       entitlement_amount: String(t.entitlement_amount ?? 0),
       is_paid: t.is_paid !== false,
+      payment_percentage: String(t.payment_percentage ?? 100),
       requires_approval: t.requires_approval !== false,
       allow_carry_over: Boolean(t.allow_carry_over),
       max_carry_over_days: String(t.max_carry_over_days ?? 0),
@@ -297,8 +300,10 @@ export default function AdminLeavePage() {
         name: typeForm.name,
         description: typeForm.description || null,
         category: typeForm.category,
+        entitlement_type: "annual",
         entitlement_amount: Number(typeForm.entitlement_amount) || 0,
         is_paid: typeForm.is_paid,
+        payment_percentage: typeForm.is_paid ? Number(typeForm.payment_percentage) || 100 : 0,
         requires_approval: typeForm.requires_approval,
         allow_carry_over: typeForm.allow_carry_over,
         max_carry_over_days: Number(typeForm.max_carry_over_days) || 0,
@@ -573,7 +578,9 @@ export default function AdminLeavePage() {
                     </p>
                     <div className="flex flex-wrap gap-1.5 text-[11px]">
                       <Badge variant="secondary">{t.entitlement_amount ?? 0} days</Badge>
-                      <Badge variant="secondary">{t.is_paid === false ? "Unpaid" : "Paid"}</Badge>
+                      <Badge variant="secondary">
+                        {t.is_paid === false ? "Unpaid" : `Paid ${t.payment_percentage ?? 100}%`}
+                      </Badge>
                       <Badge variant="secondary">{t.requires_approval === false ? "Auto" : "Approval"}</Badge>
                       {t.allow_carry_over ? <Badge variant="secondary">Carry-over</Badge> : null}
                     </div>
@@ -806,6 +813,27 @@ export default function AdminLeavePage() {
                 <Label>Paid leave</Label>
                 <Switch checked={typeForm.is_paid} onCheckedChange={(v) => setTypeForm((f) => ({ ...f, is_paid: v }))} />
               </div>
+              {typeForm.is_paid && (
+                <div>
+                  <Label>Payment % of daily rate</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={typeForm.payment_percentage}
+                    onChange={(e) => setTypeForm((f) => ({ ...f, payment_percentage: e.target.value }))}
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    100% = full pay while on leave. 50% = half pay. Unpaid portion is added to payroll deductions on
+                    approve.
+                  </p>
+                </div>
+              )}
+              {!typeForm.is_paid && (
+                <p className="text-[11px] text-amber-800 bg-amber-50 rounded-md px-2 py-1.5">
+                  Unpaid leave: on approve, days × (monthly basic ÷ 27) is written to pay inputs as a deduction.
+                </p>
+              )}
               <div className="flex items-center justify-between">
                 <Label>Requires approval</Label>
                 <Switch
@@ -835,6 +863,13 @@ export default function AdminLeavePage() {
                 <Label>Active</Label>
                 <Switch checked={typeForm.is_active} onCheckedChange={(v) => setTypeForm((f) => ({ ...f, is_active: v }))} />
               </div>
+            </div>
+            <div className="rounded-lg border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground space-y-1">
+              <p className="font-medium text-foreground text-xs">How paid leave is computed</p>
+              <p>
+                daily rate = monthly basic ÷ 27 (GRA working days). Paid amount = leave days × daily rate × payment %.
+                Saved on the leave request and unpaid remainder syncs to payroll.
+              </p>
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">

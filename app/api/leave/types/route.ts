@@ -130,15 +130,29 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = sanitizeCreate(body)
-    const { data, error } = await ctx.service
-      .from("leave_types")
-      .insert({
-        ...payload,
+    const full = {
+      ...payload,
+      company_id: ctx.companyId,
+      updated_at: new Date().toISOString(),
+    }
+
+    let { data, error } = await ctx.service.from("leave_types").insert(full).select().single()
+
+    // Fallback for older schemas missing optional columns
+    if (error && /column|does not exist/i.test(error.message)) {
+      const minimal = {
         company_id: ctx.companyId,
-        updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
+        code: payload.code,
+        name: payload.name,
+        category: payload.category || "general",
+        entitlement_type: payload.entitlement_type || "annual",
+        entitlement_amount: payload.entitlement_amount ?? 0,
+        is_paid: payload.is_paid !== false,
+        requires_approval: payload.requires_approval !== false,
+        is_active: payload.is_active !== false,
+      }
+      ;({ data, error } = await ctx.service.from("leave_types").insert(minimal).select().single())
+    }
 
     if (error) {
       if (/unique|duplicate/i.test(error.message)) {
@@ -146,7 +160,7 @@ export async function POST(request: NextRequest) {
       }
       throw new Error(error.message)
     }
-    return NextResponse.json({ leave_type: data }, { status: 201 })
+    return NextResponse.json({ leave_type: data, company_id: ctx.companyId }, { status: 201 })
   } catch (err) {
     return jsonError(err, "Failed to create leave type")
   }

@@ -3,6 +3,60 @@ import { resolveTenantContext, jsonError, isUnresolvedTenant } from "@/lib/setti
 
 export const runtime = "nodejs"
 
+const REL_ERR = /does not exist|column|more than one relationship|could not embed/i
+
+async function loadAlertsPlain(service: any, companyId: string, opts: {
+  status?: string | null
+  employeeId?: string | null
+  severity?: string | null
+  alertType?: string | null
+  limit: number
+}) {
+  let query = service
+    .from("attendance_alerts")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(opts.limit)
+
+  // Prefer company filter when column exists
+  const withCompany = query.eq("company_id", companyId)
+  let { data, error } = await withCompany
+  if (error && REL_ERR.test(error.message)) {
+    ;({ data, error } = await service
+      .from("attendance_alerts")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(opts.limit))
+  }
+  if (error) throw new Error(error.message)
+
+  let rows = (data || []).filter((r: any) => !r.company_id || r.company_id === companyId)
+  if (opts.status && opts.status !== "all") {
+    const st = opts.status === "open" ? "pending" : opts.status
+    rows = rows.filter((r: any) => r.status === st)
+  }
+  if (opts.employeeId) rows = rows.filter((r: any) => r.employee_id === opts.employeeId)
+  if (opts.severity && opts.severity !== "all") rows = rows.filter((r: any) => r.severity === opts.severity)
+  if (opts.alertType) rows = rows.filter((r: any) => r.alert_type === opts.alertType)
+
+  // Attach employees in a second query (avoids ambiguous FK embed)
+  const empIds = [...new Set(rows.map((r: any) => r.employee_id).filter(Boolean))]
+  let empMap = new Map<string, any>()
+  if (empIds.length) {
+    const { data: emps } = await service
+      .from("employees")
+      .select("id, first_name, last_name, employee_id")
+      .eq("company_id", companyId)
+      .in("id", empIds)
+    empMap = new Map((emps || []).map((e: any) => [e.id, e]))
+  }
+
+  return rows.map((r: any) => ({
+    ...r,
+    employee: r.employee_id ? empMap.get(r.employee_id) || null : null,
+  }))
+}
+
 export async function GET(request: NextRequest) {
   try {
     const ctx = await resolveTenantContext(request)
@@ -18,12 +72,13 @@ export async function GET(request: NextRequest) {
     const alertType = searchParams.get("alert_type")
     const limit = Number.parseInt(searchParams.get("limit") || "100", 10)
 
+    // Explicit FK hint — avoids "more than one relationship" with acknowledged_by/resolved_by
     let query = ctx.service
       .from("attendance_alerts")
       .select(
         `
         *,
-        employee:employees(id, first_name, last_name, employee_id),
+        employee:employees!attendance_alerts_employee_id_fkey(id, first_name, last_name, employee_id),
         rule:attendance_alert_rules(rule_name, severity, notification_channels)
       `,
       )
@@ -31,7 +86,6 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(limit)
 
-    // "open" is treated as pending for UI convenience
     if (status && status !== "all") {
       if (status === "open") query = query.eq("status", "pending")
       else query = query.eq("status", status)
@@ -42,15 +96,15 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await query
     if (error) {
-      // Fallback without join / company filter if schema differs
-      if (/does not exist|column/i.test(error.message)) {
-        const fb = await ctx.service
-          .from("attendance_alerts")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(limit)
-        if (fb.error) throw new Error(fb.error.message)
-        return NextResponse.json({ success: true, data: fb.data || [] })
+      if (REL_ERR.test(error.message)) {
+        const rows = await loadAlertsPlain(ctx.service, ctx.companyId, {
+          status,
+          employeeId,
+          severity,
+          alertType,
+          limit,
+        })
+        return NextResponse.json({ success: true, data: rows })
       }
       throw new Error(error.message)
     }
@@ -70,22 +124,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     }
 
-    const { data, error } = await ctx.service
-      .from("attendance_alerts")
-      .insert({
-        company_id: ctx.companyId,
-        rule_id: body.rule_id ?? null,
-        employee_id: body.employee_id ?? null,
-        alert_type: body.alert_type || "general",
-        severity: body.severity || "medium",
-        title: body.title || "Attendance alert",
-        message: body.message || null,
-        metadata: body.metadata || {},
-        status: body.status || "pending",
-      })
-      .select()
-      .single()
+    const payload: Record<string, any> = {
+      company_id: ctx.companyId,
+      rule_id: body.rule_id ?? null,
+      employee_id: body.employee_id ?? null,
+      alert_type: body.alert_type || "general",
+      severity: body.severity || "medium",
+      title: body.title || "Attendance alert",
+      message: body.message || "",
+      metadata: body.metadata || {},
+      status: body.status || "pending",
+    }
 
+    let { data, error } = await ctx.service.from("attendance_alerts").insert(payload).select().single()
+    if (error && /column|does not exist/i.test(error.message)) {
+      const minimal = {
+        company_id: ctx.companyId,
+        employee_id: payload.employee_id,
+        alert_type: payload.alert_type,
+        severity: payload.severity,
+        title: payload.title,
+        message: payload.message || "Attendance alert",
+        status: "pending",
+      }
+      ;({ data, error } = await ctx.service.from("attendance_alerts").insert(minimal).select().single())
+    }
     if (error) throw new Error(error.message)
     return NextResponse.json({ success: true, data }, { status: 201 })
   } catch (error) {
@@ -112,14 +175,13 @@ export async function PATCH(request: NextRequest) {
       updated_at: new Date().toISOString(),
     }
 
+    // Do NOT set acknowledged_by/resolved_by to auth.uid — those FKs point at employees(id)
     if (action === "acknowledge" || action === "acknowledged") {
       updates.status = "acknowledged"
       updates.acknowledged_at = new Date().toISOString()
-      if (ctx.userId) updates.acknowledged_by = ctx.userId
     } else if (action === "resolve" || action === "resolved") {
       updates.status = "resolved"
       updates.resolved_at = new Date().toISOString()
-      if (ctx.userId) updates.resolved_by = ctx.userId
       if (body.resolution_note || body.response_note) {
         updates.resolution_note = body.resolution_note || body.response_note
       }
@@ -150,8 +212,7 @@ export async function PATCH(request: NextRequest) {
       .select()
       .single()
 
-    if (error && /column|does not exist/i.test(error.message)) {
-      // Retry with minimal columns
+    if (error && REL_ERR.test(error.message)) {
       const minimal: Record<string, any> = { status: updates.status }
       if (updates.acknowledged_at) minimal.acknowledged_at = updates.acknowledged_at
       if (updates.resolved_at) minimal.resolved_at = updates.resolved_at
@@ -167,16 +228,6 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (error) throw new Error(error.message)
-
-    if ((action === "acknowledge" || action === "acknowledged") && (body.response_note || body.resolution_note)) {
-      await ctx.service.from("alert_acknowledgments").insert({
-        alert_id: alertId,
-        employee_id: ctx.userId,
-        response_note: body.response_note || body.resolution_note,
-        action_taken: action,
-      })
-    }
-
     return NextResponse.json({ success: true, data })
   } catch (error) {
     return jsonError(error, "Failed to update attendance alert")

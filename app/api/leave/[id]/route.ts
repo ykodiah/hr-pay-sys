@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { resolveTenantContext, jsonError, isUnresolvedTenant } from "@/lib/settings/resolve-tenant"
-import { debitLeaveBalance, markAttendanceLeave } from "@/lib/services/leave-ops-service"
+import {
+  computeLeavePay,
+  debitLeaveBalance,
+  markAttendanceLeave,
+  syncLeaveDeductionToPayroll,
+} from "@/lib/services/leave-ops-service"
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -27,15 +32,39 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     if (action === "approve") {
-      const { error } = await service
-        .from("leave_requests")
-        .update({
+      const pay = await computeLeavePay({
+        service,
+        companyId,
+        employeeId: existing.employee_id,
+        leaveTypeId: existing.leave_type_id,
+        startDate: existing.start_date,
+        endDate: existing.end_date,
+        daysRequested: existing.days_requested,
+      })
+
+      const update: Record<string, any> = {
+        status: "approved",
+        approved_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        is_paid_leave: pay.is_paid,
+        payment_percentage_applied: pay.payment_percentage,
+        daily_rate_used: pay.daily_rate,
+        paid_amount: pay.paid_amount,
+        unpaid_deduction: pay.unpaid_deduction,
+        days_requested: pay.days,
+      }
+      if (userId && !String(userId).startsWith("demo-")) update.approved_by = userId
+
+      let { error } = await service.from("leave_requests").update(update).eq("id", id).eq("company_id", companyId)
+      if (error && /column|does not exist|foreign key|approved_by/i.test(error.message)) {
+        const minimal: Record<string, any> = {
           status: "approved",
-          approved_by: userId,
-          approved_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", id)
+          approved_at: update.approved_at,
+          updated_at: update.updated_at,
+        }
+        const retry = await service.from("leave_requests").update(minimal).eq("id", id)
+        error = retry.error
+      }
       if (error) throw new Error(error.message)
 
       try {
@@ -51,13 +80,26 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           companyId,
           existing.employee_id,
           existing.leave_type_id,
-          Number(existing.days_requested || 0),
+          Number(pay.days || 0),
         )
+        if (pay.unpaid_deduction > 0) {
+          await syncLeaveDeductionToPayroll({
+            service,
+            companyId,
+            employeeId: existing.employee_id,
+            startDate: existing.start_date,
+            unpaidDeduction: pay.unpaid_deduction,
+          })
+        }
       } catch (e) {
         console.warn("[leave] approve side effects:", e)
       }
 
-      return NextResponse.json({ success: true, message: "Leave request approved" })
+      return NextResponse.json({
+        success: true,
+        message: "Leave request approved",
+        leave_pay: pay,
+      })
     }
 
     if (action === "reject") {

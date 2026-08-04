@@ -236,6 +236,35 @@ export default function AttendanceAlertsPage() {
             <RefreshCw className={cn("mr-2 h-4 w-4", syncing && "animate-spin")} />
             Sync
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={syncing}
+            onClick={async () => {
+              setSyncing(true)
+              try {
+                const res = await fetch("/api/attendance/alerts/evaluate", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  credentials: "include",
+                  body: JSON.stringify({}),
+                })
+                const json = await res.json().catch(() => ({}))
+                if (!res.ok) throw new Error(json.error || "Evaluate failed")
+                toast({
+                  title: "Alerts evaluated",
+                  description: json.message || `Created ${json.created || 0} alert(s)`,
+                })
+                await load(true)
+              } catch (e: any) {
+                toast({ title: "Evaluate failed", description: e.message, variant: "destructive" })
+              } finally {
+                setSyncing(false)
+              }
+            }}
+          >
+            Run rules
+          </Button>
           <Button asChild size="sm" className="bg-teal-600 hover:bg-teal-700">
             <Link href="/app/attendance">Attendance Register</Link>
           </Button>

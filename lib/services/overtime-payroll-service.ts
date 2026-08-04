@@ -1,4 +1,9 @@
 import { createServiceClient } from "@/lib/supabase/server"
+import {
+  getGraLabourRateForYear,
+  graHourlyMinimum,
+  type GraLabourRate,
+} from "@/lib/gra-labour-rates"
 
 /** Standard monthly hours for hourly-rate conversion (Ghana / common HR practice). */
 export const STANDARD_MONTHLY_HOURS = 173.33
@@ -22,6 +27,31 @@ function getDb() {
   return createServiceClient()
 }
 
+async function loadGraRate(
+  service: ReturnType<typeof createServiceClient>,
+  workDate?: string,
+): Promise<GraLabourRate> {
+  const year = workDate ? Number(String(workDate).slice(0, 4)) : new Date().getFullYear()
+  const { data } = await service.from("gra_labour_rates").select("*").eq("year", year).maybeSingle()
+  if (data?.daily_minimum_wage != null) {
+    return {
+      year,
+      daily_minimum_wage: Number(data.daily_minimum_wage),
+      hours_per_day: Number(data.hours_per_day || 8),
+      working_days_per_month: Number(data.working_days_per_month || 27),
+      standard_monthly_hours: Number(data.standard_monthly_hours || STANDARD_MONTHLY_HOURS),
+      overtime_weekday_multiplier: Number(data.overtime_weekday_multiplier || 1.5),
+      overtime_weekend_multiplier: Number(data.overtime_weekend_multiplier || 2.0),
+      overtime_holiday_multiplier: Number(data.overtime_holiday_multiplier || 2.0),
+      currency: data.currency || "GHS",
+      effective_from: data.effective_from || `${year}-01-01`,
+      effective_to: data.effective_to || null,
+      source: data.source || "gra_labour_rates",
+    }
+  }
+  return getGraLabourRateForYear(year)
+}
+
 async function resolveMultiplier(
   service: ReturnType<typeof createServiceClient>,
   companyId: string,
@@ -41,25 +71,76 @@ async function resolveMultiplier(
     }
   }
 
+  // Company overtime_rates by type
   const day = new Date(`${workDate}T12:00:00`).getDay()
   const isWeekend = day === 0 || day === 6
+  const rateType = isWeekend ? "weekend" : "weekday"
+  const { data: companyRate } = await service
+    .from("overtime_rates")
+    .select("multiplier, rate_type")
+    .eq("company_id", companyId)
+    .eq("rate_type", rateType)
+    .eq("is_active", true)
+    .maybeSingle()
+  if (companyRate?.multiplier != null) {
+    return { multiplier: Number(companyRate.multiplier), rateType }
+  }
+
+  // GRA / payroll_configuration fallback
+  const gra = await loadGraRate(service, workDate)
+  const { data: cfg } = await service
+    .from("payroll_configuration")
+    .select("overtime_weekday_multiplier, overtime_weekend_multiplier")
+    .eq("company_id", companyId)
+    .maybeSingle()
+
   if (isWeekend) {
     return {
-      multiplier: Number(employeeRates?.weekend || 2.0),
+      multiplier: Number(
+        employeeRates?.weekend ||
+          cfg?.overtime_weekend_multiplier ||
+          gra.overtime_weekend_multiplier ||
+          2.0,
+      ),
       rateType: "weekend",
     }
   }
   return {
-    multiplier: Number(employeeRates?.weekday || 1.5),
+    multiplier: Number(
+      employeeRates?.weekday ||
+        cfg?.overtime_weekday_multiplier ||
+        gra.overtime_weekday_multiplier ||
+        1.5,
+    ),
     rateType: "weekday",
   }
 }
 
+/**
+ * Hourly OT base:
+ * 1) Employee monthly basic ÷ GRA/standard monthly hours
+ * 2) Floor at GRA National Daily Minimum Wage ÷ hours/day
+ * Never returns 0 when GRA catalog is available.
+ */
 async function resolveHourlyRate(
   service: ReturnType<typeof createServiceClient>,
   companyId: string,
   employeeId: string,
+  workDate?: string,
 ): Promise<number> {
+  const gra = await loadGraRate(service, workDate)
+  const monthlyHours = Number(gra.standard_monthly_hours || STANDARD_MONTHLY_HOURS)
+  const graFloor = graHourlyMinimum(gra)
+
+  // Company minimum wage override (daily)
+  const { data: cfg } = await service
+    .from("payroll_configuration")
+    .select("minimum_wage")
+    .eq("company_id", companyId)
+    .maybeSingle()
+  const companyDaily = Number(cfg?.minimum_wage || 0)
+  const floor = companyDaily > 0 ? companyDaily / (gra.hours_per_day || 8) : graFloor
+
   const { data: fin } = await service
     .from("employee_financial")
     .select("monthly_salary, basic_salary, weekday_overtime_rate, weekend_overtime_rate")
@@ -76,8 +157,70 @@ async function resolveHourlyRate(
       .maybeSingle()
     monthly = Number(emp?.salary ?? 0)
   }
-  if (!monthly || monthly <= 0) return 0
-  return Math.round((monthly / STANDARD_MONTHLY_HOURS) * 10000) / 10000
+
+  if (monthly > 0) {
+    const fromSalary = monthly / monthlyHours
+    // Employee rate, but never below GRA/company statutory floor
+    return Math.round(Math.max(fromSalary, floor) * 10000) / 10000
+  }
+
+  return Math.round(floor * 10000) / 10000
+}
+
+/** Recalculate amount_earned for approved OT in a period (fixes GH₵0 rows). */
+export async function recalculateApprovedOvertime(input: {
+  companyId: string
+  period: string
+}) {
+  const service = getDb()
+  const { from, to } = periodBounds(input.period)
+  const { data: rows, error } = await service
+    .from("overtime_requests")
+    .select("*")
+    .eq("company_id", input.companyId)
+    .eq("status", "approved")
+    .gte("date", from)
+    .lte("date", to)
+
+  if (error) throw new Error(error.message)
+
+  let updated = 0
+  for (const r of rows || []) {
+    const hours = Number(r.hours_approved ?? r.hours_requested ?? 0)
+    if (!hours) continue
+    const { data: fin } = await service
+      .from("employee_financial")
+      .select("weekday_overtime_rate, weekend_overtime_rate")
+      .eq("employee_id", r.employee_id)
+      .maybeSingle()
+    const hourly = await resolveHourlyRate(service, input.companyId, r.employee_id, r.date)
+    const { multiplier, rateType } = await resolveMultiplier(
+      service,
+      input.companyId,
+      r.rate_type_id,
+      r.date,
+      {
+        weekday: Number(fin?.weekday_overtime_rate || 0) || undefined,
+        weekend: Number(fin?.weekend_overtime_rate || 0) || undefined,
+      },
+    )
+    const amount = Math.round(hours * hourly * multiplier * 100) / 100
+    const { error: updErr } = await service
+      .from("overtime_requests")
+      .update({
+        amount_earned: amount,
+        hourly_rate_used: hourly,
+        multiplier_used: multiplier,
+        rate_label: rateType,
+        pay_period: input.period,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", r.id)
+      .eq("company_id", input.companyId)
+    if (!updErr) updated += 1
+  }
+
+  return { period: input.period, updated, total: (rows || []).length }
 }
 
 /**
@@ -107,15 +250,15 @@ export async function finalizeApprovedOvertime(input: {
     .eq("employee_id", existing.employee_id)
     .maybeSingle()
 
-  const hourly = await resolveHourlyRate(service, input.companyId, existing.employee_id)
+  const hourly = await resolveHourlyRate(service, input.companyId, existing.employee_id, existing.date)
   const { multiplier, rateType } = await resolveMultiplier(
     service,
     input.companyId,
     existing.rate_type_id,
     existing.date,
     {
-      weekday: Number(fin?.weekday_overtime_rate || 1.5),
-      weekend: Number(fin?.weekend_overtime_rate || 2.0),
+      weekday: Number(fin?.weekday_overtime_rate || 0) || undefined,
+      weekend: Number(fin?.weekend_overtime_rate || 0) || undefined,
     },
   )
 
@@ -230,7 +373,9 @@ export async function syncOvertimeToPayroll(input: {
     let amount = Number(r.amount_earned ?? 0)
     let hours = Number(r.hours_approved ?? r.hours_requested ?? 0)
     if (!amount && hours > 0) {
-      const hourly = Number(r.hourly_rate_used) || (await resolveHourlyRate(service, input.companyId, r.employee_id))
+      const hourly =
+        Number(r.hourly_rate_used) ||
+        (await resolveHourlyRate(service, input.companyId, r.employee_id, r.date))
       const multiplier = Number(r.multiplier_used) || 1.5
       amount = Math.round(hours * hourly * multiplier * 100) / 100
       // Persist when columns exist
@@ -285,25 +430,35 @@ export async function syncOvertimeToPayroll(input: {
         }
       }
 
-      // Preserve existing pay-input fields; only set overtime_amount + period bounds
-      const upsert = {
-        ...(existing || {}),
-        id: existing?.id,
+      // Preserve existing pay-input fields; only refresh overtime_amount + period bounds
+      const upsert: Record<string, any> = {
         company_id: input.companyId,
         employee_id: employeeId,
         pay_period: period,
         pay_period_start: existing?.pay_period_start || from,
         pay_period_end: existing?.pay_period_end || to,
+        basic_salary: existing?.basic_salary ?? null,
+        transport_allowance: existing?.transport_allowance ?? null,
+        housing_allowance: existing?.housing_allowance ?? null,
+        medical_allowance: existing?.medical_allowance ?? null,
+        meal_allowance: existing?.meal_allowance ?? null,
+        communication_allowance: existing?.communication_allowance ?? null,
+        uniform_allowance: existing?.uniform_allowance ?? null,
+        other_allowances: existing?.other_allowances ?? null,
         overtime_amount: amount,
         bonus_amount: Number(existing?.bonus_amount ?? 0),
         loan_deduction: Number(existing?.loan_deduction ?? 0),
         advance_deduction: Number(existing?.advance_deduction ?? 0),
         other_deductions: Number(existing?.other_deductions ?? 0),
+        tier2_applicable: existing?.tier2_applicable !== false,
+        tier3_applicable: Boolean(existing?.tier3_applicable),
+        tier3_employee_rate: Number(existing?.tier3_employee_rate ?? 0),
+        apply_to_master: Boolean(existing?.apply_to_master),
+        notes: existing?.notes ?? null,
         status: existing?.status || "draft",
         updated_at: new Date().toISOString(),
       }
-      // Avoid sending read-only / join noise
-      delete (upsert as any).created_at
+      if (existing?.id) upsert.id = existing.id
 
       const { error: upErr } = await service
         .from("payroll_pay_inputs")
