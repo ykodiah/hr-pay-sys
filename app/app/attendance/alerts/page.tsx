@@ -159,30 +159,42 @@ export default function AttendanceAlertsPage() {
   }
 
   async function saveRule() {
+    if (!ruleForm.name.trim()) {
+      toast({ title: "Rule name required", variant: "destructive" })
+      return
+    }
     try {
       const res = await fetch("/api/attendance/alerts/rules", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          rule_name: ruleForm.name,
+          rule_name: ruleForm.name.trim(),
+          name: ruleForm.name.trim(),
           alert_type: ruleForm.alert_type,
           alert_category: ruleForm.alert_type,
+          rule_type: "attendance",
           severity: ruleForm.severity,
           threshold_minutes: Number(ruleForm.threshold_minutes) || null,
           notify_manager: ruleForm.notify_manager,
           notify_hr: ruleForm.notify_hr,
           notification_channels: ["in_app"],
+          channels: ["in_app"],
           is_active: true,
         }),
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.error || "Failed to save rule")
-      toast({ title: "Alert rule saved" })
+      if (!res.ok) throw new Error(json.error || json.message || "Failed to save rule")
+      toast({ title: "Alert rule saved", description: "Synced to the database." })
       setRuleForm((p) => ({ ...p, name: "" }))
+      setTab("rules")
       await load(true)
     } catch (e: any) {
-      toast({ title: "Save failed", description: e.message || "Failed to save rule", variant: "destructive" })
+      toast({
+        title: "Could not save alert rule",
+        description: e.message || "Check that script 101 has been applied.",
+        variant: "destructive",
+      })
     }
   }
 

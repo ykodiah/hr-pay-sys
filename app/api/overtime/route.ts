@@ -52,8 +52,10 @@ export async function GET(request: NextRequest) {
         employee_id_no: r.employees?.employee_id ?? null,
         department: r.employees?.department ?? null,
         position: r.employees?.position ?? null,
-        rate_type: r.overtime_rates?.rate_type ?? null,
-        multiplier: r.overtime_rates?.multiplier ?? 1.5,
+        rate_type: r.overtime_rates?.rate_type ?? r.rate_label ?? null,
+        multiplier: r.overtime_rates?.multiplier ?? r.multiplier_used ?? 1.5,
+        hours: Number(r.hours_approved ?? r.hours_requested ?? 0),
+        overtime_type: r.rate_label || r.overtime_rates?.rate_type || r.source || "weekday",
       }))
       return NextResponse.json({ requests: mapped, company_id: companyId })
     }
@@ -64,8 +66,10 @@ export async function GET(request: NextRequest) {
       employee_id_no: r.employees?.employee_id ?? null,
       department: r.employees?.department ?? null,
       position: r.employees?.position ?? null,
-      rate_type: r.overtime_rates?.rate_type ?? null,
-      multiplier: r.overtime_rates?.multiplier ?? 1.5,
+      rate_type: r.overtime_rates?.rate_type ?? r.rate_label ?? null,
+      multiplier: r.overtime_rates?.multiplier ?? r.multiplier_used ?? 1.5,
+      hours: Number(r.hours_approved ?? r.hours_requested ?? 0),
+      overtime_type: r.rate_label || r.overtime_rates?.rate_type || r.source || "weekday",
     }))
 
     return NextResponse.json({ requests: mapped, company_id: companyId })

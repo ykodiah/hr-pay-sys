@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { resolveTenantContext, jsonError, isUnresolvedTenant } from "@/lib/settings/resolve-tenant"
+import { finalizeApprovedOvertime } from "@/lib/services/overtime-payroll-service"
 
 /**
  * PATCH /api/overtime/[id]
- * Approve or reject overtime using service client (avoids RLS / auth.users FK failures).
+ * Approve → compute earned amount + queue for month-end payroll.
+ * Reject → store reason. All writes company-scoped.
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -26,13 +28,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       .from("overtime_requests")
       .select("*")
       .eq("id", id)
+      .eq("company_id", companyId)
       .maybeSingle()
 
     if (fetchErr) throw new Error(fetchErr.message)
     if (!existing) {
-      return NextResponse.json({ error: "Overtime request not found" }, { status: 404 })
-    }
-    if (existing.company_id && existing.company_id !== companyId) {
       return NextResponse.json({ error: "Overtime request not found" }, { status: 404 })
     }
 
@@ -42,40 +42,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           ? Number(hours_approved)
           : Number(existing.hours_requested || 0)
 
-      const update: Record<string, any> = {
-        status: "approved",
-        hours_approved: approvedHours,
-        approved_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-      // Only set approved_by when we have a real user id (avoid brittle auth.users FK)
-      if (userId && !String(userId).startsWith("demo-")) {
-        update.approved_by = userId
-      }
+      const result = await finalizeApprovedOvertime({
+        companyId,
+        requestId: id,
+        hoursApproved: approvedHours,
+        userId,
+      })
 
-      const { data, error } = await service
-        .from("overtime_requests")
-        .update(update)
-        .eq("id", id)
-        .select()
-        .single()
-
-      if (error) {
-        // Retry without approved_by if FK fails
-        if (/foreign key|approved_by/i.test(error.message)) {
-          delete update.approved_by
-          const retry = await service
-            .from("overtime_requests")
-            .update(update)
-            .eq("id", id)
-            .select()
-            .single()
-          if (retry.error) throw new Error(retry.error.message)
-          return NextResponse.json({ success: true, message: "Overtime approved", request: retry.data })
-        }
-        throw new Error(error.message)
-      }
-      return NextResponse.json({ success: true, message: "Overtime approved", request: data })
+      return NextResponse.json({
+        success: true,
+        message: "Overtime approved and queued for month-end payroll",
+        request: result.request,
+        earnings: result.earnings,
+        warning: (result as any).warning,
+        next_step:
+          "At month-end, open Overtime → Monthly report and click Sync to Pay Inputs, then process payroll.",
+      })
     }
 
     if (action === "reject" || action === "rejected") {
@@ -84,11 +66,29 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         .update({
           status: "rejected",
           rejection_reason: rejection_reason ?? null,
+          payroll_status: "excluded",
           updated_at: new Date().toISOString(),
         })
         .eq("id", id)
+        .eq("company_id", companyId)
         .select()
         .single()
+
+      if (error && /column|does not exist/i.test(error.message)) {
+        const retry = await service
+          .from("overtime_requests")
+          .update({
+            status: "rejected",
+            rejection_reason: rejection_reason ?? null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id)
+          .eq("company_id", companyId)
+          .select()
+          .single()
+        if (retry.error) throw new Error(retry.error.message)
+        return NextResponse.json({ success: true, message: "Overtime rejected", request: retry.data })
+      }
       if (error) throw new Error(error.message)
       return NextResponse.json({ success: true, message: "Overtime rejected", request: data })
     }
