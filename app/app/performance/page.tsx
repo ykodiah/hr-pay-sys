@@ -1,1286 +1,1006 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Separator } from "@/components/ui/separator"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import {
   Target,
+  Star,
   TrendingUp,
   Users,
-  Calendar,
-  FileText,
-  Eye,
-  Edit,
-  MoreHorizontal,
-  Plus,
-  Search,
-  Download,
-  Clock,
-  Star,
   Award,
-  BarChart3,
-  User,
-  Building,
-  ArrowUp,
+  Plus,
+  Sparkles,
+  RefreshCw,
+  Brain,
+  CheckCircle2,
+  AlertTriangle,
   Lightbulb,
-  Crown,
+  Trash2,
+  BarChart3,
 } from "lucide-react"
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  Cell,
+} from "recharts"
+import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 
-interface Goal {
-  id: string
-  title: string
-  description: string
-  type: "individual" | "team" | "company"
-  category: "okr" | "kpi" | "development"
-  owner: string
-  department: string
-  status: "draft" | "active" | "completed" | "overdue"
-  progress: number
-  target: number
-  current: number
-  unit: string
-  startDate: string
-  endDate: string
-  parentGoal?: string
-  keyResults: KeyResult[]
+type Overview = {
+  goals: any[]
+  reviews: any[]
+  competencies: any[]
+  succession: any[]
+  insights: any[]
+  stats: {
+    activeGoals: number
+    completedGoals: number
+    avgGoalProgress: number
+    avgReviewScore: number
+    pendingReviews: number
+    highPerformers: number
+    successionReady: number
+  }
+  charts: {
+    ratingDistribution: { rating: string; count: number }[]
+    departmentAvg: { department: string; avg: number; count: number }[]
+    competencyRadar: { subject: string; score: number; fullMark: number }[]
+  }
 }
 
-interface KeyResult {
-  id: string
-  title: string
-  progress: number
-  target: number
-  current: number
-  unit: string
+type EmpOpt = { id: string; name: string; code: string; department: string }
+
+const CHART = ["#0d9488", "#14b8a6", "#2dd4bf", "#5eead4", "#99f6e4", "#f59e0b", "#f97316"]
+
+function scoreBadge(score: number | null | undefined) {
+  if (score == null) return "bg-slate-100 text-slate-600"
+  if (score >= 4.5) return "bg-emerald-100 text-emerald-800"
+  if (score >= 3.5) return "bg-teal-100 text-teal-800"
+  if (score >= 2.5) return "bg-amber-100 text-amber-800"
+  return "bg-rose-100 text-rose-800"
 }
 
-interface Review {
-  id: string
-  employeeId: string
-  employeeName: string
-  reviewerId: string
-  reviewerName: string
-  type: "annual" | "quarterly" | "probation" | "360"
-  period: string
-  status: "draft" | "in-progress" | "completed" | "overdue"
-  overallRating: number
-  competencyScores: CompetencyScore[]
-  goals: string[]
-  feedback: string
-  developmentPlan: string
-  dateCreated: string
-  dueDate: string
-}
+function PerformancePageInner() {
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get("tab") || "overview"
+  const [tab, setTab] = useState(tabParam)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [data, setData] = useState<Overview | null>(null)
+  const [employees, setEmployees] = useState<EmpOpt[]>([])
 
-interface CompetencyScore {
-  competency: string
-  score: number
-  feedback: string
-}
+  const [goalOpen, setGoalOpen] = useState(false)
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const [compOpen, setCompOpen] = useState(false)
+  const [succOpen, setSuccOpen] = useState(false)
 
-interface Competency {
-  id: string
-  name: string
-  description: string
-  category: "technical" | "leadership" | "communication" | "problem-solving"
-  level: "beginner" | "intermediate" | "advanced" | "expert"
-  roles: string[]
-}
+  const [goalForm, setGoalForm] = useState({
+    employeeId: "",
+    title: "",
+    description: "",
+    category: "Individual",
+    priority: "medium",
+    targetValue: "",
+    unit: "%",
+    dueDate: "",
+  })
+  const [reviewForm, setReviewForm] = useState({
+    employeeId: "",
+    reviewType: "quarterly",
+    periodStart: "",
+    periodEnd: "",
+    overallRating: "4",
+    goalsScore: "4",
+    competenciesScore: "4",
+    strengths: "",
+    areasForImprovement: "",
+    comments: "",
+    status: "completed",
+  })
+  const [compForm, setCompForm] = useState({
+    employeeId: "",
+    competencyName: "",
+    category: "Core",
+    currentLevel: "3",
+    targetLevel: "4",
+    assessedBy: "",
+  })
+  const [succForm, setSuccForm] = useState({
+    employeeId: "",
+    targetPosition: "",
+    readinessLevel: "developing",
+    readinessPercent: "50",
+    potentialRating: "medium",
+    developmentPlan: "",
+  })
 
-interface SuccessionPlan {
-  id: string
-  position: string
-  incumbent: string
-  department: string
-  criticality: "low" | "medium" | "high"
-  successors: Successor[]
-  riskLevel: "low" | "medium" | "high"
-  developmentNeeds: string[]
-}
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [perfRes, empRes] = await Promise.all([
+        fetch("/api/performance", { credentials: "include", cache: "no-store" }),
+        fetch("/api/employees?status=active", { credentials: "include", cache: "no-store" }),
+      ])
+      const perfJson = await perfRes.json().catch(() => ({}))
+      const empJson = await empRes.json().catch(() => ({}))
+      if (!perfRes.ok) throw new Error(perfJson.error || "Failed to load performance")
+      setData(perfJson as Overview)
+      const list = Array.isArray(empJson.data) ? empJson.data : Array.isArray(empJson) ? empJson : []
+      setEmployees(
+        list.map((e: any) => ({
+          id: String(e.id),
+          name: String(e.name || `${e.first_name || ""} ${e.last_name || ""}`.trim()),
+          code: String(e.employeeId || e.employee_id || ""),
+          department: String(e.department || ""),
+        })),
+      )
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to load performance")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
-interface Successor {
-  id: string
-  name: string
-  currentRole: string
-  readiness: "ready-now" | "1-2-years" | "2-3-years"
-  potential: "high" | "medium" | "low"
-  developmentAreas: string[]
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  useEffect(() => {
+    setTab(tabParam)
+  }, [tabParam])
+
+  async function postAction(body: Record<string, unknown>) {
+    setSaving(true)
+    try {
+      const res = await fetch("/api/performance", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Save failed")
+      toast.success("Saved")
+      await load()
+      return true
+    } catch (e: any) {
+      toast.error(e?.message || "Save failed")
+      return false
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function generateInsights() {
+    setSaving(true)
+    try {
+      const res = await fetch("/api/performance", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "generate_insights" }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Insight generation failed")
+      toast.success(`Generated ${json.generated ?? json.created ?? 0} AI insights`)
+      await load()
+    } catch (e: any) {
+      toast.error(e?.message || "Failed")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const stats = data?.stats
+  const insightIcon = (t: string) => {
+    if (t === "risk") return <AlertTriangle className="h-4 w-4 text-rose-600" />
+    if (t === "opportunity") return <Lightbulb className="h-4 w-4 text-amber-600" />
+    if (t === "recommendation") return <Brain className="h-4 w-4 text-teal-700" />
+    return <Sparkles className="h-4 w-4 text-emerald-600" />
+  }
+
+  const empName = useMemo(() => {
+    const m = new Map(employees.map((e) => [e.id, e.name]))
+    return (id: string) => m.get(id) || id.slice(0, 8)
+  }, [employees])
+
+  return (
+    <>
+      <div className="space-y-6">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-teal-700">Performance</p>
+            <h1 className="text-2xl font-bold text-slate-900">Performance Management</h1>
+            <p className="text-sm text-muted-foreground">
+              Goals, reviews, competencies, succession — synced to your database with AI insights.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="rounded-xl" onClick={() => void load()} disabled={loading}>
+              <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
+              Refresh
+            </Button>
+            <Button
+              className="rounded-xl bg-gradient-to-r from-teal-700 to-teal-600 text-white shadow-sm hover:from-teal-800 hover:to-teal-700"
+              onClick={() => void generateInsights()}
+              disabled={saving}
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              Generate AI insights
+            </Button>
+            <Button className="rounded-xl bg-teal-700 text-white hover:bg-teal-800" onClick={() => setGoalOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              New goal
+            </Button>
+            <Button variant="outline" className="rounded-xl border-teal-200" onClick={() => setReviewOpen(true)}>
+              <Star className="mr-2 h-4 w-4" />
+              New review
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: "Active goals", value: stats?.activeGoals ?? "—", icon: Target, tone: "from-teal-50 to-white" },
+            { label: "Avg review score", value: stats?.avgReviewScore ?? "—", icon: Star, tone: "from-amber-50 to-white" },
+            { label: "High performers", value: stats?.highPerformers ?? "—", icon: Award, tone: "from-emerald-50 to-white" },
+            { label: "Succession ready", value: stats?.successionReady ?? "—", icon: Users, tone: "from-sky-50 to-white" },
+          ].map((card) => (
+            <div
+              key={card.label}
+              className={cn(
+                "rounded-2xl border border-teal-100/80 bg-gradient-to-br p-4 shadow-sm",
+                card.tone,
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{card.label}</p>
+                <card.icon className="h-4 w-4 text-teal-700" />
+              </div>
+              <p className="mt-2 text-3xl font-bold tabular-nums text-slate-900">{card.value}</p>
+            </div>
+          ))}
+        </div>
+
+        <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+          <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 rounded-2xl bg-slate-100/80 p-1">
+            {[
+              ["overview", "Overview", BarChart3],
+              ["goals", "Goals", Target],
+              ["reviews", "Reviews", Star],
+              ["competencies", "Competencies", TrendingUp],
+              ["succession", "Succession", Users],
+              ["insights", "AI Insights", Brain],
+            ].map(([value, label, Icon]) => (
+              <TabsTrigger
+                key={value as string}
+                value={value as string}
+                className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-teal-800 data-[state=active]:shadow-sm"
+              >
+                <Icon className="mr-1.5 h-3.5 w-3.5" />
+                {label as string}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border bg-white p-4 shadow-sm">
+                <h3 className="mb-3 text-sm font-semibold text-slate-800">Rating distribution</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={data?.charts.ratingDistribution || []}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="rating" tick={{ fontSize: 12 }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                      <Tooltip />
+                      <Bar dataKey="count" radius={[8, 8, 0, 0]}>
+                        {(data?.charts.ratingDistribution || []).map((_, i) => (
+                          <Cell key={i} fill={CHART[i % CHART.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div className="rounded-2xl border bg-white p-4 shadow-sm">
+                <h3 className="mb-3 text-sm font-semibold text-slate-800">Competency radar</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart data={data?.charts.competencyRadar || []}>
+                      <PolarGrid stroke="#cbd5e1" />
+                      <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11 }} />
+                      <PolarRadiusAxis domain={[0, 5]} tick={{ fontSize: 10 }} />
+                      <Radar dataKey="score" stroke="#0d9488" fill="#14b8a6" fillOpacity={0.35} />
+                      <Tooltip />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div className="rounded-2xl border bg-white p-4 shadow-sm lg:col-span-2">
+                <h3 className="mb-3 text-sm font-semibold text-slate-800">Department average scores</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={data?.charts.departmentAvg || []} layout="vertical" margin={{ left: 24 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis type="number" domain={[0, 5]} tick={{ fontSize: 12 }} />
+                      <YAxis type="category" dataKey="department" width={120} tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Bar dataKey="avg" fill="#0d9488" radius={[0, 8, 8, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+            {(data?.insights || []).slice(0, 3).length > 0 && (
+              <div className="grid gap-3 md:grid-cols-3">
+                {(data?.insights || []).slice(0, 3).map((ins: any) => (
+                  <div key={ins.id} className="rounded-2xl border border-teal-100 bg-gradient-to-br from-white to-teal-50/40 p-4">
+                    <div className="mb-2 flex items-center gap-2">
+                      {insightIcon(ins.insight_type)}
+                      <Badge variant="outline" className="text-[10px] uppercase">
+                        {ins.insight_type}
+                      </Badge>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900">{ins.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground line-clamp-3">{ins.body}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="goals" className="space-y-3">
+            <div className="flex justify-end">
+              <Button size="sm" className="rounded-xl bg-teal-700 text-white hover:bg-teal-800" onClick={() => setGoalOpen(true)}>
+                <Plus className="mr-1 h-3.5 w-3.5" /> Add goal
+              </Button>
+            </div>
+            <div className="overflow-hidden rounded-2xl border bg-white">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Goal</TableHead>
+                    <TableHead>Priority</TableHead>
+                    <TableHead>Progress</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Due</TableHead>
+                    <TableHead className="w-12" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(data?.goals || []).length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                        No goals yet. Create one to start tracking.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    (data?.goals || []).map((g: any) => (
+                      <TableRow key={g.id}>
+                        <TableCell className="font-medium">{g.employee_name || empName(g.employee_id)}</TableCell>
+                        <TableCell>
+                          <div className="font-medium">{g.title}</div>
+                          <div className="text-xs text-muted-foreground">{g.category}</div>
+                        </TableCell>
+                        <TableCell className="capitalize">{g.priority}</TableCell>
+                        <TableCell className="min-w-[140px]">
+                          <div className="mb-1 flex justify-between text-xs">
+                            <span>{g.progress}%</span>
+                            <span className="text-muted-foreground">
+                              {g.current_value}/{g.target_value} {g.unit}
+                            </span>
+                          </div>
+                          <Progress value={Number(g.progress) || 0} className="h-2" />
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="capitalize">
+                            {String(g.status || "").replace(/_/g, " ")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">{g.due_date || "—"}</TableCell>
+                        <TableCell>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-rose-600"
+                            onClick={() => void postAction({ action: "delete", entity: "goal", id: g.id })}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="reviews" className="space-y-3">
+            <div className="flex justify-end">
+              <Button size="sm" className="rounded-xl bg-teal-700 text-white hover:bg-teal-800" onClick={() => setReviewOpen(true)}>
+                <Plus className="mr-1 h-3.5 w-3.5" /> Add review
+              </Button>
+            </div>
+            <div className="overflow-hidden rounded-2xl border bg-white">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Period</TableHead>
+                    <TableHead>Score</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Strengths</TableHead>
+                    <TableHead className="w-12" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(data?.reviews || []).length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                        No reviews yet.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    (data?.reviews || []).map((r: any) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="font-medium">{r.employee_name || empName(r.employee_id)}</TableCell>
+                        <TableCell className="capitalize">{r.review_type}</TableCell>
+                        <TableCell className="text-xs">
+                          {r.period_start || "—"} → {r.period_end || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", scoreBadge(Number(r.overall_rating)))}>
+                            {r.overall_rating ?? "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="capitalize">
+                            {r.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground">
+                          {r.strengths || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-rose-600"
+                            onClick={() => void postAction({ action: "delete", entity: "review", id: r.id })}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="competencies" className="space-y-3">
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="outline" className="rounded-xl" onClick={() => setCompOpen(true)}>
+                <Plus className="mr-1 h-3.5 w-3.5" /> Assess competency
+              </Button>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {(data?.competencies || []).length === 0 ? (
+                <div className="col-span-full rounded-2xl border border-dashed py-12 text-center text-muted-foreground">
+                  No competency assessments yet.
+                </div>
+              ) : (
+                (data?.competencies || []).map((c: any) => (
+                  <div key={c.id} className="rounded-2xl border bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-slate-900">{c.competency_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {c.employee_name || empName(c.employee_id)} · {c.category}
+                        </p>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-rose-600"
+                        onClick={() => void postAction({ action: "delete", entity: "competency", id: c.id })}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <div className="mt-3 flex items-end justify-between">
+                      <div>
+                        <p className="text-[10px] uppercase text-slate-500">Current</p>
+                        <p className="text-2xl font-bold text-teal-800">{c.current_level}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] uppercase text-slate-500">Target</p>
+                        <p className="text-lg font-semibold text-slate-700">{c.target_level}</p>
+                      </div>
+                    </div>
+                    <Progress
+                      className="mt-3 h-2"
+                      value={Math.min(100, (Number(c.current_level) / Math.max(1, Number(c.target_level) || 5)) * 100)}
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="succession" className="space-y-3">
+            <div className="flex justify-end">
+              <Button size="sm" className="rounded-xl bg-teal-700 text-white hover:bg-teal-800" onClick={() => setSuccOpen(true)}>
+                <Plus className="mr-1 h-3.5 w-3.5" /> Add plan
+              </Button>
+            </div>
+            <div className="overflow-hidden rounded-2xl border bg-white">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Target role</TableHead>
+                    <TableHead>Readiness</TableHead>
+                    <TableHead>Potential</TableHead>
+                    <TableHead>Plan</TableHead>
+                    <TableHead className="w-12" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(data?.succession || []).length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                        No succession plans yet.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    (data?.succession || []).map((s: any) => (
+                      <TableRow key={s.id}>
+                        <TableCell className="font-medium">{s.employee_name || empName(s.employee_id)}</TableCell>
+                        <TableCell>{s.target_position}</TableCell>
+                        <TableCell>
+                          <div className="min-w-[120px]">
+                            <div className="mb-1 flex justify-between text-xs capitalize">
+                              <span>{s.readiness_level?.replace(/_/g, " ")}</span>
+                              <span>{s.readiness_percent}%</span>
+                            </div>
+                            <Progress value={Number(s.readiness_percent) || 0} className="h-2" />
+                          </div>
+                        </TableCell>
+                        <TableCell className="capitalize">{s.potential_rating}</TableCell>
+                        <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">
+                          {s.development_plan || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-rose-600"
+                            onClick={() => void postAction({ action: "delete", entity: "succession", id: s.id })}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="insights" className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-teal-100 bg-gradient-to-r from-teal-50 to-white p-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-xl bg-teal-700 p-2 text-white">
+                  <Brain className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-900">AI / ML performance insights</p>
+                  <p className="text-sm text-muted-foreground">
+                    Heuristic models score goal completion risk, high performers, competency gaps, and succession readiness from live data.
+                  </p>
+                </div>
+              </div>
+              <Button
+                className="rounded-xl bg-gradient-to-r from-teal-700 to-emerald-600 text-white hover:from-teal-800 hover:to-emerald-700"
+                onClick={() => void generateInsights()}
+                disabled={saving}
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                Run analysis
+              </Button>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              {(data?.insights || []).length === 0 ? (
+                <div className="col-span-full rounded-2xl border border-dashed py-12 text-center text-muted-foreground">
+                  No insights yet — click Run analysis.
+                </div>
+              ) : (
+                (data?.insights || []).map((ins: any) => (
+                  <div key={ins.id} className="rounded-2xl border bg-white p-4 shadow-sm">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        {insightIcon(ins.insight_type)}
+                        <Badge variant="outline" className="capitalize">
+                          {ins.insight_type}
+                        </Badge>
+                        {ins.severity && (
+                          <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 capitalize">{ins.severity}</Badge>
+                        )}
+                      </div>
+                      {ins.confidence != null && (
+                        <span className="text-xs tabular-nums text-muted-foreground">
+                          {Math.round(Number(ins.confidence) * 100)}% conf.
+                        </span>
+                      )}
+                    </div>
+                    <p className="font-semibold text-slate-900">{ins.title}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{ins.body}</p>
+                    {ins.employee_name && (
+                      <p className="mt-2 text-xs font-medium text-teal-800">
+                        <CheckCircle2 className="mr-1 inline h-3 w-3" />
+                        {ins.employee_name}
+                      </p>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Goal dialog */}
+      <Dialog open={goalOpen} onOpenChange={setGoalOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create performance goal</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label>Employee</Label>
+              <Select value={goalForm.employeeId} onValueChange={(v) => setGoalForm((f) => ({ ...f, employeeId: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                <SelectContent>
+                  {employees.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>{e.name} ({e.code})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label>Title</Label>
+              <Input value={goalForm.title} onChange={(e) => setGoalForm((f) => ({ ...f, title: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <Select value={goalForm.category} onValueChange={(v) => setGoalForm((f) => ({ ...f, category: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["Individual", "Team", "Company", "Development"].map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Priority</Label>
+              <Select value={goalForm.priority} onValueChange={(v) => setGoalForm((f) => ({ ...f, priority: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["low", "medium", "high", "critical"].map((c) => (
+                    <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Target</Label>
+              <Input value={goalForm.targetValue} onChange={(e) => setGoalForm((f) => ({ ...f, targetValue: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Unit</Label>
+              <Input value={goalForm.unit} onChange={(e) => setGoalForm((f) => ({ ...f, unit: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Due date</Label>
+              <Input type="date" value={goalForm.dueDate} onChange={(e) => setGoalForm((f) => ({ ...f, dueDate: e.target.value }))} />
+            </div>
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label>Description</Label>
+              <Textarea value={goalForm.description} onChange={(e) => setGoalForm((f) => ({ ...f, description: e.target.value }))} rows={3} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGoalOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-teal-700 text-white hover:bg-teal-800"
+              disabled={saving || !goalForm.employeeId || !goalForm.title}
+              onClick={async () => {
+                const ok = await postAction({
+                  action: "goal",
+                  employeeId: goalForm.employeeId,
+                  title: goalForm.title,
+                  description: goalForm.description,
+                  category: goalForm.category,
+                  priority: goalForm.priority,
+                  targetValue: Number(goalForm.targetValue) || 100,
+                  unit: goalForm.unit,
+                  dueDate: goalForm.dueDate || null,
+                })
+                if (ok) setGoalOpen(false)
+              }}
+            >
+              Save goal
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Review dialog */}
+      <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create performance review</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label>Employee</Label>
+              <Select value={reviewForm.employeeId} onValueChange={(v) => setReviewForm((f) => ({ ...f, employeeId: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                <SelectContent>
+                  {employees.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Type</Label>
+              <Select value={reviewForm.reviewType} onValueChange={(v) => setReviewForm((f) => ({ ...f, reviewType: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["probation", "quarterly", "mid_year", "annual", "project"].map((t) => (
+                    <SelectItem key={t} value={t} className="capitalize">{t.replace(/_/g, " ")}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Overall rating (1–5)</Label>
+              <Input type="number" min={1} max={5} step={0.1} value={reviewForm.overallRating} onChange={(e) => setReviewForm((f) => ({ ...f, overallRating: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Period start</Label>
+              <Input type="date" value={reviewForm.periodStart} onChange={(e) => setReviewForm((f) => ({ ...f, periodStart: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Period end</Label>
+              <Input type="date" value={reviewForm.periodEnd} onChange={(e) => setReviewForm((f) => ({ ...f, periodEnd: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Goals score</Label>
+              <Input type="number" min={1} max={5} step={0.1} value={reviewForm.goalsScore} onChange={(e) => setReviewForm((f) => ({ ...f, goalsScore: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Competencies score</Label>
+              <Input type="number" min={1} max={5} step={0.1} value={reviewForm.competenciesScore} onChange={(e) => setReviewForm((f) => ({ ...f, competenciesScore: e.target.value }))} />
+            </div>
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label>Strengths</Label>
+              <Textarea rows={2} value={reviewForm.strengths} onChange={(e) => setReviewForm((f) => ({ ...f, strengths: e.target.value }))} />
+            </div>
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label>Areas for improvement</Label>
+              <Textarea rows={2} value={reviewForm.areasForImprovement} onChange={(e) => setReviewForm((f) => ({ ...f, areasForImprovement: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReviewOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-teal-700 text-white hover:bg-teal-800"
+              disabled={saving || !reviewForm.employeeId}
+              onClick={async () => {
+                const ok = await postAction({
+                  action: "review",
+                  employeeId: reviewForm.employeeId,
+                  reviewType: reviewForm.reviewType,
+                  periodStart: reviewForm.periodStart || null,
+                  periodEnd: reviewForm.periodEnd || null,
+                  overallRating: Number(reviewForm.overallRating),
+                  goalsScore: Number(reviewForm.goalsScore),
+                  competenciesScore: Number(reviewForm.competenciesScore),
+                  strengths: reviewForm.strengths,
+                  areasForImprovement: reviewForm.areasForImprovement,
+                  comments: reviewForm.comments,
+                  status: reviewForm.status,
+                })
+                if (ok) setReviewOpen(false)
+              }}
+            >
+              Save review
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Competency dialog */}
+      <Dialog open={compOpen} onOpenChange={setCompOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assess competency</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div className="space-y-1.5">
+              <Label>Employee</Label>
+              <Select value={compForm.employeeId} onValueChange={(v) => setCompForm((f) => ({ ...f, employeeId: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>
+                  {employees.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Competency</Label>
+              <Input value={compForm.competencyName} onChange={(e) => setCompForm((f) => ({ ...f, competencyName: e.target.value }))} placeholder="e.g. Leadership" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Current (1–5)</Label>
+                <Input type="number" min={1} max={5} value={compForm.currentLevel} onChange={(e) => setCompForm((f) => ({ ...f, currentLevel: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Target (1–5)</Label>
+                <Input type="number" min={1} max={5} value={compForm.targetLevel} onChange={(e) => setCompForm((f) => ({ ...f, targetLevel: e.target.value }))} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCompOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-teal-700 text-white hover:bg-teal-800"
+              disabled={saving || !compForm.employeeId || !compForm.competencyName}
+              onClick={async () => {
+                const ok = await postAction({
+                  action: "competency",
+                  employeeId: compForm.employeeId,
+                  competencyName: compForm.competencyName,
+                  category: compForm.category,
+                  currentLevel: Number(compForm.currentLevel),
+                  targetLevel: Number(compForm.targetLevel),
+                  assessedBy: compForm.assessedBy || null,
+                })
+                if (ok) setCompOpen(false)
+              }}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Succession dialog */}
+      <Dialog open={succOpen} onOpenChange={setSuccOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Succession plan</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div className="space-y-1.5">
+              <Label>Employee</Label>
+              <Select value={succForm.employeeId} onValueChange={(v) => setSuccForm((f) => ({ ...f, employeeId: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>
+                  {employees.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Target position</Label>
+              <Input value={succForm.targetPosition} onChange={(e) => setSuccForm((f) => ({ ...f, targetPosition: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Readiness</Label>
+                <Select value={succForm.readinessLevel} onValueChange={(v) => setSuccForm((f) => ({ ...f, readinessLevel: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {["ready_now", "ready_1_2_years", "ready_3_plus", "developing"].map((r) => (
+                      <SelectItem key={r} value={r}>{r.replace(/_/g, " ")}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Percent</Label>
+                <Input type="number" min={0} max={100} value={succForm.readinessPercent} onChange={(e) => setSuccForm((f) => ({ ...f, readinessPercent: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Development plan</Label>
+              <Textarea rows={3} value={succForm.developmentPlan} onChange={(e) => setSuccForm((f) => ({ ...f, developmentPlan: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSuccOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-teal-700 text-white hover:bg-teal-800"
+              disabled={saving || !succForm.employeeId || !succForm.targetPosition}
+              onClick={async () => {
+                const ok = await postAction({
+                  action: "succession",
+                  employeeId: succForm.employeeId,
+                  targetPosition: succForm.targetPosition,
+                  readinessLevel: succForm.readinessLevel,
+                  readinessPercent: Number(succForm.readinessPercent),
+                  potentialRating: succForm.potentialRating,
+                  developmentPlan: succForm.developmentPlan,
+                })
+                if (ok) setSuccOpen(false)
+              }}
+            >
+              Save plan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
 }
 
 export default function PerformancePage() {
-  const searchParams = useSearchParams()
-  const [activeTab, setActiveTab] = useState("overview")
-  const [showGoalDialog, setShowGoalDialog] = useState(false)
-  const [showReviewDialog, setShowReviewDialog] = useState(false)
-  const [showSuccessionDialog, setShowSuccessionDialog] = useState(false)
-
-  useEffect(() => {
-    const tab = searchParams.get("tab")
-    const action = searchParams.get("action")
-    const allowed = new Set(["overview", "goals", "reviews", "competencies", "succession", "analytics"])
-    if (tab && allowed.has(tab)) setActiveTab(tab)
-    if (action === "add") {
-      if (tab === "goals") setShowGoalDialog(true)
-      if (tab === "reviews") setShowReviewDialog(true)
-      if (tab === "succession") setShowSuccessionDialog(true)
-    }
-  }, [searchParams])
-
-  const [goals] = useState<Goal[]>([
-    {
-      id: "1",
-      title: "Increase Revenue by 25%",
-      description: "Drive company revenue growth through improved sales and customer retention",
-      type: "company",
-      category: "okr",
-      owner: "CEO",
-      department: "Executive",
-      status: "active",
-      progress: 68,
-      target: 25,
-      current: 17,
-      unit: "%",
-      startDate: "2024-01-01",
-      endDate: "2024-12-31",
-      keyResults: [
-        { id: "1a", title: "Acquire 100 new customers", progress: 75, target: 100, current: 75, unit: "customers" },
-        { id: "1b", title: "Improve retention rate to 95%", progress: 60, target: 95, current: 92, unit: "%" },
-      ],
-    },
-    {
-      id: "2",
-      title: "Complete React Certification",
-      description: "Obtain advanced React certification to improve technical skills",
-      type: "individual",
-      category: "development",
-      owner: "John Doe",
-      department: "Engineering",
-      status: "active",
-      progress: 40,
-      target: 1,
-      current: 0.4,
-      unit: "certification",
-      startDate: "2024-01-15",
-      endDate: "2024-06-15",
-      keyResults: [
-        { id: "2a", title: "Complete online course", progress: 80, target: 1, current: 0.8, unit: "course" },
-        { id: "2b", title: "Pass certification exam", progress: 0, target: 1, current: 0, unit: "exam" },
-      ],
-    },
-  ])
-
-  const [reviews] = useState<Review[]>([
-    {
-      id: "1",
-      employeeId: "emp1",
-      employeeName: "John Doe",
-      reviewerId: "mgr1",
-      reviewerName: "Jane Smith",
-      type: "annual",
-      period: "2024",
-      status: "in-progress",
-      overallRating: 4.2,
-      competencyScores: [
-        { competency: "Technical Skills", score: 4.5, feedback: "Excellent technical knowledge and problem-solving" },
-        {
-          competency: "Communication",
-          score: 4.0,
-          feedback: "Good communication with room for improvement in presentations",
-        },
-        { competency: "Leadership", score: 3.8, feedback: "Shows potential for leadership roles" },
-      ],
-      goals: ["Complete React Certification", "Lead 2 major projects"],
-      feedback: "John has shown excellent growth this year...",
-      developmentPlan: "Focus on presentation skills and team leadership opportunities",
-      dateCreated: "2024-01-10",
-      dueDate: "2024-02-15",
-    },
-    {
-      id: "2",
-      employeeId: "emp2",
-      employeeName: "Sarah Wilson",
-      reviewerId: "mgr2",
-      reviewerName: "Mike Johnson",
-      type: "quarterly",
-      period: "Q1 2024",
-      status: "completed",
-      overallRating: 4.6,
-      competencyScores: [
-        {
-          competency: "Project Management",
-          score: 4.8,
-          feedback: "Outstanding project delivery and team coordination",
-        },
-        { competency: "Strategic Thinking", score: 4.5, feedback: "Excellent strategic planning and execution" },
-        { competency: "Team Building", score: 4.4, feedback: "Great at building and motivating teams" },
-      ],
-      goals: ["Deliver Q1 projects on time", "Improve team productivity by 15%"],
-      feedback: "Sarah consistently exceeds expectations...",
-      developmentPlan: "Prepare for senior management role with executive coaching",
-      dateCreated: "2024-03-01",
-      dueDate: "2024-03-31",
-    },
-  ])
-
-  const [competencies] = useState<Competency[]>([
-    {
-      id: "1",
-      name: "Technical Skills",
-      description: "Proficiency in relevant technical tools and technologies",
-      category: "technical",
-      level: "intermediate",
-      roles: ["Developer", "Engineer", "Analyst"],
-    },
-    {
-      id: "2",
-      name: "Leadership",
-      description: "Ability to guide, motivate, and develop team members",
-      category: "leadership",
-      level: "advanced",
-      roles: ["Manager", "Team Lead", "Director"],
-    },
-    {
-      id: "3",
-      name: "Communication",
-      description: "Effective verbal and written communication skills",
-      category: "communication",
-      level: "intermediate",
-      roles: ["All Roles"],
-    },
-  ])
-
-  const [successionPlans] = useState<SuccessionPlan[]>([
-    {
-      id: "1",
-      position: "Engineering Manager",
-      incumbent: "Jane Smith",
-      department: "Engineering",
-      criticality: "high",
-      riskLevel: "medium",
-      developmentNeeds: ["Leadership training", "Strategic planning"],
-      successors: [
-        {
-          id: "s1",
-          name: "John Doe",
-          currentRole: "Senior Developer",
-          readiness: "1-2-years",
-          potential: "high",
-          developmentAreas: ["Team management", "Budget planning"],
-        },
-        {
-          id: "s2",
-          name: "Mike Wilson",
-          currentRole: "Tech Lead",
-          readiness: "ready-now",
-          potential: "medium",
-          developmentAreas: ["Strategic thinking"],
-        },
-      ],
-    },
-    {
-      id: "2",
-      position: "HR Director",
-      incumbent: "Sarah Johnson",
-      department: "Human Resources",
-      criticality: "high",
-      riskLevel: "low",
-      developmentNeeds: ["Digital HR transformation"],
-      successors: [
-        {
-          id: "s3",
-          name: "Lisa Brown",
-          currentRole: "HR Manager",
-          readiness: "1-2-years",
-          potential: "high",
-          developmentAreas: ["Executive presence", "Change management"],
-        },
-      ],
-    },
-  ])
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "bg-green-100 text-green-700"
-      case "active":
-      case "in-progress":
-        return "bg-blue-100 text-blue-700"
-      case "draft":
-        return "bg-gray-100 text-gray-700"
-      case "overdue":
-        return "bg-red-100 text-red-700"
-      default:
-        return "bg-gray-100 text-gray-700"
-    }
-  }
-
-  const getRatingColor = (rating: number) => {
-    if (rating >= 4.5) return "text-green-600"
-    if (rating >= 3.5) return "text-blue-600"
-    if (rating >= 2.5) return "text-yellow-600"
-    return "text-red-600"
-  }
-
-  const getReadinessColor = (readiness: string) => {
-    switch (readiness) {
-      case "ready-now":
-        return "bg-green-100 text-green-700"
-      case "1-2-years":
-        return "bg-yellow-100 text-yellow-700"
-      case "2-3-years":
-        return "bg-orange-100 text-orange-700"
-      default:
-        return "bg-gray-100 text-gray-700"
-    }
-  }
-
-  // Handler functions for buttons
-  const handleCreateGoal = () => {
-    // Add logic to create goal
-    console.log("Creating new goal...")
-    setShowGoalDialog(false)
-  }
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Performance Management</h1>
-          <p className="text-gray-600 mt-1">Manage goals, reviews, competencies, and succession planning</p>
-        </div>
-        <div className="flex space-x-2">
-          <Button variant="outline">
-            <Download className="w-4 h-4 mr-2" />
-            Export Reports
-          </Button>
-          <Dialog open={showGoalDialog} onOpenChange={setShowGoalDialog}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                New Goal
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Create New Goal</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Goal Title *</Label>
-                    <Input placeholder="Enter goal title" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Goal Type *</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="individual">Individual</SelectItem>
-                        <SelectItem value="team">Team</SelectItem>
-                        <SelectItem value="company">Company</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Textarea placeholder="Describe the goal and its importance..." rows={3} />
-                </div>
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label>Target Value</Label>
-                    <Input type="number" placeholder="Enter target" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Unit</Label>
-                    <Input placeholder="e.g., %, customers, projects" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Category</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="okr">OKR</SelectItem>
-                        <SelectItem value="kpi">KPI</SelectItem>
-                        <SelectItem value="development">Development</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Start Date</Label>
-                    <Input type="date" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>End Date</Label>
-                    <Input type="date" />
-                  </div>
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button variant="outline" onClick={() => setShowGoalDialog(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleCreateGoal}>Create Goal</Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="goals">Goals & OKRs</TabsTrigger>
-          <TabsTrigger value="reviews">Reviews</TabsTrigger>
-          <TabsTrigger value="competencies">Competencies</TabsTrigger>
-          <TabsTrigger value="succession">Succession</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid md:grid-cols-4 gap-6">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Active Goals</p>
-                    <p className="text-2xl font-bold text-gray-900">24</p>
-                  </div>
-                  <Target className="w-8 h-8 text-emerald-600" />
-                </div>
-                <div className="mt-4 flex items-center text-sm">
-                  <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                  <span className="text-green-600">68% avg progress</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Pending Reviews</p>
-                    <p className="text-2xl font-bold text-gray-900">8</p>
-                  </div>
-                  <FileText className="w-8 h-8 text-blue-600" />
-                </div>
-                <div className="mt-4 flex items-center text-sm">
-                  <Clock className="w-4 h-4 text-orange-500 mr-1" />
-                  <span className="text-orange-600">3 overdue</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Avg Performance</p>
-                    <p className="text-2xl font-bold text-gray-900">4.2</p>
-                  </div>
-                  <Star className="w-8 h-8 text-yellow-600" />
-                </div>
-                <div className="mt-4 flex items-center text-sm">
-                  <ArrowUp className="w-4 h-4 text-green-500 mr-1" />
-                  <span className="text-green-600">+0.3 from last period</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">High Performers</p>
-                    <p className="text-2xl font-bold text-gray-900">12</p>
-                  </div>
-                  <Award className="w-8 h-8 text-purple-600" />
-                </div>
-                <div className="mt-4 flex items-center text-sm">
-                  <Crown className="w-4 h-4 text-purple-500 mr-1" />
-                  <span className="text-purple-600">Top 20% performers</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Goal Progress Overview</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {goals.slice(0, 4).map((goal) => (
-                    <div key={goal.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
-                          <Target className="w-5 h-5 text-emerald-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium">{goal.title}</p>
-                          <p className="text-sm text-gray-600">
-                            {goal.owner} • {goal.department}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <Progress value={goal.progress} className="w-16 h-2" />
-                          <span className="text-sm font-medium">{goal.progress}%</span>
-                        </div>
-                        <Badge className={getStatusColor(goal.status)}>{goal.status}</Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Performance Reviews</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {reviews.slice(0, 4).map((review) => (
-                    <div key={review.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                          <User className="w-5 h-5 text-blue-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium">{review.employeeName}</p>
-                          <p className="text-sm text-gray-600">
-                            {review.type} • {review.period}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-center space-x-1 mb-1">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`w-3 h-3 ${
-                                i < Math.floor(review.overallRating) ? "text-yellow-400 fill-current" : "text-gray-300"
-                              }`}
-                            />
-                          ))}
-                          <span className="text-sm font-medium ml-1">{review.overallRating}</span>
-                        </div>
-                        <Badge className={getStatusColor(review.status)}>{review.status}</Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="goals" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <Input placeholder="Search goals..." className="pl-10 w-64" />
-              </div>
-              <Select defaultValue="all">
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="individual">Individual</SelectItem>
-                  <SelectItem value="team">Team</SelectItem>
-                  <SelectItem value="company">Company</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid gap-6">
-            {goals.map((goal) => (
-              <Card key={goal.id}>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="font-semibold text-xl">{goal.title}</h3>
-                        <Badge variant="outline" className="capitalize">
-                          {goal.type}
-                        </Badge>
-                        <Badge className={getStatusColor(goal.status)}>{goal.status}</Badge>
-                      </div>
-                      <p className="text-gray-600 mb-3">{goal.description}</p>
-                      <div className="flex items-center space-x-6 text-sm text-gray-600">
-                        <span className="flex items-center">
-                          <User className="w-4 h-4 mr-1" />
-                          {goal.owner}
-                        </span>
-                        <span className="flex items-center">
-                          <Building className="w-4 h-4 mr-1" />
-                          {goal.department}
-                        </span>
-                        <span className="flex items-center">
-                          <Calendar className="w-4 h-4 mr-1" />
-                          {goal.startDate} - {goal.endDate}
-                        </span>
-                      </div>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem>
-                          <Eye className="w-4 h-4 mr-2" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Edit className="w-4 h-4 mr-2" />
-                          Edit Goal
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <TrendingUp className="w-4 h-4 mr-2" />
-                          Update Progress
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">Overall Progress</span>
-                      <span className="text-sm text-gray-600">
-                        {goal.current} / {goal.target} {goal.unit}
-                      </span>
-                    </div>
-                    <Progress value={goal.progress} className="h-3" />
-                    <div className="flex justify-between text-xs text-gray-500 mt-1">
-                      <span>0</span>
-                      <span className="font-medium">{goal.progress}%</span>
-                      <span>
-                        {goal.target} {goal.unit}
-                      </span>
-                    </div>
-                  </div>
-
-                  {goal.keyResults.length > 0 && (
-                    <div>
-                      <h4 className="font-medium mb-3">Key Results</h4>
-                      <div className="space-y-3">
-                        {goal.keyResults.map((kr) => (
-                          <div key={kr.id} className="p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-medium">{kr.title}</span>
-                              <span className="text-sm text-gray-600">
-                                {kr.current} / {kr.target} {kr.unit}
-                              </span>
-                            </div>
-                            <Progress value={kr.progress} className="h-2" />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="reviews" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <Input placeholder="Search reviews..." className="pl-10 w-64" />
-              </div>
-              <Select defaultValue="all">
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="annual">Annual</SelectItem>
-                  <SelectItem value="quarterly">Quarterly</SelectItem>
-                  <SelectItem value="360">360 Review</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Review
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-3xl">
-                <DialogHeader>
-                  <DialogTitle>Create Performance Review</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Employee *</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select employee" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="emp1">John Doe</SelectItem>
-                          <SelectItem value="emp2">Sarah Wilson</SelectItem>
-                          <SelectItem value="emp3">Mike Johnson</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Review Type *</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="annual">Annual Review</SelectItem>
-                          <SelectItem value="quarterly">Quarterly Review</SelectItem>
-                          <SelectItem value="probation">Probation Review</SelectItem>
-                          <SelectItem value="360">360 Review</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Review Period</Label>
-                      <Input placeholder="e.g., 2024, Q1 2024" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Due Date</Label>
-                      <Input type="date" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Goals & Objectives</Label>
-                    <Textarea placeholder="List the key goals and objectives for this review period..." rows={3} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Review Template</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select template" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="standard">Standard Review</SelectItem>
-                        <SelectItem value="leadership">Leadership Review</SelectItem>
-                        <SelectItem value="technical">Technical Review</SelectItem>
-                        <SelectItem value="sales">Sales Review</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button variant="outline" onClick={() => setShowReviewDialog(false)}>
-                    Save as Draft
-                  </Button>
-                  <Button>Create Review</Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          <div className="grid gap-6">
-            {reviews.map((review) => (
-              <Card key={review.id}>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                        <User className="w-6 h-6 text-blue-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-lg">{review.employeeName}</h3>
-                        <p className="text-gray-600">
-                          {review.type} Review • {review.period}
-                        </p>
-                        <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
-                          <span>Reviewer: {review.reviewerName}</span>
-                          <span>Due: {review.dueDate}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <div className="flex items-center space-x-1 mb-2">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`w-4 h-4 ${
-                                i < Math.floor(review.overallRating) ? "text-yellow-400 fill-current" : "text-gray-300"
-                              }`}
-                            />
-                          ))}
-                          <span className={`text-lg font-bold ml-2 ${getRatingColor(review.overallRating)}`}>
-                            {review.overallRating}
-                          </span>
-                        </div>
-                        <Badge className={getStatusColor(review.status)}>{review.status}</Badge>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem>
-                            <Eye className="w-4 h-4 mr-2" />
-                            View Review
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit Review
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <FileText className="w-4 h-4 mr-2" />
-                            Generate Report
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div>
-                      <h4 className="font-medium mb-3">Competency Scores</h4>
-                      <div className="space-y-3">
-                        {review.competencyScores.map((comp, index) => (
-                          <div key={index} className="flex items-center justify-between">
-                            <span className="text-sm">{comp.competency}</span>
-                            <div className="flex items-center space-x-2">
-                              <Progress value={comp.score * 20} className="w-16 h-2" />
-                              <span className="text-sm font-medium w-8">{comp.score}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="font-medium mb-3">Key Highlights</h4>
-                      <div className="space-y-2 text-sm text-gray-600">
-                        <p>
-                          <strong>Goals:</strong> {review.goals.join(", ")}
-                        </p>
-                        <p>
-                          <strong>Development Plan:</strong> {review.developmentPlan}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="competencies" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <Input placeholder="Search competencies..." className="pl-10 w-64" />
-              </div>
-              <Select defaultValue="all">
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="technical">Technical</SelectItem>
-                  <SelectItem value="leadership">Leadership</SelectItem>
-                  <SelectItem value="communication">Communication</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Competency
-            </Button>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {competencies.map((competency) => (
-              <Card key={competency.id}>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                        <Lightbulb className="w-5 h-5 text-purple-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">{competency.name}</h3>
-                        <Badge variant="outline" className="capitalize mt-1">
-                          {competency.category}
-                        </Badge>
-                      </div>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem>
-                          <Edit className="w-4 h-4 mr-2" />
-                          Edit Competency
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Users className="w-4 h-4 mr-2" />
-                          View Assessments
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-4">{competency.description}</p>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Level:</span>
-                      <Badge variant="secondary" className="capitalize">
-                        {competency.level}
-                      </Badge>
-                    </div>
-                    <div className="text-sm">
-                      <span className="text-gray-600">Applicable Roles:</span>
-                      <p className="mt-1">{competency.roles.join(", ")}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="succession" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <Input placeholder="Search positions..." className="pl-10 w-64" />
-              </div>
-              <Select defaultValue="all">
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Criticality</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Dialog open={showSuccessionDialog} onOpenChange={setShowSuccessionDialog}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Succession Plan
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Create Succession Plan</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Position Title *</Label>
-                      <Input placeholder="Enter position title" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Current Incumbent *</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select employee" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="emp1">Jane Smith</SelectItem>
-                          <SelectItem value="emp2">John Doe</SelectItem>
-                          <SelectItem value="emp3">Sarah Wilson</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Department</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select department" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="engineering">Engineering</SelectItem>
-                          <SelectItem value="hr">Human Resources</SelectItem>
-                          <SelectItem value="finance">Finance</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Criticality</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select criticality" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Development Needs</Label>
-                    <Textarea placeholder="List key development areas and requirements..." rows={3} />
-                  </div>
-                  <div className="flex justify-end space-x-2">
-                    <Button variant="outline" onClick={() => setShowSuccessionDialog(false)}>
-                      Cancel
-                    </Button>
-                    <Button>Create Plan</Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          <div className="grid gap-6">
-            {successionPlans.map((plan) => (
-              <Card key={plan.id}>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center">
-                        <Crown className="w-6 h-6 text-indigo-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-lg">{plan.position}</h3>
-                        <p className="text-gray-600">
-                          Current: {plan.incumbent} • {plan.department}
-                        </p>
-                        <div className="flex items-center space-x-4 text-sm mt-1">
-                          <Badge variant="outline" className="capitalize">
-                            {plan.criticality} criticality
-                          </Badge>
-                          <Badge
-                            className={`${plan.riskLevel === "high" ? "bg-red-100 text-red-700" : plan.riskLevel === "medium" ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"}`}
-                          >
-                            {plan.riskLevel} risk
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem>
-                          <Eye className="w-4 h-4 mr-2" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Edit className="w-4 h-4 mr-2" />
-                          Edit Plan
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Users className="w-4 h-4 mr-2" />
-                          Manage Successors
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="font-medium mb-3">Potential Successors</h4>
-                      <div className="grid md:grid-cols-2 gap-4">
-                        {plan.successors.map((successor) => (
-                          <div key={successor.id} className="p-4 border rounded-lg">
-                            <div className="flex items-center justify-between mb-2">
-                              <h5 className="font-medium">{successor.name}</h5>
-                              <Badge className={getReadinessColor(successor.readiness)}>{successor.readiness}</Badge>
-                            </div>
-                            <p className="text-sm text-gray-600 mb-2">{successor.currentRole}</p>
-                            <div className="flex items-center space-x-2 mb-2">
-                              <span className="text-xs text-gray-500">Potential:</span>
-                              <Badge variant="outline" className="text-xs capitalize">
-                                {successor.potential}
-                              </Badge>
-                            </div>
-                            <div className="text-xs text-gray-600">
-                              <span className="font-medium">Development Areas:</span>
-                              <p className="mt-1">{successor.developmentAreas.join(", ")}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    <div>
-                      <h4 className="font-medium mb-2">Development Needs</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {plan.developmentNeeds.map((need, index) => (
-                          <Badge key={index} variant="secondary">
-                            {need}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="analytics" className="space-y-6">
-          <div className="grid md:grid-cols-3 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Goal Achievement Rate</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Company Goals</span>
-                    <span className="font-medium">85%</span>
-                  </div>
-                  <Progress value={85} className="h-2" />
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Team Goals</span>
-                    <span className="font-medium">72%</span>
-                  </div>
-                  <Progress value={72} className="h-2" />
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Individual Goals</span>
-                    <span className="font-medium">68%</span>
-                  </div>
-                  <Progress value={68} className="h-2" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Performance Distribution</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Exceeds (4.5-5.0)</span>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={20} className="w-16 h-2" />
-                      <span className="text-sm font-medium">20%</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Meets (3.5-4.4)</span>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={65} className="w-16 h-2" />
-                      <span className="text-sm font-medium">65%</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Below (2.5-3.4)</span>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={12} className="w-16 h-2" />
-                      <span className="text-sm font-medium">12%</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Needs Improvement</span>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={3} className="w-16 h-2" />
-                      <span className="text-sm font-medium">3%</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Key Metrics</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Review Completion Rate</span>
-                    <span className="font-medium">92%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Avg Review Score</span>
-                    <span className="font-medium">4.2/5</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Goal Alignment</span>
-                    <span className="font-medium">88%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Succession Coverage</span>
-                    <span className="font-medium">75%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">High Potential Talent</span>
-                    <span className="font-medium">18%</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Performance Trends</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64 flex items-center justify-center text-gray-500">
-                <div className="text-center">
-                  <BarChart3 className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                  <p>Performance analytics chart would be displayed here</p>
-                  <p className="text-sm">Showing trends for goals, reviews, and competency development</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
+    <Suspense fallback={<div className="p-8 text-sm text-muted-foreground">Loading performance…</div>}>
+      <PerformancePageInner />
+    </Suspense>
   )
 }

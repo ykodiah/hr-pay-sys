@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Save,
   Search,
+  Upload,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -22,6 +23,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
+import {
+  CONTRACT_TYPE_OPTIONS,
+  DOCUMENT_TYPE_OPTIONS,
+  EDUCATION_OPTIONS,
+  EMPLOYEE_STATUS_OPTIONS,
+  GENDER_OPTIONS,
+  MARITAL_STATUS_OPTIONS,
+  NOTICE_PERIOD_OPTIONS,
+  PROBATION_PERIOD_OPTIONS,
+  SPECIAL_ROLE_OPTIONS,
+} from "@/lib/employees/form-options"
 
 type Emp = {
   id: string
@@ -77,8 +89,11 @@ export default function UpdateEmployeeDataPage() {
   const [allowances, setAllowances] = useState<any[]>([])
   const [documents, setDocuments] = useState<any[]>([])
   const [catalogAllowances, setCatalogAllowances] = useState<any[]>([])
+  const [banks, setBanks] = useState<string[]>([])
   const [lastTransferDate, setLastTransferDate] = useState<string | null>(null)
   const [section, setSection] = useState("personal")
+  const [uploadingDoc, setUploadingDoc] = useState(false)
+  const [docType, setDocType] = useState<string>("contract")
 
   const loadEmployees = useCallback(async () => {
     setLoadingList(true)
@@ -185,18 +200,24 @@ export default function UpdateEmployeeDataPage() {
       )
       setDocuments(
         (emp.documents || []).map((d: any) => ({
-          document_type: d.document_type,
-          fileName: d.file_name || d.document_name,
-          file_url: d.file_url || d.file_path,
+          document_type: d.documentType || d.document_type,
+          fileName: d.fileName || d.file_name || d.document_name,
+          file_url: d.fileUrl || d.file_url || d.file_path,
+          vault_document_id: d.vaultDocumentId || d.vault_document_id,
           notes: d.notes,
         })),
       )
       setEffectiveDate(today())
-      // Catalog for adding allowances
+      // Catalog for allowances + banks
       try {
-        const meta = await fetch("/api/employees/meta", { credentials: "include", cache: "no-store" })
+        const [meta, banksRes] = await Promise.all([
+          fetch("/api/employees/meta", { credentials: "include", cache: "no-store" }),
+          fetch("/api/banks", { credentials: "include", cache: "no-store" }),
+        ])
         const mj = await meta.json().catch(() => ({}))
+        const bj = await banksRes.json().catch(() => ({}))
         if (meta.ok) setCatalogAllowances(mj.allowances || [])
+        if (banksRes.ok) setBanks(bj.banks || [])
       } catch {
         /* optional */
       }
@@ -213,8 +234,92 @@ export default function UpdateEmployeeDataPage() {
   }
 
   function setFin(key: string, value: any) {
-    setFinancial((f) => ({ ...f, [key]: value }))
+    setFinancial((f) => {
+      const next = { ...f, [key]: value }
+      if (key === "monthly_salary" && value !== "" && !Number.isNaN(Number(value))) {
+        next.annual_salary = String(Math.round(Number(value) * 12 * 100) / 100)
+      }
+      if (key === "annual_salary" && value !== "" && !Number.isNaN(Number(value))) {
+        next.monthly_salary = String(Math.round((Number(value) / 12) * 100) / 100)
+      }
+      return next
+    })
     setDiffs([])
+  }
+
+  function FieldSelect({
+    label,
+    value,
+    onChange,
+    options,
+    placeholder,
+  }: {
+    label: string
+    value: string
+    onChange: (v: string) => void
+    options: ReadonlyArray<string | { value: string; label: string }>
+    placeholder?: string
+  }) {
+    const opts = options.map((o) =>
+      typeof o === "string" ? { value: o, label: o } : o,
+    )
+    return (
+      <div>
+        <Label className="text-xs">{label}</Label>
+        <Select value={value || undefined} onValueChange={onChange}>
+          <SelectTrigger>
+            <SelectValue placeholder={placeholder || `Select ${label.toLowerCase()}`} />
+          </SelectTrigger>
+          <SelectContent>
+            {opts.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    )
+  }
+
+  async function uploadDocument(file: File) {
+    if (!employeeId) return
+    setUploadingDoc(true)
+    try {
+      const body = new FormData()
+      body.append("file", file)
+      body.append("document_type", docType)
+      body.append("employee_id", employeeId)
+      body.append(
+        "employee_name",
+        nameOf({ first_name: form.first_name, last_name: form.last_name, employee_id: form.employee_id }),
+      )
+      body.append("employee_code", form.employee_id || "")
+      const res = await fetch("/api/employees/documents/upload", {
+        method: "POST",
+        credentials: "include",
+        body,
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Upload failed")
+      const doc = json.document || {}
+      const row = {
+        document_type: docType,
+        fileName: doc.file_name || file.name,
+        file_url: doc.file_url || doc.fileUrl || "",
+        vault_document_id: doc.vault_document_id || doc.id,
+        notes: `Uploaded ${new Date().toLocaleDateString()}`,
+      }
+      setDocuments((prev) => {
+        const without = prev.filter((d) => d.document_type !== docType)
+        return [...without, row]
+      })
+      toast({ title: "Document uploaded", description: file.name })
+    } catch (e: any) {
+      toast({ title: "Upload failed", description: e.message, variant: "destructive" })
+    } finally {
+      setUploadingDoc(false)
+    }
   }
 
   function financialPayload() {
@@ -447,13 +552,10 @@ export default function UpdateEmployeeDataPage() {
                         ["corporate_email", "Corporate email"],
                         ["phone", "Phone"],
                         ["date_of_birth", "Date of birth", "date"],
-                        ["gender", "Gender"],
-                        ["marital_status", "Marital status"],
-                        ["educational_level", "Education"],
                         ["emergency_contact_name", "Emergency contact"],
                         ["emergency_contact_tel", "Emergency phone"],
                       ].map(([key, label, type]) => (
-                        <div key={key} className={key === "address" ? "sm:col-span-2" : ""}>
+                        <div key={key}>
                           <Label className="text-xs">{label}</Label>
                           <Input
                             type={type || "text"}
@@ -462,6 +564,24 @@ export default function UpdateEmployeeDataPage() {
                           />
                         </div>
                       ))}
+                      <FieldSelect
+                        label="Gender"
+                        value={form.gender || ""}
+                        onChange={(v) => setField("gender", v)}
+                        options={GENDER_OPTIONS}
+                      />
+                      <FieldSelect
+                        label="Marital status"
+                        value={form.marital_status || ""}
+                        onChange={(v) => setField("marital_status", v)}
+                        options={MARITAL_STATUS_OPTIONS}
+                      />
+                      <FieldSelect
+                        label="Education"
+                        value={form.educational_level || ""}
+                        onChange={(v) => setField("educational_level", v)}
+                        options={EDUCATION_OPTIONS}
+                      />
                       <div className="sm:col-span-2">
                         <Label className="text-xs">Address</Label>
                         <Textarea
@@ -477,28 +597,60 @@ export default function UpdateEmployeeDataPage() {
                 <TabsContent value="employment" className="mt-4">
                   <Card className="shadow-sm">
                     <CardContent className="grid gap-3 p-4 sm:grid-cols-2">
-                      {[
-                        ["position", "Position"],
-                        ["employee_id", "Employee code"],
-                        ["special_role", "Special role"],
-                        ["contract_type", "Contract type"],
-                        ["date_of_joining", "Date of joining", "date"],
-                        ["date_of_exit", "Date of exit", "date"],
-                        ["status", "Status"],
-                        ["probation_period", "Probation period"],
-                        ["confirmation_date", "Confirmation date", "date"],
-                        ["notice_period", "Notice period"],
-                        ["ghana_card_number", "Ghana Card"],
-                      ].map(([key, label, type]) => (
-                        <div key={key}>
-                          <Label className="text-xs">{label}</Label>
-                          <Input
-                            type={type || "text"}
-                            value={form[key] || ""}
-                            onChange={(e) => setField(key, e.target.value)}
-                          />
-                        </div>
-                      ))}
+                      <div>
+                        <Label className="text-xs">Position</Label>
+                        <Input value={form.position || ""} onChange={(e) => setField("position", e.target.value)} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Employee code</Label>
+                        <Input value={form.employee_id || ""} onChange={(e) => setField("employee_id", e.target.value)} />
+                      </div>
+                      <FieldSelect
+                        label="Special role"
+                        value={form.special_role || ""}
+                        onChange={(v) => setField("special_role", v)}
+                        options={SPECIAL_ROLE_OPTIONS}
+                      />
+                      <FieldSelect
+                        label="Contract type"
+                        value={form.contract_type || ""}
+                        onChange={(v) => setField("contract_type", v)}
+                        options={CONTRACT_TYPE_OPTIONS}
+                      />
+                      <div>
+                        <Label className="text-xs">Date of joining</Label>
+                        <Input type="date" value={form.date_of_joining || ""} onChange={(e) => setField("date_of_joining", e.target.value)} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Date of exit</Label>
+                        <Input type="date" value={form.date_of_exit || ""} onChange={(e) => setField("date_of_exit", e.target.value)} />
+                      </div>
+                      <FieldSelect
+                        label="Status"
+                        value={form.status || ""}
+                        onChange={(v) => setField("status", v)}
+                        options={EMPLOYEE_STATUS_OPTIONS}
+                      />
+                      <FieldSelect
+                        label="Probation period"
+                        value={String(form.probation_period ?? "")}
+                        onChange={(v) => setField("probation_period", v)}
+                        options={PROBATION_PERIOD_OPTIONS}
+                      />
+                      <div>
+                        <Label className="text-xs">Confirmation date</Label>
+                        <Input type="date" value={form.confirmation_date || ""} onChange={(e) => setField("confirmation_date", e.target.value)} />
+                      </div>
+                      <FieldSelect
+                        label="Notice period"
+                        value={form.notice_period || ""}
+                        onChange={(v) => setField("notice_period", v)}
+                        options={NOTICE_PERIOD_OPTIONS}
+                      />
+                      <div>
+                        <Label className="text-xs">Ghana Card</Label>
+                        <Input value={form.ghana_card_number || ""} onChange={(e) => setField("ghana_card_number", e.target.value)} />
+                      </div>
                       <div className="sm:col-span-2">
                         <Label className="text-xs">Inactive reason</Label>
                         <Input
@@ -520,6 +672,7 @@ export default function UpdateEmployeeDataPage() {
                           value={financial.monthly_salary}
                           onChange={(e) => setFin("monthly_salary", e.target.value)}
                         />
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Auto-fills annual × 12</p>
                       </div>
                       <div>
                         <Label className="text-xs">Annual salary</Label>
@@ -528,14 +681,14 @@ export default function UpdateEmployeeDataPage() {
                           value={financial.annual_salary}
                           onChange={(e) => setFin("annual_salary", e.target.value)}
                         />
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Auto-fills monthly ÷ 12</p>
                       </div>
-                      <div>
-                        <Label className="text-xs">Bank name</Label>
-                        <Input
-                          value={financial.bank_name || ""}
-                          onChange={(e) => setFin("bank_name", e.target.value)}
-                        />
-                      </div>
+                      <FieldSelect
+                        label="Bank name"
+                        value={financial.bank_name || ""}
+                        onChange={(v) => setFin("bank_name", v)}
+                        options={banks.length ? banks : ["GCB Bank Limited", "Ecobank Ghana", "Stanbic Bank Ghana"]}
+                      />
                       <div>
                         <Label className="text-xs">Bank branch</Label>
                         <Input
@@ -664,59 +817,101 @@ export default function UpdateEmployeeDataPage() {
                   <Card className="shadow-sm">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base">Documents</CardTitle>
-                      <CardDescription>Update document metadata / links (vault uploads still via Employees).</CardDescription>
+                      <CardDescription>
+                        Upload replaces the same document type. Existing files are listed below.
+                      </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-3">
-                      {documents.map((d, i) => (
-                        <div key={i} className="grid gap-2 rounded-md border p-3 sm:grid-cols-3">
-                          <div>
-                            <Label className="text-xs">Type</Label>
-                            <Input
-                              value={d.document_type || ""}
-                              onChange={(e) => {
-                                const next = [...documents]
-                                next[i] = { ...d, document_type: e.target.value }
-                                setDocuments(next)
-                              }}
-                              placeholder="contract, id, cv…"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">File name</Label>
-                            <Input
-                              value={d.fileName || ""}
-                              onChange={(e) => {
-                                const next = [...documents]
-                                next[i] = { ...d, fileName: e.target.value }
-                                setDocuments(next)
-                              }}
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">File URL / path</Label>
-                            <Input
-                              value={d.file_url || ""}
-                              onChange={(e) => {
-                                const next = [...documents]
-                                next[i] = { ...d, file_url: e.target.value }
-                                setDocuments(next)
-                              }}
-                            />
-                          </div>
+                    <CardContent className="space-y-4">
+                      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-teal-100 bg-teal-50/40 p-3">
+                        <div className="w-44">
+                          <Label className="text-xs">Document type</Label>
+                          <Select value={docType} onValueChange={setDocType}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {DOCUMENT_TYPE_OPTIONS.map((t) => (
+                                <SelectItem key={t} value={t}>
+                                  {t.replace(/_/g, " ")}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
-                      ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setDocuments([
-                            ...documents,
-                            { document_type: "", fileName: "", file_url: "", notes: "" },
-                          ])
-                        }
-                      >
-                        Add document row
-                      </Button>
+                        <div>
+                          <Label className="text-xs flex items-center gap-1.5">
+                            {uploadingDoc ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Upload className="h-3.5 w-3.5" />
+                            )}
+                            {uploadingDoc ? "Uploading…" : "Choose file to upload"}
+                          </Label>
+                          <Input
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                            disabled={uploadingDoc || !employeeId}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0]
+                              if (f) void uploadDocument(f)
+                              e.target.value = ""
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {documents.length ? (
+                        documents.map((d, i) => (
+                          <div
+                            key={`${d.document_type}-${i}`}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2"
+                          >
+                            <div>
+                              <p className="text-sm font-medium capitalize">
+                                {(d.document_type || "document").replace(/_/g, " ")}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {d.fileName || d.file_name || "Uploaded file"}
+                                {d.notes ? ` · ${d.notes}` : ""}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              {d.file_url ? (
+                                <Button size="sm" variant="outline" asChild>
+                                  <a href={d.file_url} target="_blank" rel="noreferrer">
+                                    View
+                                  </a>
+                                </Button>
+                              ) : null}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setDocType(d.document_type || "other")
+                                  toast({
+                                    title: "Ready to replace",
+                                    description: `Choose a file to replace ${(d.document_type || "").replace(/_/g, " ")}`,
+                                  })
+                                }}
+                              >
+                                Replace
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-red-700"
+                                onClick={() => setDocuments(documents.filter((_, j) => j !== i))}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="py-6 text-center text-sm text-muted-foreground">
+                          No documents on file yet. Upload a contract, Ghana Card, or CV above.
+                        </p>
+                      )}
                     </CardContent>
                   </Card>
                 </TabsContent>
