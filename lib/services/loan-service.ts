@@ -336,11 +336,40 @@ export async function createLoan(input: CreateLoanInput): Promise<EmployeeLoan> 
     insertRow.loan_type_id = input.loan_type_id
   }
 
-  const { data, error } = await supabase
-    .from("employee_loans")
-    .insert(insertRow)
-    .select()
-    .single()
+  let { data, error } = await supabase.from("employee_loans").insert(insertRow).select().single()
+
+  // Retry without advanced alias columns when DB schema is behind (e.g. missing principal_amount)
+  if (error && /column|schema cache/i.test(String(error.message || ""))) {
+    const msg = String(error.message || "")
+    const stripped = { ...insertRow }
+    const optionalCols = [
+      "principal_amount",
+      "tenure_months",
+      "monthly_installment",
+      "outstanding_balance",
+      "expected_total_payment",
+      "total_interest",
+      "interest_type",
+      "loan_type_id",
+      "approval_status",
+      "processing_fee",
+      "insurance_fee",
+      "admin_fee",
+      "total_charges",
+    ]
+    for (const col of optionalCols) {
+      if (msg.includes(`'${col}'`) || msg.includes(`"${col}"`) || msg.includes(col)) {
+        delete stripped[col]
+      }
+    }
+    // If message is generic, drop all advanced aliases and keep payroll core
+    if (Object.keys(stripped).length === Object.keys(insertRow).length) {
+      for (const col of optionalCols) delete stripped[col]
+    }
+    const retry = await supabase.from("employee_loans").insert(stripped).select().single()
+    data = retry.data
+    error = retry.error
+  }
 
   if (error) throw new Error(error.message)
 
