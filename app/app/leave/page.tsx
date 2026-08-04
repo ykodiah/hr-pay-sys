@@ -14,8 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "@/hooks/use-toast"
 import {
-  Calendar, Clock, CheckCircle, XCircle, AlertCircle,
-  Filter, Search, Eye, Download, Users, RefreshCw,
+  Calendar, CheckCircle, XCircle, AlertCircle,
+  Filter, Search, Eye, Download, Users, RefreshCw, Plus, Loader2,
 } from "lucide-react"
 
 interface LeaveRequest {
@@ -56,26 +56,47 @@ function initials(name: string | null) {
   return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
 }
 
+type LeaveType = { id: string; name: string; code?: string; entitlement_amount?: number }
+type EmployeeOpt = { id: string; first_name?: string; last_name?: string; employee_id?: string }
+
 export default function AdminLeavePage() {
   const [requests, setRequests]               = useState<LeaveRequest[]>([])
+  const [leaveTypes, setLeaveTypes]           = useState<LeaveType[]>([])
+  const [employees, setEmployees]             = useState<EmployeeOpt[]>([])
   const [loading, setLoading]                 = useState(true)
   const [search, setSearch]                   = useState("")
   const [statusFilter, setStatusFilter]       = useState("all")
   const [departmentFilter, setDepartmentFilter] = useState("all")
   const [selected, setSelected]               = useState<LeaveRequest | null>(null)
   const [detailOpen, setDetailOpen]           = useState(false)
+  const [createOpen, setCreateOpen]           = useState(false)
   const [rejectReason, setRejectReason]       = useState("")
   const [actionLoading, setActionLoading]     = useState(false)
+  const [createForm, setCreateForm] = useState({
+    employee_id: "",
+    leave_type_id: "",
+    start_date: "",
+    end_date: "",
+    reason: "",
+    auto_approve: false,
+  })
 
   const loadRequests = useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
       if (statusFilter !== "all") params.set("status", statusFilter)
-      const res = await fetch(`/api/leave?${params}`)
+      const res = await fetch(`/api/leave?${params}`, { credentials: "include", cache: "no-store" })
       if (res.ok) {
         const data = await res.json()
         setRequests(data.requests ?? [])
+        setLeaveTypes(data.leave_types ?? [])
+      }
+      const empRes = await fetch("/api/employees", { credentials: "include", cache: "no-store" })
+      if (empRes.ok) {
+        const empData = await empRes.json()
+        const list = Array.isArray(empData) ? empData : empData.employees || empData.data || []
+        setEmployees(list)
       }
     } finally {
       setLoading(false)
@@ -133,6 +154,45 @@ export default function AdminLeavePage() {
     total:    requests.length,
   }
 
+  const createLeave = async () => {
+    if (!createForm.employee_id || !createForm.start_date || !createForm.end_date) {
+      toast({ title: "Missing fields", description: "Employee and dates are required.", variant: "destructive" })
+      return
+    }
+    setActionLoading(true)
+    try {
+      const res = await fetch("/api/leave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          ...createForm,
+          initiated_by: "admin",
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to create leave")
+      toast({
+        title: createForm.auto_approve ? "Leave created & approved" : "Leave request created",
+        description: "Saved to the database.",
+      })
+      setCreateOpen(false)
+      setCreateForm({
+        employee_id: "",
+        leave_type_id: "",
+        start_date: "",
+        end_date: "",
+        reason: "",
+        auto_approve: false,
+      })
+      loadRequests()
+    } catch (err) {
+      toast({ title: "Error", description: (err as Error).message, variant: "destructive" })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   const downloadCSV = () => {
     const headers = ["Employee", "ID No", "Department", "Leave Type", "Start", "End", "Days", "Status", "Reason"]
     const rows = filtered.map((r) => [
@@ -163,6 +223,10 @@ export default function AdminLeavePage() {
           <Button variant="outline" onClick={downloadCSV}>
             <Download className="w-4 h-4 mr-2" />
             Export CSV
+          </Button>
+          <Button className="bg-teal-600 hover:bg-teal-700" onClick={() => setCreateOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Initiate leave
           </Button>
         </div>
       </div>
@@ -332,6 +396,7 @@ export default function AdminLeavePage() {
                       {actionLoading ? "Processing..." : "Reject"}
                     </Button>
                     <Button
+                      className="bg-teal-600 hover:bg-teal-700"
                       disabled={actionLoading}
                       onClick={() => handleAction(selected.id, "approve")}>
                       {actionLoading ? "Processing..." : "Approve"}
@@ -341,6 +406,93 @@ export default function AdminLeavePage() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Admin initiate leave */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Initiate leave for employee</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div>
+              <Label>Employee</Label>
+              <Select
+                value={createForm.employee_id}
+                onValueChange={(v) => setCreateForm((f) => ({ ...f, employee_id: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select employee" />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {`${e.first_name || ""} ${e.last_name || ""}`.trim()} {e.employee_id ? `(${e.employee_id})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Leave type</Label>
+              <Select
+                value={createForm.leave_type_id}
+                onValueChange={(v) => setCreateForm((f) => ({ ...f, leave_type_id: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {leaveTypes.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Start</Label>
+                <Input
+                  type="date"
+                  value={createForm.start_date}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, start_date: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>End</Label>
+                <Input
+                  type="date"
+                  value={createForm.end_date}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, end_date: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Reason</Label>
+              <Textarea
+                value={createForm.reason}
+                onChange={(e) => setCreateForm((f) => ({ ...f, reason: e.target.value }))}
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={createForm.auto_approve}
+                onChange={(e) => setCreateForm((f) => ({ ...f, auto_approve: e.target.checked }))}
+              />
+              Approve immediately (marks attendance as leave & updates balances)
+            </label>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button className="bg-teal-600 hover:bg-teal-700" disabled={actionLoading} onClick={() => void createLeave()}>
+              {actionLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+              Create leave
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

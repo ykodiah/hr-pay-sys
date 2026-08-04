@@ -8,10 +8,11 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+// Input/Label used for OT generation date range
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
-import { CheckCircle2, XCircle, AlertCircle, Clock, Search, Loader2 } from "lucide-react"
+import { CheckCircle2, XCircle, AlertCircle, Clock, Search, Loader2, Timer } from "lucide-react"
 
 const STATUS_COLORS: Record<string, string> = {
   pending:  "bg-yellow-100 text-yellow-800",
@@ -28,6 +29,9 @@ export default function AdminOvertimePage() {
   const [actioning, setActioning] = useState<string | null>(null)
   const [rejectDialog, setRejectDialog] = useState<{ id: string; name: string } | null>(null)
   const [rejectReason, setRejectReason] = useState("")
+  const [generating, setGenerating] = useState(false)
+  const [otFrom, setOtFrom] = useState(() => new Date().toISOString().slice(0, 10))
+  const [otTo, setOtTo] = useState(() => new Date().toISOString().slice(0, 10))
 
   const { data, isLoading } = useSWR("/api/overtime", fetcher)
   const allRequests: any[] = data?.requests ?? []
@@ -92,11 +96,52 @@ export default function AdminOvertimePage() {
     }
   }
 
+  const generateFromAttendance = async () => {
+    setGenerating(true)
+    try {
+      const res = await fetch("/api/attendance/generate-overtime", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ from: otFrom, to: otTo }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Failed to generate")
+      toast({
+        title: "Overtime generated from attendance",
+        description: `Created ${json.created || 0}; skipped ${json.skipped || 0}.`,
+      })
+      mutate("/api/overtime")
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" })
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Overtime Management</h1>
-        <p className="text-sm text-muted-foreground">Review and approve employee overtime requests.</p>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Overtime Management</h1>
+          <p className="text-sm text-muted-foreground">
+            Review overtime requests and generate approvals from attendance OT hours.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <div>
+            <Label className="text-xs">From</Label>
+            <Input type="date" className="w-36" value={otFrom} onChange={(e) => setOtFrom(e.target.value)} />
+          </div>
+          <div>
+            <Label className="text-xs">To</Label>
+            <Input type="date" className="w-36" value={otTo} onChange={(e) => setOtTo(e.target.value)} />
+          </div>
+          <Button className="bg-teal-600 hover:bg-teal-700" onClick={() => void generateFromAttendance()} disabled={generating}>
+            {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Timer className="mr-2 h-4 w-4" />}
+            From attendance
+          </Button>
+        </div>
       </div>
 
       {/* Summary */}
