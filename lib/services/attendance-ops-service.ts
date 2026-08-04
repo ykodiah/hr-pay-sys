@@ -100,10 +100,10 @@ export async function listAttendance(input: {
       (l: any) => l.employee_id === employeeId && l.start_date <= date && l.end_date >= date,
     )
 
-  const empMap = new Map(empList.map((e: any) => [e.id, e]))
+  const empMap = new Map<string, any>(empList.map((e: any) => [e.id, e]))
   const byKey = new Map<string, any>()
   for (const r of data || []) {
-    const emp = empMap.get(r.employee_id)
+    const emp = empMap.get(r.employee_id) as any
     const name = emp ? `${emp.first_name || ""} ${emp.last_name || ""}`.trim() : "Employee"
     byKey.set(`${r.employee_id}:${r.date}`, {
       ...r,
