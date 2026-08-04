@@ -45,6 +45,22 @@ function nameOf(e: Emp | any) {
   )
 }
 
+function today() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+/** Never send org transfer fields on Update — Transfer Employee owns those */
+function buildNonOrgPatch(form: Record<string, any>) {
+  const {
+    department: _d,
+    division: _v,
+    location: _l,
+    subsidiary_id: _s,
+    ...rest
+  } = form
+  return rest
+}
+
 export default function UpdateEmployeeDataPage() {
   const [employees, setEmployees] = useState<Emp[]>([])
   const [search, setSearch] = useState("")
@@ -54,9 +70,14 @@ export default function UpdateEmployeeDataPage() {
   const [saving, setSaving] = useState(false)
   const [previewing, setPreviewing] = useState(false)
   const [reason, setReason] = useState("")
+  const [effectiveDate, setEffectiveDate] = useState(today())
   const [diffs, setDiffs] = useState<any[]>([])
   const [form, setForm] = useState<Record<string, any>>({})
   const [financial, setFinancial] = useState<Record<string, any>>({})
+  const [allowances, setAllowances] = useState<any[]>([])
+  const [documents, setDocuments] = useState<any[]>([])
+  const [catalogAllowances, setCatalogAllowances] = useState<any[]>([])
+  const [lastTransferDate, setLastTransferDate] = useState<string | null>(null)
   const [section, setSection] = useState("personal")
 
   const loadEmployees = useCallback(async () => {
@@ -104,6 +125,7 @@ export default function UpdateEmployeeDataPage() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || "Failed to load employee")
       const emp = data.employee || {}
+      setLastTransferDate(emp.last_transfer_date || null)
       setForm({
         prefix: emp.prefix || "",
         first_name: emp.first_name || "",
@@ -133,7 +155,7 @@ export default function UpdateEmployeeDataPage() {
         direct_supervisor: emp.direct_supervisor || "",
         head_of_department: emp.head_of_department || "",
         ghana_card_number: emp.ghana_card_number || "",
-        // Org fields shown read-only
+        // Org fields display-only (never patched from this screen)
         department: emp.department || "",
         division: emp.division || "",
         location: emp.location || "",
@@ -150,6 +172,34 @@ export default function UpdateEmployeeDataPage() {
         provident_fund_rate: fin.provident_fund_rate ?? "",
         provident_fund_enrolled: fin.provident_fund_enrolled ?? false,
       })
+      setAllowances(
+        (emp.allowances || []).map((a: any) => ({
+          id: a.allowance_id || a.id,
+          code: a.code,
+          description: a.description,
+          amount: a.amount,
+          percentage: a.percentage,
+          taxable: a.taxable,
+          recurring: a.recurring,
+        })),
+      )
+      setDocuments(
+        (emp.documents || []).map((d: any) => ({
+          document_type: d.document_type,
+          fileName: d.file_name || d.document_name,
+          file_url: d.file_url || d.file_path,
+          notes: d.notes,
+        })),
+      )
+      setEffectiveDate(today())
+      // Catalog for adding allowances
+      try {
+        const meta = await fetch("/api/employees/meta", { credentials: "include", cache: "no-store" })
+        const mj = await meta.json().catch(() => ({}))
+        if (meta.ok) setCatalogAllowances(mj.allowances || [])
+      } catch {
+        /* optional */
+      }
     } catch (e: any) {
       toast({ title: "Load failed", description: e.message, variant: "destructive" })
     } finally {
@@ -167,6 +217,16 @@ export default function UpdateEmployeeDataPage() {
     setDiffs([])
   }
 
+  function financialPayload() {
+    return {
+      ...financial,
+      monthly_salary: financial.monthly_salary === "" ? undefined : Number(financial.monthly_salary),
+      annual_salary: financial.annual_salary === "" ? undefined : Number(financial.annual_salary),
+      provident_fund_rate:
+        financial.provident_fund_rate === "" ? undefined : Number(financial.provident_fund_rate),
+    }
+  }
+
   async function preview() {
     if (!employeeId) return
     setPreviewing(true)
@@ -178,18 +238,9 @@ export default function UpdateEmployeeDataPage() {
         body: JSON.stringify({
           action: "preview",
           employee_id: employeeId,
-          patch: form,
-          financial: {
-            ...financial,
-            monthly_salary:
-              financial.monthly_salary === "" ? undefined : Number(financial.monthly_salary),
-            annual_salary:
-              financial.annual_salary === "" ? undefined : Number(financial.annual_salary),
-            provident_fund_rate:
-              financial.provident_fund_rate === ""
-                ? undefined
-                : Number(financial.provident_fund_rate),
-          },
+          effective_date: effectiveDate,
+          patch: buildNonOrgPatch(form),
+          financial: financialPayload(),
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -211,6 +262,10 @@ export default function UpdateEmployeeDataPage() {
       toast({ title: "Reason required", description: "Enter why this update is being made.", variant: "destructive" })
       return
     }
+    if (!effectiveDate) {
+      toast({ title: "Effective date required", variant: "destructive" })
+      return
+    }
     setSaving(true)
     try {
       const res = await fetch("/api/employees/update", {
@@ -220,18 +275,11 @@ export default function UpdateEmployeeDataPage() {
         body: JSON.stringify({
           employee_id: employeeId,
           reason,
-          patch: form,
-          financial: {
-            ...financial,
-            monthly_salary:
-              financial.monthly_salary === "" ? undefined : Number(financial.monthly_salary),
-            annual_salary:
-              financial.annual_salary === "" ? undefined : Number(financial.annual_salary),
-            provident_fund_rate:
-              financial.provident_fund_rate === ""
-                ? undefined
-                : Number(financial.provident_fund_rate),
-          },
+          effective_date: effectiveDate,
+          patch: buildNonOrgPatch(form),
+          financial: financialPayload(),
+          allowances,
+          documents,
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -239,7 +287,9 @@ export default function UpdateEmployeeDataPage() {
       setDiffs(data.diffs || [])
       toast({
         title: "Employee updated",
-        description: data.message || `${(data.diffs || []).length} field(s) saved to database with audit trail.`,
+        description:
+          data.message ||
+          `${(data.diffs || []).length} field(s) apply from ${effectiveDate}. Prior periods unchanged.`,
       })
       setReason("")
     } catch (e: any) {
@@ -361,6 +411,12 @@ export default function UpdateEmployeeDataPage() {
                       <Badge variant="outline">Loc: {form.location || "—"}</Badge>
                       <Badge className="bg-amber-100 text-amber-900">Org via Transfer only</Badge>
                     </div>
+                    {lastTransferDate ? (
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        Last transfer effective: <span className="font-medium text-slate-700">{lastTransferDate}</span>
+                        {" "}(current org shown above)
+                      </p>
+                    ) : null}
                   </div>
                   <Button asChild variant="outline" size="sm">
                     <Link href={`/app/employees/transfer?employee_id=${employeeId}`}>
@@ -372,10 +428,12 @@ export default function UpdateEmployeeDataPage() {
               </Card>
 
               <Tabs value={section} onValueChange={setSection}>
-                <TabsList>
+                <TabsList className="flex h-auto flex-wrap">
                   <TabsTrigger value="personal">Personal</TabsTrigger>
                   <TabsTrigger value="employment">Employment</TabsTrigger>
                   <TabsTrigger value="financial">Financial</TabsTrigger>
+                  <TabsTrigger value="allowances">Allowances</TabsTrigger>
+                  <TabsTrigger value="documents">Documents</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="personal" className="mt-4">
@@ -510,22 +568,186 @@ export default function UpdateEmployeeDataPage() {
                     </CardContent>
                   </Card>
                 </TabsContent>
+
+                <TabsContent value="allowances" className="mt-4">
+                  <Card className="shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Allowances</CardTitle>
+                      <CardDescription>
+                        Saved with effective date — applies from that date forward in payroll.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {allowances.map((a, i) => (
+                        <div key={i} className="flex flex-wrap items-end gap-2 rounded-md border p-2">
+                          <div className="min-w-[120px] flex-1">
+                            <Label className="text-xs">Code / desc</Label>
+                            <Input
+                              value={a.code || a.description || ""}
+                              onChange={(e) => {
+                                const next = [...allowances]
+                                next[i] = { ...a, code: e.target.value, description: e.target.value }
+                                setAllowances(next)
+                              }}
+                            />
+                          </div>
+                          <div className="w-28">
+                            <Label className="text-xs">Amount</Label>
+                            <Input
+                              type="number"
+                              value={a.amount ?? ""}
+                              onChange={(e) => {
+                                const next = [...allowances]
+                                next[i] = { ...a, amount: Number(e.target.value) }
+                                setAllowances(next)
+                              }}
+                            />
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-700"
+                            onClick={() => setAllowances(allowances.filter((_, j) => j !== i))}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      ))}
+                      <div className="flex flex-wrap gap-2">
+                        <Select
+                          onValueChange={(id) => {
+                            const cat = catalogAllowances.find((c) => c.id === id)
+                            if (!cat) return
+                            setAllowances([
+                              ...allowances,
+                              {
+                                id: cat.id,
+                                code: cat.code,
+                                description: cat.description,
+                                amount: cat.amount || 0,
+                                percentage: cat.percentage || 0,
+                                taxable: cat.taxable,
+                                recurring: cat.recurring !== false,
+                              },
+                            ])
+                          }}
+                        >
+                          <SelectTrigger className="w-56">
+                            <SelectValue placeholder="Add from catalog" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {catalogAllowances.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.code} — {c.description}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setAllowances([
+                              ...allowances,
+                              { code: "", description: "", amount: 0, taxable: true, recurring: true },
+                            ])
+                          }
+                        >
+                          Add custom
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="documents" className="mt-4">
+                  <Card className="shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Documents</CardTitle>
+                      <CardDescription>Update document metadata / links (vault uploads still via Employees).</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {documents.map((d, i) => (
+                        <div key={i} className="grid gap-2 rounded-md border p-3 sm:grid-cols-3">
+                          <div>
+                            <Label className="text-xs">Type</Label>
+                            <Input
+                              value={d.document_type || ""}
+                              onChange={(e) => {
+                                const next = [...documents]
+                                next[i] = { ...d, document_type: e.target.value }
+                                setDocuments(next)
+                              }}
+                              placeholder="contract, id, cv…"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">File name</Label>
+                            <Input
+                              value={d.fileName || ""}
+                              onChange={(e) => {
+                                const next = [...documents]
+                                next[i] = { ...d, fileName: e.target.value }
+                                setDocuments(next)
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">File URL / path</Label>
+                            <Input
+                              value={d.file_url || ""}
+                              onChange={(e) => {
+                                const next = [...documents]
+                                next[i] = { ...d, file_url: e.target.value }
+                                setDocuments(next)
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setDocuments([
+                            ...documents,
+                            { document_type: "", fileName: "", file_url: "", notes: "" },
+                          ])
+                        }
+                      >
+                        Add document row
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
               </Tabs>
 
               <Card className="shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">Confirm & save</CardTitle>
-                  <CardDescription>Preview diffs, then save with a reason — logged to the audit trail.</CardDescription>
+                  <CardDescription>
+                    Effective date drives when changes apply system-wide; prior months stay as they were.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div>
-                    <Label>Reason for update *</Label>
-                    <Textarea
-                      placeholder="e.g. Corrected phone after employee request CR-204"
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      rows={2}
-                    />
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <Label>Effective date *</Label>
+                      <Input
+                        type="date"
+                        value={effectiveDate}
+                        onChange={(e) => setEffectiveDate(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Reason for update *</Label>
+                      <Textarea
+                        placeholder="e.g. Corrected phone after employee request CR-204"
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                        rows={2}
+                      />
+                    </div>
                   </div>
 
                   {diffs.length ? (

@@ -53,9 +53,10 @@ export async function POST(request: NextRequest) {
       notes: body.notes ?? null,
       source: body.source || "manual",
       method: body.method || "manual",
+      autoDetectStatus: body.auto_detect_status !== false,
     })
 
-    return NextResponse.json({ record }, { status: 201 })
+    return NextResponse.json({ success: true, record, status: record?.status }, { status: 201 })
   } catch (err) {
     return jsonError(err, "Failed to save attendance")
   }

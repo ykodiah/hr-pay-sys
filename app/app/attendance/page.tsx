@@ -119,7 +119,6 @@ export default function AttendancePage() {
   const [markForm, setMarkForm] = useState({
     employee_id: "",
     date: today(),
-    status: "present",
     clock_in: "08:00",
     clock_out: "17:00",
     notes: "",
@@ -248,11 +247,20 @@ export default function AttendancePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(markForm),
+        body: JSON.stringify({
+          ...markForm,
+          // Status is auto-detected from assigned shift + grace (present / late / half_day)
+          auto_detect_status: true,
+          status: markForm.clock_in ? "present" : "absent",
+        }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || "Save failed")
-      toast({ title: "Attendance saved", description: "Record upserted in the database." })
+      const st = data.record?.status || data.status || "saved"
+      toast({
+        title: "Attendance saved",
+        description: `Status set to ${st} from shift late rules.`,
+      })
       setMarkOpen(false)
       await loadAttendance()
     } catch (err) {
@@ -370,7 +378,12 @@ export default function AttendancePage() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || "Sync failed")
-      toast({ title: "Device synced", description: "Last sync timestamp updated." })
+      toast({
+        title: "Device marked synced",
+        description:
+          data.message ||
+          "Timestamp updated. Import punches via Biometric import (CSV export from the device).",
+      })
       await loadMeta()
     } catch (err) {
       toast({
@@ -1036,8 +1049,12 @@ export default function AttendancePage() {
             ))}
             {!devices.length ? (
               <Card>
-                <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                  Register fingerprint, face, or card devices, then upload their CSV exports.
+                <CardContent className="py-10 text-center text-sm text-muted-foreground space-y-2">
+                  <p>Register fingerprint, face, or card devices, then upload their CSV exports.</p>
+                  <p className="text-xs">
+                    Sync Now only updates last-sync time — live device pull is not available in-browser.
+                    Use <strong>Biometric import</strong> with a CSV from the device.
+                  </p>
                 </CardContent>
               </Card>
             ) : null}
@@ -1079,23 +1096,9 @@ export default function AttendancePage() {
                   onChange={(e) => setMarkForm((f) => ({ ...f, date: e.target.value }))}
                 />
               </div>
-              <div>
-                <Label>Status</Label>
-                <Select
-                  value={markForm.status}
-                  onValueChange={(v) => setMarkForm((f) => ({ ...f, status: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="present">Present</SelectItem>
-                    <SelectItem value="late">Late</SelectItem>
-                    <SelectItem value="absent">Absent</SelectItem>
-                    <SelectItem value="half_day">Half day</SelectItem>
-                    <SelectItem value="leave">Leave</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="rounded-md border border-teal-100 bg-teal-50/50 px-3 py-2 text-xs text-teal-900">
+                Status is automatic: <strong>Present</strong> if on time vs assigned shift,{" "}
+                <strong>Late</strong> after grace, <strong>Leave</strong> when on approved leave.
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">

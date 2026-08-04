@@ -27,6 +27,9 @@ const emptyForm = {
   enforce_on_clock_out: false,
 }
 
+/** Accra CBD sample so Save works even when browser GPS is blocked */
+const SAMPLE_COORDS = { latitude: "5.6037000", longitude: "-0.1870000" }
+
 export function GeofencePanel() {
   const [geofences, setGeofences] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -76,7 +79,67 @@ export function GeofencePanel() {
     setOpen(true)
   }
 
+  async function deactivate(id: string) {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/attendance/geofences?id=${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed")
+      toast({ title: "Geofence deactivated" })
+      await load()
+    } catch (e: any) {
+      toast({ title: "Failed", description: e.message, variant: "destructive" })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function useMyLocation() {
+    if (!navigator.geolocation) {
+      setForm((f) => ({ ...f, ...SAMPLE_COORDS }))
+      toast({
+        title: "GPS unavailable",
+        description: "Filled Accra sample coordinates — replace with your site lat/lng.",
+      })
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setForm((f) => ({
+          ...f,
+          latitude: String(pos.coords.latitude),
+          longitude: String(pos.coords.longitude),
+        }))
+        toast({ title: "Location filled" })
+      },
+      () => {
+        setForm((f) => ({ ...f, ...SAMPLE_COORDS }))
+        toast({
+          title: "Browser blocked GPS",
+          description: "Sample coordinates inserted — paste your office lat/lng from Google Maps.",
+          variant: "destructive",
+        })
+      },
+      { enableHighAccuracy: true, timeout: 12000 },
+    )
+  }
+
   async function save() {
+    if (!form.name.trim()) {
+      toast({ title: "Name required", variant: "destructive" })
+      return
+    }
+    if (!form.latitude || !form.longitude) {
+      toast({
+        title: "Coordinates required",
+        description: "Enter lat/lng or use “Use my current location”.",
+        variant: "destructive",
+      })
+      return
+    }
     setBusy(true)
     try {
       const res = await fetch("/api/attendance/geofences", {
@@ -97,7 +160,12 @@ export function GeofencePanel() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || "Save failed")
-      toast({ title: editId ? "Geofence updated" : "Geofence created" })
+      toast({
+        title: editId ? "Geofence updated" : "Geofence created",
+        description: form.enforce_on_clock_in
+          ? "Clock-in will reject punches outside this radius."
+          : "Fence saved (enforcement off — turn on to block outside punches).",
+      })
       setOpen(false)
       await load()
     } catch (e: any) {
@@ -105,35 +173,6 @@ export function GeofencePanel() {
     } finally {
       setBusy(false)
     }
-  }
-
-  async function deactivate(id: string) {
-    setBusy(true)
-    try {
-      const res = await fetch(`/api/attendance/geofences?id=${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || "Failed")
-      toast({ title: "Geofence deactivated" })
-      await load()
-    } catch (e: any) {
-      toast({ title: "Failed", description: e.message, variant: "destructive" })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function useMyLocation() {
-    if (!navigator.geolocation) return
-    navigator.geolocation.getCurrentPosition((pos) => {
-      setForm((f) => ({
-        ...f,
-        latitude: String(pos.coords.latitude),
-        longitude: String(pos.coords.longitude),
-      }))
-    })
   }
 
   return (

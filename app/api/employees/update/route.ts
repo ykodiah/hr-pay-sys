@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { resolveTenantContext, jsonError, isUnresolvedTenant } from "@/lib/settings/resolve-tenant"
 import { applyGovernedEmployeeUpdate } from "@/lib/services/employee-audit-service"
-import { hasOrgFieldsInBody } from "@/lib/employees/audit-fields"
+import { ORG_TRANSFER_FIELDS } from "@/lib/employees/audit-fields"
 import { buildDiffs, EMPLOYEE_UPDATE_FIELDS, FINANCIAL_UPDATE_FIELDS } from "@/lib/employees/audit-fields"
+
+function stripOrgFields(patch: Record<string, any> = {}) {
+  const cleaned = { ...patch }
+  for (const key of ORG_TRANSFER_FIELDS) delete cleaned[key]
+  return cleaned
+}
 
 /**
  * POST /api/employees/update
@@ -24,20 +30,12 @@ export async function POST(request: NextRequest) {
     const employeeId = body.employee_id
     if (!employeeId) return NextResponse.json({ error: "employee_id required" }, { status: 400 })
 
-    const orgAttempt = hasOrgFieldsInBody(body.patch || body)
-    if (orgAttempt.length) {
-      return NextResponse.json(
-        {
-          error: `Organisational fields (${orgAttempt.join(", ")}) must be changed via Transfer Employee, not Update Employee Data.`,
-          use: "/app/employees/transfer",
-        },
-        { status: 400 },
-      )
-    }
-
-    const patch = body.patch || {}
+    // Org fields are ignored (not errors) — Transfer Employee owns those
+    const patch = stripOrgFields(body.patch || {})
     const financial = body.financial || null
     const reason = String(body.reason || "").trim()
+    const effectiveDate =
+      body.effective_date || body.effectiveDate || new Date().toISOString().slice(0, 10)
 
     // Preview only
     if (body.action === "preview") {
@@ -58,7 +56,12 @@ export async function POST(request: NextRequest) {
       const finDiffs = financial
         ? buildDiffs(beforeFin || {}, financial, FINANCIAL_UPDATE_FIELDS, "financial")
         : []
-      return NextResponse.json({ diffs: [...empDiffs, ...finDiffs], employee: before })
+      return NextResponse.json({
+        diffs: [...empDiffs, ...finDiffs],
+        employee: before,
+        effective_date: effectiveDate,
+        note: "Organisational fields are excluded — use Transfer Employee for dept/location moves.",
+      })
     }
 
     if (!reason) {
@@ -71,6 +74,9 @@ export async function POST(request: NextRequest) {
       patch,
       financial,
       reason,
+      effectiveDate,
+      allowances: Array.isArray(body.allowances) ? body.allowances : null,
+      documents: Array.isArray(body.documents) ? body.documents : null,
       actor: {
         userId: ctx.userId,
         email: undefined,

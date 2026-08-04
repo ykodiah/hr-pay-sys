@@ -40,7 +40,11 @@ export async function POST(request: NextRequest) {
         .select()
         .single()
       if (error) throw new Error(error.message)
-      return NextResponse.json({ device: data, message: "Device sync timestamp updated" })
+      return NextResponse.json({
+        device: data,
+        message:
+          "Device sync timestamp updated. Pull punches by exporting CSV from the device and using Biometric import.",
+      })
     }
 
     const device = await saveDevice(ctx.companyId, body, body.id)

@@ -20,20 +20,23 @@ export async function getAttendanceAnalytics(input: {
     .eq("company_id", input.companyId)
     .in("status", ["active", "Active", "ACTIVE", "probation", "Probation"])
 
-  const empList = employees || []
-  const empMap = new Map(empList.map((e: any) => [e.id, e]))
+  const empList: any[] = employees || []
+  const empMap = new Map<string, any>(empList.map((e: any) => [e.id, e]))
   const headcount = empList.length
 
-  const { data: records, error } = await service
-    .from("attendance_records")
-    .select("id, employee_id, date, status, clock_in, clock_out, total_hours, overtime_hours, department")
-    .eq("company_id", input.companyId)
-    .gte("date", input.from)
-    .lte("date", input.to)
-    .order("date", { ascending: true })
-
-  if (error) throw new Error(error.message)
-  const rows = records || []
+  // Prefer employee.department — attendance_records.department may not exist on older DBs
+  let rows: any[] = []
+  {
+    const primary = await service
+      .from("attendance_records")
+      .select("id, employee_id, date, status, clock_in, clock_out, total_hours, overtime_hours")
+      .eq("company_id", input.companyId)
+      .gte("date", input.from)
+      .lte("date", input.to)
+      .order("date", { ascending: true })
+    if (primary.error) throw new Error(primary.error.message)
+    rows = primary.data || []
+  }
 
   // Daily trend
   const byDate = new Map<string, any>()
@@ -50,7 +53,7 @@ export async function getAttendanceAnalytics(input: {
 
   for (const r of rows) {
     const emp = empMap.get(r.employee_id)
-    const dept = r.department || emp?.department || "General"
+    const dept = emp?.department || "General"
     const st = String(r.status || "").toLowerCase()
 
     if (st === "present") present += 1

@@ -111,43 +111,43 @@ export function LeaveCalendarHeatmap() {
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-3 lg:grid-cols-3 max-w-4xl">
         <Card className="shadow-sm lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Month heat map</CardTitle>
-            <CardDescription>Click a day to see who is out</CardDescription>
+          <CardHeader className="py-3 pb-1">
+            <CardTitle className="text-sm">Month heat map</CardTitle>
+            <CardDescription className="text-xs">Click a day to see who is out</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-2 pb-3">
             {loading && !data ? (
               <div className="flex items-center gap-2 py-12 text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading…
               </div>
             ) : (
               <>
-                <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[10px] font-medium uppercase text-muted-foreground">
+                <div className="mb-1.5 grid grid-cols-7 gap-0.5 text-center text-[9px] font-medium uppercase text-muted-foreground">
                   {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
                     <div key={d}>{d}</div>
                   ))}
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-0.5 max-w-md">
                   {weeks.map((row, ri) => (
-                    <div key={ri} className="grid grid-cols-7 gap-1">
+                    <div key={ri} className="grid grid-cols-7 gap-0.5">
                       {row.map((cell, ci) =>
                         cell.empty ? (
-                          <div key={cell.key || `e-${ri}-${ci}`} className="aspect-square rounded-md bg-transparent" />
+                          <div key={cell.key || `e-${ri}-${ci}`} className="h-8 rounded bg-transparent" />
                         ) : (
                           <button
                             key={cell.date}
                             type="button"
                             onClick={() => setSelected(cell)}
-                            className={`aspect-square rounded-md p-1 text-left transition hover:ring-2 hover:ring-teal-500 ${heatColor(
+                            className={`h-8 rounded px-1 text-left transition hover:ring-2 hover:ring-teal-500 ${heatColor(
                               cell.heat || 0,
                               cell.pending_count || 0,
                             )} ${selected?.date === cell.date ? "ring-2 ring-teal-600" : ""}`}
                             title={`${cell.date}: ${cell.count} out`}
                           >
-                            <div className="text-[11px] font-semibold">{cell.day}</div>
-                            <div className="text-[10px] opacity-90">{cell.count || "·"}</div>
+                            <div className="text-[10px] font-semibold leading-none">{cell.day}</div>
+                            <div className="text-[9px] opacity-90 leading-none mt-0.5">{cell.count || "·"}</div>
                           </button>
                         ),
                       )}

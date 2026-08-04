@@ -34,6 +34,20 @@ async function getDb() {
   return createServiceClient()
 }
 
+function eachDateInclusive(from: string, to: string): string[] {
+  const out: string[] = []
+  const start = new Date(`${from}T12:00:00`)
+  const end = new Date(`${to}T12:00:00`)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return [from]
+  // Cap synthetic expansion to 62 days to keep UI responsive
+  const maxDays = 62
+  let i = 0
+  for (let d = new Date(start); d <= end && i < maxDays; d.setDate(d.getDate() + 1), i++) {
+    out.push(d.toISOString().slice(0, 10))
+  }
+  return out.length ? out : [from]
+}
+
 export async function listAttendance(input: {
   companyId: string
   from?: string
@@ -64,7 +78,6 @@ export async function listAttendance(input: {
     .lte("date", to)
     .order("date", { ascending: false })
 
-  if (input.status && input.status !== "all") query = query.eq("status", input.status)
   if (input.employeeId) query = query.eq("employee_id", input.employeeId)
 
   const { data, error } = await query
@@ -73,18 +86,83 @@ export async function listAttendance(input: {
   }
   if (error) throw new Error(error.message)
 
+  // Approved leave overlapping range → status leave when no punch
+  const { data: leaves } = await supabase
+    .from("leave_requests")
+    .select("employee_id, start_date, end_date, status")
+    .eq("company_id", input.companyId)
+    .eq("status", "approved")
+    .lte("start_date", to)
+    .gte("end_date", from)
+
+  const onLeave = (employeeId: string, date: string) =>
+    (leaves || []).some(
+      (l: any) => l.employee_id === employeeId && l.start_date <= date && l.end_date >= date,
+    )
+
   const empMap = new Map(empList.map((e: any) => [e.id, e]))
-  let records = (data || []).map((r: any) => {
+  const byKey = new Map<string, any>()
+  for (const r of data || []) {
     const emp = empMap.get(r.employee_id)
     const name = emp ? `${emp.first_name || ""} ${emp.last_name || ""}`.trim() : "Employee"
-    return {
+    byKey.set(`${r.employee_id}:${r.date}`, {
       ...r,
       employee_name: name,
       employee_code: emp?.employee_id || null,
       department: emp?.department || null,
       position: emp?.position || null,
+      synthetic: false,
+    })
+  }
+
+  // Fill every active employee × day as absent (or leave) when unmarked
+  const dates = eachDateInclusive(from, to)
+  const scopedEmps = input.employeeId
+    ? empList.filter((e: any) => e.id === input.employeeId)
+    : empList
+
+  for (const emp of scopedEmps) {
+    for (const date of dates) {
+      const key = `${emp.id}:${date}`
+      if (byKey.has(key)) continue
+      const leave = onLeave(emp.id, date)
+      byKey.set(key, {
+        id: `synthetic-${emp.id}-${date}`,
+        employee_id: emp.id,
+        company_id: input.companyId,
+        date,
+        status: leave ? "leave" : "absent",
+        clock_in: null,
+        clock_out: null,
+        total_hours: 0,
+        overtime_hours: 0,
+        employee_name: `${emp.first_name || ""} ${emp.last_name || ""}`.trim() || "Employee",
+        employee_code: emp.employee_id || null,
+        department: emp.department || null,
+        position: emp.position || null,
+        synthetic: true,
+        source: leave ? "leave" : "register",
+      })
     }
+  }
+
+  // If a stored record exists but employee is on leave and marked absent with no clocks, prefer leave
+  for (const [key, r] of byKey) {
+    if (r.synthetic) continue
+    if (!r.clock_in && !r.clock_out && onLeave(r.employee_id, r.date) && r.status !== "leave") {
+      byKey.set(key, { ...r, status: "leave" })
+    }
+  }
+
+  let records = [...byKey.values()].sort((a, b) => {
+    if (a.date === b.date) return String(a.employee_name).localeCompare(String(b.employee_name))
+    return a.date < b.date ? 1 : -1
   })
+
+  if (input.status && input.status !== "all") {
+    const st = input.status.toLowerCase()
+    records = records.filter((r: any) => String(r.status || "").toLowerCase() === st)
+  }
 
   if (input.search) {
     const q = input.search.toLowerCase()
@@ -477,10 +555,9 @@ export async function listShifts(companyId: string) {
 
 export async function saveShift(companyId: string, payload: any, id?: string) {
   const supabase = await getDb()
-  const row = {
+  const base = {
     company_id: companyId,
     name: String(payload.name || "").trim(),
-    code: payload.code || null,
     start_time: payload.start_time || "08:00",
     end_time: payload.end_time || "17:00",
     break_duration_minutes: Number(payload.break_duration_minutes ?? 60),
@@ -494,14 +571,35 @@ export async function saveShift(companyId: string, payload: any, id?: string) {
     is_active: payload.is_active !== false,
     updated_at: new Date().toISOString(),
   }
-  if (!row.name) throw new Error("Shift name is required")
+  if (!base.name) throw new Error("Shift name is required")
 
-  if (id) {
-    const { data, error } = await supabase.from("shifts").update(row).eq("id", id).eq("company_id", companyId).select().single()
-    if (error) throw new Error(error.message)
-    return data
+  // Include code when provided; retry without if column missing in schema cache
+  const withCode = { ...base, code: payload.code || String(payload.name || "").slice(0, 12).toUpperCase().replace(/\s+/g, "_") }
+
+  async function write(row: Record<string, any>) {
+    if (id) {
+      return supabase.from("shifts").update(row).eq("id", id).eq("company_id", companyId).select().single()
+    }
+    return supabase.from("shifts").insert(row).select().single()
   }
-  const { data, error } = await supabase.from("shifts").insert(row).select().single()
+
+  let { data, error } = await write(withCode)
+  if (error && /code|schema cache|column/i.test(error.message)) {
+    ;({ data, error } = await write(base))
+  }
+  if (error && /working_days|expected_hours|department|location/i.test(error.message)) {
+    const minimal = {
+      company_id: companyId,
+      name: base.name,
+      start_time: base.start_time,
+      end_time: base.end_time,
+      grace_period_minutes: base.grace_period_minutes,
+      break_duration_minutes: base.break_duration_minutes,
+      is_active: true,
+      updated_at: base.updated_at,
+    }
+    ;({ data, error } = await write(minimal))
+  }
   if (error) throw new Error(error.message)
   return data
 }

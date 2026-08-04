@@ -164,6 +164,50 @@ export async function listEmployeeAuditEvents(input: {
   }))
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+async function resolveDisplayValue(
+  service: any,
+  companyId: string,
+  fieldName: string,
+  value: string | null,
+): Promise<string | null> {
+  if (value == null || value === "") return value
+  if (!UUID_RE.test(value)) return value
+
+  if (
+    fieldName === "direct_supervisor" ||
+    fieldName === "head_of_department" ||
+    fieldName === "employee_id"
+  ) {
+    const { data } = await service
+      .from("employees")
+      .select("id, first_name, last_name, full_name, display_name, employee_id")
+      .eq("company_id", companyId)
+      .eq("id", value)
+      .maybeSingle()
+    if (data) {
+      const name =
+        data.display_name ||
+        data.full_name ||
+        `${data.first_name || ""} ${data.last_name || ""}`.trim()
+      return data.employee_id ? `${name} (${data.employee_id})` : name
+    }
+  }
+
+  if (fieldName === "subsidiary_id") {
+    const { data } = await service
+      .from("subsidiaries")
+      .select("id, name")
+      .eq("id", value)
+      .maybeSingle()
+    if (data?.name) return data.name
+  }
+
+  return value
+}
+
 export async function getEmployeeAuditEvent(companyId: string, eventId: string) {
   const service = createServiceClient()
   const { data: event, error } = await service
@@ -187,9 +231,22 @@ export async function getEmployeeAuditEvent(companyId: string, eventId: string) 
     .eq("id", event.employee_id)
     .maybeSingle()
 
+  const resolvedDiffs = []
+  for (const d of diffs || []) {
+    const old_display = await resolveDisplayValue(service, companyId, d.field_name, d.old_value)
+    const new_display = await resolveDisplayValue(service, companyId, d.field_name, d.new_value)
+    resolvedDiffs.push({
+      ...d,
+      old_value: old_display,
+      new_value: new_display,
+      old_raw: d.old_value,
+      new_raw: d.new_value,
+    })
+  }
+
   return {
     ...event,
-    diffs: diffs || [],
+    diffs: resolvedDiffs,
     employee_name: emp
       ? emp.display_name || emp.full_name || `${emp.first_name || ""} ${emp.last_name || ""}`.trim()
       : null,
@@ -205,8 +262,12 @@ export async function applyGovernedEmployeeUpdate(input: {
   reason: string
   actor: AuditActor
   source?: string
+  effectiveDate?: string | null
+  allowances?: any[] | null
+  documents?: any[] | null
 }) {
   if (!input.reason?.trim()) throw new Error("Reason is required for employee data updates")
+  const effectiveDate = input.effectiveDate || new Date().toISOString().slice(0, 10)
 
   const service = createServiceClient()
   const { data: before, error } = await service
@@ -270,8 +331,13 @@ export async function applyGovernedEmployeeUpdate(input: {
     }
   }
 
-  const allDiffs = [...empDiffs, ...finDiffs]
-  if (!allDiffs.length) {
+  const allDiffs: DiffRow[] = [...empDiffs, ...finDiffs]
+  const hasAllowanceUpdate = Array.isArray(input.allowances)
+  const hasDocumentUpdate = Array.isArray(input.documents) && input.documents.some(
+    (d: any) => d.documentType || d.document_type || d.type,
+  )
+
+  if (!allDiffs.length && !hasAllowanceUpdate && !hasDocumentUpdate) {
     return { employee: before, diffs: [], event: null, message: "No changes detected" }
   }
 
@@ -291,6 +357,70 @@ export async function applyGovernedEmployeeUpdate(input: {
       .eq("id", input.employeeId)
   }
 
+  // Allowances replace (optional)
+  if (hasAllowanceUpdate) {
+    await service.from("employee_allowances").delete().eq("employee_id", input.employeeId)
+    const rows = (input.allowances || []).map((a: any) => ({
+      employee_id: input.employeeId,
+      allowance_id: a.id && String(a.id).length > 20 ? a.id : null,
+      code: a.code ?? null,
+      description: a.description ?? a.name ?? null,
+      taxable: Boolean(a.taxable),
+      recurring: a.recurring !== false,
+      amount: Number(a.amount ?? 0),
+      percentage: Number(a.percentage ?? 0),
+      calculation_type: String(a.calculationType || a.calculation_type || "amount").toUpperCase(),
+      effective_date: a.effectiveDate || a.effective_date || effectiveDate,
+      end_date: a.endDate || a.end_date || null,
+      is_active: true,
+    }))
+    if (rows.length) await service.from("employee_allowances").insert(rows)
+    allDiffs.push({
+      entity: "employee",
+      field_name: "allowances",
+      field_label: "Allowances",
+      old_value: "(previous set)",
+      new_value: `${rows.length} allowance(s) from ${effectiveDate}`,
+      sensitivity: "hard",
+    })
+  }
+
+  if (hasDocumentUpdate) {
+    let docCount = 0
+    for (const doc of input.documents || []) {
+      const documentType = doc.documentType || doc.document_type || doc.type || null
+      if (!documentType) continue
+      docCount += 1
+      await service
+        .from("employee_documents")
+        .delete()
+        .eq("employee_id", input.employeeId)
+        .eq("document_type", documentType)
+      const fileUrl = doc.fileUrl || doc.file_url || doc.url || null
+      await service.from("employee_documents").insert({
+        employee_id: input.employeeId,
+        document_type: documentType,
+        document_name: doc.fileName || doc.document_name || doc.name || null,
+        file_name: doc.fileName || doc.file_name || doc.name || null,
+        file_path: fileUrl,
+        file_url: fileUrl,
+        upload_date: new Date().toISOString(),
+        uploaded_by: input.actor.name || "HR",
+        notes: doc.notes || `Updated via Update Employee Data (effective ${effectiveDate})`,
+      })
+    }
+    if (docCount) {
+      allDiffs.push({
+        entity: "employee",
+        field_name: "documents",
+        field_label: "Documents",
+        old_value: "(previous)",
+        new_value: `${docCount} document(s)`,
+        sensitivity: "soft",
+      })
+    }
+  }
+
   const audit = await recordEmployeeAudit({
     companyId: input.companyId,
     employeeId: input.employeeId,
@@ -299,10 +429,24 @@ export async function applyGovernedEmployeeUpdate(input: {
     reason: input.reason,
     actor: input.actor,
     diffs: allDiffs,
-    summary: `Updated ${allDiffs.length} field(s)`,
+    summary: `Updated ${allDiffs.length} field(s) effective ${effectiveDate}`,
+    metadata: { effective_date: effectiveDate },
   })
 
-  return { employee: updated, diffs: allDiffs, event: audit.event }
+  if (audit.event?.id) {
+    await service
+      .from("employee_audit_events")
+      .update({ effective_date: effectiveDate })
+      .eq("id", audit.event.id)
+  }
+
+  return {
+    employee: updated,
+    diffs: allDiffs,
+    event: audit.event,
+    effective_date: effectiveDate,
+    message: `Changes apply from ${effectiveDate} forward. Prior payroll periods are unchanged.`,
+  }
 }
 
 export async function applyEmployeeTransfer(input: {
@@ -412,7 +556,24 @@ export async function applyEmployeeTransfer(input: {
       .eq("id", transfer.id)
   }
 
-  return { transfer, employee: updated, diffs, event: audit.event }
+  // Keep current org on employee card; stamp transfer date for display beneath
+  await service
+    .from("employees")
+    .update({
+      last_transfer_date: input.effectiveDate,
+      last_transfer_id: transfer.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.employeeId)
+    .eq("company_id", input.companyId)
+
+  return {
+    transfer,
+    employee: { ...updated, last_transfer_date: input.effectiveDate, last_transfer_id: transfer.id },
+    diffs,
+    event: audit.event,
+    note: "Current org fields updated. Payroll for months before the effective date should use prior transfer history.",
+  }
 }
 
 export async function reverseAuditEvent(input: {
