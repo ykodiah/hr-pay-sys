@@ -1024,8 +1024,9 @@ export default function AttendancePage() {
         <TabsContent value="devices" className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground max-w-2xl">
-              Register devices with an <strong>API base URL</strong> for online pull, or use the webhook token to push
-              punches in real time. CSV import remains available as a fallback.
+              <strong>Webhook</strong> devices push punches automatically (no Sync now).{" "}
+              <strong>API pull</strong> devices auto-collect on a schedule (default every 5 min via cron) — Sync now is
+              only for an immediate pull. CSV import remains as a fallback.
             </p>
             <Button className="bg-teal-600 hover:bg-teal-700 shrink-0" onClick={() => setDeviceOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
@@ -1088,8 +1089,10 @@ export default function AttendancePage() {
                 <CardContent className="py-10 text-center text-sm text-muted-foreground space-y-2">
                   <p>Register fingerprint, face, or card devices for online sync.</p>
                   <p className="text-xs">
-                    Prefer <strong>API base URL</strong> (cloud/ADMS) for Sync now pull, or configure the vendor to{" "}
-                    <strong>POST punches</strong> to the device webhook. CSV via <strong>Biometric import</strong> still works offline.
+                    Prefer device <strong>webhook push</strong> for real-time attendance (no Sync now). Or set an{" "}
+                    <strong>API base URL</strong> and schedule{" "}
+                    <code className="rounded bg-slate-100 px-1 text-[10px]">/api/attendance/devices/cron</code> every
+                    5 minutes for automatic pull. CSV via <strong>Biometric import</strong> still works offline.
                   </p>
                 </CardContent>
               </Card>

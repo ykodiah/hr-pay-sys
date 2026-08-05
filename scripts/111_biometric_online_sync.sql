@@ -9,6 +9,8 @@ ALTER TABLE public.biometric_devices ADD COLUMN IF NOT EXISTS sync_mode varchar(
 ALTER TABLE public.biometric_devices ADD COLUMN IF NOT EXISTS last_sync_count integer DEFAULT 0;
 ALTER TABLE public.biometric_devices ADD COLUMN IF NOT EXISTS last_sync_error text;
 ALTER TABLE public.biometric_devices ADD COLUMN IF NOT EXISTS webhook_token varchar(80);
+ALTER TABLE public.biometric_devices ADD COLUMN IF NOT EXISTS auto_sync_enabled boolean DEFAULT true;
+ALTER TABLE public.biometric_devices ADD COLUMN IF NOT EXISTS auto_sync_minutes integer DEFAULT 5;
 
 CREATE TABLE IF NOT EXISTS public.biometric_punch_queue (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -639,6 +639,8 @@ export async function saveDevice(companyId: string, payload: any, id?: string) {
     api_key: payload.api_key || payload.apiKey || null,
     sync_path: payload.sync_path || payload.syncPath || "/api/punches",
     sync_mode: payload.sync_mode || payload.syncMode || (payload.api_base_url || payload.apiBaseUrl ? "pull" : "webhook"),
+    auto_sync_enabled: payload.auto_sync_enabled !== false && payload.autoSyncEnabled !== false,
+    auto_sync_minutes: Number(payload.auto_sync_minutes ?? payload.autoSyncMinutes ?? 5),
     updated_at: new Date().toISOString(),
   }
   if (webhookToken) row.webhook_token = webhookToken
@@ -652,6 +654,12 @@ export async function saveDevice(companyId: string, payload: any, id?: string) {
   }
 
   let { data, error } = await write(row)
+  if (error && /api_base_url|api_key|sync_path|sync_mode|webhook_token|auto_sync|schema cache|column/i.test(error.message)) {
+    const withoutAuto = { ...row }
+    delete withoutAuto.auto_sync_enabled
+    delete withoutAuto.auto_sync_minutes
+    ;({ data, error } = await write(withoutAuto))
+  }
   if (error && /api_base_url|api_key|sync_path|sync_mode|webhook_token|schema cache|column/i.test(error.message)) {
     const minimal = {
       company_id: companyId,
@@ -1077,6 +1085,102 @@ export async function ingestBiometricPunches(input: {
     processed: processed.processed,
     failed: processed.failed,
     deviceId: device.id,
+  }
+}
+
+/** Auto-sync all due devices (cron). Pulls API devices + drains webhook queues. */
+export async function syncBiometricDevicesDue(opts?: {
+  companyId?: string
+  force?: boolean
+  deviceId?: string
+}) {
+  const supabase = await getDb()
+  let query = supabase
+    .from("biometric_devices")
+    .select("*")
+    .eq("is_active", true)
+    .limit(200)
+
+  if (opts?.companyId) query = query.eq("company_id", opts.companyId)
+  if (opts?.deviceId) query = query.eq("id", opts.deviceId)
+
+  const { data: devices, error } = await query
+  if (error) {
+    if (/does not exist/i.test(error.message)) return { synced: 0, skipped: 0, results: [] as any[] }
+    throw new Error(error.message)
+  }
+
+  const results: any[] = []
+  let synced = 0
+  let skipped = 0
+  const now = Date.now()
+
+  for (const device of devices || []) {
+    const autoEnabled = device.auto_sync_enabled !== false
+    if (!autoEnabled && !opts?.force && !opts?.deviceId) {
+      skipped += 1
+      continue
+    }
+
+    const intervalMin = Math.max(1, Number(device.auto_sync_minutes ?? 5))
+    const last = device.last_sync ? new Date(device.last_sync).getTime() : 0
+    const due = opts?.force || !last || now - last >= intervalMin * 60_000
+    if (!due) {
+      skipped += 1
+      continue
+    }
+
+    // Skip devices with no pull URL and no reason to process (still try queue drain)
+    const hasPull = Boolean(String(device.api_base_url || "").trim() || device.ip_address)
+    try {
+      if (!hasPull && !opts?.force) {
+        // Still drain any pending webhook queue for this device
+        const queueOnly = await processPunchQueue(device.company_id, device.id)
+        if (queueOnly.processed > 0) {
+          await supabase
+            .from("biometric_devices")
+            .update({
+              last_sync: new Date().toISOString(),
+              status: "online",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", device.id)
+          synced += 1
+          results.push({
+            deviceId: device.id,
+            name: device.name,
+            imported: queueOnly.processed,
+            mode: "queue",
+          })
+        } else {
+          skipped += 1
+        }
+        continue
+      }
+
+      const result = await syncBiometricDevice(device.company_id, device.id)
+      synced += 1
+      results.push({
+        deviceId: device.id,
+        name: device.name,
+        imported: result.imported,
+        pullError: result.pullError || null,
+        mode: "full",
+      })
+    } catch (e: any) {
+      results.push({
+        deviceId: device.id,
+        name: device.name,
+        error: e?.message || "sync failed",
+      })
+    }
+  }
+
+  return {
+    synced,
+    skipped,
+    results,
+    hint: "Webhook devices push automatically (no Sync now). Pull devices auto-sync via /api/attendance/devices/cron every few minutes when scheduled.",
   }
 }
 
