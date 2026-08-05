@@ -22,10 +22,18 @@ function empName(e: Employee) {
   return `${e.first_name || ""} ${e.last_name || ""}`.trim() || e.employee_id || "Employee"
 }
 
+function readManualCoords(latStr: string, lngStr: string) {
+  const lat = Number(latStr)
+  const lng = Number(lngStr)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null
+  return { lat, lng, accuracy: 25 }
+}
+
 /**
  * How geofence works:
  * 1. HR defines worksite circles (lat/lng + radius) under Geofences tab.
- * 2. Clock-in captures GPS (or manual coordinates when browser blocks GPS).
+ * 2. Clock-in captures GPS (or uses typed coordinates).
  * 3. Server finds nearest active fence; if enforce_on_clock_in and outside radius → reject.
  * 4. Punch + GPS audit are written; late status uses assigned shift start + grace.
  */
@@ -39,6 +47,7 @@ export function AttendanceClockPanel({ employees }: { employees: Employee[] }) {
   const [lastResult, setLastResult] = useState<any>(null)
   const [audits, setAudits] = useState<any[]>([])
   const [gpsBlocked, setGpsBlocked] = useState(false)
+  const [gpsHint, setGpsHint] = useState("")
 
   const loadAudits = useCallback(async () => {
     try {
@@ -57,52 +66,77 @@ export function AttendanceClockPanel({ employees }: { employees: Employee[] }) {
     void loadAudits()
   }, [loadAudits])
 
-  async function captureLocation() {
-    if (!navigator.geolocation) {
-      setGpsBlocked(true)
-      toast({
-        title: "GPS unavailable",
-        description: "Enter latitude/longitude manually below (or open on a phone with location allowed).",
-        variant: "destructive",
-      })
-      return
-    }
-    setLocBusy(true)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCoords({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-        })
-        setManualLat(String(pos.coords.latitude))
-        setManualLng(String(pos.coords.longitude))
-        setGpsBlocked(false)
-        setLocBusy(false)
-        toast({ title: "Location captured", description: `±${Math.round(pos.coords.accuracy || 0)}m accuracy` })
-      },
-      (err) => {
-        setLocBusy(false)
-        setGpsBlocked(true)
-        toast({
-          title: "Browser blocked GPS",
-          description: `${err.message}. Use manual coordinates, or allow location for this site.`,
-          variant: "destructive",
-        })
-      },
-      { enableHighAccuracy: true, timeout: 15000 },
-    )
+  function getPosition(options: PositionOptions): Promise<GeolocationPosition> {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Geolocation API unavailable"))
+        return
+      }
+      navigator.geolocation.getCurrentPosition(resolve, reject, options)
+    })
   }
 
-  function applyManualCoords() {
-    const lat = Number(manualLat)
-    const lng = Number(manualLng)
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      toast({ title: "Invalid coordinates", variant: "destructive" })
-      return
+  async function captureLocation() {
+    setLocBusy(true)
+    setGpsHint("")
+    try {
+      if (typeof navigator !== "undefined" && (navigator as any).permissions?.query) {
+        try {
+          const perm = await (navigator as any).permissions.query({ name: "geolocation" })
+          if (perm.state === "denied") {
+            throw new Error("Location permission is denied for this site")
+          }
+        } catch {
+          /* permissions API optional */
+        }
+      }
+
+      let pos: GeolocationPosition
+      try {
+        pos = await getPosition({ enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 })
+      } catch {
+        // Fallback: faster / less precise — often succeeds when high-accuracy fails
+        pos = await getPosition({ enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 })
+      }
+
+      setCoords({
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+      })
+      setManualLat(String(pos.coords.latitude))
+      setManualLng(String(pos.coords.longitude))
+      setGpsBlocked(false)
+      toast({ title: "Location captured", description: `±${Math.round(pos.coords.accuracy || 0)}m accuracy` })
+    } catch (err: any) {
+      setGpsBlocked(true)
+      const msg = String(err?.message || err || "GPS failed")
+      const policyBlocked = /permissions policy|disabled in this document/i.test(msg)
+      setGpsHint(
+        policyBlocked
+          ? "This site previously blocked geolocation. After the update, hard-refresh (Ctrl/Cmd+Shift+R). You can still clock in with lat/lng below."
+          : "Enter latitude/longitude (from Maps) and click Clock in — coordinates are applied automatically.",
+      )
+      toast({
+        title: policyBlocked ? "GPS blocked by site policy — use coordinates" : "GPS unavailable — use coordinates",
+        description: msg,
+        variant: "destructive",
+      })
+    } finally {
+      setLocBusy(false)
     }
-    setCoords({ lat, lng, accuracy: 25 })
-    toast({ title: "Coordinates set", description: `${lat.toFixed(6)}, ${lng.toFixed(6)}` })
+  }
+
+  function applyManualCoords(silent = false) {
+    const next = readManualCoords(manualLat, manualLng)
+    if (!next) {
+      if (!silent) toast({ title: "Invalid coordinates", variant: "destructive" })
+      return null
+    }
+    setCoords(next)
+    setGpsBlocked(true)
+    if (!silent) toast({ title: "Coordinates set", description: `${next.lat.toFixed(6)}, ${next.lng.toFixed(6)}` })
+    return next
   }
 
   async function clock(action: "clock_in" | "clock_out") {
@@ -110,10 +144,14 @@ export function AttendanceClockPanel({ employees }: { employees: Employee[] }) {
       toast({ title: "Select employee", variant: "destructive" })
       return
     }
-    if (!coords) {
+    let active = coords
+    if (!active) {
+      active = applyManualCoords(true)
+    }
+    if (!active) {
       toast({
         title: "Location required",
-        description: "Capture GPS or enter lat/lng, then try again.",
+        description: "Capture GPS, or type lat/lng then Clock in (coordinates apply automatically).",
         variant: "destructive",
       })
       return
@@ -127,13 +165,13 @@ export function AttendanceClockPanel({ employees }: { employees: Employee[] }) {
         body: JSON.stringify({
           action,
           employee_id: employeeId,
-          latitude: coords.lat,
-          longitude: coords.lng,
-          accuracy: coords.accuracy,
+          latitude: active.lat,
+          longitude: active.lng,
+          accuracy: active.accuracy,
           device_info: {
             userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
             platform: typeof navigator !== "undefined" ? navigator.platform : "",
-            manual: gpsBlocked,
+            manual: gpsBlocked || !coords,
           },
         }),
       })
@@ -164,9 +202,9 @@ export function AttendanceClockPanel({ employees }: { employees: Employee[] }) {
           <div>
             <p className="font-medium">How geofence clock-in works</p>
             <p className="text-xs text-sky-900/80 mt-0.5">
-              Create a worksite under <strong>Geofences</strong> (name + lat/lng + radius, enforce on). Then capture
-              GPS here (or paste coordinates if the browser blocks location). The server rejects punches outside the
-              radius when enforcement is on, and writes a GPS audit row every time.
+              1) Create a worksite under <strong>Geofences</strong> (lat/lng + radius, enforce on). 2) Select employee
+              here. 3) Capture GPS <em>or</em> type coordinates, then <strong>Clock in</strong>. Typed coordinates are
+              applied automatically — no extra step. Outside the radius is rejected when enforcement is on.
             </p>
           </div>
         </CardContent>
@@ -180,7 +218,7 @@ export function AttendanceClockPanel({ employees }: { employees: Employee[] }) {
               Geofenced clock-in
             </CardTitle>
             <CardDescription>
-              Live GPS or manual coordinates · shift-aware late detection · GPS audit trail
+              Live GPS or typed coordinates · shift-aware late detection · GPS audit trail
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -215,8 +253,9 @@ export function AttendanceClockPanel({ employees }: { employees: Employee[] }) {
                   </div>
                 </div>
               ) : (
-                <p className="text-muted-foreground">No location yet — capture GPS or enter coordinates.</p>
+                <p className="text-muted-foreground">No location yet — capture GPS or enter coordinates, then Clock in.</p>
               )}
+              {gpsHint ? <p className="mt-2 text-xs text-amber-800">{gpsHint}</p> : null}
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -224,7 +263,10 @@ export function AttendanceClockPanel({ employees }: { employees: Employee[] }) {
                 <Label className="text-xs">Latitude</Label>
                 <Input
                   value={manualLat}
-                  onChange={(e) => setManualLat(e.target.value)}
+                  onChange={(e) => {
+                    setManualLat(e.target.value)
+                    setCoords(null)
+                  }}
                   placeholder="5.603700"
                 />
               </div>
@@ -232,7 +274,10 @@ export function AttendanceClockPanel({ employees }: { employees: Employee[] }) {
                 <Label className="text-xs">Longitude</Label>
                 <Input
                   value={manualLng}
-                  onChange={(e) => setManualLng(e.target.value)}
+                  onChange={(e) => {
+                    setManualLng(e.target.value)
+                    setCoords(null)
+                  }}
                   placeholder="-0.187000"
                 />
               </div>
@@ -243,7 +288,7 @@ export function AttendanceClockPanel({ employees }: { employees: Employee[] }) {
                 {locBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MapPin className="mr-2 h-4 w-4" />}
                 Capture GPS
               </Button>
-              <Button variant="outline" onClick={applyManualCoords}>
+              <Button variant="outline" onClick={() => applyManualCoords(false)}>
                 Use coordinates
               </Button>
               <Button className="bg-teal-600 hover:bg-teal-700" disabled={busy} onClick={() => void clock("clock_in")}>

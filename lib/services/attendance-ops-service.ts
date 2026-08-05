@@ -620,33 +620,464 @@ export async function listDevices(companyId: string) {
 
 export async function saveDevice(companyId: string, payload: any, id?: string) {
   const supabase = await getDb()
-  const row = {
+  const webhookToken =
+    payload.webhook_token ||
+    payload.webhookToken ||
+    (id ? undefined : `bio_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`)
+
+  const row: Record<string, any> = {
     company_id: companyId,
     name: String(payload.name || "").trim(),
     type: payload.type || "fingerprint",
     location: payload.location || null,
-    ip_address: payload.ip_address || null,
-    serial_number: payload.serial_number || null,
+    ip_address: payload.ip_address || payload.ipAddress || null,
+    serial_number: payload.serial_number || payload.serialNumber || null,
     status: payload.status || "online",
     is_active: payload.is_active !== false,
     notes: payload.notes || null,
+    api_base_url: payload.api_base_url || payload.apiBaseUrl || null,
+    api_key: payload.api_key || payload.apiKey || null,
+    sync_path: payload.sync_path || payload.syncPath || "/api/punches",
+    sync_mode: payload.sync_mode || payload.syncMode || (payload.api_base_url || payload.apiBaseUrl ? "pull" : "webhook"),
     updated_at: new Date().toISOString(),
   }
+  if (webhookToken) row.webhook_token = webhookToken
   if (!row.name) throw new Error("Device name is required")
-  if (id) {
-    const { data, error } = await supabase
-      .from("biometric_devices")
-      .update(row)
-      .eq("id", id)
-      .eq("company_id", companyId)
-      .select()
-      .single()
-    if (error) throw new Error(error.message)
-    return data
+
+  async function write(data: Record<string, any>) {
+    if (id) {
+      return supabase.from("biometric_devices").update(data).eq("id", id).eq("company_id", companyId).select().single()
+    }
+    return supabase.from("biometric_devices").insert(data).select().single()
   }
-  const { data, error } = await supabase.from("biometric_devices").insert(row).select().single()
+
+  let { data, error } = await write(row)
+  if (error && /api_base_url|api_key|sync_path|sync_mode|webhook_token|schema cache|column/i.test(error.message)) {
+    const minimal = {
+      company_id: companyId,
+      name: row.name,
+      type: row.type,
+      location: row.location,
+      ip_address: row.ip_address,
+      serial_number: row.serial_number,
+      status: row.status,
+      is_active: row.is_active,
+      notes: row.notes,
+      updated_at: row.updated_at,
+    }
+    ;({ data, error } = await write(minimal))
+  }
   if (error) throw new Error(error.message)
   return data
+}
+
+type NormalizedPunch = {
+  employeeKey: string
+  punchedAt: Date
+  punchType: "in" | "out" | "auto"
+  raw: any
+}
+
+function normalizeDevicePunches(payload: any): NormalizedPunch[] {
+  const list = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.punches)
+      ? payload.punches
+      : Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(payload?.records)
+          ? payload.records
+          : []
+
+  const out: NormalizedPunch[] = []
+  for (const p of list) {
+    const employeeKey = String(
+      p.employee_code || p.employeeCode || p.emp_code || p.pin || p.user_id || p.userId || p.employee_id || p.badge || "",
+    ).trim()
+    const ts = p.punched_at || p.timestamp || p.time || p.clock_time || p.datetime || p.date_time
+    if (!employeeKey || !ts) continue
+    const punchedAt = new Date(ts)
+    if (Number.isNaN(punchedAt.getTime())) continue
+    const typeRaw = String(p.type || p.punch_type || p.punchType || p.state || "auto").toLowerCase()
+    const punchType: "in" | "out" | "auto" =
+      typeRaw.includes("out") || typeRaw === "0" || typeRaw === "checkout"
+        ? "out"
+        : typeRaw.includes("in") || typeRaw === "1" || typeRaw === "checkin"
+          ? "in"
+          : "auto"
+    out.push({ employeeKey, punchedAt, punchType, raw: p })
+  }
+  return out
+}
+
+async function enqueuePunches(companyId: string, deviceId: string | null, punches: NormalizedPunch[]) {
+  if (!punches.length) return 0
+  const supabase = await getDb()
+  const rows = punches.map((p) => ({
+    company_id: companyId,
+    device_id: deviceId,
+    employee_code: p.employeeKey,
+    punched_at: p.punchedAt.toISOString(),
+    punch_type: p.punchType,
+    raw: p.raw,
+    status: "pending",
+  }))
+  const { error } = await supabase.from("biometric_punch_queue").insert(rows)
+  if (error) {
+    if (/does not exist|schema cache/i.test(error.message)) {
+      // Fall through — process immediately without queue table
+      return -1
+    }
+    throw new Error(error.message)
+  }
+  return rows.length
+}
+
+async function processPunchQueue(companyId: string, deviceId?: string | null) {
+  const supabase = await getDb()
+  let query = supabase
+    .from("biometric_punch_queue")
+    .select("*")
+    .eq("company_id", companyId)
+    .eq("status", "pending")
+    .order("punched_at", { ascending: true })
+    .limit(500)
+  if (deviceId) query = query.eq("device_id", deviceId)
+
+  const { data: pending, error } = await query
+  if (error) {
+    if (/does not exist|schema cache/i.test(error.message)) return { processed: 0, failed: 0 }
+    throw new Error(error.message)
+  }
+  if (!pending?.length) return { processed: 0, failed: 0 }
+
+  const keys = [
+    ...new Set(pending.map((p: any) => String(p.employee_code || "").toLowerCase()).filter(Boolean)),
+  ] as string[]
+  const resolved = await resolveEmployeesByKeys(companyId, keys)
+  const keyMap = new Map(resolved.map((r) => [r.key.toLowerCase(), r.employeeId]))
+
+  // Group by employee+date to build clock in/out pairs
+  const byEmpDate = new Map<string, any[]>()
+  for (const p of pending) {
+    const empId = keyMap.get(String(p.employee_code || "").toLowerCase())
+    if (!empId) {
+      await supabase
+        .from("biometric_punch_queue")
+        .update({ status: "failed", error_message: "Employee not found", processed_at: new Date().toISOString() })
+        .eq("id", p.id)
+      continue
+    }
+    const day = String(p.punched_at).slice(0, 10)
+    const k = `${empId}|${day}`
+    const arr = byEmpDate.get(k) || []
+    arr.push({ ...p, _empId: empId, _day: day })
+    byEmpDate.set(k, arr)
+  }
+
+  let processed = 0
+  let failed = 0
+
+  for (const [, punches] of byEmpDate) {
+    punches.sort((a: any, b: any) => String(a.punched_at).localeCompare(String(b.punched_at)))
+    const empId = punches[0]._empId
+    const day = punches[0]._day
+    const ins = punches.filter((p: any) => p.punch_type === "in")
+    const outs = punches.filter((p: any) => p.punch_type === "out")
+    const autos = punches.filter((p: any) => p.punch_type === "auto" || !["in", "out"].includes(p.punch_type))
+
+    let clockIn: string | null = null
+    let clockOut: string | null = null
+    if (ins.length || outs.length) {
+      clockIn = ins[0] ? new Date(ins[0].punched_at).toISOString().slice(11, 19) : null
+      clockOut = outs.length ? new Date(outs[outs.length - 1].punched_at).toISOString().slice(11, 19) : null
+    } else if (autos.length) {
+      clockIn = new Date(autos[0].punched_at).toISOString().slice(11, 19)
+      if (autos.length > 1) clockOut = new Date(autos[autos.length - 1].punched_at).toISOString().slice(11, 19)
+    }
+
+    try {
+      const rec = await upsertManualAttendance({
+        companyId,
+        employeeId: empId,
+        date: day,
+        status: clockIn ? "present" : "absent",
+        clockIn,
+        clockOut,
+        method: "biometric",
+        source: "biometric_sync",
+        autoDetectStatus: true,
+      })
+      for (const p of punches) {
+        await supabase
+          .from("biometric_punch_queue")
+          .update({
+            status: "processed",
+            employee_id: empId,
+            attendance_id: rec?.id || null,
+            processed_at: new Date().toISOString(),
+          })
+          .eq("id", p.id)
+      }
+      processed += punches.length
+    } catch (e: any) {
+      failed += punches.length
+      for (const p of punches) {
+        await supabase
+          .from("biometric_punch_queue")
+          .update({
+            status: "failed",
+            error_message: e?.message || "Process failed",
+            processed_at: new Date().toISOString(),
+          })
+          .eq("id", p.id)
+      }
+    }
+  }
+
+  return { processed, failed }
+}
+
+/** Live online sync: pull from device API (if configured) + process webhook queue. */
+export async function syncBiometricDevice(companyId: string, deviceId: string) {
+  const supabase = await getDb()
+  const { data: device, error } = await supabase
+    .from("biometric_devices")
+    .select("*")
+    .eq("id", deviceId)
+    .eq("company_id", companyId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  if (!device) throw new Error("Device not found")
+
+  await supabase
+    .from("biometric_devices")
+    .update({ status: "syncing", updated_at: new Date().toISOString() })
+    .eq("id", deviceId)
+
+  let pulled = 0
+  let pullError: string | null = null
+  const since = device.last_sync || new Date(Date.now() - 7 * 86400000).toISOString()
+
+  const baseUrl = String(device.api_base_url || "").trim().replace(/\/$/, "")
+  const path = String(device.sync_path || "/api/punches").startsWith("/")
+    ? String(device.sync_path || "/api/punches")
+    : `/${device.sync_path || "api/punches"}`
+
+  // Pull mode: fetch punches from device cloud / ADMS URL
+  if (baseUrl) {
+    try {
+      const url = new URL(`${baseUrl}${path}`)
+      url.searchParams.set("since", since)
+      if (device.serial_number) url.searchParams.set("serial", device.serial_number)
+      const headers: Record<string, string> = { Accept: "application/json" }
+      if (device.api_key) {
+        headers.Authorization = `Bearer ${device.api_key}`
+        headers["X-API-Key"] = device.api_key
+      }
+      const res = await fetch(url.toString(), { headers, signal: AbortSignal.timeout(20000) })
+      if (!res.ok) throw new Error(`Device API ${res.status}`)
+      const json = await res.json().catch(() => ([]))
+      const punches = normalizeDevicePunches(json)
+      const queued = await enqueuePunches(companyId, deviceId, punches)
+      if (queued === -1) {
+        // Process directly without queue
+        const keys = [...new Set(punches.map((p) => p.employeeKey.toLowerCase()))]
+        const resolved = await resolveEmployeesByKeys(companyId, keys)
+        const keyMap = new Map(resolved.map((r) => [r.key.toLowerCase(), r.employeeId]))
+        const rows = punches
+          .map((p) => {
+            const employeeId = keyMap.get(p.employeeKey.toLowerCase())
+            if (!employeeId) return null
+            const date = p.punchedAt.toISOString().slice(0, 10)
+            const time = p.punchedAt.toISOString().slice(11, 19)
+            return {
+              employeeId,
+              date,
+              clockIn: p.punchType !== "out" ? time : undefined,
+              clockOut: p.punchType === "out" ? time : undefined,
+            }
+          })
+          .filter(Boolean) as any[]
+        if (rows.length) {
+          await bulkUpsertAttendance(companyId, rows, {
+            source: "biometric_sync",
+            method: "biometric",
+            deviceId,
+          })
+        }
+        pulled = rows.length
+      } else {
+        pulled = queued
+      }
+    } catch (e: any) {
+      pullError = e?.message || "Pull failed"
+    }
+  } else if (device.ip_address) {
+    // Best-effort LAN-style pull (works when server can reach the device network)
+    try {
+      const proto = "http"
+      const url = `${proto}://${device.ip_address}${path}?since=${encodeURIComponent(since)}`
+      const headers: Record<string, string> = { Accept: "application/json" }
+      if (device.api_key) headers["X-API-Key"] = device.api_key
+      const res = await fetch(url, { headers, signal: AbortSignal.timeout(8000) })
+      if (res.ok) {
+        const json = await res.json().catch(() => ([]))
+        const punches = normalizeDevicePunches(json)
+        const queued = await enqueuePunches(companyId, deviceId, punches)
+        pulled = queued === -1 ? punches.length : queued
+      } else {
+        pullError = `Device at ${device.ip_address} returned ${res.status}`
+      }
+    } catch {
+      pullError =
+        "Could not reach device IP from server. Use API base URL (cloud) or push punches to the webhook."
+    }
+  }
+
+  const queueResult = await processPunchQueue(companyId, deviceId)
+  const imported = pulled + queueResult.processed
+
+  const patch: Record<string, any> = {
+    last_sync: new Date().toISOString(),
+    status: pullError && !imported ? "error" : "online",
+    updated_at: new Date().toISOString(),
+  }
+  try {
+    patch.last_sync_count = imported
+    patch.last_sync_error = pullError
+  } catch {
+    /* columns may be missing */
+  }
+
+  let { data: updated, error: upErr } = await supabase
+    .from("biometric_devices")
+    .update(patch)
+    .eq("id", deviceId)
+    .eq("company_id", companyId)
+    .select()
+    .single()
+  if (upErr && /last_sync_count|last_sync_error|schema cache|column/i.test(upErr.message)) {
+    ;({ data: updated, error: upErr } = await supabase
+      .from("biometric_devices")
+      .update({
+        last_sync: patch.last_sync,
+        status: patch.status,
+        updated_at: patch.updated_at,
+      })
+      .eq("id", deviceId)
+      .eq("company_id", companyId)
+      .select()
+      .single())
+  }
+  if (upErr) throw new Error(upErr.message)
+
+  return {
+    device: updated,
+    imported,
+    pulled,
+    processed: queueResult.processed,
+    failed: queueResult.failed,
+    pullError,
+    webhookPath: `/api/attendance/devices/webhook?token=${device.webhook_token || device.id}`,
+    message: imported
+      ? `Synced ${imported} punch(es) into attendance.`
+      : pullError
+        ? pullError
+        : "No new punches. Configure API base URL for pull, or have the device POST to the webhook.",
+  }
+}
+
+/** Ingest punches pushed by a device/cloud connector. */
+export async function ingestBiometricPunches(input: {
+  companyId?: string
+  deviceId?: string
+  token?: string
+  punches: any
+}) {
+  const supabase = await getDb()
+  let device: any = null
+  if (input.token) {
+    const { data } = await supabase
+      .from("biometric_devices")
+      .select("*")
+      .eq("webhook_token", input.token)
+      .eq("is_active", true)
+      .maybeSingle()
+    device = data
+  }
+  if (!device && input.deviceId) {
+    const { data } = await supabase
+      .from("biometric_devices")
+      .select("*")
+      .eq("id", input.deviceId)
+      .eq("is_active", true)
+      .maybeSingle()
+    device = data
+  }
+  if (!device) throw new Error("Device not found for webhook token")
+
+  const companyId = input.companyId || device.company_id
+  const punches = normalizeDevicePunches(input.punches)
+  if (!punches.length) throw new Error("No valid punches in payload")
+
+  const queued = await enqueuePunches(companyId, device.id, punches)
+  if (queued === -1) {
+    // Direct process
+    const keys = [...new Set(punches.map((p) => p.employeeKey.toLowerCase()))]
+    const resolved = await resolveEmployeesByKeys(companyId, keys)
+    const keyMap = new Map(resolved.map((r) => [r.key.toLowerCase(), r.employeeId]))
+    const byDay = new Map<string, NormalizedPunch[]>()
+    for (const p of punches) {
+      const empId = keyMap.get(p.employeeKey.toLowerCase())
+      if (!empId) continue
+      const day = p.punchedAt.toISOString().slice(0, 10)
+      const k = `${empId}|${day}`
+      const arr = byDay.get(k) || []
+      arr.push(p)
+      byDay.set(k, arr)
+    }
+    const rows: any[] = []
+    for (const [k, list] of byDay) {
+      const [employeeId, date] = k.split("|")
+      list.sort((a, b) => a.punchedAt.getTime() - b.punchedAt.getTime())
+      const first = list[0]
+      const last = list[list.length - 1]
+      rows.push({
+        employeeId,
+        date,
+        clockIn: first.punchedAt.toISOString().slice(11, 19),
+        clockOut: list.length > 1 ? last.punchedAt.toISOString().slice(11, 19) : undefined,
+      })
+    }
+    const result = await bulkUpsertAttendance(companyId, rows, {
+      source: "biometric_webhook",
+      method: "biometric",
+      deviceId: device.id,
+    })
+    await supabase
+      .from("biometric_devices")
+      .update({ last_sync: new Date().toISOString(), status: "online", updated_at: new Date().toISOString() })
+      .eq("id", device.id)
+    return { imported: result.imported, deviceId: device.id }
+  }
+
+  const processed = await processPunchQueue(companyId, device.id)
+  await supabase
+    .from("biometric_devices")
+    .update({
+      last_sync: new Date().toISOString(),
+      status: "online",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", device.id)
+
+  return {
+    queued,
+    processed: processed.processed,
+    failed: processed.failed,
+    deviceId: device.id,
+  }
 }
 
 export async function generateOvertimeFromAttendance(input: {

@@ -144,6 +144,9 @@ export default function AttendancePage() {
     location: "",
     serial_number: "",
     ip_address: "",
+    api_base_url: "",
+    api_key: "",
+    sync_path: "/api/punches",
   })
 
   const loadAttendance = useCallback(async () => {
@@ -352,9 +355,23 @@ export default function AttendancePage() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || "Failed")
-      toast({ title: "Device registered" })
+      toast({
+        title: "Device registered",
+        description: data.webhookPath
+          ? `Online sync ready. Webhook: ${data.webhookPath}`
+          : "Device saved. Add an API base URL for pull sync.",
+      })
       setDeviceOpen(false)
-      setDeviceForm({ name: "", type: "fingerprint", location: "", serial_number: "", ip_address: "" })
+      setDeviceForm({
+        name: "",
+        type: "fingerprint",
+        location: "",
+        serial_number: "",
+        ip_address: "",
+        api_base_url: "",
+        api_key: "",
+        sync_path: "/api/punches",
+      })
       await loadMeta()
     } catch (err) {
       toast({
@@ -379,10 +396,12 @@ export default function AttendancePage() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || "Sync failed")
       toast({
-        title: "Device marked synced",
+        title: data.imported ? `Synced ${data.imported} punch(es)` : "Sync finished",
         description:
           data.message ||
-          "Timestamp updated. Import punches via Biometric import (CSV export from the device).",
+          (data.imported
+            ? "Attendance updated from device."
+            : "No new punches. Set API base URL for pull sync, or POST punches to the device webhook."),
       })
       await loadMeta()
     } catch (err) {
@@ -1003,8 +1022,12 @@ export default function AttendancePage() {
         </TabsContent>
 
         <TabsContent value="devices" className="space-y-4">
-          <div className="flex justify-end">
-            <Button className="bg-teal-600 hover:bg-teal-700" onClick={() => setDeviceOpen(true)}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground max-w-2xl">
+              Register devices with an <strong>API base URL</strong> for online pull, or use the webhook token to push
+              punches in real time. CSV import remains available as a fallback.
+            </p>
+            <Button className="bg-teal-600 hover:bg-teal-700 shrink-0" onClick={() => setDeviceOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Register device
             </Button>
@@ -1020,14 +1043,27 @@ export default function AttendancePage() {
                         {d.type} · {d.location || "No location"}
                       </p>
                     </div>
-                    <Badge className={d.status === "online" ? "bg-emerald-100 text-emerald-800" : "bg-slate-100"}>
+                    <Badge className={d.status === "online" ? "bg-emerald-100 text-emerald-800" : d.status === "error" ? "bg-rose-100 text-rose-800" : "bg-slate-100"}>
                       <Wifi className="mr-1 h-3 w-3" />
                       {d.status || "online"}
                     </Badge>
                   </div>
                   <p className="text-xs text-slate-500">
                     Last sync: {d.last_sync ? new Date(d.last_sync).toLocaleString() : "Never"}
+                    {d.last_sync_count != null ? ` · ${d.last_sync_count} punches` : ""}
                   </p>
+                  {d.api_base_url ? (
+                    <p className="truncate text-[11px] text-teal-800">Pull: {d.api_base_url}</p>
+                  ) : d.webhook_token ? (
+                    <p className="truncate text-[11px] text-slate-600">
+                      Webhook: /api/attendance/devices/webhook?token=…{String(d.webhook_token).slice(-6)}
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-amber-800">Add API URL for online pull, or re-save to mint a webhook token.</p>
+                  )}
+                  {d.last_sync_error ? (
+                    <p className="text-[11px] text-rose-700 line-clamp-2">{d.last_sync_error}</p>
+                  ) : null}
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="outline" onClick={() => void syncDevice(d.id)} disabled={busy}>
                       <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
@@ -1048,12 +1084,12 @@ export default function AttendancePage() {
               </Card>
             ))}
             {!devices.length ? (
-              <Card>
+              <Card className="md:col-span-2 xl:col-span-3">
                 <CardContent className="py-10 text-center text-sm text-muted-foreground space-y-2">
-                  <p>Register fingerprint, face, or card devices, then upload their CSV exports.</p>
+                  <p>Register fingerprint, face, or card devices for online sync.</p>
                   <p className="text-xs">
-                    Sync Now only updates last-sync time — live device pull is not available in-browser.
-                    Use <strong>Biometric import</strong> with a CSV from the device.
+                    Prefer <strong>API base URL</strong> (cloud/ADMS) for Sync now pull, or configure the vendor to{" "}
+                    <strong>POST punches</strong> to the device webhook. CSV via <strong>Biometric import</strong> still works offline.
                   </p>
                 </CardContent>
               </Card>
@@ -1222,10 +1258,39 @@ export default function AttendancePage() {
                 />
               </div>
               <div>
-                <Label>IP</Label>
+                <Label>IP (optional LAN)</Label>
                 <Input
                   value={deviceForm.ip_address}
                   onChange={(e) => setDeviceForm((f) => ({ ...f, ip_address: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div>
+              <Label>API base URL (online pull)</Label>
+              <Input
+                placeholder="https://device-cloud.example.com"
+                value={deviceForm.api_base_url}
+                onChange={(e) => setDeviceForm((f) => ({ ...f, api_base_url: e.target.value }))}
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Sync now will GET {"{base}"}
+                {deviceForm.sync_path || "/api/punches"}?since=…
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>API key</Label>
+                <Input
+                  value={deviceForm.api_key}
+                  onChange={(e) => setDeviceForm((f) => ({ ...f, api_key: e.target.value }))}
+                  placeholder="Bearer / X-API-Key"
+                />
+              </div>
+              <div>
+                <Label>Sync path</Label>
+                <Input
+                  value={deviceForm.sync_path}
+                  onChange={(e) => setDeviceForm((f) => ({ ...f, sync_path: e.target.value }))}
                 />
               </div>
             </div>
