@@ -1,472 +1,753 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
-import { Clock, User, FileText, CheckCircle, AlertCircle, Download, Plus, Search, Filter } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Brain,
+  CheckCircle2,
+  Clock,
+  LogOut,
+  Package,
+  Plus,
+  RefreshCw,
+  Search,
+  Sparkles,
+  Wallet,
+} from "lucide-react"
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Cell,
+  PieChart,
+  Pie,
+} from "recharts"
+import { toast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
 
-interface OffboardingCase {
-  id: string
-  employeeName: string
-  employeeId: string
-  department: string
-  position: string
-  lastWorkingDay: string
-  reason: string
-  status: "initiated" | "in-progress" | "completed"
-  exitInterviewCompleted: boolean
-  assetsReturned: boolean
-  finalSettlement: number
-  createdAt: string
+type Overview = {
+  cases: any[]
+  assets: any[]
+  interviews: any[]
+  insights: any[]
+  employees: { id: string; name: string; code: string; department: string; position: string }[]
+  stats: {
+    activeCases: number
+    completedCases: number
+    pendingAssets: number
+    pendingSettlements: number
+    avgProcessDays: number
+    totalCases: number
+  }
+  charts: {
+    byReason: { reason: string; count: number }[]
+    statusMix: { status: string; count: number }[]
+  }
 }
 
-interface Asset {
-  id: string
-  name: string
-  type: string
-  serialNumber: string
-  condition: string
-  returned: boolean
+const CHART = ["#0d9488", "#14b8a6", "#f59e0b", "#f97316", "#64748b", "#ef4444"]
+const REASONS = [
+  { value: "resignation", label: "Resignation" },
+  { value: "termination", label: "Termination" },
+  { value: "retirement", label: "Retirement" },
+  { value: "contract_end", label: "Contract end" },
+  { value: "other", label: "Other" },
+]
+
+function statusTone(s: string) {
+  if (s === "completed") return "bg-emerald-100 text-emerald-800"
+  if (s === "in_progress") return "bg-sky-100 text-sky-800"
+  if (s === "cancelled") return "bg-slate-100 text-slate-600"
+  return "bg-amber-100 text-amber-800"
 }
 
 export default function OffboardingPage() {
-  const [activeTab, setActiveTab] = useState("overview")
-  const [searchTerm, setSearchTerm] = useState("")
+  const [tab, setTab] = useState("overview")
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [data, setData] = useState<Overview | null>(null)
+  const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
-  const [showNewOffboardingDialog, setShowNewOffboardingDialog] = useState(false)
+  const [caseOpen, setCaseOpen] = useState(false)
+  const [detail, setDetail] = useState<any | null>(null)
+  const [interviewOpen, setInterviewOpen] = useState(false)
+  const [interviewCaseId, setInterviewCaseId] = useState("")
+  const [interviewForm, setInterviewForm] = useState({
+    feedback: "",
+    interviewer: "",
+    wouldRecommend: "true",
+    rehireEligible: "true",
+  })
+  const [form, setForm] = useState({
+    employeeId: "",
+    lastWorkingDay: "",
+    reason: "resignation",
+    notes: "",
+  })
 
-  // Mock data
-  const offboardingCases: OffboardingCase[] = [
-    {
-      id: "OFF001",
-      employeeName: "Kwame Asante",
-      employeeId: "EMP001",
-      department: "Technology",
-      position: "Senior Software Engineer",
-      lastWorkingDay: "2024-02-15",
-      reason: "Resignation",
-      status: "in-progress",
-      exitInterviewCompleted: true,
-      assetsReturned: false,
-      finalSettlement: 8500,
-      createdAt: "2024-01-15",
-    },
-    {
-      id: "OFF002",
-      employeeName: "Ama Osei",
-      employeeId: "EMP002",
-      department: "Human Resources",
-      position: "HR Manager",
-      lastWorkingDay: "2024-01-31",
-      reason: "Termination",
-      status: "completed",
-      exitInterviewCompleted: true,
-      assetsReturned: true,
-      finalSettlement: 12000,
-      createdAt: "2024-01-01",
-    },
-  ]
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch("/api/offboarding", { credentials: "include", cache: "no-store" })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Failed to load")
+      setData(json as Overview)
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed to load", variant: "destructive" })
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
-  const assets: Asset[] = [
-    {
-      id: "AST001",
-      name: "MacBook Pro",
-      type: "Laptop",
-      serialNumber: "MBP2023001",
-      condition: "Good",
-      returned: false,
-    },
-    {
-      id: "AST002",
-      name: "iPhone 14",
-      type: "Mobile Phone",
-      serialNumber: "IP14001",
-      condition: "Excellent",
-      returned: true,
-    },
-    {
-      id: "AST003",
-      name: "Office Key",
-      type: "Access Card",
-      serialNumber: "KEY001",
-      condition: "Good",
-      returned: false,
-    },
-  ]
+  useEffect(() => {
+    void load()
+  }, [load])
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "initiated":
-        return "bg-yellow-100 text-yellow-800"
-      case "in-progress":
-        return "bg-blue-100 text-blue-800"
-      case "completed":
-        return "bg-green-100 text-green-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+  async function postAction(body: Record<string, unknown>) {
+    setSaving(true)
+    try {
+      const res = await fetch("/api/offboarding", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Save failed")
+      toast({ title: "Saved" })
+      await load()
+      return true
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Save failed", variant: "destructive" })
+      return false
+    } finally {
+      setSaving(false)
     }
   }
 
-  const filteredCases = offboardingCases.filter((case_) => {
-    const matchesSearch =
-      case_.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      case_.employeeId.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || case_.status === statusFilter
-    return matchesSearch && matchesStatus
+  async function generateInsights() {
+    setSaving(true)
+    try {
+      const res = await fetch("/api/offboarding", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "generate_insights" }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Failed")
+      toast({ title: `Generated ${json.generated ?? 0} AI insights` })
+      await load()
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed", variant: "destructive" })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const filtered = useMemo(() => {
+    return (data?.cases || []).filter((c) => {
+      const q = search.toLowerCase()
+      const match =
+        !q ||
+        String(c.employee_name || "").toLowerCase().includes(q) ||
+        String(c.employee_code || "").toLowerCase().includes(q) ||
+        String(c.case_number || "").toLowerCase().includes(q)
+      const st = statusFilter === "all" || c.status === statusFilter
+      return match && st
+    })
+  }, [data?.cases, search, statusFilter])
+
+  const stats = data?.stats
+  const activeAssets = (data?.assets || []).filter((a) => {
+    const parent = (data?.cases || []).find((c) => c.id === a.case_id)
+    return parent && ["initiated", "in_progress"].includes(parent.status)
   })
 
-  // Handler functions for buttons
-  const handleInitiateOffboarding = () => {
-    // Add logic to initiate offboarding
-    console.log("Initiating offboarding process...")
-    setShowNewOffboardingDialog(false)
-  }
-
-  const handleJoinInterview = (caseId: string) => {
-    // Add logic to join interview
-    console.log(`Joining interview for case ${caseId}`)
-  }
-
-  const handleMarkAssetReturned = (assetId: string) => {
-    // Add logic to mark asset as returned
-    console.log(`Marking asset ${assetId} as returned`)
-  }
-
-  const handleProcessPayment = (caseId: string) => {
-    // Add logic to process payment
-    console.log(`Processing payment for case ${caseId}`)
-  }
-
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Employee Offboarding</h1>
-          <p className="text-gray-600">Manage employee departures and exit processes</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-teal-700">Lifecycle</p>
+          <h1 className="text-2xl font-bold text-slate-900">Offboarding</h1>
+          <p className="text-sm text-muted-foreground">
+            Exit cases, interviews, assets, and settlements — database-backed with AI attrition signals.
+          </p>
         </div>
-        <Dialog open={showNewOffboardingDialog} onOpenChange={setShowNewOffboardingDialog}>
-          <DialogTrigger asChild>
-            <Button className="bg-emerald-600 hover:bg-emerald-700">
-              <Plus className="w-4 h-4 mr-2" />
-              Initiate Offboarding
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Initiate Employee Offboarding</DialogTitle>
-              <DialogDescription>Start the offboarding process for an employee</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="employee">Employee</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select employee" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="emp1">Kwame Asante - EMP001</SelectItem>
-                      <SelectItem value="emp2">Ama Osei - EMP002</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="lastWorkingDay">Last Working Day</Label>
-                  <Input type="date" />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="reason">Reason for Departure</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select reason" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="resignation">Resignation</SelectItem>
-                    <SelectItem value="termination">Termination</SelectItem>
-                    <SelectItem value="retirement">Retirement</SelectItem>
-                    <SelectItem value="contract-end">Contract End</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="notes">Additional Notes</Label>
-                <Textarea placeholder="Enter any additional notes..." />
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setShowNewOffboardingDialog(false)}>
-                  Cancel
-                </Button>
-                <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleInitiateOffboarding}>Initiate Offboarding</Button>
-              </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="rounded-xl" onClick={() => void load()} disabled={loading}>
+            <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
+            Refresh
+          </Button>
+          <Button
+            className="rounded-xl bg-gradient-to-r from-teal-700 to-emerald-600 text-white hover:from-teal-800 hover:to-emerald-700"
+            onClick={() => void generateInsights()}
+            disabled={saving}
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            Generate AI insights
+          </Button>
+          <Button className="rounded-xl bg-teal-700 text-white hover:bg-teal-800" onClick={() => setCaseOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Initiate offboarding
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: "Active cases", value: stats?.activeCases ?? "—", icon: LogOut },
+          { label: "Completed", value: stats?.completedCases ?? "—", icon: CheckCircle2 },
+          { label: "Pending assets", value: stats?.pendingAssets ?? "—", icon: Package },
+          { label: "Avg process days", value: stats?.avgProcessDays ?? "—", icon: Clock },
+        ].map((card) => (
+          <div key={card.label} className="rounded-2xl border border-teal-100/80 bg-gradient-to-br from-teal-50/50 to-white p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{card.label}</p>
+              <card.icon className="h-4 w-4 text-teal-700" />
             </div>
-          </DialogContent>
-        </Dialog>
+            <p className="mt-2 text-3xl font-bold tabular-nums text-slate-900">{card.value}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Cases</CardTitle>
-            <User className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">12</div>
-            <p className="text-xs text-muted-foreground">+2 from last month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed This Month</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">8</div>
-            <p className="text-xs text-muted-foreground">+12% from last month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Assets</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">5</div>
-            <p className="text-xs text-muted-foreground">Awaiting return</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg. Process Time</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">7 days</div>
-            <p className="text-xs text-muted-foreground">-2 days from last month</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main Content */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="exit-interviews">Exit Interviews</TabsTrigger>
-          <TabsTrigger value="assets">Asset Management</TabsTrigger>
-          <TabsTrigger value="settlements">Final Settlements</TabsTrigger>
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 rounded-2xl bg-slate-100/80 p-1">
+          {[
+            ["overview", "Overview"],
+            ["cases", "Cases"],
+            ["interviews", "Exit interviews"],
+            ["assets", "Assets"],
+            ["settlements", "Settlements"],
+            ["insights", "AI Insights"],
+          ].map(([v, l]) => (
+            <TabsTrigger key={v} value={v} className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-teal-800">
+              {l}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
-          {/* Search and Filter */}
-          <div className="flex space-x-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  placeholder="Search by employee name or ID..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-sm font-semibold">Exit reasons</h3>
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data?.charts.byReason || []}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="reason" tick={{ fontSize: 11 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Bar dataKey="count" radius={[8, 8, 0, 0]}>
+                      {(data?.charts.byReason || []).map((_, i) => (
+                        <Cell key={i} fill={CHART[i % CHART.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
+            <div className="rounded-2xl border bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-sm font-semibold">Status mix</h3>
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={(data?.charts.statusMix || []).filter((s) => s.count > 0)}
+                      dataKey="count"
+                      nameKey="status"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={3}
+                    >
+                      {(data?.charts.statusMix || []).filter((s) => s.count > 0).map((_, i) => (
+                        <Cell key={i} fill={CHART[i % CHART.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+          {(data?.insights || []).slice(0, 3).length > 0 && (
+            <div className="grid gap-3 md:grid-cols-3">
+              {(data?.insights || []).slice(0, 3).map((ins: any) => (
+                <div key={ins.id} className="rounded-2xl border border-teal-100 bg-gradient-to-br from-white to-teal-50/40 p-4">
+                  <Badge variant="outline" className="mb-2 text-[10px] uppercase">{ins.insight_type}</Badge>
+                  <p className="text-sm font-semibold">{ins.title}</p>
+                  <p className="mt-1 text-xs text-muted-foreground line-clamp-3">{ins.body}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="cases" className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <div className="relative min-w-[220px] flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input className="pl-8" placeholder="Search employees…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-48">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="initiated">Initiated</SelectItem>
-                <SelectItem value="in-progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
+                {["all", "initiated", "in_progress", "completed", "cancelled"].map((s) => (
+                  <SelectItem key={s} value={s} className="capitalize">{s.replace(/_/g, " ")}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
-
-          {/* Offboarding Cases */}
-          <div className="space-y-4">
-            {filteredCases.map((case_) => (
-              <Card key={case_.id}>
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">{case_.employeeName}</CardTitle>
-                      <CardDescription>
-                        {case_.position} • {case_.department} • ID: {case_.employeeId}
-                      </CardDescription>
-                    </div>
-                    <Badge className={getStatusColor(case_.status)}>
-                      {case_.status.replace("-", " ").toUpperCase()}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <p className="font-medium text-gray-600">Last Working Day</p>
-                      <p>{new Date(case_.lastWorkingDay).toLocaleDateString()}</p>
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-600">Reason</p>
-                      <p>{case_.reason}</p>
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-600">Exit Interview</p>
-                      <p className={case_.exitInterviewCompleted ? "text-green-600" : "text-red-600"}>
-                        {case_.exitInterviewCompleted ? "Completed" : "Pending"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-600">Assets Returned</p>
-                      <p className={case_.assetsReturned ? "text-green-600" : "text-red-600"}>
-                        {case_.assetsReturned ? "Yes" : "Pending"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex justify-end space-x-2 mt-4">
-                    <Button variant="outline" size="sm">
-                      <FileText className="w-4 h-4 mr-2" />
-                      View Details
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      <Download className="w-4 h-4 mr-2" />
-                      Export Report
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="overflow-hidden rounded-2xl border bg-white">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Last day</TableHead>
+                  <TableHead>Reason</TableHead>
+                  <TableHead>Progress</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Settlement</TableHead>
+                  <TableHead className="w-24" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">No offboarding cases yet.</TableCell>
+                  </TableRow>
+                ) : (
+                  filtered.map((c) => (
+                    <TableRow key={c.id}>
+                      <TableCell>
+                        <div className="font-medium">{c.employee_name}</div>
+                        <div className="text-xs text-muted-foreground">{c.department} · {c.position}</div>
+                      </TableCell>
+                      <TableCell className="tabular-nums">{c.last_working_day}</TableCell>
+                      <TableCell className="capitalize">{String(c.reason).replace(/_/g, " ")}</TableCell>
+                      <TableCell className="min-w-[120px]">
+                        <div className="mb-1 text-xs tabular-nums">{c.checklist_progress || 0}%</div>
+                        <Progress value={Number(c.checklist_progress) || 0} className="h-2" />
+                      </TableCell>
+                      <TableCell>
+                        <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold capitalize", statusTone(c.status))}>
+                          {String(c.status).replace(/_/g, " ")}
+                        </span>
+                      </TableCell>
+                      <TableCell className="tabular-nums">
+                        GHS {Number(c.settlement_amount || 0).toLocaleString()}
+                        <div className="text-[10px] uppercase text-muted-foreground">{c.settlement_status}</div>
+                      </TableCell>
+                      <TableCell>
+                        <Button size="sm" variant="ghost" onClick={() => setDetail(c)}>Manage</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </div>
         </TabsContent>
 
-        <TabsContent value="exit-interviews" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Exit Interview Management</CardTitle>
-              <CardDescription>Schedule and manage exit interviews</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Scheduled Interviews</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
-                          <div>
-                            <p className="font-medium">Kwame Asante</p>
-                            <p className="text-sm text-gray-600">Feb 10, 2024 at 2:00 PM</p>
-                          </div>
-                          <Button size="sm" onClick={() => handleJoinInterview("OFF001")}>Join Interview</Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Completed Interviews</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                          <div>
-                            <p className="font-medium">Ama Osei</p>
-                            <p className="text-sm text-gray-600">Completed Jan 25, 2024</p>
-                          </div>
-                          <Button variant="outline" size="sm">
-                            View Report
+        <TabsContent value="interviews" className="space-y-3">
+          <div className="overflow-hidden rounded-2xl border bg-white">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Scheduled</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Recommend?</TableHead>
+                  <TableHead className="w-36" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(data?.cases || []).filter((c) => c.interview || ["initiated", "in_progress"].includes(c.status)).length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">No interviews.</TableCell>
+                  </TableRow>
+                ) : (
+                  (data?.cases || [])
+                    .filter((c) => c.interview || ["initiated", "in_progress"].includes(c.status))
+                    .map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-medium">{c.employee_name}</TableCell>
+                        <TableCell className="text-xs">
+                          {c.interview?.scheduled_at ? new Date(c.interview.scheduled_at).toLocaleString() : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="capitalize">
+                            {c.exit_interview_completed ? "completed" : c.interview?.status || "pending"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {c.interview?.would_recommend == null
+                            ? "—"
+                            : c.interview.would_recommend
+                              ? "Yes"
+                              : "No"}
+                        </TableCell>
+                        <TableCell>
+                          {!c.exit_interview_completed && (
+                            <Button
+                              size="sm"
+                              className="rounded-lg bg-teal-700 text-white hover:bg-teal-800"
+                              onClick={() => {
+                                setInterviewCaseId(c.id)
+                                setInterviewOpen(true)
+                              }}
+                            >
+                              Complete
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="assets" className="space-y-3">
+          <div className="overflow-hidden rounded-2xl border bg-white">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Asset</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Serial</TableHead>
+                  <TableHead>Condition</TableHead>
+                  <TableHead>Returned</TableHead>
+                  <TableHead className="w-36" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {activeAssets.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">No active assets to recover.</TableCell>
+                  </TableRow>
+                ) : (
+                  activeAssets.map((a) => (
+                    <TableRow key={a.id}>
+                      <TableCell className="font-medium">{a.name}</TableCell>
+                      <TableCell>{a.asset_type}</TableCell>
+                      <TableCell className="text-xs">{a.serial_number || "—"}</TableCell>
+                      <TableCell className="capitalize">{a.condition}</TableCell>
+                      <TableCell>{a.returned ? "Yes" : "No"}</TableCell>
+                      <TableCell>
+                        {!a.returned && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-lg"
+                            disabled={saving}
+                            onClick={() => void postAction({ action: "asset", id: a.id, returned: true })}
+                          >
+                            Mark returned
                           </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="settlements" className="space-y-3">
+          <div className="overflow-hidden rounded-2xl border bg-white">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Last day</TableHead>
+                  <TableHead className="w-40" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(data?.cases || []).filter((c) => c.status !== "cancelled").length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">No settlements.</TableCell>
+                  </TableRow>
+                ) : (
+                  (data?.cases || [])
+                    .filter((c) => c.status !== "cancelled")
+                    .map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-medium">{c.employee_name}</TableCell>
+                        <TableCell className="tabular-nums">GHS {Number(c.settlement_amount || 0).toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="capitalize">{c.settlement_status}</Badge>
+                        </TableCell>
+                        <TableCell>{c.last_working_day}</TableCell>
+                        <TableCell>
+                          {c.settlement_status !== "paid" && (
+                            <Button
+                              size="sm"
+                              className="rounded-lg bg-teal-700 text-white hover:bg-teal-800"
+                              disabled={saving}
+                              onClick={() => void postAction({ action: "settlement", id: c.id })}
+                            >
+                              <Wallet className="mr-1 h-3.5 w-3.5" />
+                              Process payment
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="insights" className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-teal-100 bg-gradient-to-r from-teal-50 to-white p-4">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl bg-teal-700 p-2 text-white"><Brain className="h-5 w-5" /></div>
+              <div>
+                <p className="font-semibold">AI / ML offboarding insights</p>
+                <p className="text-sm text-muted-foreground">
+                  Flags interview due dates, unreturned assets, settlement risk, process lag, and attrition patterns.
+                </p>
+              </div>
+            </div>
+            <Button className="rounded-xl bg-teal-700 text-white hover:bg-teal-800" onClick={() => void generateInsights()} disabled={saving}>
+              <Sparkles className="mr-2 h-4 w-4" /> Run analysis
+            </Button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {(data?.insights || []).length === 0 ? (
+              <div className="col-span-full rounded-2xl border border-dashed py-12 text-center text-muted-foreground">
+                No insights yet — click Run analysis.
+              </div>
+            ) : (
+              (data?.insights || []).map((ins: any) => (
+                <div key={ins.id} className="rounded-2xl border bg-white p-4 shadow-sm">
+                  <div className="mb-2 flex items-center justify-between">
+                    <Badge variant="outline" className="capitalize">{ins.insight_type?.replace(/_/g, " ")}</Badge>
+                    {ins.confidence != null && (
+                      <span className="text-xs text-muted-foreground">{Math.round(Number(ins.confidence) * 100)}% conf.</span>
+                    )}
+                  </div>
+                  <p className="font-semibold">{ins.title}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{ins.body}</p>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="assets" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Asset Return Management</CardTitle>
-              <CardDescription>Track company assets and their return status</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {assets.map((asset) => (
-                  <div key={asset.id} className="flex justify-between items-center p-4 border rounded-lg">
-                    <div>
-                      <p className="font-medium">{asset.name}</p>
-                      <p className="text-sm text-gray-600">
-                        {asset.type} • Serial: {asset.serialNumber} • Condition: {asset.condition}
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge className={asset.returned ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                        {asset.returned ? "Returned" : "Pending"}
-                      </Badge>
-                      {!asset.returned && <Button size="sm" onClick={() => handleMarkAssetReturned(asset.id)}>Mark as Returned</Button>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="settlements" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Final Settlement Management</CardTitle>
-              <CardDescription>Calculate and process final settlements</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {offboardingCases.map((case_) => (
-                  <div key={case_.id} className="flex justify-between items-center p-4 border rounded-lg">
-                    <div>
-                      <p className="font-medium">{case_.employeeName}</p>
-                      <p className="text-sm text-gray-600">
-                        Final Settlement: GHS {case_.finalSettlement.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge
-                        className={
-                          case_.status === "completed" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
-                        }
-                      >
-                        {case_.status === "completed" ? "Processed" : "Pending"}
-                      </Badge>
-                      {case_.status !== "completed" && <Button size="sm" onClick={() => handleProcessPayment(case_.id)}>Process Payment</Button>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+              ))
+            )}
+          </div>
         </TabsContent>
       </Tabs>
+
+      {/* Initiate */}
+      <Dialog open={caseOpen} onOpenChange={setCaseOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Initiate offboarding</DialogTitle></DialogHeader>
+          <div className="grid gap-3">
+            <div className="space-y-1.5">
+              <Label>Employee</Label>
+              <Select value={form.employeeId} onValueChange={(v) => setForm((f) => ({ ...f, employeeId: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                <SelectContent>
+                  {(data?.employees || []).map((e) => (
+                    <SelectItem key={e.id} value={e.id}>{e.name} ({e.code})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Last working day</Label>
+              <Input type="date" value={form.lastWorkingDay} onChange={(e) => setForm((f) => ({ ...f, lastWorkingDay: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Reason</Label>
+              <Select value={form.reason} onValueChange={(v) => setForm((f) => ({ ...f, reason: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {REASONS.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Notes</Label>
+              <Textarea rows={3} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCaseOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-teal-700 text-white hover:bg-teal-800"
+              disabled={saving || !form.employeeId || !form.lastWorkingDay}
+              onClick={async () => {
+                const ok = await postAction({ action: "case", ...form })
+                if (ok) {
+                  setCaseOpen(false)
+                  setForm({ employeeId: "", lastWorkingDay: "", reason: "resignation", notes: "" })
+                }
+              }}
+            >
+              Start process
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Interview */}
+      <Dialog open={interviewOpen} onOpenChange={setInterviewOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Complete exit interview</DialogTitle></DialogHeader>
+          <div className="grid gap-3">
+            <div className="space-y-1.5">
+              <Label>Interviewer</Label>
+              <Input value={interviewForm.interviewer} onChange={(e) => setInterviewForm((f) => ({ ...f, interviewer: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Would recommend employer?</Label>
+              <Select value={interviewForm.wouldRecommend} onValueChange={(v) => setInterviewForm((f) => ({ ...f, wouldRecommend: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Yes</SelectItem>
+                  <SelectItem value="false">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Rehire eligible?</Label>
+              <Select value={interviewForm.rehireEligible} onValueChange={(v) => setInterviewForm((f) => ({ ...f, rehireEligible: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Yes</SelectItem>
+                  <SelectItem value="false">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Feedback</Label>
+              <Textarea rows={4} value={interviewForm.feedback} onChange={(e) => setInterviewForm((f) => ({ ...f, feedback: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setInterviewOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-teal-700 text-white hover:bg-teal-800"
+              disabled={saving || !interviewCaseId}
+              onClick={async () => {
+                const ok = await postAction({
+                  action: "interview",
+                  caseId: interviewCaseId,
+                  status: "completed",
+                  interviewer: interviewForm.interviewer,
+                  feedback: interviewForm.feedback,
+                  wouldRecommend: interviewForm.wouldRecommend === "true",
+                  rehireEligible: interviewForm.rehireEligible === "true",
+                })
+                if (ok) setInterviewOpen(false)
+              }}
+            >
+              Save interview
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Case detail / checklist */}
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{detail?.employee_name}</DialogTitle>
+          </DialogHeader>
+          {detail && (
+            <div className="space-y-4 text-sm">
+              <div className="flex flex-wrap gap-2">
+                <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold capitalize", statusTone(detail.status))}>
+                  {String(detail.status).replace(/_/g, " ")}
+                </span>
+                <Badge variant="secondary" className="capitalize">{String(detail.reason).replace(/_/g, " ")}</Badge>
+                <Badge variant="outline">Last day {detail.last_working_day}</Badge>
+              </div>
+              <div>
+                <p className="mb-1 font-medium">Checklist ({detail.checklist_progress || 0}%)</p>
+                <Progress value={Number(detail.checklist_progress) || 0} className="mb-3 h-2" />
+                <ul className="space-y-2">
+                  {(detail.checklist || []).map((item: any) => (
+                    <li key={item.id} className="flex items-center justify-between gap-2 rounded-xl border px-3 py-2">
+                      <div>
+                        <p className={cn("font-medium", item.is_done && "line-through text-muted-foreground")}>{item.label}</p>
+                        <p className="text-[10px] uppercase text-muted-foreground">{item.category}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={item.is_done ? "outline" : "default"}
+                        className={cn("rounded-lg", !item.is_done && "bg-teal-700 text-white hover:bg-teal-800")}
+                        disabled={saving}
+                        onClick={async () => {
+                          await postAction({ action: "checklist", id: item.id, isDone: !item.is_done })
+                          setDetail(null)
+                        }}
+                      >
+                        {item.is_done ? "Undo" : "Done"}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              {(detail.assets || []).length > 0 && (
+                <div>
+                  <p className="mb-2 font-medium">Assets</p>
+                  <ul className="space-y-1">
+                    {(detail.assets || []).map((a: any) => (
+                      <li key={a.id} className="flex justify-between text-xs">
+                        <span>{a.name}</span>
+                        <span className={a.returned ? "text-emerald-700" : "text-amber-700"}>
+                          {a.returned ? "Returned" : "Outstanding"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

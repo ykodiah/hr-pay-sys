@@ -16,6 +16,15 @@ import { createClient } from "@/lib/supabase/client"
 import { resolveClientCompanyId } from "@/lib/tenant/resolve-company-client"
 import { normalizePayrollCashRow, normalizePayrollCashRows } from "@/lib/payroll/cash-deductions"
 import {
+  buildPayslipDeductionLines,
+  buildPayslipEarningsLines,
+} from "@/lib/payroll/payslip-lines"
+import {
+  buildPayslipLoanSummaryRows,
+  isLoanInPayPeriod,
+  toPayPeriod,
+} from "@/lib/payroll/loan-summary"
+import {
   Search,
   Download,
   Printer,
@@ -77,6 +86,13 @@ interface PayslipRow {
   paye_taxable_income: number
   paye_tax: number
   loan_deduction: number
+  loan_summary_lines?: Array<{
+    loan_id?: string
+    loan_type: string
+    opening_balance: number
+    this_month: number
+    closing_balance: number
+  }>
   advance_deduction: number
   other_deductions: number
   total_deductions: number
@@ -115,9 +131,14 @@ interface ActiveLoan {
   monthly_payment: number
   remaining_balance: number
   amount_paid: number
+  expected_total_payment?: number | null
+  total_interest?: number | null
   start_date: string
   end_date: string
   purpose: string | null
+  status?: string
+  last_payment_amount?: number | null
+  this_month_paid?: number | null
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -155,30 +176,55 @@ function statusBadge(status: string) {
 
 // ─── Payslip Preview Component ────────────────────────────────────────────────
 
-function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | null }) {
+function PayslipPreview({
+  slip,
+  loan,
+  loans = [],
+}: {
+  slip: PayslipRow
+  loan: ActiveLoan | null
+  loans?: ActiveLoan[]
+}) {
   const normalized = normalizePayrollCashRow(slip) as PayslipRow
-  const earnings = [
-    { label: "Basic Salary",            val: normalized.basic_salary },
-    { label: "Transport Allowance",     val: normalized.transport_allowance },
-    { label: "Housing Allowance",       val: normalized.housing_allowance },
-    { label: "Medical Allowance",       val: normalized.medical_allowance },
-    { label: "Meal Allowance",          val: normalized.meal_allowance },
-    { label: "Communication Allowance", val: normalized.communication_allowance },
-    { label: "Other Allowances",        val: normalized.other_allowances },
-    { label: "Overtime",                val: normalized.overtime_pay },
-    { label: "Bonus",                   val: normalized.bonus_pay },
-  ].filter(e => e.val > 0)
-
-  const deductions = [
-    { label: "SSNIT (Employee 5.5%)",   val: normalized.ssnit_employee },
-    { label: "Tier 3 / Provident Fund", val: normalized.tier3_employee },
-    { label: "PAYE Tax",                val: normalized.paye_tax },
-    { label: "Loan Repayment",          val: normalized.loan_deduction },
-    { label: "Advance Deduction",       val: normalized.advance_deduction },
-    { label: "Other Deductions",        val: normalized.other_deductions },
-  ].filter(d => d.val > 0)
-
-  const hasLoan = loan || normalized.loan_deduction > 0
+  const loanList = loans.length ? loans : loan ? [loan] : []
+  const earnings = buildPayslipEarningsLines(normalized as any).map((e) => ({
+    label: e.label,
+    val: e.amount,
+  }))
+  const deductions = buildPayslipDeductionLines(normalized as any).map((d) => ({
+    label: d.label,
+    val: d.amount,
+  }))
+  const storedSummary = Array.isArray((normalized as any).loan_summary_lines)
+    ? (normalized as any).loan_summary_lines
+    : []
+  const loanSummaryRows =
+    storedSummary.length > 0
+      ? storedSummary.map((r: any) => ({
+          loan_type: String(r.loan_type || "Loan"),
+          opening_balance: Number(r.opening_balance || 0),
+          this_month: Number(r.this_month || 0),
+          closing_balance: Number(r.closing_balance || 0),
+        }))
+      : buildPayslipLoanSummaryRows(
+          loanList as any[],
+          (loanList as any[]).map((l) => ({
+            loan_id: l.id,
+            amount: Number(l.this_month_paid || 0),
+            balance_before:
+              Number(l.remaining_balance || 0) + Number(l.this_month_paid || 0),
+            balance_after: Number(l.remaining_balance || 0),
+          })),
+        )
+  const hasLoan = loanSummaryRows.length > 0 || normalized.loan_deduction > 0
+  const loanTotals = loanSummaryRows.reduce(
+    (acc: any, r: any) => ({
+      opening: acc.opening + Number(r.opening_balance || 0),
+      thisMonth: acc.thisMonth + Number(r.this_month || 0),
+      closing: acc.closing + Number(r.closing_balance || 0),
+    }),
+    { opening: 0, thisMonth: 0, closing: 0 },
+  )
 
   // Determine entity line: subsidiary name or parent company
   const entityName = normalized.snapshot_subsidiary || normalized.snapshot_company_name || "Company"
@@ -244,8 +290,8 @@ function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | n
               <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Earnings</h3>
             </div>
             <div className="space-y-1.5">
-              {earnings.map(e => (
-                <div key={e.label} className="flex justify-between items-center py-1 border-b border-gray-50">
+              {earnings.map((e, idx) => (
+                <div key={`${e.label}-${idx}`} className="flex justify-between items-center py-1 border-b border-gray-50">
                   <span className="text-sm text-gray-600">{e.label}</span>
                   <span className="text-sm font-medium text-gray-900">{money(e.val)}</span>
                 </div>
@@ -260,87 +306,98 @@ function PayslipPreview({ slip, loan }: { slip: PayslipRow; loan: ActiveLoan | n
           {/* Deductions */}
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <ArrowDownRight className="w-4 h-4 text-red-500" />
+              <ArrowDownRight className="w-4 h-4 text-gray-600" />
               <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Deductions</h3>
             </div>
             <div className="space-y-1.5">
-              {deductions.map(d => (
-                <div key={d.label} className="flex justify-between items-center py-1 border-b border-gray-50">
+              {deductions.map((d, idx) => (
+                <div key={`${d.label}-${idx}`} className="flex justify-between items-center py-1 border-b border-gray-50">
                   <span className="text-sm text-gray-600">{d.label}</span>
-                  <span className="text-sm font-medium text-red-700">{money(d.val)}</span>
+                  <span className="text-sm font-medium text-gray-900">{money(d.val)}</span>
                 </div>
               ))}
-              <div className="flex justify-between items-center py-2 mt-1 bg-red-50 rounded-lg px-3">
-                <span className="text-sm font-bold text-red-800">Total Deductions</span>
-                <span className="text-sm font-bold text-red-800">{money(normalized.total_deductions)}</span>
+              <div className="flex justify-between items-center py-2 mt-1 bg-gray-50 rounded-lg px-3">
+                <span className="text-sm font-bold text-gray-800">Total Deductions</span>
+                <span className="text-sm font-bold text-gray-900">{money(normalized.total_deductions)}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Net Pay Banner */}
-        <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-xl px-5 py-4 flex items-center justify-between">
+        {/* Net Pay Banner — light background for readability */}
+        <div className="rounded-xl border border-gray-200 bg-gray-50 px-5 py-4 flex items-center justify-between">
           <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wider">Net Pay</p>
-            <p className="text-2xl font-bold text-white mt-0.5">{money(normalized.net_pay)}</p>
+            <p className="text-xs text-gray-500 uppercase tracking-wider">Net Pay</p>
+            <p className="text-2xl font-bold text-gray-900 mt-0.5">{money(normalized.net_pay)}</p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-gray-400">Taxable Income</p>
-            <p className="text-base font-semibold text-gray-200">{money(normalized.paye_taxable_income)}</p>
+            <p className="text-xs text-gray-500">Taxable Income</p>
+            <p className="text-base font-semibold text-gray-800">{money(normalized.paye_taxable_income)}</p>
           </div>
         </div>
 
-        {/* Loan Summary */}
+        {/* Loan Summary table */}
         {hasLoan && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <CreditCard className="w-4 h-4 text-amber-600" />
-              <h3 className="text-sm font-semibold text-amber-800 uppercase tracking-wider">Loan Summary</h3>
+          <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-3">
+            <div className="mb-2 flex items-center gap-1.5">
+              <CreditCard className="h-3.5 w-3.5 text-amber-700" />
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-900">
+                Loan Summary
+              </h3>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              {loan && (
-                <>
-                  <div className="bg-white rounded-lg px-3 py-2 border border-amber-100">
-                    <p className="text-xs text-gray-400">Loan Type</p>
-                    <p className="text-sm font-semibold text-gray-800">{loan.loan_type}</p>
-                  </div>
-                  <div className="bg-white rounded-lg px-3 py-2 border border-amber-100">
-                    <p className="text-xs text-gray-400">Principal</p>
-                    <p className="text-sm font-semibold text-gray-800">{money(loan.principal)}</p>
-                  </div>
-                  <div className="bg-white rounded-lg px-3 py-2 border border-amber-100">
-                    <p className="text-xs text-gray-400">Monthly Payment</p>
-                    <p className="text-sm font-semibold text-gray-800">{money(loan.monthly_payment)}</p>
-                  </div>
-                  <div className="bg-white rounded-lg px-3 py-2 border border-amber-100">
-                    <p className="text-xs text-gray-400">Amount Paid</p>
-                    <p className="text-sm font-semibold text-emerald-700">{money(loan.amount_paid)}</p>
-                  </div>
-                </>
-              )}
-              <div className="bg-amber-100 rounded-lg px-3 py-2 border border-amber-200 col-span-1">
-                <p className="text-xs text-amber-700">This Month Deducted</p>
-                <p className="text-sm font-bold text-amber-900">{money(slip.loan_deduction)}</p>
-              </div>
-              <div className="bg-amber-100 rounded-lg px-3 py-2 border border-amber-200 col-span-1">
-                <p className="text-xs text-amber-700">Remaining Balance</p>
-                <p className="text-sm font-bold text-amber-900">{money(loan?.remaining_balance ?? slip.loan_balance)}</p>
-              </div>
+            <div className="overflow-x-auto rounded-md border border-amber-100 bg-white">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-amber-100 bg-amber-50/80 text-left text-amber-900">
+                    <th className="px-2.5 py-2 font-semibold">Loan Type</th>
+                    <th className="px-2.5 py-2 text-right font-semibold">Opening Balance</th>
+                    <th className="px-2.5 py-2 text-right font-semibold">This month</th>
+                    <th className="px-2.5 py-2 text-right font-semibold">Closing balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loanSummaryRows.length > 0 ? (
+                    loanSummaryRows.map((r, idx) => (
+                      <tr key={`${r.loan_type}-${idx}`} className="border-b border-gray-50">
+                        <td className="px-2.5 py-2 font-medium text-gray-800">{r.loan_type}</td>
+                        <td className="px-2.5 py-2 text-right text-gray-800">{money(r.opening_balance)}</td>
+                        <td className="px-2.5 py-2 text-right text-gray-800">{money(r.this_month)}</td>
+                        <td className="px-2.5 py-2 text-right text-gray-800">{money(r.closing_balance)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="px-2.5 py-2 font-medium text-gray-800">Loan Repayment</td>
+                      <td className="px-2.5 py-2 text-right text-gray-800">
+                        {money(Number(normalized.loan_balance || 0) + Number(normalized.loan_deduction || 0))}
+                      </td>
+                      <td className="px-2.5 py-2 text-right text-gray-800">{money(normalized.loan_deduction)}</td>
+                      <td className="px-2.5 py-2 text-right text-gray-800">{money(normalized.loan_balance)}</td>
+                    </tr>
+                  )}
+                  <tr className="bg-amber-50 font-semibold text-amber-950">
+                    <td className="px-2.5 py-2">Total</td>
+                    <td className="px-2.5 py-2 text-right">
+                      {money(
+                        loanSummaryRows.length
+                          ? loanTotals.opening
+                          : Number(normalized.loan_balance || 0) + Number(normalized.loan_deduction || 0),
+                      )}
+                    </td>
+                    <td className="px-2.5 py-2 text-right">
+                      {money(loanSummaryRows.length ? loanTotals.thisMonth : normalized.loan_deduction)}
+                    </td>
+                    <td className="px-2.5 py-2 text-right">
+                      {money(
+                        loanSummaryRows.length
+                          ? loanTotals.closing
+                          : Number(normalized.loan_balance || 0),
+                      )}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-            {loan && (
-              <div className="mt-3">
-                <div className="flex justify-between text-xs text-amber-700 mb-1">
-                  <span>Repayment progress</span>
-                  <span>{Math.min(100, Math.round(((loan.principal - loan.remaining_balance) / loan.principal) * 100))}%</span>
-                </div>
-                <div className="w-full bg-amber-200 rounded-full h-2">
-                  <div
-                    className="bg-amber-600 h-2 rounded-full transition-all"
-                    style={{ width: `${Math.min(100, ((loan.principal - loan.remaining_balance) / loan.principal) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -394,6 +451,7 @@ export default function PayslipsPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<string>("")
   const [indivSlip, setIndivSlip] = useState<PayslipRow | null>(null)
   const [activeLoan, setActiveLoan] = useState<ActiveLoan | null>(null)
+  const [activeLoans, setActiveLoans] = useState<ActiveLoan[]>([])
   const [loadingSlip, setLoadingSlip] = useState(false)
   const [recentSlips, setRecentSlips] = useState<PayslipRow[]>([])
 
@@ -562,6 +620,7 @@ export default function PayslipsPage() {
     setLoadingSlip(true)
     setIndivSlip(null)
     setActiveLoan(null)
+    setActiveLoans([])
     try {
       let slipQ = supabase
         .from("payslips")
@@ -574,9 +633,8 @@ export default function PayslipsPage() {
         .from("employee_loans")
         .select("*")
         .eq("employee_id", empId)
-        .eq("status", "active")
-        .order("created_at", { ascending: false })
-        .limit(1)
+        .in("status", ["active", "approved", "completed"])
+        .order("created_at", { ascending: true })
       let recentQ = supabase
         .from("payslips")
         .select("*")
@@ -590,12 +648,52 @@ export default function PayslipsPage() {
       }
       const [slipRes, loanRes, recentRes] = await Promise.all([
         slipQ.maybeSingle(),
-        loanQ.maybeSingle(),
+        loanQ,
         recentQ,
       ])
 
-      if (slipRes.data) setIndivSlip(normalizePayrollCashRow(slipRes.data as PayslipRow) as PayslipRow)
-      if (loanRes.data) setActiveLoan(loanRes.data as ActiveLoan)
+      let slipRow = slipRes.data
+        ? (normalizePayrollCashRow(slipRes.data as PayslipRow) as PayslipRow)
+        : null
+
+      // Sync / repair per-loan payments for this payslip so "This month" is correct
+      if (slipRow?.id && Number(slipRow.loan_deduction || 0) > 0) {
+        try {
+          const syncRes = await fetch(`/api/payslips/${slipRow.id}/sync-loans`, {
+            method: "POST",
+            credentials: "include",
+          })
+          if (syncRes.ok) {
+            const syncJson = await syncRes.json()
+            const summary = Array.isArray(syncJson.summary) ? syncJson.summary : []
+            slipRow = {
+              ...slipRow,
+              loan_summary_lines: summary,
+            } as PayslipRow
+            const syncedLoans = (syncJson.loans || []) as ActiveLoan[]
+            setActiveLoans(syncedLoans)
+            setActiveLoan(syncedLoans[0] ?? null)
+            setIndivSlip(slipRow)
+            setRecentSlips(normalizePayrollCashRows((recentRes.data ?? []) as PayslipRow[]) as PayslipRow[])
+            return
+          }
+        } catch {
+          // fall through to local filter
+        }
+      }
+
+      if (slipRow) setIndivSlip(slipRow)
+
+      const periodKey = toPayPeriod(period)
+      const visible = ((loanRes.data ?? []) as ActiveLoan[])
+        .filter((l) => {
+          const inPeriod = isLoanInPayPeriod(l as any, periodKey)
+          return inPeriod && ["active", "approved"].includes(String(l.status || "active"))
+        })
+        .map((l) => ({ ...l, this_month_paid: 0 }))
+
+      setActiveLoans(visible)
+      setActiveLoan(visible[0] ?? null)
       setRecentSlips(normalizePayrollCashRows((recentRes.data ?? []) as PayslipRow[]) as PayslipRow[])
     } catch (err) {
       toast({ title: "Error", description: "Could not load payslip.", variant: "destructive" })
@@ -987,7 +1085,7 @@ export default function PayslipsPage() {
                       Print / PDF
                     </Button>
                   </div>
-                  <PayslipPreview slip={indivSlip} loan={activeLoan} />
+                  <PayslipPreview slip={indivSlip} loan={activeLoan} loans={activeLoans} />
                 </div>
               )}
             </div>

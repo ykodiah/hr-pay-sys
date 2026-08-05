@@ -1,50 +1,50 @@
 import { NextRequest, NextResponse } from "next/server"
+import {
+  resolveTenantContext,
+  jsonError,
+  isUnresolvedTenant,
+} from "@/lib/settings/resolve-tenant"
 import { getLoanTypes, createLoanType } from "@/lib/services/loan-advanced-service"
-import { createClient } from "@/lib/supabase/server"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const ctx = await resolveTenantContext(request)
+    if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) {
+      return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     }
+    const { companyId } = ctx
+    const includeInactive =
+      request.nextUrl.searchParams.get("include_inactive") === "1" ||
+      request.nextUrl.searchParams.get("include_inactive") === "true"
 
-    const searchParams = request.nextUrl.searchParams
-    const companyId = searchParams.get("company_id")
-
-    if (!companyId) {
-      return NextResponse.json({ error: "company_id required" }, { status: 400 })
-    }
-
-    const loanTypes = await getLoanTypes(companyId)
+    const loanTypes = await getLoanTypes(companyId, { includeInactive })
     return NextResponse.json(loanTypes)
   } catch (error) {
     console.error("[v0] Loan types error:", error)
-    return NextResponse.json({ error: "Failed to fetch loan types" }, { status: 500 })
+    return jsonError(error, "Failed to fetch loan types")
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
     const body = await request.json()
+    const ctx = await resolveTenantContext(request, body.company_id)
+    if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) {
+      return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
+    }
+    const { companyId, userId } = ctx
 
-    const loanType = await createLoanType(body.company_id, {
-      ...body,
-      created_by: user.id,
+    const { company_id: _ignored, created_by: _cb, ...rest } = body
+    const loanType = await createLoanType(companyId, {
+      ...rest,
+      created_by: userId || "system",
     })
 
     return NextResponse.json(loanType, { status: 201 })
   } catch (error) {
     console.error("[v0] Create loan type error:", error)
-    return NextResponse.json({ error: "Failed to create loan type" }, { status: 500 })
+    return jsonError(error, "Failed to create loan type")
   }
 }

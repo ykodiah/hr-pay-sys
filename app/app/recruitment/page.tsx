@@ -47,6 +47,7 @@ import {
 } from "lucide-react"
 import { buildJobApplyUrl, buildOfferRespondUrl } from "@/lib/recruitment/public-origin"
 import { OnboardingTaskArtifactPanel } from "@/components/recruitment/onboarding-task-artifact"
+import { RecruitmentDashboardOverview } from "@/components/recruitment/recruitment-dashboard-overview"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -919,7 +920,6 @@ export default function RecruitmentPage() {
     })
   }, [applications, applicationSearch, applicationStatus])
 
-  const recentApplications = applications.slice(0, 5)
   const upcomingInterviews = interviews.filter((interview) => interview.status === "scheduled").slice(0, 5)
 
   const runMutation = async (
@@ -1901,15 +1901,6 @@ export default function RecruitmentPage() {
     }
   }
 
-  const metricCards = [
-    { label: "Active Jobs", value: metrics.active_jobs, icon: Briefcase, tone: "text-emerald-600" },
-    { label: "Applications", value: metrics.total_applications, icon: Users, tone: "text-blue-600" },
-    { label: "Interviews", value: metrics.interviews_scheduled, icon: Calendar, tone: "text-purple-600" },
-    { label: "Offers", value: metrics.offers_extended, icon: FileText, tone: "text-amber-600" },
-    { label: "Requisitions", value: metrics.requisitions, icon: ClipboardCheck, tone: "text-slate-600" },
-    { label: "Onboarding", value: metrics.onboarding_active, icon: UserPlus, tone: "text-teal-600" },
-  ]
-
   const totalFunnel = Object.values(analytics.funnel ?? {}).reduce((sum, count) => sum + count, 0)
   const sourceEntries = Object.entries(analytics.sources ?? {})
 
@@ -1917,9 +1908,9 @@ export default function RecruitmentPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Recruitment</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Recruitment Dashboard</h1>
           <p className="text-muted-foreground">
-            Recruitment tracking system for requisitions, jobs, candidates and hiring workflows
+            Overview of your hiring performance across requisitions, jobs, and candidates
           </p>
           {lastSynced ? (
             <p className="mt-2 text-xs text-muted-foreground">
@@ -2404,80 +2395,65 @@ export default function RecruitmentPage() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-            {metricCards.map((metric) => {
-              const Icon = metric.icon
-              return (
-                <Card key={metric.label}>
-                  <CardContent className="flex items-center justify-between pt-6">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{metric.label}</p>
-                      <p className="text-2xl font-bold">{metric.value}</p>
+          <RecruitmentDashboardOverview
+            metrics={{
+              ...metrics,
+              hires: Number(analytics.funnel?.hired || 0),
+              in_pipeline: Math.max(
+                0,
+                Number(metrics.total_applications || 0) -
+                  Number(analytics.funnel?.hired || 0) -
+                  Number(analytics.funnel?.rejected || 0),
+              ),
+            }}
+            analytics={analytics}
+            applications={applications.map((application) => ({
+              id: application.id,
+              candidate_name: application.candidate_name,
+              status: application.status,
+              applied_at: application.applied_at,
+              job_title: getApplicationJobTitle(application),
+              source: application.source,
+            }))}
+            jobs={jobs.map((job) => ({
+              id: job.id,
+              title: job.title,
+              applications_count: job.applications_count ?? applicationsByJob.get(job.id) ?? 0,
+              status: job.status,
+            }))}
+            onViewJobs={() => setActiveTab("jobs")}
+          />
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Upcoming interviews</CardTitle>
+              <CardDescription>Scheduled interviews sorted by the API.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {upcomingInterviews.length ? (
+                <div className="space-y-3">
+                  {upcomingInterviews.map((interview) => (
+                    <div key={interview.id} className="flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <p className="font-medium">{interview.candidate_name || "Candidate"}</p>
+                        <p className="text-sm text-muted-foreground">{interview.job_title || "Role"}</p>
+                      </div>
+                      <div className="text-right text-sm">
+                        <p>{formatDateTime(interview.scheduled_at)}</p>
+                        <p className="text-xs text-muted-foreground">{interview.interview_type || "interview"}</p>
+                      </div>
                     </div>
-                    <Icon className={`h-8 w-8 ${metric.tone}`} />
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent applications</CardTitle>
-                <CardDescription>Newest candidates from the database.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {recentApplications.length ? (
-                  <div className="space-y-3">
-                    {recentApplications.map((application) => (
-                      <div key={application.id} className="flex items-center justify-between rounded-lg border p-3">
-                        <div>
-                          <p className="font-medium">{application.candidate_name || "Candidate"}</p>
-                          <p className="text-sm text-muted-foreground">{getApplicationJobTitle(application)}</p>
-                        </div>
-                        <div className="text-right">
-                          <Badge variant="outline" className={statusClass(application.status)}>
-                            {application.status || "unknown"}
-                          </Badge>
-                          <p className="mt-1 text-xs text-muted-foreground">{formatDate(application.applied_at)}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState icon={Users} title="No applications yet" description="Applications will appear here after candidates apply or are added." />
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Upcoming interviews</CardTitle>
-                <CardDescription>Scheduled interviews sorted by the API.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {upcomingInterviews.length ? (
-                  <div className="space-y-3">
-                    {upcomingInterviews.map((interview) => (
-                      <div key={interview.id} className="flex items-center justify-between rounded-lg border p-3">
-                        <div>
-                          <p className="font-medium">{interview.candidate_name || "Candidate"}</p>
-                          <p className="text-sm text-muted-foreground">{interview.job_title || "Role"}</p>
-                        </div>
-                        <div className="text-right text-sm">
-                          <p>{formatDateTime(interview.scheduled_at)}</p>
-                          <p className="text-xs text-muted-foreground">{interview.interview_type || "interview"}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState icon={Calendar} title="No interviews scheduled" description="Schedule interviews from the Applications or Interviews tabs." />
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  icon={Calendar}
+                  title="No interviews scheduled"
+                  description="Schedule interviews from the Applications or Interviews tabs."
+                />
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="requisitions" className="space-y-4">
@@ -4127,58 +4103,47 @@ export default function RecruitmentPage() {
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-3">
-            <Card className="lg:col-span-2">
-              <CardHeader className="gap-4 sm:flex sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <CardTitle>Hiring funnel</CardTitle>
-                  <CardDescription>Derived from application statuses returned by the API.</CardDescription>
-                </div>
-                <Button variant="outline" onClick={handleExportAnalytics}>
-                  <Download className="h-4 w-4" />
-                  Export CSV
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {Object.keys(analytics.funnel ?? {}).length ? (
-                  <div className="space-y-4">
-                    {Object.entries(analytics.funnel).map(([stage, count]) => (
-                      <div key={stage} className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="capitalize">{stage.replace(/_/g, " ")}</span>
-                          <span className="font-medium">{count}</span>
-                        </div>
-                        <Progress value={totalFunnel ? Math.round((count / totalFunnel) * 100) : 0} />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState icon={BarChart3} title="No funnel data" description="Funnel analytics will populate when applications exist." />
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Sources</CardTitle>
-                <CardDescription>Candidate source distribution.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {sourceEntries.length ? (
-                  <div className="space-y-3">
-                    {sourceEntries.map(([source, count]) => (
-                      <div key={source} className="flex items-center justify-between rounded-lg border p-3">
-                        <span className="text-sm capitalize">{source}</span>
-                        <Badge variant="secondary">{count}</Badge>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState icon={BarChart3} title="No source data" description="Sources will appear after applications are added." />
-                )}
-              </CardContent>
-            </Card>
+          <div className="flex justify-end">
+            <Button variant="outline" className="gap-2" onClick={handleExportAnalytics}>
+              <Download className="h-4 w-4" />
+              Export CSV
+            </Button>
           </div>
+          <RecruitmentDashboardOverview
+            metrics={{
+              ...metrics,
+              hires: Number(analytics.funnel?.hired || 0),
+              in_pipeline: Math.max(
+                0,
+                Number(metrics.total_applications || 0) -
+                  Number(analytics.funnel?.hired || 0) -
+                  Number(analytics.funnel?.rejected || 0),
+              ),
+            }}
+            analytics={analytics}
+            applications={applications.map((application) => ({
+              id: application.id,
+              candidate_name: application.candidate_name,
+              status: application.status,
+              applied_at: application.applied_at,
+              job_title: getApplicationJobTitle(application),
+              source: application.source,
+            }))}
+            jobs={jobs.map((job) => ({
+              id: job.id,
+              title: job.title,
+              applications_count: job.applications_count ?? applicationsByJob.get(job.id) ?? 0,
+              status: job.status,
+            }))}
+            onViewJobs={() => setActiveTab("jobs")}
+          />
+          {!totalFunnel && !sourceEntries.length ? (
+            <EmptyState
+              icon={BarChart3}
+              title="No analytics yet"
+              description="Funnel and source charts populate when applications exist."
+            />
+          ) : null}
         </TabsContent>
       </Tabs>
 

@@ -21,7 +21,7 @@ export const ADMIN_PORTAL_MODULES: AdminPortalModule[] = [
   { code: "communication_settings", name: "Comm. Settings", description: "Channels, templates & credentials", href: "/app/communication/settings", section: "HR Management", monthly_cost: 10 },
   { code: "meetings", name: "Meetings", description: "Secure meetings workspace", href: "/app/meetings", section: "HR Management", monthly_cost: 20 },
   { code: "attendance", name: "Attendance", description: "Track work hours", href: "/app/attendance", section: "Time & Attendance", monthly_cost: 35 },
-  { code: "attendance_alerts", name: "Attendance Alerts", description: "Alerts & attendance rules", href: "/attendance/alerts", section: "Time & Attendance", monthly_cost: 15 },
+  { code: "attendance_alerts", name: "Attendance Alerts", description: "Alerts & attendance rules", href: "/app/attendance/alerts", section: "Time & Attendance", monthly_cost: 15 },
   { code: "leave", name: "Leave Management", description: "Manage leave requests", href: "/app/leave", section: "Time & Attendance", monthly_cost: 30 },
   { code: "overtime", name: "Overtime", description: "Overtime requests", href: "/app/overtime", section: "Time & Attendance", monthly_cost: 20 },
   { code: "performance", name: "Performance", description: "Performance reviews", href: "/app/performance", section: "Performance", monthly_cost: 35 },

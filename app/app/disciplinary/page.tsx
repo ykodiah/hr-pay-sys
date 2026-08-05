@@ -1,1355 +1,821 @@
 "use client"
 
-import type React from "react"
-
-import { useEffect, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { toast } from "@/hooks/use-toast"
 import {
-  Search,
-  Plus,
-  MoreHorizontal,
-  Edit,
-  Eye,
-  Calendar,
-  Clock,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
   AlertTriangle,
-  FileText,
-  Users,
+  Brain,
   Gavel,
   MessageSquare,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
+  Plus,
+  RefreshCw,
   Scale,
-  Download,
-  User,
-  BarChart3,
+  Search,
+  Sparkles,
+  Trash2,
 } from "lucide-react"
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Cell,
+} from "recharts"
+import { toast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
 
-interface DisciplinaryCase {
-  id: string
-  employeeId: string
-  employeeName: string
-  employeeAvatar?: string
-  caseType: "incident" | "grievance"
-  category: string
-  severity: "low" | "medium" | "high" | "critical"
-  status: "open" | "investigating" | "hearing_scheduled" | "resolved" | "closed" | "escalated"
-  title: string
-  description: string
-  reportedBy: string
-  reportedDate: Date
-  dueDate?: Date
-  assignedTo?: string
-  actions: DisciplinaryAction[]
-  documents: string[]
-  witnesses?: string[]
-  hearingDate?: Date
-  resolution?: string
-  complianceNotes?: string
+type Overview = {
+  cases: any[]
+  grievances: any[]
+  insights: any[]
+  employees: { id: string; name: string; code: string; department: string }[]
+  stats: {
+    totalCases: number
+    openCases: number
+    investigating: number
+    critical: number
+    resolved: number
+    totalGrievances: number
+    openGrievances: number
+    actionsIssued: number
+  }
+  charts: {
+    byCategory: { category: string; count: number }[]
+    bySeverity: { severity: string; count: number }[]
+  }
 }
 
-interface DisciplinaryAction {
-  id: string
-  type:
-    | "verbal_warning"
-    | "written_warning"
-    | "final_warning"
-    | "suspension"
-    | "termination"
-    | "counseling"
-    | "training"
-  date: Date
-  description: string
-  issuedBy: string
-  acknowledged: boolean
-  acknowledgedDate?: Date
-  followUpRequired: boolean
-  followUpDate?: Date
-  ghanaLabourActReference?: string
-}
+const CHART = ["#0d9488", "#14b8a6", "#f59e0b", "#f97316", "#ef4444", "#64748b"]
+const CATEGORIES = ["Misconduct", "Performance", "Attendance", "Policy Violation", "Harassment", "Safety"]
+const ACTION_TYPES = [
+  "verbal_warning",
+  "written_warning",
+  "final_warning",
+  "suspension",
+  "termination",
+  "counseling",
+  "training",
+]
 
-interface GrievanceCase {
-  id: string
-  employeeId: string
-  employeeName: string
-  employeeAvatar?: string
-  grievanceType: string
-  priority: "low" | "medium" | "high" | "urgent"
-  status: "submitted" | "acknowledged" | "investigating" | "mediation" | "hearing" | "resolved" | "closed"
-  title: string
-  description: string
-  submittedDate: Date
-  desiredOutcome: string
-  investigator?: string
-  mediator?: string
-  hearingDate?: Date
-  resolution?: string
-  satisfactionRating?: number
+function sevBadge(s: string) {
+  if (s === "critical") return "bg-rose-100 text-rose-800"
+  if (s === "high" || s === "urgent") return "bg-orange-100 text-orange-800"
+  if (s === "medium") return "bg-amber-100 text-amber-800"
+  return "bg-slate-100 text-slate-700"
 }
 
 export default function DisciplinaryGrievancePage() {
-  const [activeTab, setActiveTab] = useState("overview")
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedStatus, setSelectedStatus] = useState("all")
-  const [selectedSeverity, setSelectedSeverity] = useState("all")
-  const [isNewCaseDialogOpen, setIsNewCaseDialogOpen] = useState(false)
-  const [isNewGrievanceDialogOpen, setIsNewGrievanceDialogOpen] = useState(false)
-  const [selectedCase, setSelectedCase] = useState<DisciplinaryCase | null>(null)
-  const [isCaseDetailOpen, setIsCaseDetailOpen] = useState(false)
+  const [tab, setTab] = useState("overview")
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [data, setData] = useState<Overview | null>(null)
+  const [search, setSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [severityFilter, setSeverityFilter] = useState("all")
 
-  const [disciplinaryCases, setDisciplinaryCases] = useState<DisciplinaryCase[]>([
-    {
-      id: "DISC-001",
-      employeeId: "EMP001",
-      employeeName: "Kwame Asante",
-      employeeAvatar: "/placeholder.svg?height=40&width=40",
-      caseType: "incident",
-      category: "Misconduct",
-      severity: "medium",
-      status: "investigating",
-      title: "Unauthorized Absence",
-      description: "Employee was absent for 3 consecutive days without prior notice or approval",
-      reportedBy: "Jane Smith (HR Manager)",
-      reportedDate: new Date("2024-01-15"),
-      dueDate: new Date("2024-01-25"),
-      assignedTo: "HR Department",
-      actions: [
-        {
-          id: "ACT-001",
-          type: "verbal_warning",
-          date: new Date("2024-01-16"),
-          description: "Initial verbal warning issued regarding attendance policy",
-          issuedBy: "Jane Smith",
-          acknowledged: true,
-          acknowledgedDate: new Date("2024-01-16"),
-          followUpRequired: true,
-          followUpDate: new Date("2024-02-16"),
-          ghanaLabourActReference: "Section 62 - Grounds for Termination",
-        },
-      ],
-      documents: ["attendance_record.pdf", "policy_handbook.pdf"],
-      witnesses: ["John Doe", "Mary Johnson"],
-      complianceNotes: "Case handled in accordance with Ghana Labour Act 2003, Section 62",
-    },
-    {
-      id: "DISC-002",
-      employeeId: "EMP003",
-      employeeName: "Kofi Mensah",
-      employeeAvatar: "/placeholder.svg?height=40&width=40",
-      caseType: "incident",
-      category: "Performance",
-      severity: "high",
-      status: "hearing_scheduled",
-      title: "Repeated Performance Issues",
-      description: "Consistent failure to meet sales targets despite multiple coaching sessions",
-      reportedBy: "Sales Manager",
-      reportedDate: new Date("2024-01-10"),
-      dueDate: new Date("2024-01-30"),
-      assignedTo: "HR Department",
-      hearingDate: new Date("2024-01-28"),
-      actions: [
-        {
-          id: "ACT-002",
-          type: "written_warning",
-          date: new Date("2024-01-12"),
-          description: "Formal written warning for performance deficiencies",
-          issuedBy: "HR Manager",
-          acknowledged: false,
-          followUpRequired: true,
-          followUpDate: new Date("2024-02-12"),
-          ghanaLabourActReference: "Section 61 - Progressive Discipline",
-        },
-      ],
-      documents: ["performance_review.pdf", "coaching_records.pdf"],
-      complianceNotes: "Progressive discipline approach as per Ghana Labour Act requirements",
-    },
-  ])
+  const [caseOpen, setCaseOpen] = useState(false)
+  const [grievOpen, setGrievOpen] = useState(false)
+  const [actionOpen, setActionOpen] = useState(false)
+  const [detail, setDetail] = useState<any | null>(null)
 
-  const [grievanceCases, setGrievanceCases] = useState<GrievanceCase[]>([
-    {
-      id: "GRIEV-001",
-      employeeId: "EMP002",
-      employeeName: "Ama Osei",
-      employeeAvatar: "/placeholder.svg?height=40&width=40",
-      grievanceType: "Workplace Harassment",
-      priority: "high",
-      status: "investigating",
-      title: "Harassment by Supervisor",
-      description: "Reporting inappropriate comments and behavior from direct supervisor",
-      submittedDate: new Date("2024-01-20"),
-      desiredOutcome: "Investigation and appropriate disciplinary action against supervisor",
-      investigator: "External HR Consultant",
-      resolution: undefined,
-    },
-    {
-      id: "GRIEV-002",
-      employeeId: "EMP004",
-      employeeName: "Akosua Boateng",
-      employeeAvatar: "/placeholder.svg?height=40&width=40",
-      grievanceType: "Compensation Dispute",
-      priority: "medium",
-      status: "mediation",
-      title: "Overtime Payment Dispute",
-      description: "Claiming unpaid overtime hours for the past 3 months",
-      submittedDate: new Date("2024-01-18"),
-      desiredOutcome: "Payment of outstanding overtime compensation",
-      mediator: "HR Manager",
-      resolution: undefined,
-    },
-  ])
-
-  const handleNewDisciplinaryCase = (caseData: any) => {
-    const newCase: DisciplinaryCase = {
-      id: `DISC-${String(disciplinaryCases.length + 1).padStart(3, "0")}`,
-      ...caseData,
-      reportedDate: new Date(),
-      status: "open" as const,
-      actions: [],
-      documents: [],
-    }
-    setDisciplinaryCases([...disciplinaryCases, newCase])
-    setIsNewCaseDialogOpen(false)
-    toast({
-      title: "Disciplinary Case Created",
-      description: `Case ${newCase.id} has been created and assigned for investigation.`,
-    })
-  }
-
-  const handleNewGrievance = (grievanceData: any) => {
-    const newGrievance: GrievanceCase = {
-      id: `GRIEV-${String(grievanceCases.length + 1).padStart(3, "0")}`,
-      ...grievanceData,
-      submittedDate: new Date(),
-      status: "submitted" as const,
-    }
-    setGrievanceCases([...grievanceCases, newGrievance])
-    setIsNewGrievanceDialogOpen(false)
-    toast({
-      title: "Grievance Submitted",
-      description: `Grievance ${newGrievance.id} has been submitted and will be reviewed.`,
-    })
-  }
-
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case "low":
-        return "bg-green-100 text-green-800"
-      case "medium":
-        return "bg-yellow-100 text-yellow-800"
-      case "high":
-        return "bg-orange-100 text-orange-800"
-      case "critical":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "open":
-        return "bg-blue-100 text-blue-800"
-      case "investigating":
-        return "bg-yellow-100 text-yellow-800"
-      case "hearing_scheduled":
-        return "bg-purple-100 text-purple-800"
-      case "resolved":
-        return "bg-green-100 text-green-800"
-      case "closed":
-        return "bg-gray-100 text-gray-800"
-      case "escalated":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "open":
-      case "submitted":
-        return <AlertCircle className="w-4 h-4" />
-      case "investigating":
-      case "acknowledged":
-        return <Search className="w-4 h-4" />
-      case "hearing_scheduled":
-      case "hearing":
-        return <Gavel className="w-4 h-4" />
-      case "resolved":
-        return <CheckCircle className="w-4 h-4" />
-      case "closed":
-        return <XCircle className="w-4 h-4" />
-      case "escalated":
-        return <AlertTriangle className="w-4 h-4" />
-      default:
-        return <Clock className="w-4 h-4" />
-    }
-  }
-
-  const filteredDisciplinaryCases = disciplinaryCases.filter((case_) => {
-    const matchesSearch =
-      case_.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      case_.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      case_.id.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = selectedStatus === "all" || case_.status === selectedStatus
-    const matchesSeverity = selectedSeverity === "all" || case_.severity === selectedSeverity
-    return matchesSearch && matchesStatus && matchesSeverity
-  })
-
-  const filteredGrievances = grievanceCases.filter((grievance) => {
-    const matchesSearch =
-      grievance.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      grievance.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      grievance.id.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesSearch
-  })
-
-  const getDisciplinaryStats = () => {
-    const total = disciplinaryCases.length
-    const open = disciplinaryCases.filter((c) => c.status === "open").length
-    const investigating = disciplinaryCases.filter((c) => c.status === "investigating").length
-    const resolved = disciplinaryCases.filter((c) => c.status === "resolved").length
-    const critical = disciplinaryCases.filter((c) => c.severity === "critical").length
-    return { total, open, investigating, resolved, critical }
-  }
-
-  const getGrievanceStats = () => {
-    const total = grievanceCases.length
-    const submitted = grievanceCases.filter((c) => c.status === "submitted").length
-    const investigating = grievanceCases.filter((c) => c.status === "investigating").length
-    const resolved = grievanceCases.filter((c) => c.status === "resolved").length
-    const urgent = grievanceCases.filter((c) => c.priority === "urgent").length
-    return { total, submitted, investigating, resolved, urgent }
-  }
-
-  const disciplinaryStats = getDisciplinaryStats()
-  const grievanceStats = getGrievanceStats()
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Disciplinary & Grievance Management</h1>
-          <p className="text-gray-600">Manage workplace incidents, disciplinary actions, and employee grievances</p>
-        </div>
-        <div className="flex gap-2">
-          <Dialog open={isNewGrievanceDialogOpen} onOpenChange={setIsNewGrievanceDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <MessageSquare className="w-4 h-4 mr-2" />
-                New Grievance
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Submit New Grievance</DialogTitle>
-              </DialogHeader>
-              <NewGrievanceForm onSubmit={handleNewGrievance} onClose={() => setIsNewGrievanceDialogOpen(false)} />
-            </DialogContent>
-          </Dialog>
-          <Dialog open={isNewCaseDialogOpen} onOpenChange={setIsNewCaseDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                New Disciplinary Case
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Create New Disciplinary Case</DialogTitle>
-              </DialogHeader>
-              <NewDisciplinaryCaseForm
-                onSubmit={handleNewDisciplinaryCase}
-                onClose={() => setIsNewCaseDialogOpen(false)}
-              />
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="disciplinary">Disciplinary Cases</TabsTrigger>
-          <TabsTrigger value="grievances">Grievances</TabsTrigger>
-          <TabsTrigger value="compliance">Compliance & Reports</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
-          {/* Statistics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Total Cases</p>
-                    <p className="text-2xl font-bold text-gray-900">{disciplinaryStats.total + grievanceStats.total}</p>
-                  </div>
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <FileText className="w-4 h-4 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Under Investigation</p>
-                    <p className="text-2xl font-bold text-yellow-600">
-                      {disciplinaryStats.investigating + grievanceStats.investigating}
-                    </p>
-                  </div>
-                  <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-                    <Search className="w-4 h-4 text-yellow-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Critical/Urgent</p>
-                    <p className="text-2xl font-bold text-red-600">
-                      {disciplinaryStats.critical + grievanceStats.urgent}
-                    </p>
-                  </div>
-                  <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-                    <AlertTriangle className="w-4 h-4 text-red-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Resolved</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      {disciplinaryStats.resolved + grievanceStats.resolved}
-                    </p>
-                  </div>
-                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Ghana Labour Act Compliance */}
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Scale className="w-5 h-5 text-green-600" />
-                  <span>Ghana Labour Act Compliance</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium mb-2">Section 61 - Progressive Discipline</h4>
-                  <p className="text-sm text-gray-600 mb-2">Ensures fair and progressive disciplinary procedures</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Compliance Rate</span>
-                    <Badge className="bg-green-100 text-green-800">100%</Badge>
-                  </div>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium mb-2">Section 62 - Grounds for Termination</h4>
-                  <p className="text-sm text-gray-600 mb-2">Valid reasons and procedures for employment termination</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Cases Following Guidelines</span>
-                    <Badge className="bg-green-100 text-green-800">100%</Badge>
-                  </div>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium mb-2">Section 63 - Notice Requirements</h4>
-                  <p className="text-sm text-gray-600 mb-2">Proper notice periods for disciplinary actions</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Notice Compliance</span>
-                    <Badge className="bg-green-100 text-green-800">100%</Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <BarChart3 className="w-5 h-5 text-blue-600" />
-                  <span>Case Analytics</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 bg-red-50 rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">{disciplinaryStats.total}</div>
-                    <p className="text-sm text-red-700">Disciplinary Cases</p>
-                  </div>
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">{grievanceStats.total}</div>
-                    <p className="text-sm text-blue-700">Grievances Filed</p>
-                  </div>
-                  <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{disciplinaryStats.resolved}</div>
-                    <p className="text-sm text-green-700">Cases Resolved</p>
-                  </div>
-                  <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                    <div className="text-2xl font-bold text-yellow-600">{disciplinaryStats.investigating}</div>
-                    <p className="text-sm text-yellow-700">Under Investigation</p>
-                  </div>
-                </div>
-                <Button variant="outline" className="w-full bg-transparent">
-                  <Download className="w-4 h-4 mr-2" />
-                  Download Compliance Report
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Recent Actions Log */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Disciplinary Actions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {disciplinaryCases
-                  .flatMap((case_) => case_.actions)
-                  .slice(0, 5)
-                  .map((action) => (
-                    <div key={action.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-                          <AlertTriangle className="w-4 h-4 text-red-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">{action.type.replace("_", " ").toUpperCase()}</p>
-                          <p className="text-xs text-gray-600">{action.description}</p>
-                          <p className="text-xs text-gray-500">
-                            Issued by {action.issuedBy} on {action.date.toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge
-                          className={
-                            action.acknowledged ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
-                          }
-                        >
-                          {action.acknowledged ? "Acknowledged" : "Pending"}
-                        </Badge>
-                        {action.ghanaLabourActReference && (
-                          <Badge variant="outline" className="text-xs">
-                            {action.ghanaLabourActReference}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="disciplinary" className="space-y-6">
-          {/* Filters */}
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="relative flex-1">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                  <Input
-                    placeholder="Search cases by title, employee, or case ID..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                  <SelectTrigger className="w-full md:w-48">
-                    <SelectValue placeholder="Filter by status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="open">Open</SelectItem>
-                    <SelectItem value="investigating">Investigating</SelectItem>
-                    <SelectItem value="hearing_scheduled">Hearing Scheduled</SelectItem>
-                    <SelectItem value="resolved">Resolved</SelectItem>
-                    <SelectItem value="closed">Closed</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={selectedSeverity} onValueChange={setSelectedSeverity}>
-                  <SelectTrigger className="w-full md:w-48">
-                    <SelectValue placeholder="Filter by severity" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Severities</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Disciplinary Cases List */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Disciplinary Cases ({filteredDisciplinaryCases.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {filteredDisciplinaryCases.map((case_) => (
-                  <div
-                    key={case_.id}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
-                    onClick={() => {
-                      setSelectedCase(case_)
-                      setIsCaseDetailOpen(true)
-                    }}
-                  >
-                    <div className="flex items-center space-x-4">
-                      <Avatar className="w-12 h-12">
-                        <AvatarImage src={case_.employeeAvatar || "/placeholder.svg"} />
-                        <AvatarFallback>
-                          {case_.employeeName
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-gray-900">{case_.title}</h3>
-                          <Badge variant="outline" className="text-xs">
-                            {case_.id}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-gray-600">
-                          {case_.employeeName} - {case_.category}
-                        </p>
-                        <div className="flex items-center space-x-4 mt-1">
-                          <div className="flex items-center text-xs text-gray-500">
-                            <Calendar className="w-3 h-3 mr-1" />
-                            {case_.reportedDate.toLocaleDateString()}
-                          </div>
-                          <div className="flex items-center text-xs text-gray-500">
-                            <User className="w-3 h-3 mr-1" />
-                            {case_.reportedBy}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <Badge className={getSeverityColor(case_.severity)}>{case_.severity.toUpperCase()}</Badge>
-                        <p className="text-sm text-gray-600 mt-1">{case_.actions.length} actions</p>
-                      </div>
-                      <Badge className={getStatusColor(case_.status)}>
-                        {case_.status.replace("_", " ").toUpperCase()}
-                      </Badge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="w-4 h-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit Case
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Gavel className="w-4 h-4 mr-2" />
-                            Add Action
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Calendar className="w-4 h-4 mr-2" />
-                            Schedule Hearing
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="grievances" className="space-y-6">
-          {/* Grievances List */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Employee Grievances ({filteredGrievances.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {filteredGrievances.map((grievance) => (
-                  <div
-                    key={grievance.id}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <Avatar className="w-12 h-12">
-                        <AvatarImage src={grievance.employeeAvatar || "/placeholder.svg"} />
-                        <AvatarFallback>
-                          {grievance.employeeName
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-gray-900">{grievance.title}</h3>
-                          <Badge variant="outline" className="text-xs">
-                            {grievance.id}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-gray-600">
-                          {grievance.employeeName} - {grievance.grievanceType}
-                        </p>
-                        <div className="flex items-center space-x-4 mt-1">
-                          <div className="flex items-center text-xs text-gray-500">
-                            <Calendar className="w-3 h-3 mr-1" />
-                            {grievance.submittedDate.toLocaleDateString()}
-                          </div>
-                          {grievance.investigator && (
-                            <div className="flex items-center text-xs text-gray-500">
-                              <User className="w-3 h-3 mr-1" />
-                              {grievance.investigator}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <Badge className={getSeverityColor(grievance.priority)}>
-                          {grievance.priority.toUpperCase()}
-                        </Badge>
-                      </div>
-                      <Badge className={getStatusColor(grievance.status)}>
-                        {grievance.status.replace("_", " ").toUpperCase()}
-                      </Badge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="w-4 h-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Update Status
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Users className="w-4 h-4 mr-2" />
-                            Assign Mediator
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Calendar className="w-4 h-4 mr-2" />
-                            Schedule Meeting
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="compliance" className="space-y-6">
-          {/* Ghana Labour Act Compliance */}
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Scale className="w-5 h-5 text-green-600" />
-                  <span>Ghana Labour Act Compliance</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium mb-2">Section 61 - Progressive Discipline</h4>
-                  <p className="text-sm text-gray-600 mb-2">Ensures fair and progressive disciplinary procedures</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Compliance Rate</span>
-                    <Badge className="bg-green-100 text-green-800">100%</Badge>
-                  </div>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium mb-2">Section 62 - Grounds for Termination</h4>
-                  <p className="text-sm text-gray-600 mb-2">Valid reasons and procedures for employment termination</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Cases Following Guidelines</span>
-                    <Badge className="bg-green-100 text-green-800">100%</Badge>
-                  </div>
-                </div>
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium mb-2">Section 63 - Notice Requirements</h4>
-                  <p className="text-sm text-gray-600 mb-2">Proper notice periods for disciplinary actions</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Notice Compliance</span>
-                    <Badge className="bg-green-100 text-green-800">100%</Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <BarChart3 className="w-5 h-5 text-blue-600" />
-                  <span>Case Analytics</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 bg-red-50 rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">{disciplinaryStats.total}</div>
-                    <p className="text-sm text-red-700">Disciplinary Cases</p>
-                  </div>
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">{grievanceStats.total}</div>
-                    <p className="text-sm text-blue-700">Grievances Filed</p>
-                  </div>
-                  <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{disciplinaryStats.resolved}</div>
-                    <p className="text-sm text-green-700">Cases Resolved</p>
-                  </div>
-                  <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                    <div className="text-2xl font-bold text-yellow-600">{disciplinaryStats.investigating}</div>
-                    <p className="text-sm text-yellow-700">Under Investigation</p>
-                  </div>
-                </div>
-                <Button variant="outline" className="w-full bg-transparent">
-                  <Download className="w-4 h-4 mr-2" />
-                  Download Compliance Report
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Case Detail Dialog */}
-        <Dialog open={isCaseDetailOpen} onOpenChange={setIsCaseDetailOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Case Details - {selectedCase?.id}</DialogTitle>
-            </DialogHeader>
-            {selectedCase && <CaseDetailView case={selectedCase} />}
-          </DialogContent>
-        </Dialog>
-      </Tabs>
-    </div>
-  )
-}
-
-function NewDisciplinaryCaseForm({ onSubmit, onClose }: { onSubmit: (data: any) => void; onClose: () => void }) {
-  const [formData, setFormData] = useState({
+  const [caseForm, setCaseForm] = useState({
     employeeId: "",
-    employeeName: "",
-    category: "",
+    category: "Misconduct",
     severity: "medium",
     title: "",
     description: "",
     reportedBy: "",
     assignedTo: "",
     witnesses: "",
+    dueDate: "",
   })
-  const [employeeOptions, setEmployeeOptions] = useState<
-    { id: string; employee_id: string | null; full_name: string }[]
-  >([])
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const res = await fetch("/api/employees?status=active&options=true&limit=500", { cache: "no-store" })
-        if (!res.ok) return
-        const json = await res.json()
-        const rows = (json.employees ?? json.data ?? []).map((e: any) => ({
-          id: e.id,
-          employee_id: e.employee_id,
-          full_name: e.full_name || `${e.first_name ?? ""} ${e.last_name ?? ""}`.trim(),
-        }))
-        setEmployeeOptions(rows)
-      } catch {
-        /* keep empty */
-      }
-    })()
-  }, [])
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSubmit({
-      ...formData,
-      witnesses: formData.witnesses
-        .split(",")
-        .map((w) => w.trim())
-        .filter((w) => w),
-    })
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="space-y-2 md:col-span-2">
-          <Label>Employee *</Label>
-          <Select
-            value={formData.employeeId}
-            onValueChange={(value) => {
-              const selected = employeeOptions.find(
-                (e) => e.employee_id === value || e.id === value,
-              )
-              setFormData((prev) => ({
-                ...prev,
-                employeeId: selected?.employee_id || selected?.id || value,
-                employeeName: selected?.full_name || prev.employeeName,
-              }))
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder={employeeOptions.length ? "Select employee from database" : "Loading employees…"} />
-            </SelectTrigger>
-            <SelectContent>
-              {employeeOptions.map((emp) => (
-                <SelectItem key={emp.id} value={emp.employee_id || emp.id}>
-                  {(emp.employee_id || emp.id.slice(0, 8)) + " — " + emp.full_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Category *</Label>
-          <Select
-            value={formData.category}
-            onValueChange={(value) => setFormData((prev) => ({ ...prev, category: value }))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Misconduct">Misconduct</SelectItem>
-              <SelectItem value="Performance">Performance Issues</SelectItem>
-              <SelectItem value="Attendance">Attendance Problems</SelectItem>
-              <SelectItem value="Policy Violation">Policy Violation</SelectItem>
-              <SelectItem value="Harassment">Harassment</SelectItem>
-              <SelectItem value="Safety Violation">Safety Violation</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Severity *</Label>
-          <Select
-            value={formData.severity}
-            onValueChange={(value) => setFormData((prev) => ({ ...prev, severity: value }))}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="low">Low</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="critical">Critical</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      <div className="space-y-2">
-        <Label>Case Title *</Label>
-        <Input
-          value={formData.title}
-          onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-          placeholder="Brief description of the incident"
-          required
-        />
-      </div>
-      <div className="space-y-2">
-        <Label>Description *</Label>
-        <Textarea
-          value={formData.description}
-          onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-          placeholder="Detailed description of the incident or issue"
-          rows={4}
-          required
-        />
-      </div>
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Reported By *</Label>
-          <Input
-            value={formData.reportedBy}
-            onChange={(e) => setFormData((prev) => ({ ...prev, reportedBy: e.target.value }))}
-            placeholder="Name and title of reporter"
-            required
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Assigned To</Label>
-          <Input
-            value={formData.assignedTo}
-            onChange={(e) => setFormData((prev) => ({ ...prev, assignedTo: e.target.value }))}
-            placeholder="Department or person handling the case"
-          />
-        </div>
-      </div>
-      <div className="space-y-2">
-        <Label>Witnesses</Label>
-        <Input
-          value={formData.witnesses}
-          onChange={(e) => setFormData((prev) => ({ ...prev, witnesses: e.target.value }))}
-          placeholder="Comma-separated list of witness names"
-        />
-      </div>
-      <div className="flex justify-end space-x-2">
-        <Button type="button" variant="outline" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button type="submit">Create Case</Button>
-      </div>
-    </form>
-  )
-}
-
-function NewGrievanceForm({ onSubmit, onClose }: { onSubmit: (data: any) => void; onClose: () => void }) {
-  const [formData, setFormData] = useState({
+  const [grievForm, setGrievForm] = useState({
     employeeId: "",
-    employeeName: "",
-    grievanceType: "",
+    grievanceType: "Workplace",
     priority: "medium",
     title: "",
     description: "",
     desiredOutcome: "",
   })
+  const [actionForm, setActionForm] = useState({
+    caseId: "",
+    actionType: "written_warning",
+    description: "",
+    issuedBy: "",
+    followUpRequired: false,
+    followUpDate: "",
+  })
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSubmit(formData)
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch("/api/disciplinary", { credentials: "include", cache: "no-store" })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Failed to load")
+      setData(json as Overview)
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed to load", variant: "destructive" })
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  async function postAction(body: Record<string, unknown>) {
+    setSaving(true)
+    try {
+      const res = await fetch("/api/disciplinary", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Save failed")
+      toast({ title: "Saved" })
+      await load()
+      return true
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Save failed", variant: "destructive" })
+      return false
+    } finally {
+      setSaving(false)
+    }
   }
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Employee ID *</Label>
-          <Input
-            value={formData.employeeId}
-            onChange={(e) => setFormData((prev) => ({ ...prev, employeeId: e.target.value }))}
-            placeholder="EMP001"
-            required
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Employee Name *</Label>
-          <Input
-            value={formData.employeeName}
-            onChange={(e) => setFormData((prev) => ({ ...prev, employeeName: e.target.value }))}
-            placeholder="John Doe"
-            required
-          />
-        </div>
-      </div>
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Grievance Type *</Label>
-          <Select
-            value={formData.grievanceType}
-            onValueChange={(value) => setFormData((prev) => ({ ...prev, grievanceType: value }))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Workplace Harassment">Workplace Harassment</SelectItem>
-              <SelectItem value="Discrimination">Discrimination</SelectItem>
-              <SelectItem value="Compensation Dispute">Compensation Dispute</SelectItem>
-              <SelectItem value="Working Conditions">Working Conditions</SelectItem>
-              <SelectItem value="Management Issues">Management Issues</SelectItem>
-              <SelectItem value="Policy Concerns">Policy Concerns</SelectItem>
-              <SelectItem value="Other">Other</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Priority *</Label>
-          <Select
-            value={formData.priority}
-            onValueChange={(value) => setFormData((prev) => ({ ...prev, priority: value }))}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="low">Low</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="urgent">Urgent</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      <div className="space-y-2">
-        <Label>Grievance Title *</Label>
-        <Input
-          value={formData.title}
-          onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-          placeholder="Brief summary of the grievance"
-          required
-        />
-      </div>
-      <div className="space-y-2">
-        <Label>Description *</Label>
-        <Textarea
-          value={formData.description}
-          onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-          placeholder="Detailed description of the grievance"
-          rows={4}
-          required
-        />
-      </div>
-      <div className="space-y-2">
-        <Label>Desired Outcome *</Label>
-        <Textarea
-          value={formData.desiredOutcome}
-          onChange={(e) => setFormData((prev) => ({ ...prev, desiredOutcome: e.target.value }))}
-          placeholder="What resolution are you seeking?"
-          rows={3}
-          required
-        />
-      </div>
-      <div className="flex justify-end space-x-2">
-        <Button type="button" variant="outline" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button type="submit">Submit Grievance</Button>
-      </div>
-    </form>
-  )
-}
+  async function generateInsights() {
+    setSaving(true)
+    try {
+      const res = await fetch("/api/disciplinary", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "generate_insights" }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || "Failed")
+      toast({ title: `Generated ${json.generated ?? 0} AI insights` })
+      await load()
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed", variant: "destructive" })
+    } finally {
+      setSaving(false)
+    }
+  }
 
-function CaseDetailView({ case: selectedCase }: { case: DisciplinaryCase }) {
+  const filteredCases = useMemo(() => {
+    return (data?.cases || []).filter((c) => {
+      const q = search.toLowerCase()
+      const match =
+        !q ||
+        String(c.title || "").toLowerCase().includes(q) ||
+        String(c.employee_name || "").toLowerCase().includes(q) ||
+        String(c.case_number || "").toLowerCase().includes(q)
+      const st = statusFilter === "all" || c.status === statusFilter
+      const sv = severityFilter === "all" || c.severity === severityFilter
+      return match && st && sv
+    })
+  }, [data?.cases, search, statusFilter, severityFilter])
+
+  const stats = data?.stats
+
   return (
     <div className="space-y-6">
-      {/* Case Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Avatar className="w-16 h-16">
-            <AvatarImage src={selectedCase.employeeAvatar || "/placeholder.svg"} />
-            <AvatarFallback>
-              {selectedCase.employeeName
-                .split(" ")
-                .map((n) => n[0])
-                .join("")}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <h2 className="text-xl font-semibold">{selectedCase.title}</h2>
-            <p className="text-gray-600">
-              {selectedCase.employeeName} ({selectedCase.employeeId})
-            </p>
-            <div className="flex items-center space-x-2 mt-1">
-              <Badge
-                className={
-                  selectedCase.severity === "critical"
-                    ? "bg-red-100 text-red-800"
-                    : selectedCase.severity === "high"
-                      ? "bg-orange-100 text-orange-800"
-                      : selectedCase.severity === "medium"
-                        ? "bg-yellow-100 text-yellow-800"
-                        : "bg-green-100 text-green-800"
-                }
-              >
-                {selectedCase.severity.toUpperCase()}
-              </Badge>
-              <Badge
-                className={
-                  selectedCase.status === "resolved"
-                    ? "bg-green-100 text-green-800"
-                    : selectedCase.status === "investigating"
-                      ? "bg-yellow-100 text-yellow-800"
-                      : "bg-blue-100 text-blue-800"
-                }
-              >
-                {selectedCase.status.replace("_", " ").toUpperCase()}
-              </Badge>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-teal-700">Employee relations</p>
+          <h1 className="text-2xl font-bold text-slate-900">Disciplinary & Grievances</h1>
+          <p className="text-sm text-muted-foreground">
+            Case files, progressive discipline, and grievances — synced to the database with AI risk signals.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="rounded-xl" onClick={() => void load()} disabled={loading}>
+            <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
+            Refresh
+          </Button>
+          <Button
+            className="rounded-xl bg-gradient-to-r from-teal-700 to-emerald-600 text-white hover:from-teal-800 hover:to-emerald-700"
+            onClick={() => void generateInsights()}
+            disabled={saving}
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            Generate AI insights
+          </Button>
+          <Button className="rounded-xl bg-teal-700 text-white hover:bg-teal-800" onClick={() => setCaseOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New case
+          </Button>
+          <Button variant="outline" className="rounded-xl border-teal-200" onClick={() => setGrievOpen(true)}>
+            <MessageSquare className="mr-2 h-4 w-4" />
+            New grievance
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: "Open cases", value: stats?.openCases ?? "—", icon: Gavel },
+          { label: "Investigating", value: stats?.investigating ?? "—", icon: Search },
+          { label: "Critical / high", value: stats?.critical ?? "—", icon: AlertTriangle },
+          { label: "Open grievances", value: stats?.openGrievances ?? "—", icon: MessageSquare },
+        ].map((card) => (
+          <div key={card.label} className="rounded-2xl border border-teal-100/80 bg-gradient-to-br from-teal-50/60 to-white p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{card.label}</p>
+              <card.icon className="h-4 w-4 text-teal-700" />
+            </div>
+            <p className="mt-2 text-3xl font-bold tabular-nums text-slate-900">{card.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 rounded-2xl bg-slate-100/80 p-1">
+          {[
+            ["overview", "Overview"],
+            ["cases", "Disciplinary cases"],
+            ["grievances", "Grievances"],
+            ["insights", "AI Insights"],
+            ["compliance", "Compliance"],
+          ].map(([v, l]) => (
+            <TabsTrigger key={v} value={v} className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-teal-800">
+              {l}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-sm font-semibold">Cases by category</h3>
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data?.charts.byCategory || []}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="category" tick={{ fontSize: 11 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Bar dataKey="count" radius={[8, 8, 0, 0]}>
+                      {(data?.charts.byCategory || []).map((_, i) => (
+                        <Cell key={i} fill={CHART[i % CHART.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div className="rounded-2xl border bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-sm font-semibold">Severity mix</h3>
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data?.charts.bySeverity || []}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="severity" tick={{ fontSize: 11 }} className="capitalize" />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#0d9488" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="text-right">
-          <p className="text-sm text-gray-500">Case ID</p>
-          <p className="font-semibold">{selectedCase.id}</p>
-          <p className="text-sm text-gray-500 mt-1">Reported: {selectedCase.reportedDate.toLocaleDateString()}</p>
-        </div>
-      </div>
-
-      {/* Case Details */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Case Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Category:</span>
-              <span>{selectedCase.category}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Reported By:</span>
-              <span>{selectedCase.reportedBy}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Assigned To:</span>
-              <span>{selectedCase.assignedTo || "Unassigned"}</span>
-            </div>
-            {selectedCase.dueDate && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">Due Date:</span>
-                <span>{selectedCase.dueDate.toLocaleDateString()}</span>
-              </div>
-            )}
-            {selectedCase.hearingDate && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">Hearing Date:</span>
-                <span>{selectedCase.hearingDate.toLocaleDateString()}</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Description</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-700">{selectedCase.description}</p>
-            {selectedCase.complianceNotes && (
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm font-medium text-blue-900">Compliance Notes</p>
-                <p className="text-sm text-blue-700">{selectedCase.complianceNotes}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Actions Timeline */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Disciplinary Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {selectedCase.actions.map((action, index) => (
-              <div key={action.id} className="flex items-start space-x-4 p-4 border rounded-lg">
-                <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <AlertTriangle className="w-4 h-4 text-red-600" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">{action.type.replace("_", " ").toUpperCase()}</h4>
-                    <Badge
-                      className={action.acknowledged ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}
-                    >
-                      {action.acknowledged ? "Acknowledged" : "Pending"}
-                    </Badge>
+          {(data?.insights || []).slice(0, 3).length > 0 && (
+            <div className="grid gap-3 md:grid-cols-3">
+              {(data?.insights || []).slice(0, 3).map((ins: any) => (
+                <div key={ins.id} className="rounded-2xl border border-teal-100 bg-gradient-to-br from-white to-teal-50/40 p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Brain className="h-4 w-4 text-teal-700" />
+                    <Badge variant="outline" className="text-[10px] uppercase">{ins.insight_type}</Badge>
                   </div>
-                  <p className="text-sm text-gray-600 mt-1">{action.description}</p>
-                  <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                    <span>Issued by {action.issuedBy}</span>
-                    <span>{action.date.toLocaleDateString()}</span>
-                    {action.ghanaLabourActReference && (
-                      <Badge variant="outline" className="text-xs">
-                        {action.ghanaLabourActReference}
-                      </Badge>
+                  <p className="text-sm font-semibold">{ins.title}</p>
+                  <p className="mt-1 text-xs text-muted-foreground line-clamp-3">{ins.body}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="cases" className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <div className="relative min-w-[220px] flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input className="pl-8" placeholder="Search cases…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[160px]"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                {["all", "open", "investigating", "hearing_scheduled", "resolved", "closed", "escalated"].map((s) => (
+                  <SelectItem key={s} value={s} className="capitalize">{s.replace(/_/g, " ")}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={severityFilter} onValueChange={setSeverityFilter}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Severity" /></SelectTrigger>
+              <SelectContent>
+                {["all", "low", "medium", "high", "critical"].map((s) => (
+                  <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="overflow-hidden rounded-2xl border bg-white">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Case</TableHead>
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Severity</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                  <TableHead className="w-28" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredCases.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                      No disciplinary cases yet.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredCases.map((c) => (
+                    <TableRow key={c.id}>
+                      <TableCell>
+                        <div className="font-medium">{c.title}</div>
+                        <div className="text-xs text-muted-foreground">{c.case_number || c.id.slice(0, 8)}</div>
+                      </TableCell>
+                      <TableCell>{c.employee_name || "—"}</TableCell>
+                      <TableCell>{c.category}</TableCell>
+                      <TableCell>
+                        <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold capitalize", sevBadge(c.severity))}>
+                          {c.severity}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="capitalize">{String(c.status).replace(/_/g, " ")}</Badge>
+                      </TableCell>
+                      <TableCell className="tabular-nums">{(c.actions || []).length}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => setDetail(c)}>View</Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setActionForm((f) => ({ ...f, caseId: c.id }))
+                              setActionOpen(true)
+                            }}
+                          >
+                            Action
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-rose-600"
+                            onClick={() => void postAction({ action: "delete", entity: "case", id: c.id })}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="grievances" className="space-y-3">
+          <div className="overflow-hidden rounded-2xl border bg-white">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Priority</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-40" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(data?.grievances || []).length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">No grievances filed.</TableCell>
+                  </TableRow>
+                ) : (
+                  (data?.grievances || []).map((g: any) => (
+                    <TableRow key={g.id}>
+                      <TableCell className="font-medium">{g.title || g.subject}</TableCell>
+                      <TableCell>{g.employee_name || "—"}</TableCell>
+                      <TableCell>{g.grievance_type}</TableCell>
+                      <TableCell>
+                        <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold capitalize", sevBadge(g.priority))}>
+                          {g.priority}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="capitalize">{String(g.status).replace(/_/g, " ")}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Select
+                            value={g.status === "filed" ? "submitted" : g.status}
+                            onValueChange={(v) =>
+                              void postAction({ action: "update_status", entity: "grievance", id: g.id, status: v })
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-[130px] text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {["submitted", "acknowledged", "investigating", "mediation", "hearing", "resolved", "closed"].map((s) => (
+                                <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-rose-600"
+                            onClick={() => void postAction({ action: "delete", entity: "grievance", id: g.id })}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="insights" className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-teal-100 bg-gradient-to-r from-teal-50 to-white p-4">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl bg-teal-700 p-2 text-white"><Brain className="h-5 w-5" /></div>
+              <div>
+                <p className="font-semibold">AI / ML employee-relations insights</p>
+                <p className="text-sm text-muted-foreground">
+                  Detects repeat offenders, stalled cases, urgent grievances, and category patterns from live case data.
+                </p>
+              </div>
+            </div>
+            <Button className="rounded-xl bg-teal-700 text-white hover:bg-teal-800" onClick={() => void generateInsights()} disabled={saving}>
+              <Sparkles className="mr-2 h-4 w-4" /> Run analysis
+            </Button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {(data?.insights || []).length === 0 ? (
+              <div className="col-span-full rounded-2xl border border-dashed py-12 text-center text-muted-foreground">
+                No insights yet — click Run analysis.
+              </div>
+            ) : (
+              (data?.insights || []).map((ins: any) => (
+                <div key={ins.id} className="rounded-2xl border bg-white p-4 shadow-sm">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <Badge variant="outline" className="capitalize">{ins.insight_type?.replace(/_/g, " ")}</Badge>
+                    {ins.confidence != null && (
+                      <span className="text-xs text-muted-foreground">{Math.round(Number(ins.confidence) * 100)}% conf.</span>
                     )}
                   </div>
-                  {action.followUpRequired && action.followUpDate && (
-                    <div className="mt-2 p-2 bg-yellow-50 rounded text-xs">
-                      <span className="text-yellow-800">
-                        Follow-up required by {action.followUpDate.toLocaleDateString()}
-                      </span>
-                    </div>
-                  )}
+                  <p className="font-semibold">{ins.title}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{ins.body}</p>
+                  {ins.employee_name && <p className="mt-2 text-xs font-medium text-teal-800">{ins.employee_name}</p>}
                 </div>
+              ))
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="compliance" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              { title: "Fair hearing", act: "Labour Act §61", pct: stats?.openCases ? 85 : 100 },
+              { title: "Grounds documented", act: "Labour Act §62", pct: 100 },
+              { title: "Progressive discipline", act: "Labour Act §63", pct: stats?.actionsIssued ? 90 : 100 },
+            ].map((card) => (
+              <div key={card.title} className="rounded-2xl border bg-white p-4 shadow-sm">
+                <div className="mb-2 flex items-center gap-2">
+                  <Scale className="h-4 w-4 text-teal-700" />
+                  <p className="font-semibold">{card.title}</p>
+                </div>
+                <p className="text-xs text-muted-foreground">{card.act}</p>
+                <Progress value={card.pct} className="mt-3 h-2" />
+                <p className="mt-1 text-right text-xs tabular-nums text-teal-800">{card.pct}%</p>
               </div>
             ))}
           </div>
-        </CardContent>
-      </Card>
+          <div className="rounded-2xl border bg-gradient-to-br from-slate-50 to-white p-4 text-sm text-muted-foreground">
+            Cases and actions are stored in <code className="text-xs">disciplinary_cases</code> /{" "}
+            <code className="text-xs">disciplinary_actions</code> and feed HR formula metrics (disciplinary rate).
+            Grievances write to <code className="text-xs">grievances</code> for grievance rate / resolution analytics.
+          </div>
+        </TabsContent>
+      </Tabs>
 
-      {/* Documents and Witnesses */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Documents</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {selectedCase.documents.map((doc, index) => (
-                <div key={index} className="flex items-center justify-between p-2 border rounded">
-                  <div className="flex items-center">
-                    <FileText className="w-4 h-4 mr-2 text-gray-500" />
-                    <span className="text-sm">{doc}</span>
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    <Download className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
+      {/* New case */}
+      <Dialog open={caseOpen} onOpenChange={setCaseOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>New disciplinary case</DialogTitle></DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label>Employee</Label>
+              <Select value={caseForm.employeeId} onValueChange={(v) => setCaseForm((f) => ({ ...f, employeeId: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                <SelectContent>
+                  {(data?.employees || []).map((e) => (
+                    <SelectItem key={e.id} value={e.id}>{e.name} ({e.code})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </CardContent>
-        </Card>
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <Select value={caseForm.category} onValueChange={(v) => setCaseForm((f) => ({ ...f, category: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Severity</Label>
+              <Select value={caseForm.severity} onValueChange={(v) => setCaseForm((f) => ({ ...f, severity: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["low", "medium", "high", "critical"].map((s) => (
+                    <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label>Title</Label>
+              <Input value={caseForm.title} onChange={(e) => setCaseForm((f) => ({ ...f, title: e.target.value }))} />
+            </div>
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label>Description</Label>
+              <Textarea rows={3} value={caseForm.description} onChange={(e) => setCaseForm((f) => ({ ...f, description: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Reported by</Label>
+              <Input value={caseForm.reportedBy} onChange={(e) => setCaseForm((f) => ({ ...f, reportedBy: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Assigned to</Label>
+              <Input value={caseForm.assignedTo} onChange={(e) => setCaseForm((f) => ({ ...f, assignedTo: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Due date</Label>
+              <Input type="date" value={caseForm.dueDate} onChange={(e) => setCaseForm((f) => ({ ...f, dueDate: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Witnesses (comma-separated)</Label>
+              <Input value={caseForm.witnesses} onChange={(e) => setCaseForm((f) => ({ ...f, witnesses: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCaseOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-teal-700 text-white hover:bg-teal-800"
+              disabled={saving || !caseForm.employeeId || !caseForm.title}
+              onClick={async () => {
+                const ok = await postAction({ action: "case", ...caseForm })
+                if (ok) setCaseOpen(false)
+              }}
+            >
+              Open case
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Witnesses</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {selectedCase.witnesses?.map((witness, index) => (
-                <div key={index} className="flex items-center p-2 border rounded">
-                  <Users className="w-4 h-4 mr-2 text-gray-500" />
-                  <span className="text-sm">{witness}</span>
-                </div>
-              ))}
+      {/* Grievance */}
+      <Dialog open={grievOpen} onOpenChange={setGrievOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>File grievance</DialogTitle></DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label>Employee</Label>
+              <Select value={grievForm.employeeId} onValueChange={(v) => setGrievForm((f) => ({ ...f, employeeId: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>
+                  {(data?.employees || []).map((e) => (
+                    <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+            <div className="space-y-1.5">
+              <Label>Type</Label>
+              <Select value={grievForm.grievanceType} onValueChange={(v) => setGrievForm((f) => ({ ...f, grievanceType: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["Workplace", "Harassment", "Pay", "Discrimination", "Safety", "Other"].map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Priority</Label>
+              <Select value={grievForm.priority} onValueChange={(v) => setGrievForm((f) => ({ ...f, priority: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["low", "medium", "high", "urgent"].map((p) => (
+                    <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label>Title</Label>
+              <Input value={grievForm.title} onChange={(e) => setGrievForm((f) => ({ ...f, title: e.target.value }))} />
+            </div>
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label>Description</Label>
+              <Textarea rows={3} value={grievForm.description} onChange={(e) => setGrievForm((f) => ({ ...f, description: e.target.value }))} />
+            </div>
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label>Desired outcome</Label>
+              <Input value={grievForm.desiredOutcome} onChange={(e) => setGrievForm((f) => ({ ...f, desiredOutcome: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGrievOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-teal-700 text-white hover:bg-teal-800"
+              disabled={saving || !grievForm.title}
+              onClick={async () => {
+                const ok = await postAction({ action: "grievance", ...grievForm })
+                if (ok) setGrievOpen(false)
+              }}
+            >
+              Submit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add action */}
+      <Dialog open={actionOpen} onOpenChange={setActionOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Issue disciplinary action</DialogTitle></DialogHeader>
+          <div className="grid gap-3">
+            <div className="space-y-1.5">
+              <Label>Action type</Label>
+              <Select value={actionForm.actionType} onValueChange={(v) => setActionForm((f) => ({ ...f, actionType: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ACTION_TYPES.map((t) => (
+                    <SelectItem key={t} value={t} className="capitalize">{t.replace(/_/g, " ")}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Description</Label>
+              <Textarea rows={3} value={actionForm.description} onChange={(e) => setActionForm((f) => ({ ...f, description: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Issued by</Label>
+              <Input value={actionForm.issuedBy} onChange={(e) => setActionForm((f) => ({ ...f, issuedBy: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Follow-up date</Label>
+              <Input type="date" value={actionForm.followUpDate} onChange={(e) => setActionForm((f) => ({ ...f, followUpDate: e.target.value, followUpRequired: !!e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActionOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-teal-700 text-white hover:bg-teal-800"
+              disabled={saving || !actionForm.caseId}
+              onClick={async () => {
+                const ok = await postAction({
+                  action: "action",
+                  caseId: actionForm.caseId,
+                  actionType: actionForm.actionType,
+                  description: actionForm.description,
+                  issuedBy: actionForm.issuedBy,
+                  followUpRequired: actionForm.followUpRequired,
+                  followUpDate: actionForm.followUpDate || null,
+                  labourActRef: "Ghana Labour Act 2003 §62",
+                })
+                if (ok) setActionOpen(false)
+              }}
+            >
+              Issue action
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Detail */}
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{detail?.title}</DialogTitle>
+          </DialogHeader>
+          {detail && (
+            <div className="space-y-3 text-sm">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="capitalize">{String(detail.status).replace(/_/g, " ")}</Badge>
+                <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold capitalize", sevBadge(detail.severity))}>
+                  {detail.severity}
+                </span>
+                <Badge variant="secondary">{detail.category}</Badge>
+              </div>
+              <p className="text-muted-foreground">{detail.description}</p>
+              <p><span className="font-medium">Employee:</span> {detail.employee_name}</p>
+              <p><span className="font-medium">Reported by:</span> {detail.reported_by || "—"}</p>
+              <p><span className="font-medium">Assigned:</span> {detail.assigned_to || "—"}</p>
+              {detail.witnesses?.length > 0 && (
+                <p><span className="font-medium">Witnesses:</span> {detail.witnesses.join(", ")}</p>
+              )}
+              <div>
+                <p className="mb-2 font-medium">Action history</p>
+                {(detail.actions || []).length === 0 ? (
+                  <p className="text-muted-foreground">No actions yet.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {(detail.actions || []).map((a: any) => (
+                      <li key={a.id} className="rounded-xl border p-2">
+                        <p className="font-medium capitalize">{String(a.action_type).replace(/_/g, " ")}</p>
+                        <p className="text-xs text-muted-foreground">{a.description || a.notes}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Select
+                  value={detail.status}
+                  onValueChange={async (v) => {
+                    await postAction({ action: "update_status", entity: "case", id: detail.id, status: v })
+                    setDetail(null)
+                  }}
+                >
+                  <SelectTrigger className="w-[180px]"><SelectValue placeholder="Update status" /></SelectTrigger>
+                  <SelectContent>
+                    {["open", "investigating", "hearing_scheduled", "resolved", "closed", "escalated"].map((s) => (
+                      <SelectItem key={s} value={s} className="capitalize">{s.replace(/_/g, " ")}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setActionForm((f) => ({ ...f, caseId: detail.id }))
+                    setDetail(null)
+                    setActionOpen(true)
+                  }}
+                >
+                  Add action
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

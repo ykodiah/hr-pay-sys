@@ -42,8 +42,11 @@ export const APP_NAV_TREE: AppNavModule[] = [
         gate: "employees",
         type: "folder",
         children: [
-          { code: "employees_add", label: "Add Employees", href: "/app/employees?action=add", gate: "employees", type: "link" },
           { code: "employees_view", label: "View Employees", href: "/app/employees", gate: "employees", type: "link" },
+          { code: "employees_add", label: "Add Employees", href: "/app/employees?action=add", gate: "employees", type: "link" },
+          { code: "employees_update", label: "Update Employee Data", href: "/app/employees/update", gate: "employees", type: "link" },
+          { code: "employees_transfer", label: "Transfer Employee", href: "/app/employees/transfer", gate: "employees", type: "link" },
+          { code: "employees_audit", label: "Employee Audit Trail", href: "/app/employees/audit", gate: "employees", type: "link" },
         ],
       },
       {
@@ -181,7 +184,8 @@ export const APP_NAV_TREE: AppNavModule[] = [
     gates: ["attendance", "attendance_alerts", "leave", "overtime"],
     children: [
       { code: "attendance", label: "Attendance", href: "/app/attendance", gate: "attendance", type: "link" },
-      { code: "attendance_alerts", label: "Attendance Alerts", href: "/attendance/alerts", gate: "attendance_alerts", type: "link" },
+      { code: "attendance_alerts", label: "Attendance Alerts", href: "/app/attendance/alerts", gate: "attendance_alerts", type: "link" },
+      { code: "manager_approvals", label: "Manager Approvals", href: "/app/manager", gate: "leave", type: "link" },
       { code: "leave", label: "Leave Management", href: "/app/leave", gate: "leave", type: "link" },
       { code: "overtime", label: "Overtime", href: "/app/overtime", gate: "overtime", type: "link" },
     ],

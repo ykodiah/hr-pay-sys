@@ -52,8 +52,10 @@ export async function GET(request: NextRequest) {
         employee_id_no: r.employees?.employee_id ?? null,
         department: r.employees?.department ?? null,
         position: r.employees?.position ?? null,
-        rate_type: r.overtime_rates?.rate_type ?? null,
-        multiplier: r.overtime_rates?.multiplier ?? 1.5,
+        rate_type: r.overtime_rates?.rate_type ?? r.rate_label ?? null,
+        multiplier: r.overtime_rates?.multiplier ?? r.multiplier_used ?? 1.5,
+        hours: Number(r.hours_approved ?? r.hours_requested ?? 0),
+        overtime_type: r.rate_label || r.overtime_rates?.rate_type || r.source || "weekday",
       }))
       return NextResponse.json({ requests: mapped, company_id: companyId })
     }
@@ -64,8 +66,10 @@ export async function GET(request: NextRequest) {
       employee_id_no: r.employees?.employee_id ?? null,
       department: r.employees?.department ?? null,
       position: r.employees?.position ?? null,
-      rate_type: r.overtime_rates?.rate_type ?? null,
-      multiplier: r.overtime_rates?.multiplier ?? 1.5,
+      rate_type: r.overtime_rates?.rate_type ?? r.rate_label ?? null,
+      multiplier: r.overtime_rates?.multiplier ?? r.multiplier_used ?? 1.5,
+      hours: Number(r.hours_approved ?? r.hours_requested ?? 0),
+      overtime_type: r.rate_label || r.overtime_rates?.rate_type || r.source || "weekday",
     }))
 
     return NextResponse.json({ requests: mapped, company_id: companyId })
@@ -81,8 +85,11 @@ export async function POST(request: NextRequest) {
     if (ctx instanceof NextResponse) return ctx
     const { companyId, service } = ctx
 
-    const { employee_id, date, hours_requested, reason } = body
-    if (!employee_id || !date || !hours_requested) {
+    const employee_id = body.employee_id
+    const date = body.date
+    const hours_requested = body.hours_requested ?? body.hours
+    const reason = body.reason
+    if (!employee_id || !date || hours_requested == null) {
       return NextResponse.json(
         { error: "employee_id, date, hours_requested required" },
         { status: 400 },
@@ -108,6 +115,9 @@ export async function POST(request: NextRequest) {
         hours_requested: Number(hours_requested),
         reason: reason ?? null,
         status: "pending",
+        source: body.source || "manual",
+        attendance_record_id: body.attendance_record_id || null,
+        rate_type_id: body.rate_type_id || null,
         requested_at: new Date().toISOString(),
       })
       .select()

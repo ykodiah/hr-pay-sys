@@ -8,7 +8,7 @@ const securityHeaders = [
   { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
   // Improve referrer privacy
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  // Limit powerful browser APIs
+  // Limit powerful browser APIs — allow geolocation on this origin for GPS clock-in
   {
     key: 'Permissions-Policy',
     value: [
@@ -18,7 +18,7 @@ const securityHeaders = [
       'display-capture=()',
       'encrypted-media=()',
       'fullscreen=(self)',
-      'geolocation=()',
+      'geolocation=(self)',
       'gyroscope=()',
       'microphone=()',
       'midi=()',

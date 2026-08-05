@@ -31,6 +31,7 @@ import { Switch } from "@/components/ui/switch"
 import { toast, useToast } from "@/hooks/use-toast"
 import {
   createPromotionCase as createPromotionCaseMutation,
+  generatePromotionInsights,
   getPromotionEmployees,
   loadPromotionEmployees,
   listPromotionCases,
@@ -46,10 +47,12 @@ import {
   CheckCircle,
   ChevronRight,
   Clock,
+  Brain,
   Download,
   Eye,
   FileText,
   ShieldCheck,
+  Sparkles,
   TrendingUp,
   Upload,
   Users,
@@ -85,6 +88,18 @@ export default function PromotionsPage() {
   const [activeTab, setActiveTab] = useState("pipeline")
   const [wizardOpen, setWizardOpen] = useState(false)
   const [detailCaseId, setDetailCaseId] = useState<string | null>(null)
+  const [aiInsights, setAiInsights] = useState<any[]>([])
+  const [generatingAi, setGeneratingAi] = useState(false)
+
+  const loadAiInsights = async () => {
+    try {
+      const res = await fetch("/api/promotions?view=overview", { credentials: "include", cache: "no-store" })
+      const json = await res.json().catch(() => ({}))
+      if (res.ok && Array.isArray(json.insights)) setAiInsights(json.insights)
+    } catch {
+      /* optional */
+    }
+  }
 
   const departments = useMemo(() => {
     const set = new Set<string>(cases.map((promo) => promo.department))
@@ -101,6 +116,7 @@ export default function PromotionsPage() {
         setPromotionEmployees(employees)
         const payload = await listPromotionCases()
         setCases(payload)
+        await loadAiInsights()
       } catch (error) {
         console.error("Failed to load promotion cases", error)
         pushToast({
@@ -115,6 +131,19 @@ export default function PromotionsPage() {
 
     bootstrap()
   }, [pushToast])
+
+  const handleGenerateInsights = async () => {
+    setGeneratingAi(true)
+    try {
+      const result = await generatePromotionInsights()
+      pushToast({ title: `Generated ${result.generated} AI insights` })
+      await loadAiInsights()
+    } catch {
+      pushToast({ variant: "destructive", title: "Failed to generate insights" })
+    } finally {
+      setGeneratingAi(false)
+    }
+  }
 
   const filteredCases = useMemo(() => {
     return cases.filter((promotionCase) => {
@@ -251,6 +280,10 @@ export default function PromotionsPage() {
               <p className="text-muted-foreground">Manage grade progressions, salary scales, and delegated approvals across the group.</p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="gap-2" onClick={() => void handleGenerateInsights()} disabled={generatingAi}>
+                <Sparkles className="h-4 w-4" />
+                Generate AI insights
+              </Button>
               <Button variant="outline" className="gap-2">
                 <Download className="h-4 w-4" />
                 Export pipeline
@@ -393,7 +426,13 @@ export default function PromotionsPage() {
             </TabsContent>
 
             <TabsContent value="analytics">
-              <PromotionInsights cases={cases} formatAmount={formatAmount} />
+              <PromotionInsights
+                cases={cases}
+                formatAmount={formatAmount}
+                aiInsights={aiInsights}
+                onGenerate={() => void handleGenerateInsights()}
+                generating={generatingAi}
+              />
             </TabsContent>
           </Tabs>
 
@@ -786,7 +825,19 @@ function WorkflowPanel() {
   )
 }
 
-function PromotionInsights({ cases, formatAmount }: { cases: PromotionCase[]; formatAmount: (value: number) => string }) {
+function PromotionInsights({
+  cases,
+  formatAmount,
+  aiInsights = [],
+  onGenerate,
+  generating,
+}: {
+  cases: PromotionCase[]
+  formatAmount: (value: number) => string
+  aiInsights?: any[]
+  onGenerate?: () => void
+  generating?: boolean
+}) {
   const approved = cases.filter((promotionCase) => promotionCase.status === "approved")
   const averageIncrease =
     approved.length > 0
@@ -819,7 +870,7 @@ function PromotionInsights({ cases, formatAmount }: { cases: PromotionCase[]; fo
                 <p className="text-sm text-muted-foreground">Average salary uplift</p>
                 <p className="text-2xl font-semibold text-emerald-600">{formatAmount(averageIncrease)}</p>
               </div>
-              <TrendingUp className="h-5 w-5 text-purple-600" />
+              <TrendingUp className="h-5 w-5 text-teal-600" />
             </div>
           </CardContent>
         </Card>
@@ -836,14 +887,39 @@ function PromotionInsights({ cases, formatAmount }: { cases: PromotionCase[]; fo
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-semibold">DEI distribution by grade (snapshot)</CardTitle>
+      <Card className="border-teal-100">
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Brain className="h-5 w-5 text-teal-700" />
+            <CardTitle className="text-base font-semibold">AI promotion readiness</CardTitle>
+          </div>
+          <Button size="sm" className="bg-teal-700 text-white hover:bg-teal-800" onClick={onGenerate} disabled={generating}>
+            <Sparkles className="mr-1 h-3.5 w-3.5" />
+            Run analysis
+          </Button>
         </CardHeader>
         <CardContent>
-          <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-            Dashboards for diversity, equity & inclusion will surface once HR analytics feeds are connected.
-          </div>
+          {aiInsights.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+              No AI insights yet. Run analysis to surface promotion-ready employees, approval bottlenecks, and eligibility blockers
+              from live performance, training, and disciplinary data.
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2">
+              {aiInsights.map((ins) => (
+                <div key={ins.id} className="rounded-xl border bg-gradient-to-br from-white to-teal-50/40 p-4">
+                  <Badge variant="outline" className="mb-2 capitalize">
+                    {String(ins.insight_type || "").replace(/_/g, " ")}
+                  </Badge>
+                  <p className="font-semibold text-sm">{ins.title}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{ins.body}</p>
+                  {ins.confidence != null && (
+                    <p className="mt-2 text-[10px] tabular-nums text-teal-800">{Math.round(Number(ins.confidence) * 100)}% confidence</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

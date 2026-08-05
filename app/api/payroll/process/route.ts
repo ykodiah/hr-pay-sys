@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { isMockSupabaseClient } from "@/lib/supabase/server"
 import { resolveTenantContext } from "@/lib/settings/resolve-tenant"
 import { createPayrollService } from "@/lib/services"
+import { expandCompLines } from "@/lib/payroll/employee-comp-extras"
 
 type ProcessRow = {
   employeeId: string
@@ -180,7 +181,8 @@ async function persistRowsFromWorksheet(
 
   // Pre-fetch employee financial data + employee info for snapshot enrichment
   const empIds = rows.map((r) => r.employeeId).filter(Boolean)
-  const [finRes, empRes, subRes, coRes] = await Promise.all([
+  const asOf = bounds.pay_period_end || `${payPeriod}-15`
+  const [finRes, empRes, subRes, coRes, allowRes, dedRes] = await Promise.all([
     empIds.length
       ? client.from("employee_financial").select("employee_id, transport_allowance, housing_allowance, medical_allowance, meal_allowance, communication_allowance, uniform_allowance, other_allowances, bank_name, bank_account_number, ssnit_number").in("employee_id", empIds)
       : { data: [] as any[] },
@@ -189,6 +191,20 @@ async function persistRowsFromWorksheet(
       : { data: [] as any[] },
     client.from("subsidiaries").select("id, name"),
     client.from("companies").select("id, name").eq("id", companyId).limit(1).maybeSingle(),
+    empIds.length
+      ? client
+          .from("employee_allowances")
+          .select("employee_id, amount, percentage, calculation_type, effective_date, end_date, is_active, recurring, code, description")
+          .eq("is_active", true)
+          .in("employee_id", empIds)
+      : { data: [] as any[] },
+    empIds.length
+      ? client
+          .from("employee_deductions")
+          .select("employee_id, amount, percentage, calculation_type, effective_date, end_date, is_active, recurring, code, description")
+          .eq("is_active", true)
+          .in("employee_id", empIds)
+      : { data: [] as any[] },
   ])
   const finByEmp = new Map<string, any>()
   for (const f of finRes.data ?? []) finByEmp.set(f.employee_id, f)
@@ -197,6 +213,18 @@ async function persistRowsFromWorksheet(
   const subById = new Map<string, string>()
   for (const s of subRes.data ?? []) subById.set(s.id, s.name)
   const companyName: string = coRes.data?.name ?? "Company"
+  const cardAllowByEmp = new Map<string, any[]>()
+  for (const row of allowRes.data ?? []) {
+    const list = cardAllowByEmp.get(row.employee_id) ?? []
+    list.push(row)
+    cardAllowByEmp.set(row.employee_id, list)
+  }
+  const cardDedByEmp = new Map<string, any[]>()
+  for (const row of dedRes.data ?? []) {
+    const list = cardDedByEmp.get(row.employee_id) ?? []
+    list.push(row)
+    cardDedByEmp.set(row.employee_id, list)
+  }
 
   for (const row of rows) {
     try {
@@ -266,6 +294,23 @@ async function persistRowsFromWorksheet(
       const splitComm       = masterAllowTotal > 0 ? n(masterComm      * scale) : 0
       const splitOther      = masterAllowTotal > 0 ? n(allowances - splitTransport - splitHousing - splitMedical - splitMeal - splitComm) : allowances
 
+      const cardAllowLines = expandCompLines(cardAllowByEmp.get(row.employeeId), basic, asOf, "Allowance")
+      const cardDedLines = expandCompLines(cardDedByEmp.get(row.employeeId), basic, asOf, "Deduction")
+      const cardDedTotal = cardDedLines.reduce((s, l) => s + l.amount, 0)
+      const allowanceLines = [
+        ...cardAllowLines,
+        ...(masterOther > 0.009
+          ? [{ label: "Other Allowances", code: "OTHER", amount: masterOther }]
+          : []),
+      ]
+      const residualOtherDed = Math.max(0, n(other - cardDedTotal))
+      const deductionLines = [
+        ...cardDedLines,
+        ...(residualOtherDed > 0.009
+          ? [{ label: "Other Deductions", code: "OTHER", amount: residualOtherDed }]
+          : []),
+      ]
+
       // Build only the columns that actually exist in payroll_items table
       // Do NOT pass id — let Postgres gen_random_uuid() generate a valid UUID
       const itemPayload: Record<string, any> = {
@@ -295,7 +340,7 @@ async function persistRowsFromWorksheet(
         taxable_income: taxable,
         paye_taxable_income: taxable,
         tax_relief_total: taxReliefTotal,
-        allowances: { total: allowances },
+        allowances: { total: allowances, lines: allowanceLines },
         calculation_breakdown: {
           allowances,
           ssnit_employee: ssnit,
@@ -310,6 +355,8 @@ async function persistRowsFromWorksheet(
           loan,
           advance,
           other,
+          allowance_lines: allowanceLines,
+          deduction_lines: deductionLines,
         },
         status: "calculated",
         updated_at: new Date().toISOString(),
@@ -355,6 +402,8 @@ async function persistRowsFromWorksheet(
         meal_allowance: splitMeal,
         communication_allowance: splitComm,
         other_allowances: splitOther,
+        allowance_lines: allowanceLines,
+        deduction_lines: deductionLines,
         overtime_pay: overtime,
         bonus_pay: bonus,
         gross_pay: gross,

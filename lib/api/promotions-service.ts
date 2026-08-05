@@ -14,6 +14,7 @@ export type PromotionEmployeeProfile = {
   hasDisciplinary: boolean
   supervisor: string
   headOfDepartment: string
+  _uuid?: string
 }
 
 /** Fallback only when DB has no employees yet. */
@@ -36,8 +37,22 @@ function monthsSince(dateStr?: string | null): number {
   return Math.max(0, (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()))
 }
 
-/** Load active employees from DB via shared employees API. */
+/** Load active employees — prefer promotions API (enriched eligibility), fallback to /api/employees. */
 export async function loadPromotionEmployees(companyId?: string): Promise<PromotionEmployeeProfile[]> {
+  try {
+    const enriched = await httpRequest<{ data?: PromotionEmployeeProfile[]; employees?: PromotionEmployeeProfile[] }>(
+      `${promotionsEndpoint()}?view=employees`,
+      { method: "GET" },
+    )
+    const rows = enriched?.employees ?? enriched?.data ?? []
+    if (Array.isArray(rows) && rows.length) {
+      cachedEmployees = rows
+      return cachedEmployees
+    }
+  } catch {
+    /* fall through */
+  }
+
   try {
     const params = new URLSearchParams({ status: "active", limit: "500", options: "true" })
     if (companyId) params.set("company_id", companyId)
@@ -53,15 +68,12 @@ export async function loadPromotionEmployees(companyId?: string): Promise<Promot
       step: Number(emp.step ?? 1),
       tenureMonths: monthsSince(emp.date_of_joining),
       appraisalScore: Number(emp.appraisal_score ?? 3.5),
-      trainingCompleted: Boolean(emp.training_completed ?? true),
+      trainingCompleted: Boolean(emp.training_completed ?? false),
       hasDisciplinary: Boolean(emp.has_disciplinary ?? false),
       supervisor: emp.direct_supervisor || "—",
       headOfDepartment: emp.head_of_department || "—",
       _uuid: emp.id,
     }))
-    if (!promotionStore.length && cachedEmployees.length) {
-      promotionStore = buildSeedPromotionCases()
-    }
     return cachedEmployees
   } catch {
     return cachedEmployees.length ? cachedEmployees : FALLBACK_EMPLOYEES
@@ -72,96 +84,6 @@ export function getPromotionEmployees() {
   return cachedEmployees.length ? cachedEmployees : FALLBACK_EMPLOYEES
 }
 
-export function buildSeedPromotionCases(): PromotionCase[] {
-  const source = cachedEmployees.length ? cachedEmployees : FALLBACK_EMPLOYEES
-  if (source.length < 1) return []
-  const ama = source[0]
-  const kofi = source[1] ?? source[0]
-
-  const amaEligibility = evaluateEligibility(
-    ama.grade,
-    ama.step,
-    ama.tenureMonths,
-    ama.appraisalScore,
-    ama.trainingCompleted,
-    ama.hasDisciplinary,
-    false,
-  )
-  const amaDelta = computeSalaryDelta(ama.grade, ama.step, "G8", 1)
-
-  const kofiEligibility = evaluateEligibility(
-    kofi.grade,
-    kofi.step,
-    kofi.tenureMonths,
-    kofi.appraisalScore,
-    kofi.trainingCompleted,
-    kofi.hasDisciplinary,
-    false,
-  )
-  const kofiDelta = computeSalaryDelta(kofi.grade, kofi.step, "G7", 2)
-
-  return [
-    {      id: "PC-2025-001",
-      employeeId: ama.id,
-      employeeName: ama.name,
-      department: ama.department,
-      fromGrade: ama.grade,
-      fromStep: ama.step,
-      toGrade: "G8",
-      toStep: 1,
-      effectiveDate: "2025-03-01",
-      reason: "Leadership programme completion and 2024 performance rating above threshold.",
-      status: "in-review",
-      initiatedBy: "John Doe",
-      initiatedAt: "2025-01-20",
-      attachments: ["appraisal-summary-2024.pdf", "leadership-certificate.pdf"],
-      eligibility: amaEligibility,
-      approvals: approvalMatrix.map((entry, index) => ({
-        stage: entry.stage,
-        role: entry.role,
-        approverName: getApproverName(entry.role),
-        status: index === 0 ? "pending" : "pending",
-      })),
-      compensationDelta: {
-        currentBase: amaDelta.currentBase,
-        proposedBase: amaDelta.proposedBase,
-        currency: amaDelta.currency,
-      },
-    },
-    {
-      id: "PC-2025-002",
-      employeeId: kofi.id,
-      employeeName: kofi.name,
-      department: kofi.department,
-      fromGrade: kofi.grade,
-      fromStep: kofi.step,
-      toGrade: "G7",
-      toStep: 2,
-      effectiveDate: "2025-02-15",
-      reason: "Exceeded sales targets for three consecutive quarters and mentoring contributions.",
-      status: "approved",
-      initiatedBy: "Jane Smith",
-      initiatedAt: "2025-01-10",
-      attachments: ["sales-report-q4.pdf", "mentorship-feedback.pdf"],
-      eligibility: kofiEligibility,
-      approvals: approvalMatrix.map((entry) => ({
-        stage: entry.stage,
-        role: entry.role,
-        approverName: getApproverName(entry.role),
-        status: "approved",
-        decidedAt: "2025-01-25",
-        comment: "Approved as part of annual review cycle.",
-      })),
-      compensationDelta: {
-        currentBase: kofiDelta.currentBase,
-        proposedBase: kofiDelta.proposedBase,
-        currency: kofiDelta.currency,
-      },
-      letterUrl: undefined,
-    },
-  ]
-}
-
 function getApproverName(role: string) {
   const directory: Record<string, string> = {
     "Line Manager": "Ama Koomson",
@@ -170,8 +92,12 @@ function getApproverName(role: string) {
     "Finance Director": "Yaw Sarfo",
     "Managing Director": "Nana Akoto",
   }
-
   return directory[role] ?? role
+}
+
+/** @deprecated Seeds removed — DB is source of truth. Kept for type compatibility. */
+export function buildSeedPromotionCases(): PromotionCase[] {
+  return []
 }
 
 export async function listPromotionCases(): Promise<PromotionCase[]> {
@@ -179,14 +105,14 @@ export async function listPromotionCases(): Promise<PromotionCase[]> {
     const payload = await httpRequest<{ data: PromotionCase[] }>(promotionsEndpoint(), { method: "GET" })
     if (Array.isArray(payload?.data)) {
       promotionStore = payload.data
+      return structuredClone(promotionStore)
     }
-    return structuredClone(promotionStore)
   } catch (error) {
     if (!isApiError(error)) {
       console.warn("Promotion API error", error)
     }
-    return structuredClone(promotionStore)
   }
+  return structuredClone(promotionStore)
 }
 
 export async function createPromotionCase(casePayload: PromotionCase): Promise<PromotionCase> {
@@ -223,3 +149,17 @@ export async function persistPromotionCase(caseRecord: PromotionCase): Promise<v
     promotionStore = promotionStore.map((entry) => (entry.id === caseRecord.id ? caseRecord : entry))
   }
 }
+
+export async function generatePromotionInsights(): Promise<{ generated: number }> {
+  try {
+    const payload = await httpRequest<{ generated?: number }>(promotionsEndpoint(), {
+      method: "POST",
+      body: JSON.stringify({ action: "generate_insights" }),
+    })
+    return { generated: payload?.generated ?? 0 }
+  } catch {
+    return { generated: 0 }
+  }
+}
+
+export { evaluateEligibility, computeSalaryDelta, approvalMatrix, getApproverName }

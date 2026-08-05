@@ -85,37 +85,42 @@ export function renderBrandedHtmlDocument(opts: {
 <style>
   :root { --ink:#14201a; --muted:#5b6b62; --line:#d7ddd8; --brand:#0f6b4c; }
   * { box-sizing: border-box; }
-  body { font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; color: var(--ink); margin: 0; padding: 28px; font-size: 12px; background: #fff; }
-  .toolbar { margin-bottom: 16px; }
-  .toolbar button { background: var(--brand); color: #fff; border: 0; padding: 8px 14px; border-radius: 6px; cursor: pointer; font: inherit; }
+  body { font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; color: var(--ink); margin: 0; padding: 28px; font-size: 14px; background: #fff; }
+  .toolbar { margin-bottom: 16px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .toolbar button { background: var(--brand); color: #fff; border: 0; padding: 9px 16px; border-radius: 6px; cursor: pointer; font: 600 14px/1 inherit; }
+  .toolbar .hint { color: var(--muted); font-size: 12px; }
   .letterhead { display: flex; gap: 16px; align-items: flex-start; border-bottom: 2px solid var(--brand); padding-bottom: 14px; margin-bottom: 16px; }
   .logo { width: 64px; height: 64px; object-fit: contain; border: 1px solid var(--line); border-radius: 8px; background: #f7faf8; }
   .logo-fallback { width: 64px; height: 64px; border-radius: 8px; background: linear-gradient(145deg,#0f6b4c,#1f8f67); color: #fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:18px; }
-  h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: -0.02em; }
-  .meta { color: var(--muted); line-height: 1.45; }
-  h2 { margin: 0 0 4px; font-size: 16px; color: var(--brand); }
+  h1 { margin: 0 0 4px; font-size: 24px; letter-spacing: -0.02em; }
+  .meta { color: var(--muted); line-height: 1.45; font-size: 13px; }
+  h2 { margin: 0 0 4px; font-size: 18px; color: var(--brand); }
   table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-  th, td { border: 1px solid var(--line); padding: 5px 6px; text-align: left; vertical-align: top; font-size: 10px; }
+  th, td { border: 1px solid var(--line); padding: 7px 8px; text-align: left; vertical-align: top; font-size: 12px; }
   th { background: #eef6f1; font-weight: 600; }
   .right { text-align: right; white-space: nowrap; }
   .total { font-weight: 700; background: #f7faf8; }
-  .footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; display:flex; justify-content:space-between; gap: 12px; }
+  .footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; display:flex; justify-content:space-between; gap: 12px; }
   .brand { color: var(--brand); font-weight: 700; }
   @media print { 
     .toolbar { display: none; } 
     body { padding: 10px; margin: 0; }
     .letterhead { padding-bottom: 10px; margin-bottom: 10px; }
-    h1 { margin: 0 0 2px; font-size: 18px; }
-    .meta { font-size: 9px; }
-    table { margin-top: 8px; font-size: 9px; }
-    th, td { padding: 4px 5px; border-width: 0.5px; }
+    h1 { margin: 0 0 2px; font-size: 20px; }
+    .meta { font-size: 11px; }
+    table { margin-top: 8px; }
+    th, td { padding: 5px 6px; font-size: 11px; border-width: 0.5px; }
   }
+  /* Default landscape suggestion; browser Print dialog can switch to portrait */
   @page { 
     size: A4 landscape;
     margin: 10mm;
   }
 </style></head><body>
-  <div class="toolbar"><button onclick="window.print()">Print / Save as PDF</button></div>
+  <div class="toolbar">
+    <button onclick="window.print()">Print / Save as PDF</button>
+    <span class="hint">Use the print dialog to choose Portrait or Landscape</span>
+  </div>
   <header class="letterhead">
     ${
       logo

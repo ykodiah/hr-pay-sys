@@ -216,35 +216,35 @@ function ReportCard({
     <Card className="flex flex-col h-full border border-border hover:shadow-sm transition-shadow">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
-          <div className={`p-2 rounded-lg ${meta.bg} shrink-0`}>
-            <Icon className={`h-4 w-4 ${meta.color}`} />
+          <div className={`p-2.5 rounded-lg ${meta.bg} shrink-0`}>
+            <Icon className={`h-5 w-5 ${meta.color}`} />
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${meta.badge}`}>
+            <span className={`text-sm font-medium px-2.5 py-0.5 rounded-full ${meta.badge}`}>
               {meta.label}
             </span>
           </div>
         </div>
-        <CardTitle className="text-sm font-semibold leading-tight mt-2">
+        <CardTitle className="text-base font-semibold leading-tight mt-2">
           {REPORT_LABELS[def.type]}
         </CardTitle>
-        <CardDescription className="text-xs leading-relaxed">
+        <CardDescription className="text-sm leading-relaxed">
           {def.description}
         </CardDescription>
       </CardHeader>
 
       <CardContent className="pt-0 mt-auto">
-        <div className="flex items-center justify-between text-xs text-muted-foreground mb-3 border-t pt-3">
+        <div className="flex items-center justify-between text-sm text-muted-foreground mb-3 border-t pt-3">
           <span className="flex items-center gap-1">
-            <Building2 className="h-3 w-3" />
+            <Building2 className="h-3.5 w-3.5" />
             {def.authority}
           </span>
           <span>{def.frequency}</span>
         </div>
 
         {status && StatusIcon && (
-          <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-md mb-3 ${STATUS_META[status].className}`}>
-            <StatusIcon className="h-3 w-3" />
+          <div className={`flex items-center gap-1.5 text-sm px-2 py-1 rounded-md mb-3 ${STATUS_META[status].className}`}>
+            <StatusIcon className="h-3.5 w-3.5" />
             <span>{STATUS_META[status].label}</span>
             {latest?.generated_at && (
               <span className="ml-auto opacity-70">{fmtDate(latest.generated_at)}</span>
@@ -256,39 +256,39 @@ function ReportCard({
           <Button
             size="sm"
             variant="default"
-            className="flex-1 h-8 text-xs"
+            className="flex-1 h-9 text-sm"
             onClick={() => onGenerate(def.type)}
             disabled={generating}
           >
             {generating ? (
-              <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+              <RefreshCw className="h-3.5 w-3.5 animate-spin mr-1" />
             ) : (
-              <BarChart3 className="h-3 w-3 mr-1" />
+              <BarChart3 className="h-3.5 w-3.5 mr-1" />
             )}
             Generate
           </Button>
           <Button
             size="sm"
             variant="outline"
-            className="h-8 text-xs px-2"
+            className="h-9 text-sm px-2.5"
             onClick={() => onDownload(def.type, "csv")}
             disabled={downloading}
             title="Download CSV"
           >
             {downloading ? (
-              <RefreshCw className="h-3 w-3 animate-spin" />
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <Download className="h-3 w-3" />
+              <Download className="h-3.5 w-3.5" />
             )}
             <span className="ml-1">CSV</span>
           </Button>
           <Button
             size="sm"
             variant="outline"
-            className="h-8 text-xs px-2"
+            className="h-9 text-sm px-2.5"
             onClick={() => onDownload(def.type, "pdf")}
             disabled={downloading}
-            title="Download PDF"
+            title="Preview / Print PDF"
           >
             PDF
           </Button>
@@ -439,100 +439,28 @@ export default function ComplianceReportsPage() {
         throw new Error(json.error ?? `Download failed (${res.status})`)
       }
       if (format === "pdf") {
+        // Same UX as payslip PDF: open printable HTML preview in a new tab.
+        // Browser Print dialog lets the user choose Portrait or Landscape.
         const html = await res.text()
-        
-        // Generate true PDF using jsPDF + html2canvas
-        try {
-          const { jsPDF } = await import("jspdf")
-          const html2canvas = (await import("html2canvas")).default
-          
-          // Create a temporary container for the HTML
-          const container = document.createElement("div")
-          container.innerHTML = html
-          container.style.position = "absolute"
-          container.style.left = "-9999px"
-          container.style.width = "1600px" // Wide for PAYE with 28 columns in landscape
-          document.body.appendChild(container)
-          
-          const table = container.querySelector("table")
-          if (table) {
-            // For reports with tables (PAYE has many columns), use landscape
-            const isWideReport = type === "paye_report"
-            const orientation = isWideReport ? "landscape" : "portrait"
-            
-            // Render HTML to canvas with high DPI for quality
-            const canvas = await html2canvas(container, {
-              scale: 2,
-              allowTaint: true,
-              useCORS: true,
-              backgroundColor: "#ffffff",
-            })
-            
-            // Calculate PDF dimensions
-            const imgWidth = orientation === "landscape" ? 297 : 210 // A4 in mm
-            const imgHeight = (canvas.height * imgWidth) / canvas.width
-            
-            // Create PDF
-            const doc = new jsPDF({
-              orientation,
-              unit: "mm",
-              format: "a4",
-            })
-            
-            const pageHeight = orientation === "landscape" ? 190 : 277
-            let heightLeft = imgHeight
-            let position = 0
-            
-            // Add image with proper scaling
-            const imgData = canvas.toDataURL("image/png")
-            const pageWidth = orientation === "landscape" ? 297 : 210
-            
-            // First page
-            doc.addImage(imgData, "PNG", 10, 10, pageWidth - 20, Math.min(pageHeight - 20, imgHeight))
-            heightLeft -= pageHeight - 20
-            position = pageHeight - 20
-            
-            // Additional pages if needed
-            while (heightLeft > 0) {
-              position = heightLeft - imgHeight
-              doc.addPage()
-              doc.addImage(imgData, "PNG", 10, position + 10, pageWidth - 20, imgHeight)
-              heightLeft -= pageHeight
-            }
-            
-            // Download the PDF
-            const filename = `${type}-${period}.pdf`
-            doc.save(filename)
-            
-            toast({
-              title: "PDF downloaded",
-              description: `${REPORT_LABELS[type]} saved as PDF with all columns visible.`,
-            })
-          } else {
-            // Fallback if no table found
-            throw new Error("Report table not found")
-          }
-          
-          // Cleanup
-          document.body.removeChild(container)
-        } catch (error) {
-          console.error("[v0] PDF generation error:", error)
-          // Fallback to HTML
-          const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }))
-          const opened = window.open(url, "_blank", "noopener,noreferrer")
-          if (!opened) {
-            const a = document.createElement("a")
-            a.href = url
-            a.download = `${type}-${period}.html`
-            a.click()
-          }
-          setTimeout(() => URL.revokeObjectURL(url), 60_000)
+        const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }))
+        const opened = window.open(url, "_blank", "noopener,noreferrer")
+        if (!opened) {
+          const a = document.createElement("a")
+          a.href = url
+          a.download = `${type}-${period}.html`
+          a.click()
           toast({
-            title: "PDF generation fallback",
-            description: `HTML opened for printing. Use Print → Save as PDF for best results.`,
-            variant: "warning" as const,
+            title: "Pop-up blocked",
+            description: "HTML downloaded. Open it and use Print → Save as PDF (Portrait or Landscape).",
+            variant: "destructive",
+          })
+        } else {
+          toast({
+            title: "Report preview opened",
+            description: `${REPORT_LABELS[type]} opened in a new tab. Use Print / Save as PDF and choose orientation.`,
           })
         }
+        setTimeout(() => URL.revokeObjectURL(url), 60_000)
       } else {
         const blob     = await res.blob()
         const url      = URL.createObjectURL(blob)
@@ -680,7 +608,7 @@ export default function ComplianceReportsPage() {
               <div key={cat} className="mb-8">
                 <div className="flex items-center gap-2 mb-4">
                   <CatIcon className={`h-4 w-4 ${meta.color}`} />
-                  <h2 className="text-sm font-semibold text-foreground">{meta.label}</h2>
+                  <h2 className="text-base font-semibold text-foreground">{meta.label}</h2>
                   <Separator className="flex-1" />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

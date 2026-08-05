@@ -22,7 +22,9 @@ import {
   Briefcase,
   Loader2,
   RefreshCw,
+  BookOpen,
 } from "lucide-react"
+import { HrFormulaReportsPanel } from "@/components/analytics/hr-formula-reports-panel"
 
 type DashboardData = {
   totalEmployees: number
@@ -206,6 +208,51 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      {/* Snapshot HR formulas */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {[
+          {
+            name: "Average Salary",
+            formula: "Total Salary Paid ÷ Employees",
+            value: loading
+              ? "—"
+              : money(
+                  data && data.totalEmployees > 0
+                    ? Math.round(data.monthlyPayroll / data.totalEmployees)
+                    : 0,
+                ),
+          },
+          {
+            name: "Workforce Growth (approx.)",
+            formula: "(New Joiners ÷ Headcount) × 100",
+            value: loading
+              ? "—"
+              : `${
+                  data && data.totalEmployees > 0
+                    ? ((data.newEmployeesThisMonth / data.totalEmployees) * 100).toFixed(1)
+                    : "0.0"
+                }%`,
+          },
+          {
+            name: "Span of Control (proxy)",
+            formula: "Employees ÷ Departments",
+            value: loading
+              ? "—"
+              : data && data.departments > 0
+                ? (data.totalEmployees / data.departments).toFixed(1)
+                : "—",
+          },
+        ].map((item) => (
+          <Card key={item.name} className="border-slate-200 shadow-sm">
+            <CardContent className="p-4">
+              <p className="text-xs font-medium text-slate-500">{item.name}</p>
+              <p className="mt-1 text-xl font-bold text-slate-900">{item.value}</p>
+              <p className="mt-1 font-mono text-[11px] text-slate-500">{item.formula}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -289,6 +336,22 @@ export default function DashboardPage() {
             </Link>
           </Button>
         ))}
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
+            <BookOpen className="h-4 w-4" />
+            HR Formula Reports
+          </h2>
+          <Button asChild variant="link" className="h-auto px-0 text-teal-700">
+            <Link href="/app/analytics?tab=formulas">All formula reports →</Link>
+          </Button>
+        </div>
+        <HrFormulaReportsPanel
+          compact
+          categoryFilter={["workforce", "attendance", "recruitment", "compensation"]}
+        />
       </div>
     </div>
   )

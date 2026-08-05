@@ -98,6 +98,9 @@ export type EmployeeDto = {
   confirmation_date?: string | null
   notice_period?: string | null
   profile_picture?: string | null
+  /** Display-only: latest transfer effective date (current org stays on card) */
+  last_transfer_date?: string | null
+  last_transfer_id?: string | null
   created_at?: string
   updated_at?: string
   financial?: EmployeeFinancialDto | null
@@ -243,6 +246,8 @@ export function mapEmployeeRow(
     confirmation_date: row.confirmation_date ?? null,
     notice_period: row.notice_period ?? null,
     profile_picture: row.profile_picture ?? null,
+    last_transfer_date: row.last_transfer_date ?? null,
+    last_transfer_id: row.last_transfer_id ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
     subsidiaries: subsidiary ? { id: subsidiary.id, name: subsidiary.name } : null,

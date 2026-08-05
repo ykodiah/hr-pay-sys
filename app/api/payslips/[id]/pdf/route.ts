@@ -8,6 +8,16 @@ import { createClient } from "@/lib/supabase/server"
 import { requireApiUser } from "@/lib/auth/api-user"
 import { getPayslipById } from "@/lib/services/payslip-service"
 import { loadCompanyBrand, AKWAABA_BRAND_FOOTER } from "@/lib/exports/company-branding"
+import {
+  buildPayslipDeductionLines,
+  buildPayslipEarningsLines,
+} from "@/lib/payroll/payslip-lines"
+import {
+  buildPayslipLoanSummaryRows,
+  isLoanInPayPeriod,
+  toPayPeriod,
+} from "@/lib/payroll/loan-summary"
+import { ensurePayslipLoanPayments } from "@/lib/services/loan-service"
 
 function money(n: number | null | undefined) {
   return `GHS ${Number(n || 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -36,44 +46,106 @@ export async function GET(
     }
 
     const client = await createClient()
+    const period = toPayPeriod(data.pay_period)
 
-    // Load company branding and active loan in parallel
-    const [company, loanRes] = await Promise.all([
+    if (Number(data.loan_deduction || 0) > 0) {
+      try {
+        await ensurePayslipLoanPayments({
+          companyId: data.company_id,
+          employeeId: data.employee_id,
+          totalDeduction: Number(data.loan_deduction || 0),
+          payrollRunId: data.payroll_run_id ?? null,
+          payslipId: data.id,
+          payPeriod: period,
+          paymentDate: data.pay_date || new Date().toISOString().slice(0, 10),
+        })
+      } catch (e) {
+        console.warn("[payslip-pdf] loan sync failed:", e)
+      }
+    }
+
+    // Load company branding and loans active in this pay period (+ this-slip payments)
+    const [company, loanRes, paymentRes] = await Promise.all([
       loadCompanyBrand(client, data.company_id),
-      client.from("employee_loans").select("*").eq("employee_id", data.employee_id).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      client
+        .from("employee_loans")
+        .select("*")
+        .eq("employee_id", data.employee_id)
+        .eq("company_id", data.company_id)
+        .in("status", ["active", "approved", "completed"])
+        .order("created_at", { ascending: true }),
+      client
+        .from("payroll_loan_payments")
+        .select("loan_id, amount, balance_before, balance_after, payslip_id, pay_period")
+        .eq("employee_id", data.employee_id)
+        .eq("company_id", data.company_id)
+        .or(`payslip_id.eq.${data.id},pay_period.eq.${period}`),
     ])
 
     const companyName = company?.name || data.snapshot_company_name || "Company"
     const logoUrl = company?.logo_url || ""
-    const loan = loanRes.data
+    const payments = paymentRes.data ?? []
+    const paidLoanIds = new Set(payments.map((p) => p.loan_id))
+    const loans = ((loanRes.data ?? []) as any[]).filter(
+      (l) => paidLoanIds.has(l.id) || (["active", "approved"].includes(String(l.status)) && isLoanInPayPeriod(l, period)),
+    )
 
-    const earnings: [string, number][] = [
-      ["Basic Salary",            Number(data.basic_salary)],
-      ["Transport Allowance",     Number(data.transport_allowance)],
-      ["Housing Allowance",       Number(data.housing_allowance)],
-      ["Medical Allowance",       Number(data.medical_allowance)],
-      ["Meal Allowance",          Number(data.meal_allowance)],
-      ["Communication Allowance", Number(data.communication_allowance)],
-      ["Other Allowances",        Number(data.other_allowances)],
-      ["Overtime",                Number(data.overtime_pay)],
-      ["Bonus",                   Number(data.bonus_pay)],
-    ].filter(([, v]) => v > 0)
+    const earnings = buildPayslipEarningsLines(data as any).map((e) => [e.label, e.amount] as [string, number])
+    const deductions = buildPayslipDeductionLines(data as any).map((d) => [d.label, d.amount] as [string, number])
 
-    const deductions: [string, number][] = [
-      ["SSNIT (Employee 5.5%)",   Number(data.ssnit_employee)],
-      ["Tier 3 / Provident Fund", Number(data.tier3_employee)],
-      ["PAYE Tax",                Number(data.paye_tax)],
-      ["Loan Repayment",          Number(data.loan_deduction)],
-      ["Advance Deduction",       Number(data.advance_deduction)],
-      ["Other Deductions",        Number(data.other_deductions)],
-    ].filter(([, v]) => v > 0)
-
-    const hasLoan = loan || Number(data.loan_deduction) > 0
-    const loanBalance = loan?.remaining_balance ?? data.loan_balance ?? 0
-    const loanPct = loan
-      ? Math.min(100, Math.round(((Number(loan.principal) - Number(loan.remaining_balance)) / Number(loan.principal)) * 100))
-      : 0
+    const loanSummary =
+      Array.isArray((data as any).loan_summary_lines) && (data as any).loan_summary_lines.length
+        ? (data as any).loan_summary_lines
+        : buildPayslipLoanSummaryRows(loans, payments)
+    const hasLoan = loanSummary.length > 0 || Number(data.loan_deduction) > 0
+    const loanTotals = loanSummary.reduce(
+      (acc, r) => ({
+        opening: acc.opening + r.opening_balance,
+        thisMonth: acc.thisMonth + r.this_month,
+        closing: acc.closing + r.closing_balance,
+      }),
+      { opening: 0, thisMonth: 0, closing: 0 },
+    )
     const ytd = Number((data as any).ytd_gross ?? 0)
+    const loanRowsHtml = loanSummary.length
+      ? `<table class="loan-table">
+          <thead><tr><th>Loan Type</th><th class="r">Opening Balance</th><th class="r">This month</th><th class="r">Closing balance</th></tr></thead>
+          <tbody>
+            ${loanSummary
+              .map(
+                (r) => `<tr>
+              <td>${esc(r.loan_type)}</td>
+              <td class="r">${money(r.opening_balance)}</td>
+              <td class="r">${money(r.this_month)}</td>
+              <td class="r">${money(r.closing_balance)}</td>
+            </tr>`,
+              )
+              .join("")}
+            <tr class="tr">
+              <td>Total</td>
+              <td class="r">${money(loanTotals.opening)}</td>
+              <td class="r">${money(loanTotals.thisMonth)}</td>
+              <td class="r">${money(loanTotals.closing)}</td>
+            </tr>
+          </tbody>
+        </table>`
+      : `<table class="loan-table">
+          <thead><tr><th>Loan Type</th><th class="r">Opening Balance</th><th class="r">This month</th><th class="r">Closing balance</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Loan Repayment</td>
+              <td class="r">${money(Number(data.loan_balance || 0) + Number(data.loan_deduction || 0))}</td>
+              <td class="r">${money(data.loan_deduction)}</td>
+              <td class="r">${money(data.loan_balance)}</td>
+            </tr>
+            <tr class="tr">
+              <td>Total</td>
+              <td class="r">${money(Number(data.loan_balance || 0) + Number(data.loan_deduction || 0))}</td>
+              <td class="r">${money(data.loan_deduction)}</td>
+              <td class="r">${money(data.loan_balance)}</td>
+            </tr>
+          </tbody>
+        </table>`
 
     const html = `<!DOCTYPE html>
 <html>
@@ -104,29 +176,25 @@ export async function GET(
     .t-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
     .th { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; padding:5px 8px; border-radius:4px 4px 0 0; }
     .th-e { background:#ecfdf5; color:#065f46; }
-    .th-d { background:#fef2f2; color:#991b1b; }
+    .th-d { background:#f3f4f6; color:#111827; }
     table { width:100%; border-collapse:collapse; }
     td { padding:4.5px 8px; font-size:11px; border-bottom:1px solid #f3f4f6; }
     .r { text-align:right; white-space:nowrap; }
-    .red { color:#b91c1c; }
+    .red { color:#111827; }
     .tr td { font-weight:700; background:#f9fafb; border-top:1.5px solid var(--line); }
-    /* Net pay */
-    .net { background:linear-gradient(135deg,#111827,#1f2937); color:#fff; border-radius:8px; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
-    .nl { font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:rgba(255,255,255,.6); }
-    .na { font-size:22px; font-weight:700; letter-spacing:-.02em; }
-    .nd { text-align:right; font-size:11px; color:rgba(255,255,255,.8); }
-    /* Loan */
-    .loan-box { background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:10px 12px; margin-bottom:10px; }
-    .ln-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#92400e; margin-bottom:8px; }
-    .ln-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
-    .ln-cell { background:#fff; border:1px solid #fde68a; border-radius:5px; padding:5px 8px; }
-    .ln-lbl { display:block; font-size:9px; color:#78716c; text-transform:uppercase; }
-    .ln-val { display:block; font-size:11px; font-weight:600; color:#1c1917; margin-top:1px; }
+    /* Net pay — light background for readability */
+    .net { background:#f9fafb; color:#111827; border:1px solid var(--line); border-radius:8px; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .nl { font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:#6b7280; }
+    .na { font-size:22px; font-weight:700; letter-spacing:-.02em; color:#111827; }
+    .nd { text-align:right; font-size:11px; color:#374151; }
+    /* Loan summary table */
+    .loan-box { background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:8px 10px; margin-bottom:10px; }
+    .ln-title { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#92400e; margin-bottom:6px; }
+    .loan-table { width:100%; border-collapse:collapse; background:#fff; }
+    .loan-table th, .loan-table td { border:1px solid #fde68a; padding:5px 7px; font-size:10px; }
+    .loan-table th { background:#fffbeb; color:#92400e; }
     .amber { color:#b45309; }
     .green { color:#065f46; }
-    .pr-row { display:flex; justify-content:space-between; font-size:9px; color:#92400e; margin-top:8px; margin-bottom:3px; }
-    .pr-bar { background:#fde68a; border-radius:9999px; height:5px; }
-    .pr-fill { background:#d97706; height:5px; border-radius:9999px; }
     /* YTD */
     .ytd-row { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:10px; }
     .ytd-c { background:#f9fafb; border:1px solid #e5e7eb; border-radius:5px; padding:5px 8px; }
@@ -169,8 +237,8 @@ export async function GET(
     <div>
       <div class="th th-d">Deductions</div>
       <table><tbody>
-        ${deductions.map(([l, v]) => `<tr><td>${esc(l)}</td><td class="r red">${money(v)}</td></tr>`).join("")}
-        <tr class="tr"><td>Total Deductions</td><td class="r red">${money(data.total_deductions)}</td></tr>
+        ${deductions.map(([l, v]) => `<tr><td>${esc(l)}</td><td class="r">${money(v)}</td></tr>`).join("")}
+        <tr class="tr"><td>Total Deductions</td><td class="r">${money(data.total_deductions)}</td></tr>
       </tbody></table>
     </div>
   </div>
@@ -183,17 +251,7 @@ export async function GET(
   ${hasLoan ? `
   <div class="loan-box">
     <div class="ln-title">Loan Summary</div>
-    <div class="ln-grid">
-      ${loan ? `
-      <div class="ln-cell"><span class="ln-lbl">Loan Type</span><span class="ln-val">${esc(loan.loan_type)}</span></div>
-      <div class="ln-cell"><span class="ln-lbl">Principal</span><span class="ln-val">${money(loan.principal)}</span></div>
-      <div class="ln-cell"><span class="ln-lbl">Monthly Payment</span><span class="ln-val">${money(loan.monthly_payment)}</span></div>
-      <div class="ln-cell"><span class="ln-lbl">Amount Paid</span><span class="ln-val green">${money(loan.amount_paid)}</span></div>
-      ` : ""}
-      <div class="ln-cell"><span class="ln-lbl">This Month Deducted</span><span class="ln-val amber">${money(data.loan_deduction)}</span></div>
-      <div class="ln-cell"><span class="ln-lbl">Remaining Balance</span><span class="ln-val amber">${money(loanBalance)}</span></div>
-    </div>
-    ${loan ? `<div class="pr-row"><span>Repayment Progress</span><span>${loanPct}%</span></div><div class="pr-bar"><div class="pr-fill" style="width:${loanPct}%"></div></div>` : ""}
+    ${loanRowsHtml}
   </div>` : ""}
 
   ${ytd > 0 ? `
