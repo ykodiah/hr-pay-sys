@@ -100,11 +100,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Choose clock in or clock out" }, { status: 400 })
     }
 
-    const { data: settings } = await session.db
+    const { data: settings, error: settingsError } = await session.db
       .from("company_attendance_settings")
       .select("*")
       .eq("company_id", session.companyId)
       .maybeSingle()
+    if (settingsError) {
+      console.error("[v0] Attendance settings lookup failed", settingsError)
+      return NextResponse.json({ error: "Attendance settings are unavailable. Please try again." }, { status: 503 })
+    }
     if (settings && (settings.employee_gps_clock_enabled === false || settings.allow_web_clock === false)) {
       return NextResponse.json(
         { error: "Portal clocking is disabled. Your biometric or imported attendance will still appear here." },

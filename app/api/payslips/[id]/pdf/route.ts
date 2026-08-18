@@ -54,10 +54,8 @@ export async function GET(
       .eq("user_id", user.id)
       .in("status", ["active", "invited"])
       .maybeSingle()
-    if (
-      portalAccount &&
-      (portalAccount.employee_id !== data.employee_id || portalAccount.company_id !== data.company_id)
-    ) {
+    const isOwner = portalAccount?.employee_id === data.employee_id && portalAccount?.company_id === data.company_id
+    if (!isOwner) {
       const canAdminister = await resolveAdminAccess(service, user, data.company_id)
       if (!canAdminister) {
         return NextResponse.json({ error: "Payslip not found" }, { status: 404 })

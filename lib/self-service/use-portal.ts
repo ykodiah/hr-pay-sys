@@ -36,7 +36,13 @@ export const postJson = <T = any,>(url: string, payload?: unknown) => portalMuta
 export const patchJson = <T = any,>(url: string, payload?: unknown) => portalMutate<T>(url, "PATCH", payload)
 export const deleteJson = <T = any,>(url: string, payload?: unknown) => portalMutate<T>(url, "DELETE", payload)
 
-const options = { revalidateOnFocus: false, shouldRetryOnError: false }
+const options = {
+  revalidateOnFocus: false,
+  revalidateOnReconnect: true,
+  dedupingInterval: 30_000,
+  keepPreviousData: true,
+  shouldRetryOnError: false,
+}
 
 export function usePortalMe() {
   return useSWR("/api/self-service/me", portalFetcher, options)

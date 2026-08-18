@@ -69,8 +69,8 @@ export default function SettingsPage() {
       toast.error("Enter your current password and complete all new password fields")
       return
     }
-    if (passwords.next.length < 10) {
-      toast.error("Your new password must be at least 10 characters")
+    if (passwords.next.length < 8) {
+      toast.error("Your new password must be at least 8 characters")
       return
     }
     if (!/[a-z]/.test(passwords.next) || !/[A-Z]/.test(passwords.next) || !/[0-9]/.test(passwords.next)) {

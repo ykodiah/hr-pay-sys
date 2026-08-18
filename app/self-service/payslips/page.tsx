@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "@/hooks/use-toast"
+import { PayslipDocument } from "@/components/payslip-document"
 import { Download, Eye, Loader2, Printer, Receipt, TrendingDown, Wallet } from "lucide-react"
 import {
   usePortalMe,
@@ -207,7 +208,7 @@ export default function PayslipsPage() {
       </Card>
 
       <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
-        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto print:hidden">
           <DialogHeader>
             <DialogTitle>Payslip · {selected?.pay_period}</DialogTitle>
             <DialogDescription>
@@ -330,6 +331,12 @@ export default function PayslipsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {selected && (
+        <div className="hidden print:block">
+          <PayslipDocument payslip={selected} showPrintButton={false} />
+        </div>
+      )}
 
       {loadingSlip && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/10">
