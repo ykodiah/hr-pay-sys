@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import useSWR from "swr"
-import { Bell, Shield, Activity } from "lucide-react"
+import { Bell, Shield, Activity, Eye, EyeOff } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -45,6 +45,7 @@ export default function SettingsPage() {
   const [savingPrefs, setSavingPrefs] = useState(false)
   const [changingPassword, setChangingPassword] = useState(false)
   const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" })
+  const [showPasswords, setShowPasswords] = useState({ current: false, next: false, confirm: false })
 
   useEffect(() => {
     if (data?.preferences) setPrefs(data.preferences as Prefs)
@@ -64,12 +65,16 @@ export default function SettingsPage() {
   }
 
   async function changePassword() {
-    if (!passwords.current || !passwords.next) {
-      toast.error("Enter your current and new password")
+    if (!passwords.current || !passwords.next || !passwords.confirm) {
+      toast.error("Enter your current password and complete all new password fields")
       return
     }
     if (passwords.next.length < 10) {
       toast.error("Your new password must be at least 10 characters")
+      return
+    }
+    if (!/[a-z]/.test(passwords.next) || !/[A-Z]/.test(passwords.next) || !/[0-9]/.test(passwords.next)) {
+      toast.error("Use at least one uppercase letter, one lowercase letter and one number")
       return
     }
     if (passwords.next !== passwords.confirm) {
@@ -194,36 +199,36 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="flex max-w-md flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="current-password">Current password</Label>
-                <Input
-                  id="current-password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={passwords.current}
-                  onChange={(e) => setPasswords((p) => ({ ...p, current: e.target.value }))}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="new-password">New password</Label>
-                <Input
-                  id="new-password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={passwords.next}
-                  onChange={(e) => setPasswords((p) => ({ ...p, next: e.target.value }))}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="confirm-password">Confirm new password</Label>
-                <Input
-                  id="confirm-password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={passwords.confirm}
-                  onChange={(e) => setPasswords((p) => ({ ...p, confirm: e.target.value }))}
-                />
-              </div>
+              {([
+                ["current", "current-password", "Current password", "current-password"],
+                ["next", "new-password", "New password", "new-password"],
+                ["confirm", "confirm-password", "Confirm new password", "new-password"],
+              ] as const).map(([key, id, label, autoComplete]) => {
+                const visible = showPasswords[key]
+                return (
+                  <div className="flex flex-col gap-2" key={id}>
+                    <Label htmlFor={id}>{label}</Label>
+                    <div className="relative">
+                      <Input
+                        id={id}
+                        type={visible ? "text" : "password"}
+                        autoComplete={autoComplete}
+                        value={passwords[key]}
+                        onChange={(e) => setPasswords((p) => ({ ...p, [key]: e.target.value }))}
+                        className="pr-11"
+                      />
+                      <button
+                        type="button"
+                        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-muted-foreground hover:text-foreground"
+                        aria-label={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+                        onClick={() => setShowPasswords((p) => ({ ...p, [key]: !p[key] }))}
+                      >
+                        {visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
               <Button onClick={changePassword} disabled={changingPassword} className="self-start">
                 {changingPassword ? "Updating..." : "Update password"}
               </Button>

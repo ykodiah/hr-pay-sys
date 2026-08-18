@@ -35,38 +35,44 @@ export default function AttendancePage() {
   )
 
   async function clock(action: "clock_in" | "clock_out") {
+    if (clocking) return
     if (!navigator.geolocation) {
-      toast.error("This browser does not support GPS location")
+      toast.error("This browser does not support location services")
       return
     }
+
     setClocking(true)
+    const submit = async (position: GeolocationPosition) => {
+      try {
+        await postJson("/api/self-service/attendance", {
+          action,
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          device_info: { platform: navigator.platform, user_agent: navigator.userAgent },
+        })
+        toast.success(action === "clock_in" ? "Clocked in successfully" : "Clocked out successfully")
+        await mutate()
+      } catch (e: any) {
+        toast.error(e?.message || "Could not mark attendance")
+      } finally {
+        setClocking(false)
+      }
+    }
+
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          await postJson("/api/self-service/attendance", {
-            action,
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-            device_info: { platform: navigator.platform, user_agent: navigator.userAgent },
-          })
-          toast.success(action === "clock_in" ? "Clocked in successfully" : "Clocked out successfully")
-          mutate()
-        } catch (e: any) {
-          toast.error(e?.message || "Could not mark attendance")
-        } finally {
-          setClocking(false)
-        }
-      },
+      submit,
       (geoError) => {
         toast.error(
           geoError.code === geoError.PERMISSION_DENIED
-            ? "Location permission is required to mark attendance"
-            : "Your location could not be determined",
+            ? "Allow location access in your browser settings, then try again"
+            : geoError.code === geoError.TIMEOUT
+              ? "Location lookup timed out. Move near a window and try again"
+              : "Your location could not be determined",
         )
         setClocking(false)
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+      { enableHighAccuracy: true, timeout: 30000, maximumAge: 60000 },
     )
   }
 

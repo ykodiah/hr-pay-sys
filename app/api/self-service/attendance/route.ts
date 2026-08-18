@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
       .select("*")
       .eq("company_id", session.companyId)
       .maybeSingle()
-    if (settings && (!settings.employee_gps_clock_enabled || !settings.allow_web_clock)) {
+    if (settings && (settings.employee_gps_clock_enabled === false || settings.allow_web_clock === false)) {
       return NextResponse.json(
         { error: "Portal clocking is disabled. Your biometric or imported attendance will still appear here." },
         { status: 403 },
@@ -204,6 +204,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (latitude != null && longitude != null) {
+      // GPS auditing is supplementary; an audit-table issue must not make a
+      // successfully saved attendance event look like it failed.
       await session.db.from("attendance_gps_audit").insert({
         company_id: session.companyId,
         employee_id: session.employeeId,
@@ -216,7 +218,7 @@ export async function POST(req: NextRequest) {
         geofence_id: geo?.geofence?.id || null,
         distance_meters: geo?.distance ?? null,
         device_info: body.device_info || {},
-      })
+      }).then(() => undefined, () => undefined)
     }
 
     await logPortalActivity(session, action, `${date} ${time}`, { attendance_record_id: record?.id })

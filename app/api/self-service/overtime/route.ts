@@ -14,7 +14,7 @@ export async function GET() {
   if (isPortalError(session)) return session
 
   try {
-    const [requestsRes, ratesRes] = await Promise.all([
+    const [requestsRes, ratesRes, attendanceRes] = await Promise.all([
       session.db
         .from("overtime_requests")
         .select("*")
@@ -26,17 +26,49 @@ export async function GET() {
         .from("overtime_rates")
         .select("*")
         .eq("company_id", session.companyId),
+      session.db
+        .from("attendance_records")
+        .select("date, overtime_hours")
+        .eq("employee_id", session.employeeId)
+        .eq("company_id", session.companyId)
+        .not("overtime_hours", "is", null)
+        .order("date", { ascending: false })
+        .limit(366),
     ])
 
     const requests = requestsRes.data || []
+    const attendance = attendanceRes.data || []
     const approvedHours = requests
       .filter((r: any) => String(r.status).toLowerCase() === "approved")
       .reduce((s: number, r: any) => s + Number(r.hours_approved ?? r.hours_requested ?? 0), 0)
     const earned = requests.reduce((s: number, r: any) => s + Number(r.amount_earned || 0), 0)
+    const monthMap = new Map<string, { clocked: number; requested: number; approved: number; pending: number; earned: number }>()
+    const month = (date: string | null) => date ? date.slice(0, 7) : null
+    const ensure = (key: string) => {
+      const row = monthMap.get(key) || { clocked: 0, requested: 0, approved: 0, pending: 0, earned: 0 }
+      monthMap.set(key, row)
+      return row
+    }
+    for (const row of attendance) {
+      const key = month(row.date)
+      if (key) ensure(key).clocked += Number(row.overtime_hours || 0)
+    }
+    for (const row of requests) {
+      const key = month(row.date)
+      if (!key) continue
+      const target = ensure(key)
+      target.requested += Number(row.hours_requested || 0)
+      const status = String(row.status || "").toLowerCase()
+      if (status === "approved") target.approved += Number(row.hours_approved ?? row.hours_requested ?? 0)
+      if (status === "pending") target.pending += Number(row.hours_requested || 0)
+      target.earned += Number(row.amount_earned || 0)
+    }
+    const monthly_summary = [...monthMap.entries()].sort(([a], [b]) => b.localeCompare(a)).slice(0, 12).map(([month, values]) => ({ month, ...values }))
 
     return NextResponse.json({
       requests,
       rates: ratesRes.data || [],
+      monthly_summary,
       summary: {
         approved_hours: approvedHours,
         pending: requests.filter((r: any) => String(r.status).toLowerCase() === "pending").length,

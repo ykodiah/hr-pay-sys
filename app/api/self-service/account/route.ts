@@ -129,9 +129,18 @@ export async function POST(req: NextRequest) {
     const current = String(body.current_password || "")
     const next = String(body.new_password || "")
 
+    if (!current || !next) {
+      return NextResponse.json({ error: "Enter your current and new password" }, { status: 400 })
+    }
     if (next.length < 10) {
       return NextResponse.json(
         { error: "Your new password must be at least 10 characters" },
+        { status: 400 },
+      )
+    }
+    if (!/[a-z]/.test(next) || !/[A-Z]/.test(next) || !/[0-9]/.test(next)) {
+      return NextResponse.json(
+        { error: "Use at least one uppercase letter, one lowercase letter and one number" },
         { status: 400 },
       )
     }
@@ -165,17 +174,23 @@ export async function POST(req: NextRequest) {
       },
     })
     if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 400 })
+      const message = updateError.message.toLowerCase()
+      const safeMessage = message.includes("password") || message.includes("weak")
+        ? "The new password does not meet the account password policy"
+        : "The password could not be updated. Try again or contact HR."
+      return NextResponse.json({ error: safeMessage }, { status: 400 })
     }
+
+    const accountUpdate: Record<string, string | boolean> = {
+      must_change_password: false,
+      status: "active",
+      updated_at: new Date().toISOString(),
+    }
+    if (session.account?.status === "invited") accountUpdate.activated_at = new Date().toISOString()
 
     await session.db
       .from("employee_portal_accounts")
-      .update({
-        must_change_password: false,
-        status: "active",
-        activated_at: session.account?.status === "invited" ? new Date().toISOString() : undefined,
-        updated_at: new Date().toISOString(),
-      })
+      .update(accountUpdate)
       .eq("employee_id", session.employeeId)
       .eq("company_id", session.companyId)
 

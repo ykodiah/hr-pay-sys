@@ -327,14 +327,6 @@ export default function PayslipsPage() {
               <Printer className="mr-2 h-4 w-4" />
               Print / save PDF
             </Button>
-            {selected?.id ? (
-              <Button asChild>
-                <a href={`/api/payslips/${selected.id}/pdf`} target="_blank" rel="noreferrer">
-                  <Download className="mr-2 h-4 w-4" />
-                  Admin-format PDF
-                </a>
-              </Button>
-            ) : null}
           </DialogFooter>
         </DialogContent>
       </Dialog>

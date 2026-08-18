@@ -50,9 +50,19 @@ type OvertimeRate = {
   is_active: boolean | null
 }
 
+type MonthlySummary = {
+  month: string
+  clocked: number
+  requested: number
+  approved: number
+  pending: number
+  earned: number
+}
+
 type OvertimeResponse = {
   requests: OvertimeRequest[]
   rates: OvertimeRate[]
+  monthly_summary: MonthlySummary[]
   summary: { approved_hours: number; pending: number; total_earned: number }
 }
 
@@ -138,6 +148,45 @@ export default function SelfServiceOvertimePage() {
         <StatCard label="Approved hours" value={(data?.summary.approved_hours ?? 0).toFixed(1)} icon={TrendingUp} />
         <StatCard label="Pending approval" value={String(data?.summary.pending ?? 0)} icon={Clock} />
         <StatCard label="Total earned" value={formatMoney(data?.summary.total_earned, currency)} icon={TrendingUp} />
+      </div>
+
+      <div className="rounded-lg border border-border bg-muted/30 px-5 py-4">
+        <h2 className="text-sm font-semibold text-card-foreground">How overtime works</h2>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          Clocked hours are attendance evidence. Hours beyond your scheduled shift are shown as clocked overtime,
+          but they are not automatically payable. Submit a request for review; your manager or HR must approve it
+          before payroll uses the configured overtime rate.
+        </p>
+      </div>
+
+      <div className="rounded-lg border border-border bg-card">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="text-sm font-semibold text-card-foreground">Monthly summary</h2>
+          <p className="text-xs text-muted-foreground">Clocked evidence compared with submitted and approved overtime.</p>
+        </div>
+        {(data?.monthly_summary ?? []).length === 0 ? (
+          <p className="px-5 py-6 text-sm text-muted-foreground">No overtime activity to summarize yet.</p>
+        ) : (
+          <div className="overflow-x-auto px-5 py-2">
+            <table className="w-full min-w-[620px] text-left text-sm">
+              <thead className="text-xs text-muted-foreground">
+                <tr><th className="py-2">Month</th><th>Clocked</th><th>Requested</th><th>Approved</th><th>Pending</th><th>Earned</th></tr>
+              </thead>
+              <tbody>
+                {data?.monthly_summary.map((row) => (
+                  <tr key={row.month} className="border-t border-border">
+                    <td className="py-3 font-medium">{row.month}</td>
+                    <td>{row.clocked.toFixed(1)}h</td>
+                    <td>{row.requested.toFixed(1)}h</td>
+                    <td>{row.approved.toFixed(1)}h</td>
+                    <td>{row.pending.toFixed(1)}h</td>
+                    <td>{formatMoney(row.earned, currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="rounded-lg border border-border bg-card">
