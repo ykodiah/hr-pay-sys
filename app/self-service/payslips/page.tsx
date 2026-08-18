@@ -1,630 +1,335 @@
 "use client"
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { toast } from "@/hooks/use-toast"
-import { FileText, Download, Eye, Calendar, DollarSign, Calculator, TrendingDown } from "lucide-react"
 
-const payslips = [
-  {
-    id: 1,
-    period: "January 2025",
-    date: "31/1/2025",
-    processedDate: "2025-01-31T14:30:00",
-    employeeName: "KWAME ASANTE",
-    jobTitle: "SENIOR SOFTWARE ENGINEER",
-    employeeId: "EMP001",
-    ssnitNo: "GHA-001689781-4",
-    bankName: "GT BANK",
-    accountNumber: "20610953414",
-    companyName: "AKWAABA HOLDINGS LIMITED",
-    basicSalary: 8500,
-    allowances: [
-      { name: "Transport Allowance", amount: 500, taxable: true },
-      { name: "Housing Allowance", amount: 600, taxable: true },
-      { name: "Medical Allowance", amount: 100, taxable: false },
-    ],
-    totalAllowances: 1200,
-    grossSalary: 9700,
-    deductions: {
-      ssnitEmployee: 467.5,
-      paye: 1248.98,
-      providentFundEmployee: 425.0,
-      welfare: 20,
-      loans: 200,
-      other: 0,
-    },
-    employerContributions: {
-      ssnitEmployer: 1105.0,
-      providentFundEmployer: 425.0,
-    },
-    totalDeductions: 2361.48,
-    netPay: 5338.52,
-    payDate: "2025-01-31",
-    status: "Paid",
-  },
-  {
-    id: 2,
-    period: "December 2024",
-    date: "31/12/2024",
-    processedDate: "2024-12-31T16:45:00",
-    employeeName: "KWAME ASANTE",
-    jobTitle: "SENIOR SOFTWARE ENGINEER",
-    employeeId: "EMP001",
-    ssnitNo: "GHA-001689781-4",
-    bankName: "GT BANK",
-    accountNumber: "20610953414",
-    companyName: "AKWAABA HOLDINGS LIMITED",
-    basicSalary: 8500,
-    allowances: [
-      { name: "Transport Allowance", amount: 400, taxable: true },
-      { name: "Housing Allowance", amount: 500, taxable: true },
-      { name: "Medical Allowance", amount: 100, taxable: false },
-    ],
-    totalAllowances: 1000,
-    grossSalary: 9500,
-    deductions: {
-      ssnitEmployee: 467.5,
-      paye: 1198.75,
-      providentFundEmployee: 425.0,
-      welfare: 20,
-      loans: 0,
-      other: 0,
-    },
-    employerContributions: {
-      ssnitEmployer: 1105.0,
-      providentFundEmployer: 425.0,
-    },
-    totalDeductions: 2111.25,
-    netPay: 7388.75,
-    payDate: "2024-12-31",
-    status: "Paid",
-  },
-]
+import { useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Separator } from "@/components/ui/separator"
+import { toast } from "@/hooks/use-toast"
+import { Download, Eye, Loader2, Printer, Receipt, TrendingDown, Wallet } from "lucide-react"
+import {
+  usePortalMe,
+  usePortalResource,
+  portalFetcher,
+  formatMoney,
+  formatDate,
+} from "@/lib/self-service/use-portal"
+import {
+  PageHeader,
+  StatCard,
+  StatusBadge,
+  LoadingBlock,
+  ErrorBlock,
+  EmptyState,
+} from "@/components/self-service/portal-ui"
+
+function Row({
+  label,
+  value,
+  strong,
+  negative,
+}: {
+  label: string
+  value: number
+  strong?: boolean
+  negative?: boolean
+}) {
+  if (!value && !strong) return null
+  return (
+    <div className={`flex items-center justify-between py-1.5 text-sm ${strong ? "font-semibold" : ""}`}>
+      <span className="text-slate-600">{label}</span>
+      <span className={negative ? "text-rose-600" : "text-slate-900"}>
+        {negative ? "-" : ""}
+        {formatMoney(Math.abs(value))}
+      </span>
+    </div>
+  )
+}
 
 export default function PayslipsPage() {
-  const [selectedYear, setSelectedYear] = useState("2025")
-  const [selectedPayslip, setSelectedPayslip] = useState<any>(null)
+  const [year, setYear] = useState<string>("all")
+  const [selected, setSelected] = useState<any>(null)
+  const [loadingSlip, setLoadingSlip] = useState(false)
 
-  const filteredPayslips = payslips.filter((payslip) => payslip.period.includes(selectedYear))
+  const { data: me } = usePortalMe()
+  const query = year === "all" ? "" : `?year=${year}`
+  const { data, error, isLoading } = usePortalResource<any>(
+    me ? `/api/self-service/payslips${query}` : null,
+  )
 
-  const downloadPDF = (payslip: any) => {
+  if (error) return <ErrorBlock error={error} />
+  if (isLoading || !data) return <LoadingBlock rows={4} />
+
+  const payslips = data.payslips || []
+  const totals = data.totals || { gross: 0, net: 0, tax: 0, ssnit: 0 }
+
+  const openPayslip = async (id: string) => {
+    setLoadingSlip(true)
     try {
-      const payslipHTML = generatePayslipHTML(payslip)
-
-      // Create blob and download link
-      const blob = new Blob([payslipHTML], { type: "text/html" })
-      const url = URL.createObjectURL(blob)
-
-      // Create temporary link and trigger download
-      const link = document.createElement("a")
-      link.href = url
-      link.download = `Payslip_${payslip.period.replace(" ", "_")}_${payslip.employeeName.replace(" ", "_")}.html`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-
+      const result = await portalFetcher(`/api/self-service/payslips?id=${id}`)
+      setSelected(result.payslip)
+    } catch (err) {
       toast({
-        title: "Payslip Downloaded",
-        description: `Payslip for ${payslip.period} has been downloaded successfully.`,
-      })
-    } catch (error) {
-      console.error("PDF generation error:", error)
-      toast({
-        title: "Download Error",
-        description: "Error generating payslip. Please try again.",
+        title: "Could not open payslip",
+        description: err instanceof Error ? err.message : "Try again",
         variant: "destructive",
       })
+    } finally {
+      setLoadingSlip(false)
     }
   }
 
+  const downloadCsv = () => {
+    const header = ["Period", "Pay date", "Gross", "PAYE", "SSNIT", "Deductions", "Net"]
+    const rows = payslips.map((p: any) => [
+      p.pay_period,
+      p.pay_date || "",
+      p.gross_pay || 0,
+      p.paye_tax || 0,
+      p.ssnit_employee || 0,
+      p.total_deductions || 0,
+      p.net_pay || 0,
+    ])
+    const csv = [header, ...rows].map((r) => r.join(",")).join("\n")
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }))
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `payslips-${data.employee_name || "employee"}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    toast({ title: "Download started", description: `${rows.length} payslip row(s) exported.` })
+  }
+
+  const printPayslip = () => window.print()
+
+  const allowanceLines = Array.isArray(selected?.allowance_lines) ? selected.allowance_lines : []
+  const deductionLines = Array.isArray(selected?.deduction_lines) ? selected.deduction_lines : []
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">My Payslips</h1>
-          <p className="text-gray-600">View and download your salary statements</p>
-        </div>
-        <Select value={selectedYear} onValueChange={setSelectedYear}>
-          <SelectTrigger className="w-32">
-            <Calendar className="w-4 h-4 mr-2" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="2025">2025</SelectItem>
-            <SelectItem value="2024">2024</SelectItem>
-            <SelectItem value="2023">2023</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+    <div className="mx-auto flex max-w-5xl flex-col gap-6">
+      <PageHeader
+        title="My payslips"
+        description="Every payslip issued to you by payroll, with year-to-date totals."
+        action={
+          <div className="flex gap-2">
+            <Select value={year} onValueChange={setYear}>
+              <SelectTrigger className="w-36">
+                <SelectValue placeholder="All years" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All years</SelectItem>
+                {(data.years || []).map((y: string) => (
+                  <SelectItem key={y} value={y}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" onClick={downloadCsv} disabled={!payslips.length}>
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+          </div>
+        }
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <DollarSign className="w-5 h-5 text-emerald-600" />
-              <div>
-                <div className="text-2xl font-bold text-gray-900">
-                  GHS {filteredPayslips.reduce((sum, p) => sum + p.grossSalary, 0).toLocaleString()}
-                </div>
-                <p className="text-sm text-gray-600">Total Gross Pay</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Calculator className="w-5 h-5 text-blue-600" />
-              <div>
-                <div className="text-2xl font-bold text-gray-900">
-                  GHS {filteredPayslips.reduce((sum, p) => sum + p.totalAllowances, 0).toLocaleString()}
-                </div>
-                <p className="text-sm text-gray-600">Total Allowances</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <TrendingDown className="w-5 h-5 text-purple-600" />
-              <div>
-                <div className="text-2xl font-bold text-gray-900">
-                  GHS{" "}
-                  {filteredPayslips
-                    .reduce(
-                      (sum, p) =>
-                        sum + p.deductions.providentFundEmployee + p.employerContributions.providentFundEmployer,
-                      0,
-                    )
-                    .toLocaleString()}
-                </div>
-                <p className="text-sm text-gray-600">Total PF (Employee + Employer)</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Calculator className="w-5 h-5 text-red-600" />
-              <div>
-                <div className="text-2xl font-bold text-gray-900">
-                  GHS {filteredPayslips.reduce((sum, p) => sum + p.totalDeductions, 0).toLocaleString()}
-                </div>
-                <p className="text-sm text-gray-600">Total Deductions</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <FileText className="w-5 h-5 text-emerald-600" />
-              <div>
-                <div className="text-2xl font-bold text-gray-900">
-                  GHS {filteredPayslips.reduce((sum, p) => sum + p.netPay, 0).toLocaleString()}
-                </div>
-                <p className="text-sm text-gray-600">Total Net Pay</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Total gross" value={formatMoney(totals.gross)} icon={Wallet} />
+        <StatCard
+          label="Total net"
+          value={formatMoney(totals.net)}
+          icon={Receipt}
+          tone="positive"
+        />
+        <StatCard label="PAYE paid" value={formatMoney(totals.tax)} icon={TrendingDown} />
+        <StatCard label="SSNIT paid" value={formatMoney(totals.ssnit)} icon={TrendingDown} />
+      </section>
 
-      {/* Payslips List */}
       <Card>
         <CardHeader>
-          <CardTitle>Payslips for {selectedYear}</CardTitle>
+          <CardTitle className="text-base">Payslip history</CardTitle>
+          <CardDescription>
+            {payslips.length} payslip(s){year !== "all" ? ` for ${year}` : ""}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {filteredPayslips.map((payslip) => (
-              <div
-                key={payslip.id}
-                className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-                    <FileText className="w-6 h-6 text-emerald-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{payslip.period}</h3>
-                    <p className="text-sm text-gray-600">Paid on {new Date(payslip.payDate).toLocaleDateString()}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-4 gap-6 text-center text-sm">
-                  <div>
-                    <p className="font-medium text-gray-900">GHS {payslip.grossSalary.toLocaleString()}</p>
-                    <p className="text-gray-500">Gross Pay</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-red-600">-GHS {payslip.deductions.paye.toLocaleString()}</p>
-                    <p className="text-gray-500">PAYE</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-blue-600">
-                      -GHS {payslip.deductions.ssnitEmployee.toLocaleString()}
+          {payslips.length === 0 ? (
+            <EmptyState
+              title="No payslips yet"
+              description="Payslips appear here once payroll issues them for your account."
+            />
+          ) : (
+            <ul className="flex flex-col divide-y">
+              {payslips.map((p: any) => (
+                <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-900">{p.pay_period}</p>
+                    <p className="text-xs text-slate-500">
+                      Paid {formatDate(p.pay_date)} · Gross {formatMoney(p.gross_pay)} · Deductions{" "}
+                      {formatMoney(p.total_deductions)}
                     </p>
-                    <p className="text-gray-500">SSNIT</p>
                   </div>
-                  <div>
-                    <p className="font-medium text-emerald-600">GHS {payslip.netPay.toLocaleString()}</p>
-                    <p className="text-gray-500">Net Pay</p>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-semibold text-emerald-700">
+                      {formatMoney(p.net_pay)}
+                    </span>
+                    <StatusBadge status={p.status} />
+                    <Button size="sm" variant="outline" onClick={() => openPayslip(p.id)}>
+                      <Eye className="mr-2 h-4 w-4" />
+                      View
+                    </Button>
                   </div>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <Badge className="bg-emerald-100 text-emerald-800">{payslip.status}</Badge>
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedPayslip(payslip)}
-                        className="bg-transparent"
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        View
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                      <DialogHeader>
-                        <DialogTitle>Payslip - {payslip.period}</DialogTitle>
-                      </DialogHeader>
-                      {selectedPayslip && <PayslipDetail payslip={selectedPayslip} />}
-                    </DialogContent>
-                  </Dialog>
-                  <Button
-                    size="sm"
-                    className="bg-emerald-600 hover:bg-emerald-700"
-                    onClick={() => downloadPDF(payslip)}
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download PDF
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </CardContent>
       </Card>
-    </div>
-  )
-}
 
-function PayslipDetail({ payslip }: { payslip: any }) {
-  const applicableDeductions = [
-    { name: "SSNIT EMPLOYEE(5.5%)", amount: payslip.deductions.ssnitEmployee },
-    { name: "INCOME TAX", amount: payslip.deductions.paye },
-    { name: "PROVIDENT FUND (5%)", amount: payslip.deductions.providentFundEmployee },
-    ...(payslip.deductions.welfare > 0 ? [{ name: "WELFARE", amount: payslip.deductions.welfare }] : []),
-    ...(payslip.deductions.loans > 0 ? [{ name: "LOANS", amount: payslip.deductions.loans }] : []),
-    ...(payslip.deductions.other > 0 ? [{ name: "OTHER DEDUCTIONS", amount: payslip.deductions.other }] : []),
-  ].filter((deduction) => deduction.amount > 0)
+      <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Payslip · {selected?.pay_period}</DialogTitle>
+            <DialogDescription>
+              {selected?.snapshot_company_name || me?.company_name} · paid{" "}
+              {formatDate(selected?.pay_date)}
+            </DialogDescription>
+          </DialogHeader>
 
-  return (
-    <div className="bg-white p-8 font-mono text-sm" style={{ fontFamily: "monospace" }}>
-      <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">{payslip.companyName}</h1>
-        <h2 className="text-xl font-semibold text-gray-800">Payslip</h2>
-      </div>
+          {selected && (
+            <div className="flex flex-col gap-4 text-sm">
+              <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-4">
+                <div>
+                  <p className="text-xs uppercase text-slate-500">Employee</p>
+                  <p className="font-medium">{selected.snapshot_employee_name || data.employee_name}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-slate-500">Staff ID</p>
+                  <p className="font-medium">{selected.snapshot_employee_id_no || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-slate-500">Position</p>
+                  <p className="font-medium">{selected.snapshot_position || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-slate-500">SSNIT</p>
+                  <p className="font-medium">{selected.snapshot_ssnit_number || "—"}</p>
+                </div>
+              </div>
 
-      <div className="grid grid-cols-2 gap-8 mb-6 text-sm">
-        <div className="space-y-1">
-          <div className="flex">
-            <span className="w-16">Date:</span>
-            <span className="font-semibold">{payslip.date}</span>
-          </div>
-          <div className="flex">
-            <span className="w-16">Period:</span>
-            <span className="font-semibold">{payslip.period}</span>
-          </div>
-        </div>
-        <div className="space-y-1">
-          <div className="flex">
-            <span className="w-20">SSNIT No.</span>
-            <span className="font-semibold">{payslip.ssnitNo}</span>
-          </div>
-          <div className="flex">
-            <span className="w-20">Bank:</span>
-            <span className="font-semibold">{payslip.bankName}</span>
-          </div>
-        </div>
-      </div>
+              <div>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Earnings
+                </h3>
+                <Row label="Basic salary" value={Number(selected.basic_salary || 0)} />
+                {allowanceLines.length > 0
+                  ? allowanceLines.map((line: any, i: number) => (
+                      <Row
+                        key={i}
+                        label={line.label || line.name || "Allowance"}
+                        value={Number(line.amount || 0)}
+                      />
+                    ))
+                  : (
+                      <>
+                        <Row label="Transport allowance" value={Number(selected.transport_allowance || 0)} />
+                        <Row label="Housing allowance" value={Number(selected.housing_allowance || 0)} />
+                        <Row label="Medical allowance" value={Number(selected.medical_allowance || 0)} />
+                        <Row label="Meal allowance" value={Number(selected.meal_allowance || 0)} />
+                        <Row
+                          label="Communication allowance"
+                          value={Number(selected.communication_allowance || 0)}
+                        />
+                        <Row label="Other allowances" value={Number(selected.other_allowances || 0)} />
+                      </>
+                    )}
+                <Row label="Overtime" value={Number(selected.overtime_pay || 0)} />
+                <Row label="Bonus" value={Number(selected.bonus_pay || 0)} />
+                <Separator className="my-2" />
+                <Row label="Gross pay" value={Number(selected.gross_pay || 0)} strong />
+              </div>
 
-      <div className="mb-6 text-sm">
-        <div className="mb-2">
-          <span className="font-semibold">Employee Name: </span>
-          <span className="font-bold">{payslip.employeeName}</span>
-        </div>
-        <div className="mb-2">
-          <span className="font-semibold">Job Title: </span>
-          <span className="font-semibold">{payslip.jobTitle}</span>
-        </div>
-        <div>
-          <span className="font-semibold">Acc. Number: </span>
-          <span className="font-semibold">{payslip.accountNumber}</span>
-        </div>
-      </div>
+              <div>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Deductions
+                </h3>
+                <Row label="SSNIT (employee)" value={Number(selected.ssnit_employee || 0)} negative />
+                <Row label="Tier 3" value={Number(selected.tier3_employee || 0)} negative />
+                <Row label="PAYE tax" value={Number(selected.paye_tax || 0)} negative />
+                <Row label="Loan repayment" value={Number(selected.loan_deduction || 0)} negative />
+                <Row label="Salary advance" value={Number(selected.advance_deduction || 0)} negative />
+                {deductionLines.map((line: any, i: number) => (
+                  <Row
+                    key={i}
+                    label={line.label || line.name || "Deduction"}
+                    value={Number(line.amount || 0)}
+                    negative
+                  />
+                ))}
+                <Row label="Other deductions" value={Number(selected.other_deductions || 0)} negative />
+                <Separator className="my-2" />
+                <Row
+                  label="Total deductions"
+                  value={Number(selected.total_deductions || 0)}
+                  strong
+                  negative
+                />
+              </div>
 
-      <div className="border-2 border-gray-800 mb-6">
-        <div className="grid grid-cols-4 border-b-2 border-gray-800 bg-gray-100">
-          <div className="p-3 border-r border-gray-800 font-bold text-center">EARNINGS</div>
-          <div className="p-3 border-r border-gray-800 font-bold text-center">AMT(GH¢)</div>
-          <div className="p-3 border-r border-gray-800 font-bold text-center">DEDUCTIONS</div>
-          <div className="p-3 font-bold text-center">AMT(GH¢)</div>
-        </div>
+              <div className="rounded-lg bg-emerald-50 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-emerald-900">Net pay</span>
+                  <span className="text-xl font-bold text-emerald-700">
+                    {formatMoney(selected.net_pay)}
+                  </span>
+                </div>
+                {(selected.ytd_gross || selected.ytd_net) && (
+                  <p className="mt-2 text-xs text-emerald-800">
+                    Year to date · gross {formatMoney(selected.ytd_gross)} · net{" "}
+                    {formatMoney(selected.ytd_net)}
+                  </p>
+                )}
+              </div>
 
-        <div className="grid grid-cols-4 border-b border-gray-400">
-          <div className="p-3 border-r border-gray-800 font-semibold">BASIC SALARY</div>
-          <div className="p-3 border-r border-gray-800 text-right font-semibold">{payslip.basicSalary.toFixed(2)}</div>
-          <div className="p-3 border-r border-gray-800 font-semibold">{applicableDeductions[0]?.name || ""}</div>
-          <div className="p-3 text-right font-semibold">{applicableDeductions[0]?.amount.toFixed(2) || ""}</div>
-        </div>
-
-        {payslip.allowances.map((allowance: any, index: number) => (
-          <div key={index} className="grid grid-cols-4 border-b border-gray-400">
-            <div className="p-3 border-r border-gray-800 font-semibold">{allowance.name.toUpperCase()}</div>
-            <div className="p-3 border-r border-gray-800 text-right font-semibold">{allowance.amount.toFixed(2)}</div>
-            <div className="p-3 border-r border-gray-800 font-semibold">
-              {applicableDeductions[index + 1]?.name || ""}
-            </div>
-            <div className="p-3 text-right font-semibold">
-              {applicableDeductions[index + 1]?.amount.toFixed(2) || ""}
-            </div>
-          </div>
-        ))}
-
-        {applicableDeductions.slice(payslip.allowances.length + 1).map((deduction, index) => (
-          <div key={index} className="grid grid-cols-4 border-b border-gray-400">
-            <div className="p-3 border-r border-gray-800"></div>
-            <div className="p-3 border-r border-gray-800"></div>
-            <div className="p-3 border-r border-gray-800 font-semibold">{deduction.name}</div>
-            <div className="p-3 text-right font-semibold">{deduction.amount.toFixed(2)}</div>
-          </div>
-        ))}
-
-        <div className="grid grid-cols-4 bg-gray-100 border-t-2 border-gray-800">
-          <div className="p-3 border-r border-gray-800 font-bold">GROSS SALARY</div>
-          <div className="p-3 border-r border-gray-800 text-right font-bold">{payslip.grossSalary.toFixed(2)}</div>
-          <div className="p-3 border-r border-gray-800 font-bold">TOTAL DEDUCTIONS</div>
-          <div className="p-3 text-right font-bold">{payslip.totalDeductions.toFixed(2)}</div>
-        </div>
-      </div>
-
-      <div className="text-center mb-6">
-        <div className="inline-block border-2 border-gray-800 bg-gray-100 px-8 py-4">
-          <span className="font-bold text-lg">NET PAY: GHS {payslip.netPay.toFixed(2)}</span>
-        </div>
-      </div>
-
-      <div className="mb-6 text-sm">
-        <div className="font-semibold mb-2">Employer Contributions:</div>
-        <div className="pl-4 space-y-1">
-          <div className="flex justify-between">
-            <span>SSNIT - EMPLOYER (13%):</span>
-            <span className="font-semibold">GHS {payslip.employerContributions.ssnitEmployer.toFixed(2)}</span>
-          </div>
-          {payslip.employerContributions.providentFundEmployer > 0 && (
-            <div className="flex justify-between">
-              <span>PROVIDENT FUND - EMPLOYER (5%):</span>
-              <span className="font-semibold">
-                GHS {payslip.employerContributions.providentFundEmployer.toFixed(2)}
-              </span>
+              {Number(selected.loan_balance || 0) > 0 && (
+                <p className="text-xs text-slate-500">
+                  Outstanding loan balance after this period: {formatMoney(selected.loan_balance)}
+                </p>
+              )}
             </div>
           )}
-        </div>
-      </div>
 
-      <div className="flex justify-between items-center text-xs text-gray-600 border-t pt-4">
-        <div>
-          <span className="font-semibold">akwaabahrpay - Welcome to Growth</span>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelected(null)}>
+              Close
+            </Button>
+            <Button onClick={printPayslip}>
+              <Printer className="mr-2 h-4 w-4" />
+              Print / save PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {loadingSlip && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/10">
+          <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
         </div>
-        <div>
-          <span>Print date: {new Date(payslip.processedDate).toLocaleString()}</span>
-        </div>
-      </div>
+      )}
     </div>
   )
-}
-
-function generatePayslipHTML(payslip: any): string {
-  const applicableDeductions = [
-    { name: "SSNIT EMPLOYEE(5.5%)", amount: payslip.deductions.ssnitEmployee },
-    { name: "INCOME TAX", amount: payslip.deductions.paye },
-    { name: "PROVIDENT FUND (5%)", amount: payslip.deductions.providentFundEmployee },
-    ...(payslip.deductions.welfare > 0 ? [{ name: "WELFARE", amount: payslip.deductions.welfare }] : []),
-    ...(payslip.deductions.loans > 0 ? [{ name: "LOANS", amount: payslip.deductions.loans }] : []),
-    ...(payslip.deductions.other > 0 ? [{ name: "OTHER DEDUCTIONS", amount: payslip.deductions.other }] : []),
-  ].filter((deduction) => deduction.amount > 0)
-
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>Payslip - ${payslip.period}</title>
-      <style>
-        @media print {
-          body { margin: 0; }
-          .no-print { display: none; }
-        }
-        body { 
-          font-family: 'Courier New', monospace; 
-          font-size: 12px; 
-          margin: 20px; 
-          line-height: 1.4;
-          color: #000;
-        }
-        .header { text-align: center; margin-bottom: 20px; }
-        .company-name { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
-        .payslip-title { font-size: 16px; font-weight: bold; }
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-        .employee-info { margin-bottom: 20px; }
-        .payslip-table { 
-          border: 2px solid #000; 
-          border-collapse: collapse; 
-          width: 100%; 
-          margin-bottom: 20px; 
-        }
-        .payslip-table th, .payslip-table td { 
-          border: 1px solid #000; 
-          padding: 8px; 
-          text-align: left; 
-          vertical-align: top;
-        }
-        .payslip-table th { 
-          background-color: #f0f0f0; 
-          font-weight: bold; 
-          text-align: center; 
-        }
-        .amount { text-align: right; font-weight: bold; }
-        .net-pay { text-align: center; margin: 20px 0; }
-        .net-pay-box { 
-          display: inline-block; 
-          border: 2px solid #000; 
-          background-color: #f0f0f0; 
-          padding: 15px; 
-          font-weight: bold;
-          font-size: 14px;
-        }
-        .employer-contributions { margin-bottom: 20px; }
-        .footer { 
-          border-top: 1px solid #000; 
-          padding-top: 10px; 
-          display: flex; 
-          justify-content: space-between; 
-          font-size: 10px; 
-          margin-top: 30px;
-        }
-        .print-button {
-          margin: 20px 0;
-          text-align: center;
-        }
-        .print-btn {
-          background-color: #059669;
-          color: white;
-          padding: 10px 20px;
-          border: none;
-          border-radius: 5px;
-          cursor: pointer;
-          font-size: 14px;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="print-button no-print">
-        <button class="print-btn" onclick="window.print()">Print Payslip</button>
-      </div>
-      
-      <div class="header">
-        <div class="company-name">${payslip.companyName}</div>
-        <div class="payslip-title">Payslip</div>
-      </div>
-      
-      <div class="info-grid">
-        <div>
-          <div>Date: <strong>${payslip.date}</strong></div>
-          <div>Period: <strong>${payslip.period}</strong></div>
-        </div>
-        <div>
-          <div>SSNIT No. <strong>${payslip.ssnitNo}</strong></div>
-          <div>Bank: <strong>${payslip.bankName}</strong></div>
-        </div>
-      </div>
-      
-      <div class="employee-info">
-        <div>Employee Name: <strong>${payslip.employeeName}</strong></div>
-        <div>Job Title: <strong>${payslip.jobTitle}</strong></div>
-        <div>Acc. Number: <strong>${payslip.accountNumber}</strong></div>
-      </div>
-      
-      <table class="payslip-table">
-        <tr>
-          <th style="width: 25%;">EARNINGS</th>
-          <th style="width: 25%;">AMT(GHS)</th>
-          <th style="width: 25%;">DEDUCTIONS</th>
-          <th style="width: 25%;">AMT(GHS)</th>
-        </tr>
-        <tr>
-          <td><strong>BASIC SALARY</strong></td>
-          <td class="amount">${payslip.basicSalary.toFixed(2)}</td>
-          <td><strong>${applicableDeductions[0]?.name || ""}</strong></td>
-          <td class="amount">${applicableDeductions[0]?.amount.toFixed(2) || ""}</td>
-        </tr>
-        ${payslip.allowances
-          .map(
-            (allowance: any, index: number) => `
-          <tr>
-            <td><strong>${allowance.name.toUpperCase()}</strong></td>
-            <td class="amount">${allowance.amount.toFixed(2)}</td>
-            <td><strong>${applicableDeductions[index + 1]?.name || ""}</strong></td>
-            <td class="amount">${applicableDeductions[index + 1]?.amount.toFixed(2) || ""}</td>
-          </tr>
-        `,
-          )
-          .join("")}
-        ${applicableDeductions
-          .slice(payslip.allowances.length + 1)
-          .map(
-            (deduction) => `
-          <tr>
-            <td></td>
-            <td></td>
-            <td><strong>${deduction.name}</strong></td>
-            <td class="amount">${deduction.amount.toFixed(2)}</td>
-          </tr>
-        `,
-          )
-          .join("")}
-        <tr style="background-color: #f0f0f0;">
-          <td><strong>GROSS SALARY</strong></td>
-          <td class="amount"><strong>${payslip.grossSalary.toFixed(2)}</strong></td>
-          <td><strong>TOTAL DEDUCTIONS</strong></td>
-          <td class="amount"><strong>${payslip.totalDeductions.toFixed(2)}</strong></td>
-        </tr>
-      </table>
-      
-      <div class="net-pay">
-        <div class="net-pay-box">
-          NET PAY: GHS ${payslip.netPay.toFixed(2)}
-        </div>
-      </div>
-      
-      <div class="employer-contributions">
-        <div><strong>Employer Contributions:</strong></div>
-        <div style="padding-left: 20px; margin-top: 10px;">
-          <div>SSNIT - EMPLOYER (13%): <strong>GHS ${payslip.employerContributions.ssnitEmployer.toFixed(2)}</strong></div>
-          ${
-            payslip.employerContributions.providentFundEmployer > 0
-              ? `<div>PROVIDENT FUND - EMPLOYER (5%): <strong>GHS ${payslip.employerContributions.providentFundEmployer.toFixed(2)}</strong></div>`
-              : ""
-          }
-        </div>
-      </div>
-      
-      <div class="footer">
-        <div><strong>akwaabahrpay - Welcome to Growth</strong></div>
-        <div>Print date: ${new Date(payslip.processedDate).toLocaleString()}</div>
-      </div>
-      
-      <script>
-        // Auto-print when opened in new window
-        window.onload = function() {
-          setTimeout(function() {
-            window.print();
-          }, 500);
-        }
-      </script>
-    </body>
-    </html>
-  `
 }

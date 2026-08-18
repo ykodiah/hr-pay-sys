@@ -6,6 +6,9 @@ import {
   ORG_TRANSFER_OPTIONAL_FIELDS,
   buildDiffs,
   canReverseEvent,
+  coerceFieldValue,
+  coercePatch,
+  toEffectiveDate,
   type DiffRow,
 } from "@/lib/employees/audit-fields"
 import { normalizeEmployeeStatus } from "@/lib/employees/status"
@@ -267,7 +270,7 @@ export async function applyGovernedEmployeeUpdate(input: {
   documents?: any[] | null
 }) {
   if (!input.reason?.trim()) throw new Error("Reason is required for employee data updates")
-  const effectiveDate = input.effectiveDate || new Date().toISOString().slice(0, 10)
+  const effectiveDate = toEffectiveDate(input.effectiveDate)
 
   const service = createServiceClient()
   const { data: before, error } = await service
@@ -287,9 +290,11 @@ export async function applyGovernedEmployeeUpdate(input: {
 
   const empPatch: Record<string, any> = { updated_at: new Date().toISOString() }
   for (const key of EMPLOYEE_UPDATE_FIELDS) {
-    if (input.patch[key] !== undefined) {
-      empPatch[key] = key === "status" ? normalizeEmployeeStatus(input.patch[key]) : input.patch[key]
-    }
+    if (input.patch[key] === undefined) continue
+    empPatch[key] =
+      key === "status"
+        ? normalizeEmployeeStatus(input.patch[key])
+        : coerceFieldValue(key, input.patch[key])
   }
   // Block org fields even if someone sneaks them in
   for (const key of ORG_TRANSFER_FIELDS) {
@@ -313,7 +318,7 @@ export async function applyGovernedEmployeeUpdate(input: {
   if (finPayload) {
     const cleaned: Record<string, any> = { employee_id: input.employeeId, updated_at: finPayload.updated_at }
     for (const key of FINANCIAL_UPDATE_FIELDS) {
-      if (finPayload[key] !== undefined) cleaned[key] = finPayload[key]
+      if (finPayload[key] !== undefined) cleaned[key] = coerceFieldValue(key, finPayload[key])
     }
     if (cleaned.monthly_salary != null && cleaned.annual_salary == null) {
       cleaned.annual_salary = Number(cleaned.monthly_salary) * 12

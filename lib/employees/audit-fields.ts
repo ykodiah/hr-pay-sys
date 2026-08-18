@@ -134,6 +134,130 @@ export function fieldLabel(field: string) {
   return LABELS[field] || field.replace(/_/g, " ")
 }
 
+/**
+ * Typed columns that Postgres rejects when given an empty string.
+ * HTML inputs post "" for cleared fields, so every write path must coerce.
+ */
+export const DATE_COLUMNS = new Set([
+  "date_of_birth",
+  "date_of_joining",
+  "date_of_exit",
+  "confirmation_date",
+  "probation_start_date",
+  "probation_end_date",
+  "last_transfer_date",
+  "loan_start_date",
+  "loan_end_date",
+  "effective_date",
+  "end_date",
+])
+
+export const NUMERIC_COLUMNS = new Set([
+  "probation_period",
+  "probation_duration_months",
+  "monthly_salary",
+  "annual_salary",
+  "tier3_contribution",
+  "provident_fund_rate",
+  "tier2_employee_contribution",
+  "tier2_employer_contribution",
+  "weekday_overtime_rate",
+  "weekend_overtime_rate",
+  "transport_allowance",
+  "housing_allowance",
+  "medical_allowance",
+  "meal_allowance",
+  "uniform_allowance",
+  "communication_allowance",
+  "other_allowances",
+  "tax_deduction",
+  "loan_deduction",
+  "advance_deduction",
+  "other_deductions",
+  "loan_amount",
+  "loan_balance",
+  "loan_installment",
+])
+
+export const UUID_COLUMNS = new Set([
+  "direct_supervisor",
+  "head_of_department",
+  "subsidiary_id",
+  "last_transfer_id",
+  "company_id",
+  "user_id",
+])
+
+export const BOOLEAN_COLUMNS = new Set([
+  "provident_fund_enrolled",
+  "is_date_of_birth_mandatory",
+])
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Coerce a single form value into something Postgres accepts for that column. */
+export function coerceFieldValue(field: string, value: unknown): unknown {
+  if (value === undefined) return undefined
+
+  const isBlank =
+    value === null ||
+    value === "" ||
+    (typeof value === "string" && value.trim() === "")
+
+  if (DATE_COLUMNS.has(field)) {
+    if (isBlank) return null
+    const raw = String(value).trim()
+    // Accept both ISO (yyyy-mm-dd) and full timestamps; reject anything unparseable.
+    const iso = /^\d{4}-\d{2}-\d{2}/.test(raw) ? raw.slice(0, 10) : null
+    if (iso) return iso
+    const parsed = new Date(raw)
+    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10)
+  }
+
+  if (NUMERIC_COLUMNS.has(field)) {
+    if (isBlank) return null
+    const num = Number(String(value).replace(/,/g, "").trim())
+    return Number.isFinite(num) ? num : null
+  }
+
+  if (UUID_COLUMNS.has(field)) {
+    if (isBlank) return null
+    const raw = String(value).trim()
+    return UUID_PATTERN.test(raw) ? raw : null
+  }
+
+  if (BOOLEAN_COLUMNS.has(field)) {
+    if (isBlank) return null
+    if (typeof value === "boolean") return value
+    const raw = String(value).trim().toLowerCase()
+    return raw === "true" || raw === "yes" || raw === "1"
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    return trimmed === "" ? null : trimmed
+  }
+
+  return value
+}
+
+/** Coerce every key of a patch object. Safe for employees + employee_financial. */
+export function coercePatch<T extends Record<string, any>>(patch: T): T {
+  const out: Record<string, any> = {}
+  for (const [key, value] of Object.entries(patch || {})) {
+    const coerced = coerceFieldValue(key, value)
+    if (coerced !== undefined) out[key] = coerced
+  }
+  return out as T
+}
+
+/** Normalise a date-ish input to `yyyy-mm-dd`, falling back to today. */
+export function toEffectiveDate(value: unknown): string {
+  const coerced = coerceFieldValue("effective_date", value)
+  return typeof coerced === "string" ? coerced : new Date().toISOString().slice(0, 10)
+}
+
 export function fieldSensitivity(field: string): FieldSensitivity {
   if (ORG_FIELDS.has(field)) return "org"
   if (HARD_FIELDS.has(field)) return "hard"

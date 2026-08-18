@@ -1,0 +1,163 @@
+import { NextRequest, NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
+import {
+  requirePortalSession,
+  isPortalError,
+  portalJsonError,
+  logPortalActivity,
+} from "@/lib/self-service/portal-session"
+
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
+
+/** GET — account + notification preferences for the signed-in employee. */
+export async function GET() {
+  const session = await requirePortalSession()
+  if (isPortalError(session)) return session
+
+  try {
+    const [prefsRes, activityRes] = await Promise.all([
+      session.db
+        .from("notification_settings")
+        .select("*")
+        .eq("employee_id", session.employeeId)
+        .eq("company_id", session.companyId)
+        .maybeSingle(),
+      session.db
+        .from("employee_portal_activity")
+        .select("action, detail, created_at, ip_address")
+        .eq("employee_id", session.employeeId)
+        .order("created_at", { ascending: false })
+        .limit(15),
+    ])
+
+    return NextResponse.json({
+      account: {
+        login_email: session.account?.login_email,
+        status: session.account?.status,
+        must_change_password: session.account?.must_change_password,
+        last_login_at: session.account?.last_login_at,
+        can_access_admin: session.canAccessAdmin,
+      },
+      preferences: prefsRes.data || {
+        payroll_notifications: true,
+        leave_notifications: true,
+        attendance_alerts: true,
+        promotion_notifications: true,
+        system_maintenance_alerts: true,
+        email_digest: false,
+        sms_alerts: false,
+        push_notifications: true,
+      },
+      activity: activityRes.data || [],
+    })
+  } catch (err) {
+    return portalJsonError(err, "Failed to load account settings")
+  }
+}
+
+const PREF_FLAGS = [
+  "payroll_notifications",
+  "leave_notifications",
+  "attendance_alerts",
+  "promotion_notifications",
+  "system_maintenance_alerts",
+  "email_digest",
+  "sms_alerts",
+  "push_notifications",
+] as const
+
+/** PATCH — save notification preferences. */
+export async function PATCH(req: NextRequest) {
+  const session = await requirePortalSession()
+  if (isPortalError(session)) return session
+
+  try {
+    const body = await req.json().catch(() => ({}))
+    const payload: Record<string, any> = {
+      company_id: session.companyId,
+      employee_id: session.employeeId,
+      updated_at: new Date().toISOString(),
+    }
+    for (const flag of PREF_FLAGS) {
+      if (body[flag] !== undefined) payload[flag] = Boolean(body[flag])
+    }
+
+    const { data: existing } = await session.db
+      .from("notification_settings")
+      .select("id")
+      .eq("employee_id", session.employeeId)
+      .eq("company_id", session.companyId)
+      .maybeSingle()
+
+    const { data, error } = existing
+      ? await session.db
+          .from("notification_settings")
+          .update(payload)
+          .eq("id", existing.id)
+          .select("*")
+          .single()
+      : await session.db.from("notification_settings").insert(payload).select("*").single()
+
+    if (error) throw new Error(error.message)
+    return NextResponse.json({ success: true, preferences: data })
+  } catch (err) {
+    return portalJsonError(err, "Failed to save preferences")
+  }
+}
+
+/** POST — change password. Verifies the current password before updating. */
+export async function POST(req: NextRequest) {
+  const session = await requirePortalSession()
+  if (isPortalError(session)) return session
+
+  try {
+    const body = await req.json().catch(() => ({}))
+    const current = String(body.current_password || "")
+    const next = String(body.new_password || "")
+
+    if (next.length < 10) {
+      return NextResponse.json(
+        { error: "Your new password must be at least 10 characters" },
+        { status: 400 },
+      )
+    }
+    if (next === current) {
+      return NextResponse.json({ error: "Choose a password you have not used before" }, { status: 400 })
+    }
+
+    const email = session.user.email || session.account?.login_email
+    if (!email) return NextResponse.json({ error: "No login email on file" }, { status: 400 })
+
+    const auth = await createClient()
+    const { error: verifyError } = await auth.auth.signInWithPassword({
+      email,
+      password: current,
+    })
+    if (verifyError) {
+      return NextResponse.json({ error: "Your current password is incorrect" }, { status: 400 })
+    }
+
+    const { error: updateError } = await auth.auth.updateUser({ password: next })
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 400 })
+    }
+
+    await session.db
+      .from("employee_portal_accounts")
+      .update({
+        must_change_password: false,
+        status: "active",
+        activated_at: session.account?.status === "invited" ? new Date().toISOString() : undefined,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("employee_id", session.employeeId)
+      .eq("company_id", session.companyId)
+
+    await logPortalActivity(session, "password_changed")
+
+    return NextResponse.json({ success: true, message: "Password updated" })
+  } catch (err) {
+    return portalJsonError(err, "Failed to change password")
+  }
+}

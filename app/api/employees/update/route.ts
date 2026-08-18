@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { resolveTenantContext, jsonError, isUnresolvedTenant } from "@/lib/settings/resolve-tenant"
 import { applyGovernedEmployeeUpdate } from "@/lib/services/employee-audit-service"
 import { ORG_TRANSFER_FIELDS } from "@/lib/employees/audit-fields"
-import { buildDiffs, EMPLOYEE_UPDATE_FIELDS, FINANCIAL_UPDATE_FIELDS } from "@/lib/employees/audit-fields"
+import {
+  buildDiffs,
+  EMPLOYEE_UPDATE_FIELDS,
+  FINANCIAL_UPDATE_FIELDS,
+  toEffectiveDate,
+} from "@/lib/employees/audit-fields"
 
 function stripOrgFields(patch: Record<string, any> = {}) {
   const cleaned = { ...patch }
@@ -34,8 +39,7 @@ export async function POST(request: NextRequest) {
     const patch = stripOrgFields(body.patch || {})
     const financial = body.financial || null
     const reason = String(body.reason || "").trim()
-    const effectiveDate =
-      body.effective_date || body.effectiveDate || new Date().toISOString().slice(0, 10)
+    const effectiveDate = toEffectiveDate(body.effective_date || body.effectiveDate)
 
     // Preview only
     if (body.action === "preview") {
