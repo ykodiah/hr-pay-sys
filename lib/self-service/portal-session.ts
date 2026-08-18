@@ -68,6 +68,20 @@ export async function resolveAdminAccess(
 ): Promise<boolean> {
   if (ADMIN_META_ROLES.has(metaRole(user))) return true
 
+  if (companyId) {
+    try {
+      const { data: tenantProfile } = await db
+        .from("tenant_user_profiles")
+        .select("user_id")
+        .eq("user_id", user.id)
+        .eq("company_id", companyId)
+        .maybeSingle()
+      if (tenantProfile?.user_id) return true
+    } catch {
+      // optional on databases that have not applied the portal expansion yet
+    }
+  }
+
   const email = (user.email || "").trim().toLowerCase()
   if (email && companyId) {
     try {

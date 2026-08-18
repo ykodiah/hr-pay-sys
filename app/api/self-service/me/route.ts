@@ -27,7 +27,7 @@ export async function GET(_req: NextRequest) {
     const { db, employeeId, companyId, employee } = session
     const year = new Date().getFullYear()
 
-    const [financialRes, balancesRes, payslipRes, leaveRes, loanRes, unreadRes, requestsRes] =
+    const [financialRes, balancesRes, payslipRes, leaveRes, loanRes, unreadRes, requestsRes, authorityRes, teamRes] =
       await Promise.all([
         db.from("employee_financial").select("*").eq("employee_id", employeeId).maybeSingle(),
         db
@@ -67,6 +67,18 @@ export async function GET(_req: NextRequest) {
           .eq("employee_id", employeeId)
           .order("created_at", { ascending: false })
           .limit(5),
+        db
+          .from("approval_authority_lines")
+          .select("id, approver_employee_id, authority_type, approval_scope, sequence_no")
+          .eq("company_id", companyId)
+          .eq("employee_id", employeeId)
+          .eq("is_active", true)
+          .order("sequence_no"),
+        db
+          .from("employees")
+          .select("id", { count: "exact", head: true })
+          .eq("company_id", companyId)
+          .or(`direct_supervisor.eq.${employeeId},head_of_department.eq.${employeeId}`),
       ])
 
     const balances = balancesRes.data || []
@@ -91,10 +103,58 @@ export async function GET(_req: NextRequest) {
       employee.full_name ||
       `${employee.first_name || ""} ${employee.last_name || ""}`.trim()
 
+    const authorityIds = [
+      employee.direct_supervisor,
+      employee.head_of_department,
+      ...(authorityRes.data || []).map((line: any) => line.approver_employee_id),
+    ].filter(Boolean)
+    const uniqueAuthorityIds = [...new Set(authorityIds)]
+    const { data: authorityEmployees } = uniqueAuthorityIds.length
+      ? await db
+          .from("employees")
+          .select("id, employee_id, first_name, last_name, full_name, position, department")
+          .eq("company_id", companyId)
+          .in("id", uniqueAuthorityIds)
+      : { data: [] as any[] }
+    const authorityById = new Map((authorityEmployees || []).map((person: any) => [person.id, person]))
+    const explicitLines = (authorityRes.data || []).map((line: any) => ({
+      ...line,
+      approver: authorityById.get(line.approver_employee_id) || null,
+    }))
+    if (!explicitLines.length) {
+      if (employee.direct_supervisor) {
+        explicitLines.push({
+          authority_type: "supervisor",
+          sequence_no: 1,
+          approval_scope: ["leave", "overtime", "documents", "profile_changes"],
+          approver_employee_id: employee.direct_supervisor,
+          approver: authorityById.get(employee.direct_supervisor) || null,
+        })
+      }
+      if (employee.head_of_department && employee.head_of_department !== employee.direct_supervisor) {
+        explicitLines.push({
+          authority_type: "head_of_department",
+          sequence_no: 2,
+          approval_scope: ["leave", "overtime", "documents", "disciplinary", "loans"],
+          approver_employee_id: employee.head_of_department,
+          approver: authorityById.get(employee.head_of_department) || null,
+        })
+      }
+    }
+
+    const canManageTeam =
+      Number(teamRes.count || 0) > 0 ||
+      session.account?.access_level === "manager" ||
+      ["manager", "supervisor", "team lead", "head of department", "hod"].some((role) =>
+        String(employee.position || employee.special_role || "").toLowerCase().includes(role),
+      )
+
     return NextResponse.json({
       company_id: companyId,
       company_name: session.companyName,
       can_access_admin: session.canAccessAdmin,
+      can_manage_team: canManageTeam,
+      authority_lines: explicitLines,
       portal: session.account
         ? {
             status: session.account.status,

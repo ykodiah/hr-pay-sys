@@ -5,21 +5,13 @@ import {
   portalJsonError,
   logPortalActivity,
 } from "@/lib/self-service/portal-session"
+import {
+  buildAmortizationForInterestType,
+  normalizeInterestType,
+} from "@/lib/services/loan-calculations"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
-
-function monthlyInstalment(principal: number, annualRate: number, months: number, type: string) {
-  if (months <= 0) return 0
-  if (!annualRate) return principal / months
-  if (String(type).toLowerCase() === "reducing") {
-    const r = annualRate / 100 / 12
-    if (r === 0) return principal / months
-    return (principal * r) / (1 - Math.pow(1 + r, -months))
-  }
-  const totalInterest = principal * (annualRate / 100) * (months / 12)
-  return (principal + totalInterest) / months
-}
 
 export async function GET() {
   const session = await requirePortalSession()
@@ -49,7 +41,36 @@ export async function GET() {
         .maybeSingle(),
     ])
 
-    const loans = loansRes.data || []
+    const loans = (loansRes.data || []).map((loan: any) => {
+      const principal = Number(loan.principal_amount ?? loan.principal ?? 0)
+      const amountPaid = Number(loan.amount_paid || 0)
+      const method = normalizeInterestType(loan.interest_type)
+      const preview = buildAmortizationForInterestType({
+        principal,
+        annualRatePercent: Number(loan.interest_rate || 0),
+        tenureMonths: Number(loan.tenure_months ?? loan.repayment_months ?? 1),
+        interestType: method,
+        startDate: loan.start_date || loan.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+      })
+      const totalPayable =
+        Number(loan.expected_total_payment || 0) > 0
+          ? Number(loan.expected_total_payment)
+          : preview.total_payable
+      // Fixed-term balances include all fixed interest. Reducing/compound methods
+      // keep a persisted schedule balance when one exists.
+      const canonicalBalance =
+        method === "fixed"
+          ? Math.max(0, totalPayable - amountPaid)
+          : Number(loan.outstanding_balance ?? loan.remaining_balance ?? Math.max(0, totalPayable - amountPaid))
+      return {
+        ...loan,
+        interest_type: method,
+        total_interest: Number(loan.total_interest || preview.total_interest),
+        expected_total_payment: totalPayable,
+        remaining_balance: canonicalBalance,
+        outstanding_balance: canonicalBalance,
+      }
+    })
     const loanIds = loans.map((l: any) => l.id)
     let schedule: any[] = []
     if (loanIds.length) {
@@ -176,8 +197,16 @@ export async function POST(req: NextRequest) {
     }
 
     const rate = Number(loanType.annual_interest_rate || 0)
-    const instalment = monthlyInstalment(principal, rate, months, loanType.interest_type || "flat")
-    const totalPayable = instalment * months
+    const interestType = normalizeInterestType(loanType.interest_type)
+    const preview = buildAmortizationForInterestType({
+      principal,
+      annualRatePercent: rate,
+      tenureMonths: months,
+      interestType,
+      startDate: new Date().toISOString().slice(0, 10),
+    })
+    const instalment = preview.monthly_payment
+    const totalPayable = preview.total_payable
 
     const { data, error } = await session.db
       .from("employee_loans")
@@ -190,15 +219,15 @@ export async function POST(req: NextRequest) {
         principal,
         principal_amount: principal,
         interest_rate: rate,
-        interest_type: loanType.interest_type || "flat",
+        interest_type: interestType,
         repayment_months: months,
         tenure_months: months,
         monthly_payment: Number(instalment.toFixed(2)),
         monthly_installment: Number(instalment.toFixed(2)),
         expected_total_payment: Number(totalPayable.toFixed(2)),
-        total_interest: Number((totalPayable - principal).toFixed(2)),
-        outstanding_balance: principal,
-        remaining_balance: principal,
+        total_interest: preview.total_interest,
+        outstanding_balance: totalPayable,
+        remaining_balance: totalPayable,
         amount_paid: 0,
         status: "pending",
         approval_status: "pending",

@@ -173,9 +173,12 @@ export default function LoansPage() {
             <ul className="flex flex-col gap-4">
               {loans.map((loan: any) => {
                 const principal = Number(loan.principal_amount ?? loan.principal ?? 0)
+                const totalPayable = Number(
+                  loan.expected_total_payment || principal + Number(loan.total_interest || 0),
+                )
                 const outstanding = Number(loan.outstanding_balance ?? loan.remaining_balance ?? 0)
-                const paid = Math.max(0, principal - outstanding)
-                const pct = principal ? Math.min(100, (paid / principal) * 100) : 0
+                const paid = Math.max(0, totalPayable - outstanding)
+                const pct = totalPayable ? Math.min(100, (paid / totalPayable) * 100) : 0
                 const rows = schedule.filter((s: any) => s.loan_id === loan.id)
                 return (
                   <li key={loan.id} className="rounded-lg border p-4">
@@ -217,6 +220,7 @@ export default function LoansPage() {
                         <div className="flex flex-wrap justify-between gap-2 text-xs text-slate-500">
                           <span>Repaid {formatMoney(paid)}</span>
                           <span>Outstanding {formatMoney(outstanding)}</span>
+                          <span>Total payable {formatMoney(totalPayable)}</span>
                           <span>
                             Monthly{" "}
                             {formatMoney(loan.monthly_installment ?? loan.monthly_payment ?? 0)}

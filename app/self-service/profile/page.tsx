@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { toast } from "@/hooks/use-toast"
-import { Building2, CreditCard, Loader2, Save, Send, ShieldAlert, User, X } from "lucide-react"
+import { Building2, CreditCard, Loader2, Save, Send, ShieldAlert, User, X, Network } from "lucide-react"
 import {
   usePortalMe,
   usePortalResource,
@@ -346,6 +346,49 @@ export default function ProfilePage() {
           <Field label="Date of joining" value={formatDate(employee.date_of_joining)} />
           <Field label="Date of birth" value={formatDate(employee.date_of_birth)} />
           <Field label="Ghana Card" value={employee.ghana_card_number} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Network className="h-4 w-4 text-emerald-600" />
+            Reporting and approval lines
+          </CardTitle>
+          <CardDescription>
+            Your line of authority and the people who review requests submitted through the portal.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {(me.authority_lines || []).length ? (
+            <ol className="grid gap-3 sm:grid-cols-2">
+              {me.authority_lines.map((line: any) => {
+                const person = line.approver || {}
+                const name =
+                  person.full_name ||
+                  `${person.first_name || ""} ${person.last_name || ""}`.trim() ||
+                  "Position currently vacant"
+                return (
+                  <li key={`${line.authority_type}-${line.sequence_no}`} className="rounded-lg border p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                      Step {line.sequence_no} · {String(line.authority_type || "approver").replace(/_/g, " ")}
+                    </p>
+                    <p className="mt-1 font-medium text-slate-900">{name}</p>
+                    <p className="text-sm text-slate-500">
+                      {[person.position, person.department].filter(Boolean).join(" · ") || "Authority assignment"}
+                    </p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      Approves: {(line.approval_scope || []).join(", ") || "assigned requests"}
+                    </p>
+                  </li>
+                )
+              })}
+            </ol>
+          ) : (
+            <p className="text-sm text-slate-500">
+              No supervisor or head of department has been assigned. Ask HR to update your employment record.
+            </p>
+          )}
         </CardContent>
       </Card>
 
