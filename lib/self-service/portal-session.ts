@@ -25,6 +25,7 @@ export type PortalAccount = {
   login_email: string
   status: "invited" | "active" | "suspended" | "disabled"
   access_level: "employee" | "manager"
+  approval_permissions?: string[] | null
   must_change_password: boolean
   last_login_at: string | null
 }
