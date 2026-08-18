@@ -97,12 +97,36 @@ export async function generatePortalLink(
   return body?.action_link || body?.properties?.action_link || null
 }
 
-/** Human-friendly but high-entropy temporary password. */
+/**
+ * Human-friendly but high-entropy temporary password.
+ * Supabase's default password policy requires at least one lowercase, one
+ * uppercase, one digit, and one special character — so we guarantee all four
+ * classes are present rather than relying on chance from a single alphabet.
+ */
 export function generateTempPassword(): string {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
-  const bytes = randomBytes(14)
-  let out = ""
-  for (let i = 0; i < 12; i += 1) out += alphabet[bytes[i] % alphabet.length]
+  const lower = "abcdefghijkmnopqrstuvwxyz"
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+  const digits = "23456789"
+  const special = "!@#$%^&*"
+  const alphabet = lower + upper + digits + special
+  const bytes = randomBytes(16)
+
+  const pick = (set: string, byte: number) => set[byte % set.length]
+
+  // Guarantee one of each required character class first.
+  const required = [pick(lower, bytes[0]), pick(upper, bytes[1]), pick(digits, bytes[2]), pick(special, bytes[3])]
+
+  let rest = ""
+  for (let i = 4; i < 12; i += 1) rest += pick(alphabet, bytes[i])
+
+  // Shuffle so the required characters aren't always in the same positions.
+  const chars = [...required, ...rest.split("")]
+  for (let i = chars.length - 1; i > 0; i -= 1) {
+    const j = bytes[(i + 4) % bytes.length] % (i + 1)
+    ;[chars[i], chars[j]] = [chars[j], chars[i]]
+  }
+
+  const out = chars.join("")
   return `${out.slice(0, 4)}-${out.slice(4, 8)}-${out.slice(8, 12)}`
 }
 
@@ -194,6 +218,17 @@ export async function provisionPortalAccess(input: {
       },
     })
     issuedTempPassword = tempPassword
+  }
+
+  // The auth user is only useful once it resolves to this employee record —
+  // every self-service page and the login redirect look this up by auth user id.
+  if (authUser?.id) {
+    const { error: profileError } = await db.from("employee_profiles").upsert({
+      id: authUser.id,
+      employee_id: employee.id,
+      updated_at: new Date().toISOString(),
+    })
+    if (profileError) throw new Error(profileError.message)
   }
 
   let inviteLink: string | null = null
