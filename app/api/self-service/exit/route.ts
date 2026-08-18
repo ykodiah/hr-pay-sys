@@ -121,3 +121,49 @@ export async function POST(req: NextRequest) {
     return portalJsonError(err, "Failed to submit resignation")
   }
 }
+
+/** PATCH — employee completes their exit interview on their own active case. */
+export async function PATCH(req: NextRequest) {
+  const session = await requirePortalSession()
+  if (isPortalError(session)) return session
+
+  try {
+    const body = await req.json().catch(() => ({}))
+    if (!body.case_id) return NextResponse.json({ error: "Case id is required" }, { status: 400 })
+
+    const feedback = String(body.feedback || "").trim()
+    if (!feedback) return NextResponse.json({ error: "Feedback is required" }, { status: 400 })
+
+    const { data: existing } = await session.db
+      .from("offboarding_cases")
+      .select("id, notes")
+      .eq("id", body.case_id)
+      .eq("employee_id", session.employeeId)
+      .eq("company_id", session.companyId)
+      .maybeSingle()
+
+    if (!existing) return NextResponse.json({ error: "Case not found" }, { status: 404 })
+
+    const interviewNote = `Exit interview — would recommend: ${
+      body.would_recommend ? "yes" : "no"
+    }. Feedback: ${feedback}`
+
+    const { data, error } = await session.db
+      .from("offboarding_cases")
+      .update({
+        exit_interview_completed: true,
+        notes: [existing.notes, interviewNote].filter(Boolean).join("\n\n"),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", body.case_id)
+      .select("*")
+      .single()
+
+    if (error) throw new Error(error.message)
+    await logPortalActivity(session, "exit_interview_completed", "Exit interview", { case_id: body.case_id })
+
+    return NextResponse.json({ success: true, case: data })
+  } catch (err) {
+    return portalJsonError(err, "Failed to save exit interview")
+  }
+}
