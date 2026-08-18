@@ -46,10 +46,10 @@ export async function GET(request: NextRequest) {
       .select("*")
       .eq("company_id", ctx.companyId)
 
-    const byEmployee = new Map((accounts || []).map((a: any) => [a.employee_id, a]))
+    const byEmployee = new Map<string, any>((accounts || []).map((a: any) => [a.employee_id, a]))
 
     const rows = (employees || []).map((e: any) => {
-      const account = byEmployee.get(e.id) || null
+      const account: any = byEmployee.get(e.id) || null
       return {
         employee_id: e.id,
         employee_code: e.employee_id,
@@ -76,8 +76,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       company_id: ctx.companyId,
       total: rows.length,
-      enabled: rows.filter((r) => r.portal).length,
-      active: rows.filter((r) => r.portal?.status === "active").length,
+      enabled: rows.filter((r: any) => r.portal).length,
+      active: rows.filter((r: any) => r.portal?.status === "active").length,
       employees: rows,
     })
   } catch (err) {

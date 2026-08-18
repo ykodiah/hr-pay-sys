@@ -38,7 +38,7 @@ export async function GET() {
 
     const enrollments = enrollRes.data || []
     const catalog = catalogRes.data || []
-    const courseById = new Map(catalog.map((c: any) => [c.id, c]))
+    const courseById = new Map<string, any>(catalog.map((c: any) => [c.id, c]))
     const enrolledIds = new Set(enrollments.map((e: any) => e.course_id))
 
     const myCourses = enrollments.map((e: any) => ({

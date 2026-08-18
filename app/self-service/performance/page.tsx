@@ -1,401 +1,324 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import useSWR from "swr"
+import { Star, Target, Award, ClipboardCheck } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { toast } from "@/hooks/use-toast"
-import { Target, TrendingUp, Calendar, Star, Award, Plus, Eye, CheckCircle, Clock, AlertCircle } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { toast } from "sonner"
+import { fetcher, patchJson, formatDate } from "@/lib/self-service/use-portal"
+import {
+  PageHeader,
+  StatCard,
+  StatusBadge,
+  EmptyState,
+  LoadingBlock,
+  ErrorBlock,
+} from "@/components/self-service/portal-ui"
 
-const performanceData = {
-  currentRating: 4.2,
-  goals: [
-    {
-      id: 1,
-      title: "Complete React Training",
-      description: "Finish advanced React course and implement learnings",
-      progress: 75,
-      dueDate: "2025-03-15",
-      status: "In Progress",
-      category: "Learning & Development",
-    },
-    {
-      id: 2,
-      title: "Improve Customer Satisfaction",
-      description: "Achieve 95% customer satisfaction rating",
-      progress: 90,
-      dueDate: "2025-02-28",
-      status: "On Track",
-      category: "Performance",
-    },
-    {
-      id: 3,
-      title: "Lead Team Project",
-      description: "Successfully lead the Q1 product launch project",
-      progress: 60,
-      dueDate: "2025-04-30",
-      status: "In Progress",
-      category: "Leadership",
-    },
-  ],
-  reviews: [
-    {
-      id: 1,
-      period: "Q4 2024",
-      rating: 4.2,
-      status: "Completed",
-      reviewDate: "2024-12-15",
-      reviewer: "John Doe",
-      feedback: "Excellent performance with strong technical skills and team collaboration.",
-    },
-    {
-      id: 2,
-      period: "Q3 2024",
-      rating: 4.0,
-      status: "Completed",
-      reviewDate: "2024-09-15",
-      reviewer: "Jane Smith",
-      feedback: "Good progress on goals with room for improvement in leadership skills.",
-    },
-  ],
-  competencies: [
-    { name: "Technical Skills", rating: 4.5, target: 4.0 },
-    { name: "Communication", rating: 4.0, target: 4.2 },
-    { name: "Leadership", rating: 3.8, target: 4.0 },
-    { name: "Problem Solving", rating: 4.3, target: 4.0 },
-    { name: "Teamwork", rating: 4.6, target: 4.5 },
-  ],
+type Review = {
+  id: string
+  review_period_start: string | null
+  review_period_end: string | null
+  review_type: string | null
+  status: string | null
+  overall_rating: number | null
+  overall_score: number | null
+  rating: number | null
+  strengths: string | null
+  areas_for_improvement: string | null
+  comments: string | null
+  submitted_at: string | null
+}
+
+type Competency = {
+  id: string
+  competency_name: string | null
+  rating: number | null
+  max_rating: number | null
+  comments: string | null
+}
+
+type Goal = {
+  id: string
+  title: string | null
+  status: string | null
+  progress: number | null
+  due_date: string | null
+  category: string | null
+}
+
+type PerformanceResponse = {
+  reviews: Review[]
+  competencies: Competency[]
+  goals: Goal[]
+  summary: {
+    total_reviews: number
+    average_rating: number | null
+    latest: Review | null
+    awaiting_self_assessment: number
+  }
+}
+
+function ratingOf(review: Review) {
+  return Number(review.overall_rating ?? review.overall_score ?? review.rating ?? 0)
+}
+
+function isOpen(review: Review) {
+  return !["approved", "completed", "closed"].includes(String(review.status || "").toLowerCase())
 }
 
 export default function PerformancePage() {
-  const [isGoalDialogOpen, setIsGoalDialogOpen] = useState(false)
-  const [selectedReview, setSelectedReview] = useState<any>(null)
+  const { data, error, isLoading, mutate } = useSWR<PerformanceResponse>(
+    "/api/self-service/performance",
+    fetcher,
+  )
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "Completed":
-        return <CheckCircle className="w-4 h-4 text-green-600" />
-      case "In Progress":
-        return <Clock className="w-4 h-4 text-blue-600" />
-      case "On Track":
-        return <TrendingUp className="w-4 h-4 text-emerald-600" />
-      case "At Risk":
-        return <AlertCircle className="w-4 h-4 text-red-600" />
-      default:
-        return <Clock className="w-4 h-4 text-gray-600" />
+  const [active, setActive] = useState<Review | null>(null)
+  const [comments, setComments] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  const reviews = data?.reviews ?? []
+  const competencies = data?.competencies ?? []
+  const goals = data?.goals ?? []
+  const summary = data?.summary
+
+  function openSelfAssessment(review: Review) {
+    setActive(review)
+    setComments(review.comments || "")
+  }
+
+  async function submitSelfAssessment() {
+    if (!active) return
+    if (!comments.trim()) {
+      toast.error("Add your self-assessment before submitting")
+      return
+    }
+    setSaving(true)
+    try {
+      await patchJson("/api/self-service/performance", { id: active.id, comments })
+      toast.success("Self-assessment submitted")
+      setActive(null)
+      setComments("")
+      mutate()
+    } catch (e: any) {
+      toast.error(e?.message || "Could not submit self-assessment")
+    } finally {
+      setSaving(false)
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "Completed":
-        return <Badge className="bg-green-100 text-green-800">Completed</Badge>
-      case "In Progress":
-        return <Badge className="bg-blue-100 text-blue-800">In Progress</Badge>
-      case "On Track":
-        return <Badge className="bg-emerald-100 text-emerald-800">On Track</Badge>
-      case "At Risk":
-        return <Badge className="bg-red-100 text-red-800">At Risk</Badge>
-      default:
-        return <Badge variant="secondary">{status}</Badge>
-    }
-  }
+  if (isLoading) return <LoadingBlock label="Loading performance data" />
+  if (error) return <ErrorBlock message={(error as Error).message} onRetry={() => mutate()} />
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Performance Reviews</h1>
-          <p className="text-gray-600">Track your goals, reviews, and professional development</p>
-        </div>
-        <Dialog open={isGoalDialogOpen} onOpenChange={setIsGoalDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-emerald-600 hover:bg-emerald-700">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Goal
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Add New Goal</DialogTitle>
-            </DialogHeader>
-            <AddGoalForm onClose={() => setIsGoalDialogOpen(false)} />
-          </DialogContent>
-        </Dialog>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="My performance"
+        description="Review cycles, competency ratings and the goals you are measured on."
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Average rating"
+          value={summary?.average_rating != null ? summary.average_rating.toFixed(2) : "—"}
+          icon={Star}
+        />
+        <StatCard label="Reviews on record" value={String(summary?.total_reviews ?? 0)} icon={ClipboardCheck} />
+        <StatCard
+          label="Awaiting your input"
+          value={String(summary?.awaiting_self_assessment ?? 0)}
+          icon={ClipboardCheck}
+          tone={summary?.awaiting_self_assessment ? "warning" : "default"}
+        />
+        <StatCard label="Tracked goals" value={String(goals.length)} icon={Target} />
       </div>
 
-      {/* Performance Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Star className="w-5 h-5 text-yellow-500" />
-              <div>
-                <div className="text-2xl font-bold text-gray-900">{performanceData.currentRating}</div>
-                <p className="text-sm text-gray-600">Current Rating</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Target className="w-5 h-5 text-blue-600" />
-              <div>
-                <div className="text-2xl font-bold text-gray-900">{performanceData.goals.length}</div>
-                <p className="text-sm text-gray-600">Active Goals</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Award className="w-5 h-5 text-purple-600" />
-              <div>
-                <div className="text-2xl font-bold text-gray-900">{performanceData.reviews.length}</div>
-                <p className="text-sm text-gray-600">Reviews Completed</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <TrendingUp className="w-5 h-5 text-emerald-600" />
-              <div>
-                <div className="text-2xl font-bold text-gray-900">
-                  {Math.round(
-                    performanceData.goals.reduce((sum, goal) => sum + goal.progress, 0) / performanceData.goals.length,
-                  )}
-                  %
-                </div>
-                <p className="text-sm text-gray-600">Avg. Goal Progress</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs defaultValue="goals" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="goals">My Goals</TabsTrigger>
-          <TabsTrigger value="reviews">Performance Reviews</TabsTrigger>
+      <Tabs defaultValue="reviews">
+        <TabsList>
+          <TabsTrigger value="reviews">Reviews</TabsTrigger>
           <TabsTrigger value="competencies">Competencies</TabsTrigger>
+          <TabsTrigger value="goals">Goals</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="goals">
-          <Card>
-            <CardHeader>
-              <CardTitle>Current Goals</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {performanceData.goals.map((goal) => (
-                  <div
-                    key={goal.id}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <h3 className="font-semibold text-gray-900">{goal.title}</h3>
-                        <Badge variant="outline">{goal.category}</Badge>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-3">{goal.description}</p>
-                      <div className="flex items-center space-x-4">
-                        <div className="flex items-center text-xs text-gray-500">
-                          <Calendar className="w-3 h-3 mr-1" />
-                          Due: {new Date(goal.dueDate).toLocaleDateString()}
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {getStatusIcon(goal.status)}
-                          {getStatusBadge(goal.status)}
-                        </div>
-                      </div>
+        <TabsContent value="reviews" className="mt-4 flex flex-col gap-4">
+          {reviews.length === 0 ? (
+            <EmptyState
+              icon={ClipboardCheck}
+              title="No reviews yet"
+              description="Once your first review cycle opens, it will appear here with your ratings and feedback."
+            />
+          ) : (
+            reviews.map((review) => {
+              const rating = ratingOf(review)
+              return (
+                <Card key={review.id}>
+                  <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-base capitalize">
+                        {review.review_type ? `${review.review_type} review` : "Performance review"}
+                      </CardTitle>
+                      <CardDescription>
+                        {formatDate(review.review_period_start)} — {formatDate(review.review_period_end)}
+                      </CardDescription>
                     </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="w-32">
-                        <div className="flex justify-between text-xs text-gray-500 mb-1">
-                          <span>Progress</span>
-                          <span>{goal.progress}%</span>
-                        </div>
-                        <Progress value={goal.progress} className="h-2" />
-                      </div>
-                      <Button variant="outline" size="sm">
-                        <Eye className="w-4 h-4 mr-2" />
-                        View
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="reviews">
-          <Card>
-            <CardHeader>
-              <CardTitle>Performance Reviews</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {performanceData.reviews.map((review) => (
-                  <div
-                    key={review.id}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <h3 className="font-semibold text-gray-900">{review.period}</h3>
-                        {getStatusBadge(review.status)}
-                      </div>
-                      <p className="text-sm text-gray-600 mb-2">{review.feedback}</p>
-                      <div className="flex items-center space-x-4 text-xs text-gray-500">
-                        <span>Reviewed by: {review.reviewer}</span>
-                        <span>Date: {new Date(review.reviewDate).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="text-center">
-                        <div className="flex items-center space-x-1">
-                          <Star className="w-4 h-4 text-yellow-500" />
-                          <span className="text-lg font-semibold">{review.rating}</span>
-                        </div>
-                        <p className="text-xs text-gray-500">Rating</p>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => setSelectedReview(review)}>
-                        <Eye className="w-4 h-4 mr-2" />
-                        View Details
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="competencies">
-          <Card>
-            <CardHeader>
-              <CardTitle>Core Competencies</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {performanceData.competencies.map((competency, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-medium text-gray-900">{competency.name}</h3>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-600">
-                          {competency.rating} / 5.0 (Target: {competency.target})
+                    <div className="flex items-center gap-3">
+                      <StatusBadge status={review.status} />
+                      {rating > 0 ? (
+                        <span className="flex items-center gap-1 text-sm font-semibold text-card-foreground">
+                          <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                          {rating.toFixed(1)}
                         </span>
-                        {competency.rating >= competency.target ? (
-                          <CheckCircle className="w-4 h-4 text-green-600" />
-                        ) : (
-                          <AlertCircle className="w-4 h-4 text-orange-600" />
-                        )}
-                      </div>
+                      ) : null}
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={(competency.rating / 5) * 100} className="flex-1 h-2" />
-                      <div className="w-16 text-right">
-                        <span className="text-sm font-medium">{competency.rating}</span>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-3">
+                    {review.strengths ? (
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          Strengths
+                        </p>
+                        <p className="mt-1 text-sm text-card-foreground">{review.strengths}</p>
                       </div>
+                    ) : null}
+                    {review.areas_for_improvement ? (
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          Areas to develop
+                        </p>
+                        <p className="mt-1 text-sm text-card-foreground">{review.areas_for_improvement}</p>
+                      </div>
+                    ) : null}
+                    {review.comments ? (
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          Your self-assessment
+                        </p>
+                        <p className="mt-1 text-sm text-card-foreground">{review.comments}</p>
+                      </div>
+                    ) : null}
+                    {isOpen(review) ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="self-start"
+                        onClick={() => openSelfAssessment(review)}
+                      >
+                        {review.comments ? "Edit self-assessment" : "Add self-assessment"}
+                      </Button>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              )
+            })
+          )}
+        </TabsContent>
+
+        <TabsContent value="competencies" className="mt-4">
+          {competencies.length === 0 ? (
+            <EmptyState
+              icon={Award}
+              title="No competency assessments"
+              description="Competency scores appear here once a reviewer completes your assessment."
+            />
+          ) : (
+            <Card>
+              <CardContent className="flex flex-col gap-4 p-6">
+                {competencies.map((c) => {
+                  const max = Number(c.max_rating || 5)
+                  const value = Number(c.rating || 0)
+                  return (
+                    <div key={c.id} className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium text-card-foreground">
+                          {c.competency_name || "Competency"}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {value.toFixed(1)} / {max}
+                        </span>
+                      </div>
+                      <Progress value={max ? (value / max) * 100 : 0} />
+                      {c.comments ? <p className="text-xs text-muted-foreground">{c.comments}</p> : null}
                     </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  )
+                })}
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="goals" className="mt-4">
+          {goals.length === 0 ? (
+            <EmptyState
+              icon={Target}
+              title="No goals assigned"
+              description="Goals set by your manager for this review cycle will be listed here."
+            />
+          ) : (
+            <Card>
+              <CardContent className="flex flex-col gap-5 p-6">
+                {goals.map((goal) => {
+                  const progress = Number(goal.progress || 0)
+                  return (
+                    <div key={goal.id} className="flex flex-col gap-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-sm font-medium text-card-foreground">{goal.title}</span>
+                        <StatusBadge status={goal.status} />
+                      </div>
+                      <Progress value={progress} />
+                      <p className="text-xs text-muted-foreground">
+                        {goal.category || "Uncategorised"}
+                        {goal.due_date ? ` · due ${formatDate(goal.due_date)}` : ""} · {progress}% complete
+                      </p>
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={Boolean(active)} onOpenChange={(next) => !next && setActive(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Self-assessment</DialogTitle>
+            <DialogDescription>
+              Share your own view of this review period. Your reviewer sees this before finalising.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 py-2">
+            <Label htmlFor="self-assessment">Your comments</Label>
+            <Textarea
+              id="self-assessment"
+              rows={6}
+              placeholder="What went well, what was challenging, and what support would help?"
+              value={comments}
+              onChange={(e) => setComments(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActive(null)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={submitSelfAssessment} disabled={saving}>
+              {saving ? "Submitting..." : "Submit"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
-  )
-}
-
-function AddGoalForm({ onClose }: { onClose: () => void }) {
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    category: "",
-    dueDate: "",
-    targetValue: "",
-  })
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    toast({
-      title: "Goal Added",
-      description: "Your new goal has been created successfully.",
-    })
-    onClose()
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="title">Goal Title</Label>
-        <Input
-          id="title"
-          value={formData.title}
-          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-          placeholder="Enter goal title"
-          required
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="description">Description</Label>
-        <Textarea
-          id="description"
-          value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          placeholder="Describe your goal and how you plan to achieve it"
-          required
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="category">Category</Label>
-          <Input
-            id="category"
-            value={formData.category}
-            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-            placeholder="e.g., Learning & Development"
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor="dueDate">Due Date</Label>
-          <Input
-            id="dueDate"
-            type="date"
-            value={formData.dueDate}
-            onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-            required
-          />
-        </div>
-      </div>
-
-      <div className="flex justify-end space-x-3 pt-4">
-        <Button type="button" variant="outline" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">
-          Add Goal
-        </Button>
-      </div>
-    </form>
   )
 }

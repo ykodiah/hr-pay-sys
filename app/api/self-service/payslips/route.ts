@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
 
     const payslips = data || []
     const ytd = payslips.reduce(
-      (acc, p: any) => {
+      (acc: { gross: number; net: number; tax: number; ssnit: number }, p: any) => {
         acc.gross += Number(p.gross_pay || 0)
         acc.net += Number(p.net_pay || 0)
         acc.tax += Number(p.paye_tax || 0)

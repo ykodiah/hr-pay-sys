@@ -78,14 +78,16 @@ export function EmptyState({
   title,
   description,
   action,
+  icon: Icon = Inbox,
 }: {
   title: string
   description?: string
   action?: React.ReactNode
+  icon?: React.ComponentType<{ className?: string }>
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-slate-200 bg-white p-12 text-center">
-      <Inbox className="h-8 w-8 text-slate-300" />
+      <Icon className="h-8 w-8 text-slate-300" />
       <p className="font-medium text-slate-900">{title}</p>
       {description && <p className="max-w-md text-sm text-slate-500">{description}</p>}
       {action}
@@ -93,9 +95,10 @@ export function EmptyState({
   )
 }
 
-export function LoadingBlock({ rows = 3 }: { rows?: number }) {
+export function LoadingBlock({ rows = 3, label }: { rows?: number; label?: string }) {
   return (
     <div className="flex flex-col gap-3">
+      {label && <p className="text-sm text-slate-500">{label}…</p>}
       {Array.from({ length: rows }).map((_, i) => (
         <Skeleton key={i} className="h-20 w-full" />
       ))}
@@ -103,11 +106,30 @@ export function LoadingBlock({ rows = 3 }: { rows?: number }) {
   )
 }
 
-export function ErrorBlock({ error }: { error: { message?: string } }) {
+export function ErrorBlock({
+  error,
+  message,
+  onRetry,
+}: {
+  error?: { message?: string } | null
+  message?: string
+  onRetry?: () => void
+}) {
   return (
     <Alert variant="destructive">
       <AlertTriangle className="h-4 w-4" />
-      <AlertDescription>{error?.message || "Something went wrong"}</AlertDescription>
+      <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+        <span>{message || error?.message || "Something went wrong"}</span>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="rounded-md border border-current px-2 py-1 text-xs font-medium"
+          >
+            Retry
+          </button>
+        )}
+      </AlertDescription>
     </Alert>
   )
 }

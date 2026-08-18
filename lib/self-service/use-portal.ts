@@ -30,6 +30,12 @@ export async function portalMutate<T = any>(
   return body as T
 }
 
+/** Convenience aliases used across the portal pages. */
+export const fetcher = portalFetcher
+export const postJson = <T = any,>(url: string, payload?: unknown) => portalMutate<T>(url, "POST", payload)
+export const patchJson = <T = any,>(url: string, payload?: unknown) => portalMutate<T>(url, "PATCH", payload)
+export const deleteJson = <T = any,>(url: string, payload?: unknown) => portalMutate<T>(url, "DELETE", payload)
+
 const options = { revalidateOnFocus: false, shouldRetryOnError: false }
 
 export function usePortalMe() {

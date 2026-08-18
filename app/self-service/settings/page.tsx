@@ -1,332 +1,271 @@
 "use client"
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
+import { useEffect, useState } from "react"
+import useSWR from "swr"
+import { Bell, Shield, Activity } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { toast } from "@/hooks/use-toast"
-import { Bell, Shield, User } from "lucide-react"
+import { toast } from "sonner"
+import { fetcher, patchJson, postJson, relativeTime } from "@/lib/self-service/use-portal"
+import { PageHeader, StatusBadge, LoadingBlock, ErrorBlock, EmptyState } from "@/components/self-service/portal-ui"
+
+const PREF_FLAGS = [
+  { key: "payroll_notifications", label: "Payroll updates", hint: "Payslip released, salary changes" },
+  { key: "leave_notifications", label: "Leave updates", hint: "Approvals, rejections, balance changes" },
+  { key: "attendance_alerts", label: "Attendance alerts", hint: "Missed clock-ins and corrections" },
+  { key: "promotion_notifications", label: "Promotions and reviews", hint: "Performance and progression news" },
+  { key: "system_maintenance_alerts", label: "System notices", hint: "Planned downtime and maintenance" },
+  { key: "email_digest", label: "Email digest", hint: "A single daily summary email" },
+  { key: "sms_alerts", label: "SMS alerts", hint: "Text messages for urgent items" },
+  { key: "push_notifications", label: "Push notifications", hint: "Browser and mobile push" },
+] as const
+
+type Prefs = Record<string, boolean>
+
+type AccountResponse = {
+  account: {
+    login_email?: string | null
+    status?: string | null
+    must_change_password?: boolean | null
+    last_login_at?: string | null
+    can_access_admin?: boolean | null
+  }
+  preferences: Prefs
+  activity: { action: string; detail: string | null; created_at: string; ip_address: string | null }[]
+}
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState({
-    notifications: {
-      emailNotifications: true,
-      smsNotifications: false,
-      payslipAlerts: true,
-      leaveUpdates: true,
-      loanUpdates: true,
-    },
-    security: {
-      twoFactorAuth: false,
-      loginAlerts: true,
-    },
-    preferences: {
-      language: "English",
-      timezone: "GMT",
-      dateFormat: "DD/MM/YYYY",
-    },
-  })
+  const { data, error, isLoading, mutate } = useSWR<AccountResponse>("/api/self-service/account", fetcher)
 
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  })
+  const [prefs, setPrefs] = useState<Prefs>({})
+  const [savingPrefs, setSavingPrefs] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" })
 
-  const handleSaveSettings = () => {
-    toast({
-      title: "Settings Updated",
-      description: "Your account settings have been successfully updated.",
-    })
+  useEffect(() => {
+    if (data?.preferences) setPrefs(data.preferences as Prefs)
+  }, [data?.preferences])
+
+  async function savePreferences() {
+    setSavingPrefs(true)
+    try {
+      await patchJson("/api/self-service/account", prefs)
+      toast.success("Notification preferences saved")
+      mutate()
+    } catch (e: any) {
+      toast.error(e?.message || "Could not save preferences")
+    } finally {
+      setSavingPrefs(false)
+    }
   }
 
-  const handleChangePassword = () => {
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast({
-        title: "Password Mismatch",
-        description: "New password and confirmation password do not match.",
-        variant: "destructive",
-      })
+  async function changePassword() {
+    if (!passwords.current || !passwords.next) {
+      toast.error("Enter your current and new password")
       return
     }
-
-    setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" })
-    toast({
-      title: "Password Changed",
-      description: "Your password has been successfully updated.",
-    })
+    if (passwords.next.length < 10) {
+      toast.error("Your new password must be at least 10 characters")
+      return
+    }
+    if (passwords.next !== passwords.confirm) {
+      toast.error("New passwords do not match")
+      return
+    }
+    setChangingPassword(true)
+    try {
+      await postJson("/api/self-service/account", {
+        current_password: passwords.current,
+        new_password: passwords.next,
+      })
+      toast.success("Password updated")
+      setPasswords({ current: "", next: "", confirm: "" })
+      mutate()
+    } catch (e: any) {
+      toast.error(e?.message || "Could not change password")
+    } finally {
+      setChangingPassword(false)
+    }
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Account Settings</h1>
-          <p className="text-gray-600">Manage your account preferences and security settings</p>
-        </div>
-      </div>
+  if (isLoading) return <LoadingBlock label="Loading account settings" />
+  if (error) return <ErrorBlock message={(error as Error).message} onRetry={() => mutate()} />
 
-      <Tabs defaultValue="notifications" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
-          <TabsTrigger value="preferences">Preferences</TabsTrigger>
+  const account = data?.account
+  const activity = data?.activity ?? []
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader title="Settings" description="Manage your login, password and notification preferences." />
+
+      <Tabs defaultValue="notifications">
+        <TabsList>
+          <TabsTrigger value="notifications">
+            <Bell className="mr-2 h-4 w-4" />
+            Notifications
+          </TabsTrigger>
+          <TabsTrigger value="security">
+            <Shield className="mr-2 h-4 w-4" />
+            Security
+          </TabsTrigger>
+          <TabsTrigger value="activity">
+            <Activity className="mr-2 h-4 w-4" />
+            Activity
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="notifications">
+        <TabsContent value="notifications" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Bell className="w-5 h-5" />
-                <span>Notification Settings</span>
-              </CardTitle>
+              <CardTitle className="text-base">Notification preferences</CardTitle>
+              <CardDescription>Choose what the portal tells you about and how.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="emailNotifications" className="text-base font-medium">
-                      Email Notifications
+            <CardContent className="flex flex-col gap-1">
+              {PREF_FLAGS.map((flag) => (
+                <div
+                  key={flag.key}
+                  className="flex items-center justify-between gap-4 border-b border-border py-3 last:border-0"
+                >
+                  <div className="min-w-0">
+                    <Label htmlFor={flag.key} className="text-sm font-medium">
+                      {flag.label}
                     </Label>
-                    <p className="text-sm text-gray-600">Receive notifications via email</p>
+                    <p className="text-xs text-muted-foreground">{flag.hint}</p>
                   </div>
                   <Switch
-                    id="emailNotifications"
-                    checked={settings.notifications.emailNotifications}
-                    onCheckedChange={(checked) =>
-                      setSettings({
-                        ...settings,
-                        notifications: { ...settings.notifications, emailNotifications: checked },
-                      })
-                    }
+                    id={flag.key}
+                    checked={Boolean(prefs[flag.key])}
+                    onCheckedChange={(checked) => setPrefs((p) => ({ ...p, [flag.key]: checked }))}
                   />
                 </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="smsNotifications" className="text-base font-medium">
-                      SMS Notifications
-                    </Label>
-                    <p className="text-sm text-gray-600">Receive notifications via SMS</p>
-                  </div>
-                  <Switch
-                    id="smsNotifications"
-                    checked={settings.notifications.smsNotifications}
-                    onCheckedChange={(checked) =>
-                      setSettings({
-                        ...settings,
-                        notifications: { ...settings.notifications, smsNotifications: checked },
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="payslipAlerts" className="text-base font-medium">
-                      Payslip Alerts
-                    </Label>
-                    <p className="text-sm text-gray-600">Get notified when new payslips are available</p>
-                  </div>
-                  <Switch
-                    id="payslipAlerts"
-                    checked={settings.notifications.payslipAlerts}
-                    onCheckedChange={(checked) =>
-                      setSettings({
-                        ...settings,
-                        notifications: { ...settings.notifications, payslipAlerts: checked },
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="leaveUpdates" className="text-base font-medium">
-                      Leave Request Updates
-                    </Label>
-                    <p className="text-sm text-gray-600">Notifications about leave request status changes</p>
-                  </div>
-                  <Switch
-                    id="leaveUpdates"
-                    checked={settings.notifications.leaveUpdates}
-                    onCheckedChange={(checked) =>
-                      setSettings({
-                        ...settings,
-                        notifications: { ...settings.notifications, leaveUpdates: checked },
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="loanUpdates" className="text-base font-medium">
-                      Loan Request Updates
-                    </Label>
-                    <p className="text-sm text-gray-600">Notifications about loan request status changes</p>
-                  </div>
-                  <Switch
-                    id="loanUpdates"
-                    checked={settings.notifications.loanUpdates}
-                    onCheckedChange={(checked) =>
-                      setSettings({
-                        ...settings,
-                        notifications: { ...settings.notifications, loanUpdates: checked },
-                      })
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button onClick={handleSaveSettings} className="bg-emerald-600 hover:bg-emerald-700">
-                  Save Changes
+              ))}
+              <div className="pt-4">
+                <Button onClick={savePreferences} disabled={savingPrefs}>
+                  {savingPrefs ? "Saving..." : "Save preferences"}
                 </Button>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="security">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Shield className="w-5 h-5" />
-                  <span>Security Settings</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label htmlFor="twoFactorAuth" className="text-base font-medium">
-                        Two-Factor Authentication
-                      </Label>
-                      <p className="text-sm text-gray-600">Add an extra layer of security to your account</p>
-                    </div>
-                    <Switch
-                      id="twoFactorAuth"
-                      checked={settings.security.twoFactorAuth}
-                      onCheckedChange={(checked) =>
-                        setSettings({
-                          ...settings,
-                          security: { ...settings.security, twoFactorAuth: checked },
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label htmlFor="loginAlerts" className="text-base font-medium">
-                        Login Alerts
-                      </Label>
-                      <p className="text-sm text-gray-600">Get notified of new login attempts</p>
-                    </div>
-                    <Switch
-                      id="loginAlerts"
-                      checked={settings.security.loginAlerts}
-                      onCheckedChange={(checked) =>
-                        setSettings({
-                          ...settings,
-                          security: { ...settings.security, loginAlerts: checked },
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end">
-                  <Button onClick={handleSaveSettings} className="bg-emerald-600 hover:bg-emerald-700">
-                    Save Changes
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Change Password</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="currentPassword">Current Password</Label>
-                  <Input
-                    id="currentPassword"
-                    type="password"
-                    value={passwordData.currentPassword}
-                    onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="newPassword">New Password</Label>
-                  <Input
-                    id="newPassword"
-                    type="password"
-                    value={passwordData.newPassword}
-                    onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    value={passwordData.confirmPassword}
-                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                  />
-                </div>
-                <div className="flex justify-end">
-                  <Button onClick={handleChangePassword} className="bg-emerald-600 hover:bg-emerald-700">
-                    Change Password
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="preferences">
+        <TabsContent value="security" className="mt-4 flex flex-col gap-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <User className="w-5 h-5" />
-                <span>Account Preferences</span>
-              </CardTitle>
+              <CardTitle className="text-base">Your account</CardTitle>
+              <CardDescription>Details of the login linked to your employee record.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="language">Language</Label>
-                  <Input id="language" value={settings.preferences.language} disabled />
-                </div>
-                <div>
-                  <Label htmlFor="timezone">Timezone</Label>
-                  <Input id="timezone" value={settings.preferences.timezone} disabled />
-                </div>
-                <div>
-                  <Label htmlFor="dateFormat">Date Format</Label>
-                  <Input id="dateFormat" value={settings.preferences.dateFormat} disabled />
+            <CardContent className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Login email</p>
+                <p className="mt-1 text-sm font-medium text-card-foreground">{account?.login_email || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Status</p>
+                <div className="mt-1">
+                  <StatusBadge status={account?.status} />
                 </div>
               </div>
-
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>Note:</strong> Language, timezone, and date format preferences are managed by your system
-                  administrator. Contact HR if you need changes to these settings.
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Last sign-in</p>
+                <p className="mt-1 text-sm text-card-foreground">
+                  {account?.last_login_at ? relativeTime(account.last_login_at) : "First session"}
                 </p>
               </div>
-
-              <div className="flex justify-end">
-                <Button onClick={handleSaveSettings} className="bg-emerald-600 hover:bg-emerald-700">
-                  Save Changes
-                </Button>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Admin console</p>
+                <p className="mt-1 text-sm text-card-foreground">
+                  {account?.can_access_admin ? "Access granted" : "Employee portal only"}
+                </p>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Change password</CardTitle>
+              <CardDescription>
+                {account?.must_change_password
+                  ? "You are required to set a new password before continuing."
+                  : "Use at least 10 characters that you do not use elsewhere."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex max-w-md flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="current-password">Current password</Label>
+                <Input
+                  id="current-password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={passwords.current}
+                  onChange={(e) => setPasswords((p) => ({ ...p, current: e.target.value }))}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="new-password">New password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={passwords.next}
+                  onChange={(e) => setPasswords((p) => ({ ...p, next: e.target.value }))}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="confirm-password">Confirm new password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={passwords.confirm}
+                  onChange={(e) => setPasswords((p) => ({ ...p, confirm: e.target.value }))}
+                />
+              </div>
+              <Button onClick={changePassword} disabled={changingPassword} className="self-start">
+                {changingPassword ? "Updating..." : "Update password"}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="activity" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Recent portal activity</CardTitle>
+              <CardDescription>The last actions recorded on your account.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {activity.length === 0 ? (
+                <EmptyState
+                  icon={Activity}
+                  title="No activity recorded"
+                  description="Actions you take in the portal will be listed here for your own audit trail."
+                />
+              ) : (
+                <ul className="divide-y divide-border">
+                  {activity.map((entry, i) => (
+                    <li key={`${entry.created_at}-${i}`} className="flex items-center justify-between gap-4 px-6 py-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium capitalize text-card-foreground">
+                          {entry.action.replace(/_/g, " ")}
+                        </p>
+                        {entry.detail ? (
+                          <p className="truncate text-xs text-muted-foreground">{entry.detail}</p>
+                        ) : null}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-xs text-muted-foreground">{relativeTime(entry.created_at)}</p>
+                        {entry.ip_address ? (
+                          <p className="text-xs text-muted-foreground">{entry.ip_address}</p>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

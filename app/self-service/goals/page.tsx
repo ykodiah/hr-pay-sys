@@ -1,149 +1,330 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import useSWR from "swr"
+import { Target, Plus, CheckCircle2, TrendingUp, Trash2, Briefcase } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
-import { Target, Calendar, TrendingUp, CheckCircle, Clock } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { toast } from "sonner"
+import { fetcher, postJson, patchJson, portalMutate, formatDate } from "@/lib/self-service/use-portal"
+import {
+  PageHeader,
+  StatCard,
+  StatusBadge,
+  EmptyState,
+  LoadingBlock,
+  ErrorBlock,
+} from "@/components/self-service/portal-ui"
+
+type Goal = {
+  id: string
+  title: string | null
+  progress: number | null
+  status: string | null
+  due_date: string | null
+  created_at: string | null
+}
+
+type AssignedGoal = {
+  id: string
+  title: string | null
+  description: string | null
+  category: string | null
+  priority: string | null
+  status: string | null
+  progress: number | null
+  target_value: number | null
+  current_value: number | null
+  unit: string | null
+  due_date: string | null
+  end_date: string | null
+}
+
+type GoalsResponse = {
+  goals: Goal[]
+  assigned_goals: AssignedGoal[]
+  summary: { total: number; completed: number; in_progress: number; average_progress: number }
+}
 
 export default function GoalsPage() {
-  const [goals] = useState([
-    {
-      id: 1,
-      title: "Complete React Certification",
-      description: "Obtain React Developer certification to enhance frontend skills",
-      category: "Learning & Development",
-      progress: 75,
-      status: "In Progress",
-      dueDate: "2024-03-15",
-      keyResults: [
-        { title: "Complete online course modules", completed: true },
-        { title: "Build 3 practice projects", completed: true },
-        { title: "Pass certification exam", completed: false },
-      ],
-    },
-    {
-      id: 2,
-      title: "Improve Code Review Quality",
-      description: "Enhance code review skills and provide more constructive feedback",
-      category: "Professional Development",
-      progress: 60,
-      status: "In Progress",
-      dueDate: "2024-04-30",
-      keyResults: [
-        { title: "Review 50 pull requests", completed: true },
-        { title: "Attend code review workshop", completed: false },
-        { title: "Mentor junior developer", completed: false },
-      ],
-    },
-  ])
+  const { data, error, isLoading, mutate } = useSWR<GoalsResponse>("/api/self-service/goals", fetcher)
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Completed":
-        return "bg-green-100 text-green-800"
-      case "In Progress":
-        return "bg-blue-100 text-blue-800"
-      case "Overdue":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+  const [open, setOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [form, setForm] = useState({ title: "", due_date: "" })
+
+  const goals = data?.goals ?? []
+  const assigned = data?.assigned_goals ?? []
+  const summary = data?.summary
+
+  function resetForm() {
+    setForm({ title: "", due_date: "" })
+  }
+
+  async function createGoal() {
+    if (!form.title.trim()) {
+      toast.error("Give the goal a title")
+      return
+    }
+    setSaving(true)
+    try {
+      await postJson("/api/self-service/goals", {
+        title: form.title,
+        due_date: form.due_date,
+        status: "not_started",
+      })
+      toast.success("Goal created")
+      setOpen(false)
+      resetForm()
+      mutate()
+    } catch (e: any) {
+      toast.error(e?.message || "Could not create goal")
+    } finally {
+      setSaving(false)
     }
   }
 
+  async function updateProgress(goal: Goal, progress: number) {
+    setBusyId(goal.id)
+    try {
+      await patchJson("/api/self-service/goals", {
+        id: goal.id,
+        progress,
+        status: progress >= 100 ? "completed" : "in_progress",
+      })
+      mutate()
+    } catch (e: any) {
+      toast.error(e?.message || "Could not update goal")
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function removeGoal(id: string) {
+    setBusyId(id)
+    try {
+      await portalMutate(`/api/self-service/goals?id=${encodeURIComponent(id)}`, "DELETE")
+      toast.success("Goal removed")
+      mutate()
+    } catch (e: any) {
+      toast.error(e?.message || "Could not remove goal")
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  if (isLoading) return <LoadingBlock label="Loading your goals" />
+  if (error) return <ErrorBlock message={(error as Error).message} onRetry={() => mutate()} />
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">My Goals</h1>
-          <p className="text-gray-600 mt-1">Track your performance goals and key results</p>
-        </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="My goals"
+        description="Track goals your manager assigned and the personal ones you set for yourself."
+        action={
+          <Button onClick={() => setOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New goal
+          </Button>
+        }
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Total goals" value={String(summary?.total ?? 0)} icon={Target} />
+        <StatCard label="In progress" value={String(summary?.in_progress ?? 0)} icon={TrendingUp} />
+        <StatCard
+          label="Completed"
+          value={String(summary?.completed ?? 0)}
+          icon={CheckCircle2}
+          tone="positive"
+        />
+        <StatCard label="Average progress" value={`${summary?.average_progress ?? 0}%`} icon={TrendingUp} />
       </div>
 
-      {/* Goals Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <Target className="w-8 h-8 text-emerald-600" />
-              <div>
-                <p className="text-2xl font-bold text-gray-900">2</p>
-                <p className="text-sm text-gray-600">Active Goals</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <TrendingUp className="w-8 h-8 text-blue-600" />
-              <div>
-                <p className="text-2xl font-bold text-gray-900">67%</p>
-                <p className="text-sm text-gray-600">Average Progress</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <CheckCircle className="w-8 h-8 text-green-600" />
-              <div>
-                <p className="text-2xl font-bold text-gray-900">3</p>
-                <p className="text-sm text-gray-600">Completed This Year</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Goals List */}
-      <div className="space-y-4">
-        {goals.map((goal) => (
-          <Card key={goal.id}>
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <CardTitle className="text-xl">{goal.title}</CardTitle>
-                  <CardDescription>{goal.description}</CardDescription>
-                </div>
-                <Badge className={getStatusColor(goal.status)}>{goal.status}</Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Progress</span>
-                <span className="font-medium">{goal.progress}%</span>
-              </div>
-              <Progress value={goal.progress} className="w-full" />
-
-              <div className="flex items-center space-x-4 text-sm text-gray-600">
-                <div className="flex items-center space-x-1">
-                  <Calendar className="w-4 h-4" />
-                  <span>Due: {new Date(goal.dueDate).toLocaleDateString()}</span>
-                </div>
-                <Badge variant="outline">{goal.category}</Badge>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-900">Key Results:</p>
-                {goal.keyResults.map((result, index) => (
-                  <div key={index} className="flex items-center space-x-2 text-sm">
-                    {result.completed ? (
-                      <CheckCircle className="w-4 h-4 text-green-600" />
-                    ) : (
-                      <Clock className="w-4 h-4 text-gray-400" />
-                    )}
-                    <span className={result.completed ? "text-gray-900" : "text-gray-600"}>{result.title}</span>
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold text-slate-900">Assigned by your manager</h2>
+        {assigned.length === 0 ? (
+          <EmptyState
+            icon={Briefcase}
+            title="No assigned goals"
+            description="When your manager sets performance goals for you, they appear here."
+          />
+        ) : (
+          <div className="flex flex-col gap-4">
+            {assigned.map((goal) => {
+              const progress = Number(goal.progress || 0)
+              return (
+                <div key={goal.id} className="rounded-lg border border-border bg-card p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h3 className="text-sm font-semibold text-card-foreground">{goal.title}</h3>
+                        <StatusBadge status={goal.status} />
+                        {goal.priority ? (
+                          <span className="text-xs capitalize text-muted-foreground">
+                            {goal.priority} priority
+                          </span>
+                        ) : null}
+                      </div>
+                      {goal.description ? (
+                        <p className="mt-1 text-sm text-muted-foreground">{goal.description}</p>
+                      ) : null}
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {goal.category || "Uncategorised"}
+                        {goal.due_date || goal.end_date
+                          ? ` · due ${formatDate(goal.due_date || goal.end_date)}`
+                          : ""}
+                      </p>
+                    </div>
+                    {goal.target_value ? (
+                      <div className="text-right text-xs text-muted-foreground">
+                        <p className="text-sm font-semibold text-card-foreground">
+                          {Number(goal.current_value || 0)} / {Number(goal.target_value)}
+                        </p>
+                        <p>{goal.unit || "units"}</p>
+                      </div>
+                    ) : null}
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                  <div className="mt-4 flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Progress</span>
+                      <span className="font-medium text-card-foreground">{progress}%</span>
+                    </div>
+                    <Progress value={progress} />
+                    <p className="text-xs text-muted-foreground">
+                      Progress on assigned goals is updated by your manager during reviews.
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold text-slate-900">My personal goals</h2>
+        {goals.length === 0 ? (
+          <EmptyState
+            icon={Target}
+            title="No personal goals yet"
+            description="Create your first development goal to track what you are working towards this cycle."
+            action={
+              <Button onClick={() => setOpen(true)} className="mt-2">
+                <Plus className="mr-2 h-4 w-4" />
+                Create a goal
+              </Button>
+            }
+          />
+        ) : (
+          <div className="flex flex-col gap-4">
+            {goals.map((goal) => {
+              const progress = Number(goal.progress || 0)
+              return (
+                <div key={goal.id} className="rounded-lg border border-border bg-card p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h3 className="text-sm font-semibold text-card-foreground">{goal.title}</h3>
+                        <StatusBadge status={goal.status} />
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {goal.due_date ? `Due ${formatDate(goal.due_date)}` : "No target date"}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeGoal(goal.id)}
+                      disabled={busyId === goal.id}
+                      aria-label={`Delete goal ${goal.title}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="mt-4 flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Progress</span>
+                      <span className="font-medium text-card-foreground">{progress}%</span>
+                    </div>
+                    <Progress value={progress} />
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {[0, 25, 50, 75, 100].map((step) => (
+                        <Button
+                          key={step}
+                          size="sm"
+                          variant={progress === step ? "default" : "outline"}
+                          disabled={busyId === goal.id}
+                          onClick={() => updateProgress(goal, step)}
+                        >
+                          {step}%
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </section>
+
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next)
+          if (!next) resetForm()
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create a goal</DialogTitle>
+            <DialogDescription>
+              Personal goals are visible to you and your manager, and feed into your performance reviews.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 py-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="goal-title">Title *</Label>
+              <Input
+                id="goal-title"
+                placeholder="e.g. Complete payroll compliance training"
+                value={form.title}
+                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="goal-date">Target date</Label>
+              <Input
+                id="goal-date"
+                type="date"
+                value={form.due_date}
+                onChange={(e) => setForm((f) => ({ ...f, due_date: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={createGoal} disabled={saving}>
+              {saving ? "Creating..." : "Create goal"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
