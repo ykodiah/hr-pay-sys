@@ -186,11 +186,11 @@ export default function SettingsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Change password</CardTitle>
+              <CardTitle className="text-base">Account password</CardTitle>
               <CardDescription>
                 {account?.must_change_password
                   ? "You are required to set a new password before continuing."
-                  : "Use at least 10 characters that you do not use elsewhere."}
+                  : "Change the password for your personal portal login. Use at least 10 characters that you do not use elsewhere."}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex max-w-md flex-col gap-4">
