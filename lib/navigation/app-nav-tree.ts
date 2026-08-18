@@ -47,6 +47,7 @@ export const APP_NAV_TREE: AppNavModule[] = [
           { code: "employees_update", label: "Update Employee Data", href: "/app/employees/update", gate: "employees", type: "link" },
           { code: "employees_transfer", label: "Transfer Employee", href: "/app/employees/transfer", gate: "employees", type: "link" },
           { code: "employees_audit", label: "Employee Audit Trail", href: "/app/employees/audit", gate: "employees", type: "link" },
+          { code: "employees_portal_access", label: "Portal Access", href: "/app/employees/portal-access", gate: "employees", type: "link" },
         ],
       },
       {

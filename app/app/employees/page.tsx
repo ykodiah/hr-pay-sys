@@ -37,6 +37,7 @@ import {
   PencilLine,
   ArrowRightLeft,
   FileSearch,
+  KeyRound,
 } from "lucide-react"
 
 import { CentralDocumentService } from "@/lib/storage/centralDocumentService"
@@ -1303,6 +1304,12 @@ export default function EmployeesPage() {
             <Link href="/app/employees/audit">
               <FileSearch className="w-4 h-4 mr-2" />
               Audit trail
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="bg-transparent">
+            <Link href="/app/employees/portal-access">
+              <KeyRound className="w-4 h-4 mr-2" />
+              Portal access
             </Link>
           </Button>
           <Button variant="outline" className="bg-transparent">
