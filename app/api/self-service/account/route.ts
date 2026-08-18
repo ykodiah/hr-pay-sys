@@ -128,9 +128,13 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}))
     const current = String(body.current_password || "")
     const next = String(body.new_password || "")
+    const confirm = String(body.confirm_password || "")
 
-    if (!current || !next) {
-      return NextResponse.json({ error: "Enter your current and new password" }, { status: 400 })
+    if (!current || !next || !confirm) {
+      return NextResponse.json({ error: "Complete all password fields" }, { status: 400 })
+    }
+    if (next !== confirm) {
+      return NextResponse.json({ error: "New passwords do not match" }, { status: 400 })
     }
     const { data: policy } = await session.db
       .from("access_control_settings")

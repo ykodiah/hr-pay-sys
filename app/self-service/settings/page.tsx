@@ -86,6 +86,7 @@ export default function SettingsPage() {
       await postJson("/api/self-service/account", {
         current_password: passwords.current,
         new_password: passwords.next,
+        confirm_password: passwords.confirm,
       })
       toast.success("Password updated")
       setPasswords({ current: "", next: "", confirm: "" })

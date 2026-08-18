@@ -118,8 +118,20 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const current = String(body.current_password || "")
   const next = String(body.new_password || "")
-  if (!user.email || !current) return NextResponse.json({ error: "Current password is required" }, { status: 400 })
-  if (next.length < 10) return NextResponse.json({ error: "New password must be at least 10 characters" }, { status: 400 })
+  const confirm = String(body.confirm_password || "")
+  if (!user.email || !current || !next || !confirm) return NextResponse.json({ error: "Complete all password fields" }, { status: 400 })
+  if (next !== confirm) return NextResponse.json({ error: "New passwords do not match" }, { status: 400 })
+  const { data: policy } = await tenant.service
+    .from("access_control_settings")
+    .select("password_min_length, password_require_uppercase, password_require_lowercase, password_require_numbers, password_require_special")
+    .eq("company_id", tenant.companyId)
+    .maybeSingle()
+  const minLength = Math.max(8, Number(policy?.password_min_length || 8))
+  if (next.length < minLength) return NextResponse.json({ error: `New password must be at least ${minLength} characters` }, { status: 400 })
+  if (policy?.password_require_lowercase !== false && !/[a-z]/.test(next)) return NextResponse.json({ error: "Use at least one lowercase letter" }, { status: 400 })
+  if (policy?.password_require_uppercase !== false && !/[A-Z]/.test(next)) return NextResponse.json({ error: "Use at least one uppercase letter" }, { status: 400 })
+  if (policy?.password_require_numbers !== false && !/[0-9]/.test(next)) return NextResponse.json({ error: "Use at least one number" }, { status: 400 })
+  if (policy?.password_require_special === true && !/[^A-Za-z0-9]/.test(next)) return NextResponse.json({ error: "Use at least one special character" }, { status: 400 })
   if (current === next) return NextResponse.json({ error: "Choose a different password" }, { status: 400 })
 
   const verifier = createSupabaseClient(

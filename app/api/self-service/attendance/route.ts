@@ -58,11 +58,12 @@ export async function GET(req: NextRequest) {
     const records = recordsRes.data || []
     const current = records.find((row: any) => row.date === today()) || null
     const settings = settingsRes.data || {
-      employee_gps_clock_enabled: true,
-      require_gps: true,
-      allow_web_clock: true,
+      configured: false,
+      employee_gps_clock_enabled: false,
+      require_gps: false,
+      allow_web_clock: false,
       biometric_enabled: Boolean(devicesRes.data?.length),
-      attendance_method_label: devicesRes.data?.length ? "GPS and biometric" : "GPS clock",
+      attendance_method_label: devicesRes.data?.length ? "Biometric or imported attendance" : "Attendance not configured",
     }
 
     const summary = records.reduce(
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest) {
       console.error("[v0] Attendance settings lookup failed", settingsError)
       return NextResponse.json({ error: "Attendance settings are unavailable. Please try again." }, { status: 503 })
     }
-    if (settings && (settings.employee_gps_clock_enabled === false || settings.allow_web_clock === false)) {
+    if (!settings || settings.employee_gps_clock_enabled !== true || settings.allow_web_clock !== true) {
       return NextResponse.json(
         { error: "Portal clocking is disabled. Your biometric or imported attendance will still appear here." },
         { status: 403 },

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import useSWR from "swr"
-import { Briefcase, KeyRound, Save, UserCircle } from "lucide-react"
+import { Briefcase, Eye, EyeOff, KeyRound, Save, UserCircle } from "lucide-react"
 import { toast } from "sonner"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -23,6 +23,7 @@ export default function AdminProfilePage() {
   const [profile, setProfile] = useState<any>({})
   const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" })
   const [saving, setSaving] = useState(false)
+  const [showPasswords, setShowPasswords] = useState({ current: false, next: false, confirm: false })
 
   useEffect(() => {
     if (data?.profile) setProfile(data.profile)
@@ -56,7 +57,7 @@ export default function AdminProfilePage() {
     if (passwords.next !== passwords.confirm) return toast.error("New passwords do not match")
     setSaving(true)
     try {
-      await request("POST", { current_password: passwords.current, new_password: passwords.next })
+      await request("POST", { current_password: passwords.current, new_password: passwords.next, confirm_password: passwords.confirm })
       toast.success("Password updated")
       setPasswords({ current: "", next: "", confirm: "" })
     } catch (e: any) {
@@ -114,9 +115,16 @@ export default function AdminProfilePage() {
           <CardDescription>Update the password for the currently logged-in administrator.</CardDescription>
         </CardHeader>
         <CardContent className="grid max-w-2xl gap-4 sm:grid-cols-3">
-          <div className="flex flex-col gap-2"><Label>Current password</Label><Input type="password" value={passwords.current} onChange={(e) => setPasswords({ ...passwords, current: e.target.value })} /></div>
-          <div className="flex flex-col gap-2"><Label>New password</Label><Input type="password" value={passwords.next} onChange={(e) => setPasswords({ ...passwords, next: e.target.value })} /></div>
-          <div className="flex flex-col gap-2"><Label>Confirm password</Label><Input type="password" value={passwords.confirm} onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })} /></div>
+          {([['current', 'Current password', 'current-password'], ['next', 'New password', 'new-password'], ['confirm', 'Confirm password', 'new-password']] as const).map(([key, label, autoComplete]) => {
+            const visible = showPasswords[key]
+            return <div className="flex flex-col gap-2" key={key}>
+              <Label htmlFor={`admin-${key}`}>{label}</Label>
+              <div className="relative">
+                <Input id={`admin-${key}`} type={visible ? 'text' : 'password'} autoComplete={autoComplete} value={passwords[key]} onChange={(e) => setPasswords({ ...passwords, [key]: e.target.value })} className="pr-11" />
+                <button type="button" className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-muted-foreground" aria-label={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`} onClick={() => setShowPasswords((p) => ({ ...p, [key]: !p[key] }))}>{visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}</button>
+              </div>
+            </div>
+          })}
           <div className="sm:col-span-3"><Button onClick={changePassword} disabled={saving || !passwords.current || !passwords.next}><KeyRound className="mr-2 h-4 w-4" /> Update password</Button></div>
         </CardContent>
       </Card>
