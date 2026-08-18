@@ -257,7 +257,10 @@ export async function PATCH(req: NextRequest) {
     const { data, error } = await session.db
       .from("employee_loans")
       .update({
-        status: "withdrawn",
+        // `status` has a DB check constraint that doesn't include "withdrawn" — use "cancelled",
+        // the closest allowed value, and keep the more specific "withdrawn" label on approval_status
+        // (free-form text) so the UI can still distinguish an employee withdrawal from an HR rejection.
+        status: "cancelled",
         approval_status: "withdrawn",
         updated_at: new Date().toISOString(),
       })

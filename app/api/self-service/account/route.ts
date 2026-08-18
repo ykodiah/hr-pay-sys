@@ -11,6 +11,23 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 /** GET — account + notification preferences for the signed-in employee. */
+/** `email_digest` is stored as text (legacy EAV column); coerce it back to a boolean for the UI. */
+function normalizePreferences(row: Record<string, any> | null) {
+  if (!row) {
+    return {
+      payroll_notifications: true,
+      leave_notifications: true,
+      attendance_alerts: true,
+      promotion_notifications: true,
+      system_maintenance_alerts: true,
+      email_digest: false,
+      sms_alerts: false,
+      push_notifications: true,
+    }
+  }
+  return { ...row, email_digest: row.email_digest === true || row.email_digest === "true" }
+}
+
 export async function GET() {
   const session = await requirePortalSession()
   if (isPortalError(session)) return session
@@ -39,16 +56,7 @@ export async function GET() {
         last_login_at: session.account?.last_login_at,
         can_access_admin: session.canAccessAdmin,
       },
-      preferences: prefsRes.data || {
-        payroll_notifications: true,
-        leave_notifications: true,
-        attendance_alerts: true,
-        promotion_notifications: true,
-        system_maintenance_alerts: true,
-        email_digest: false,
-        sms_alerts: false,
-        push_notifications: true,
-      },
+      preferences: normalizePreferences(prefsRes.data),
       activity: activityRes.data || [],
     })
   } catch (err) {
@@ -74,13 +82,18 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json().catch(() => ({}))
+    // `notification_settings` also stores per-company EAV preference rows (category/notification_type
+    // NOT NULL, employee_id null). This per-employee flat row uses sentinel values that never collide
+    // with those admin-side rows.
     const payload: Record<string, any> = {
       company_id: session.companyId,
       employee_id: session.employeeId,
+      category: "preference",
+      notification_type: "employee_flat",
       updated_at: new Date().toISOString(),
     }
     for (const flag of PREF_FLAGS) {
-      if (body[flag] !== undefined) payload[flag] = Boolean(body[flag])
+      if (body[flag] !== undefined) payload[flag] = flag === "email_digest" ? String(Boolean(body[flag])) : Boolean(body[flag])
     }
 
     const { data: existing } = await session.db
@@ -100,7 +113,7 @@ export async function PATCH(req: NextRequest) {
       : await session.db.from("notification_settings").insert(payload).select("*").single()
 
     if (error) throw new Error(error.message)
-    return NextResponse.json({ success: true, preferences: data })
+    return NextResponse.json({ success: true, preferences: normalizePreferences(data) })
   } catch (err) {
     return portalJsonError(err, "Failed to save preferences")
   }

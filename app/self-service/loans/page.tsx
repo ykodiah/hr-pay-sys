@@ -194,7 +194,14 @@ export default function LoansPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <StatusBadge status={loan.status} />
+                        <StatusBadge
+                          status={
+                            String(loan.status).toLowerCase() === "cancelled" &&
+                            String(loan.approval_status).toLowerCase() === "withdrawn"
+                              ? "withdrawn"
+                              : loan.status
+                          }
+                        />
                         {String(loan.status).toLowerCase() === "pending" && (
                           <Button size="sm" variant="ghost" onClick={() => withdraw(loan.id)}>
                             <X className="mr-1 h-4 w-4" />
