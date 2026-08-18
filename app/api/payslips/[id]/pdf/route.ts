@@ -4,8 +4,9 @@
  */
 
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { requireApiUser } from "@/lib/auth/api-user"
+import { resolveAdminAccess } from "@/lib/self-service/portal-session"
 import { getPayslipById } from "@/lib/services/payslip-service"
 import { loadCompanyBrand, AKWAABA_BRAND_FOOTER } from "@/lib/exports/company-branding"
 import {
@@ -46,6 +47,22 @@ export async function GET(
     }
 
     const client = await createClient()
+    const service = createServiceClient()
+    const { data: portalAccount } = await service
+      .from("employee_portal_accounts")
+      .select("employee_id, company_id")
+      .eq("user_id", user.id)
+      .in("status", ["active", "invited"])
+      .maybeSingle()
+    if (
+      portalAccount &&
+      (portalAccount.employee_id !== data.employee_id || portalAccount.company_id !== data.company_id)
+    ) {
+      const canAdminister = await resolveAdminAccess(service, user, data.company_id)
+      if (!canAdminister) {
+        return NextResponse.json({ error: "Payslip not found" }, { status: 404 })
+      }
+    }
     const period = toPayPeriod(data.pay_period)
 
     if (Number(data.loan_deduction || 0) > 0) {

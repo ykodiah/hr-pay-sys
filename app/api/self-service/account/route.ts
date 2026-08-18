@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import {
   requirePortalSession,
   isPortalError,
@@ -142,8 +142,14 @@ export async function POST(req: NextRequest) {
     const email = session.user.email || session.account?.login_email
     if (!email) return NextResponse.json({ error: "No login email on file" }, { status: 400 })
 
-    const auth = await createClient()
-    const { error: verifyError } = await auth.auth.signInWithPassword({
+    // Verify in an isolated client so the server-side sign-in does not replace
+    // or invalidate the employee's browser session cookies.
+    const verifier = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { auth: { persistSession: false, autoRefreshToken: false } },
+    )
+    const { error: verifyError } = await verifier.auth.signInWithPassword({
       email,
       password: current,
     })
@@ -151,7 +157,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Your current password is incorrect" }, { status: 400 })
     }
 
-    const { error: updateError } = await auth.auth.updateUser({ password: next })
+    const { error: updateError } = await session.db.auth.admin.updateUserById(session.user.id, {
+      password: next,
+      user_metadata: {
+        ...(session.user.user_metadata || {}),
+        must_change_password: false,
+      },
+    })
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 400 })
     }

@@ -174,11 +174,13 @@ async function enrichLoansWithEmployees(loans: any[]): Promise<EmployeeLoan[]> {
 
     const amountPaid = Number(row.amount_paid || 0)
     const remaining = round2(
-      Number(
-        row.remaining_balance != null && row.remaining_balance !== ""
-          ? row.remaining_balance
-          : Math.max(0, expectedTotal - amountPaid),
-      ),
+      interestType === "fixed"
+        ? Math.max(0, expectedTotal - amountPaid)
+        : Number(
+            row.remaining_balance != null && row.remaining_balance !== ""
+              ? row.remaining_balance
+              : Math.max(0, expectedTotal - amountPaid),
+          ),
     )
 
     return {
@@ -652,6 +654,7 @@ export async function approveLoan(loanId: string, approverId: string): Promise<v
       approved_at: new Date().toISOString(),
       disbursed_at: new Date().toISOString(),
       remaining_balance: totalPayable > 0 ? totalPayable : Number(loan.principal || 0),
+      outstanding_balance: totalPayable > 0 ? totalPayable : Number(loan.principal || 0),
       updated_at: new Date().toISOString(),
     })
     .eq("id", loanId)

@@ -47,6 +47,10 @@ import {
   ShieldCheck,
   CheckCheck,
   Loader2,
+  MapPinCheck,
+  FolderLock,
+  Scale,
+  UsersRound,
 } from "lucide-react"
 
 const NAV_SECTIONS = [
@@ -55,7 +59,10 @@ const NAV_SECTIONS = [
     items: [
       { name: "Dashboard", href: "/self-service", icon: Home },
       { name: "My Profile", href: "/self-service/profile", icon: User },
+      { name: "Attendance", href: "/self-service/attendance", icon: MapPinCheck },
       { name: "Payslips", href: "/self-service/payslips", icon: FileText },
+      { name: "Document Vault", href: "/self-service/documents", icon: FolderLock },
+      { name: "Disciplinary", href: "/self-service/disciplinary", icon: Scale },
     ],
   },
   {
@@ -75,6 +82,7 @@ const NAV_SECTIONS = [
   {
     title: "Requests",
     items: [
+      { name: "My Team & Approvals", href: "/self-service/team", icon: UsersRound },
       { name: "Leave Requests", href: "/self-service/leave", icon: Calendar },
       { name: "Overtime", href: "/self-service/overtime", icon: Clock },
       { name: "Loans", href: "/self-service/loans", icon: CreditCard },
@@ -102,6 +110,8 @@ function initials(name?: string | null) {
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
+  const { data: me } = usePortalMe()
+  const canManageTeam = Boolean(me?.can_manage_team)
   return (
     <nav className="flex flex-col gap-6 p-4">
       {NAV_SECTIONS.map((section) => (
@@ -109,7 +119,9 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
           <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {section.title}
           </p>
-          {section.items.map((item) => {
+          {section.items
+            .filter((item) => item.href !== "/self-service/team" || canManageTeam)
+            .map((item) => {
             const active = pathname === item.href
             return (
               <Link
@@ -127,7 +139,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
                 <span>{item.name}</span>
               </Link>
             )
-          })}
+            })}
         </div>
       ))}
     </nav>

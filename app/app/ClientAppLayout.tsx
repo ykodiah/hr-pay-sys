@@ -77,6 +77,7 @@ import {
   APP_NAV_FLAT_SECTIONS,
   filterNavTreeByGates,
 } from "@/lib/navigation/app-nav-tree"
+import { createClient } from "@/lib/supabase/client"
 
 // Theme configuration and state management
 const themes = {
@@ -150,6 +151,7 @@ export default function ClientAppLayout({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [currentPath, setCurrentPath] = useState("")
   const [breadcrumbs, setBreadcrumbs] = useState<{ label: string; href: string; icon: any }[]>([])
+  const [adminAccount, setAdminAccount] = useState<any>(null)
 
   // Service Worker registration with proper error handling
   useEffect(() => {
@@ -171,6 +173,13 @@ export default function ClientAppLayout({
         }
       })
     }
+  }, [])
+
+  useEffect(() => {
+    fetch("/api/admin/account")
+      .then(async (response) => (response.ok ? response.json() : null))
+      .then((value) => value && setAdminAccount(value))
+      .catch(() => undefined)
   }, [])
 
   useEffect(() => {
@@ -382,11 +391,22 @@ export default function ClientAppLayout({
     }
   }
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    await createClient().auth.signOut().catch(() => undefined)
     localStorage.removeItem("authToken")
     sessionStorage.clear()
     window.location.href = "/login"
   }
+
+  const adminProfile = adminAccount?.profile || {}
+  const adminName = adminProfile.display_name || "Administrator"
+  const adminRole = adminProfile.role_label || "Admin"
+  const adminInitials = adminName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part: string) => part[0]?.toUpperCase())
+    .join("") || "AD"
 
   return (
     <CurrencyProvider>
@@ -637,26 +657,32 @@ export default function ClientAppLayout({
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center space-x-2 hover:bg-gray-50">
                     <Avatar className="w-8 h-8">
-                      <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                      <AvatarFallback>KA</AvatarFallback>
+                      <AvatarImage src={adminProfile.avatar_url || undefined} />
+                      <AvatarFallback>{adminInitials}</AvatarFallback>
                     </Avatar>
                     <div className="hidden md:block text-left">
-                      <p className="text-sm font-medium text-gray-900">Kwame Asante</p>
-                      <p className="text-xs text-gray-500">Admin</p>
+                      <p className="text-sm font-medium text-gray-900">{adminName}</p>
+                      <p className="text-xs text-gray-500">{adminRole}</p>
                     </div>
                     <ChevronDown className="w-4 h-4 text-gray-400" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <div className="px-2 py-1.5">
-                    <p className="text-sm font-medium">Kwame Asante</p>
-                    <p className="text-xs text-gray-500">kwame.asante@company.com</p>
+                    <p className="text-sm font-medium">{adminName}</p>
+                    <p className="text-xs text-gray-500">{adminProfile.email || ""}</p>
                   </div>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => (window.location.href = "/app/self-service")}>
+                  <DropdownMenuItem onClick={() => (window.location.href = "/app/profile")}>
                     <User className="w-4 h-4 mr-2" />
                     My Profile
                   </DropdownMenuItem>
+                  {adminAccount?.can_access_employee_portal && (
+                    <DropdownMenuItem onClick={() => (window.location.href = "/self-service")}>
+                      <UserCheck className="w-4 h-4 mr-2" />
+                      Switch to employee portal
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={() => (window.location.href = "/app/settings")}>
                     <Settings className="w-4 h-4 mr-2" />
                     Account Settings
