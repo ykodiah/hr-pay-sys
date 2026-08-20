@@ -14,6 +14,8 @@ import {
   RotateCcw,
   Trash2,
   Upload,
+  BookOpen,
+  RefreshCw,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -23,13 +25,14 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Textarea } from "@/components/ui/textarea"
 
 const CATEGORIES = [
-  { key: "allowance", label: "Allowances", icon: Plus, color: "from-emerald-500 to-teal-600" },
-  { key: "deduction", label: "Deductions", icon: MinusCircle, color: "from-rose-500 to-red-600" },
-  { key: "provident_fund", label: "Provident Fund", icon: PiggyBank, color: "from-indigo-500 to-violet-600" },
-  { key: "bonus", label: "Bonus", icon: Gift, color: "from-amber-500 to-orange-600" },
-  { key: "backpay", label: "Backpay", icon: RotateCcw, color: "from-sky-500 to-blue-600" },
+  { key: "allowance", label: "Allowances", icon: Plus, color: "from-teal-600 to-emerald-700" },
+  { key: "deduction", label: "Deductions", icon: MinusCircle, color: "from-rose-600 to-red-700" },
+  { key: "provident_fund", label: "Provident Fund", icon: PiggyBank, color: "from-slate-700 to-slate-900" },
+  { key: "bonus", label: "Bonus", icon: Gift, color: "from-amber-600 to-orange-700" },
+  { key: "backpay", label: "Backpay", icon: RotateCcw, color: "from-sky-600 to-cyan-700" },
 ] as const
 
 type Category = (typeof CATEGORIES)[number]["key"]
@@ -45,45 +48,65 @@ type Employee = {
 }
 
 const currentPeriod = () => new Date().toISOString().slice(0, 7)
-const initialForm = {
-  component_definition_id: "",
-  code: "",
-  name: "",
-  description: "",
-  calculation_type: "amount",
-  calculation_basis: "basic_salary",
-  amount: "",
-  percentage: "",
-  rate: "",
-  quantity: "1",
-  employer_amount: "",
-  employer_percentage: "",
-  min_amount: "",
-  max_amount: "",
-  currency_code: "GHS",
-  frequency: "monthly",
-  tax_treatment: "taxable",
-  pensionable: false,
-  proratable: false,
-  proration_method: "calendar_days",
-  include_in_overtime_base: false,
-  scope_type: "individual",
-  scope_value: "",
-  employee_id: "",
-  taxable: true,
-  recurring: true,
-  end_period: "",
-  source_period: "",
-  reason_code: "",
-  payment_method: "with_payroll",
-  pay_date: "",
-  gl_debit_account: "",
-  gl_credit_account: "",
-  cost_center: "",
-  project_code: "",
-  external_reference: "",
-  approval_status: "approved",
-  notes: "",
+
+function baseForm(category: Category = "allowance") {
+  const oneTime = category === "bonus" || category === "backpay"
+  return {
+    component_definition_id: "",
+    code: "",
+    name: "",
+    description: "",
+    calculation_type: "amount",
+    calculation_basis: "basic_salary",
+    amount: "",
+    percentage: "",
+    rate: "",
+    quantity: "1",
+    employer_amount: "",
+    employer_percentage: "",
+    min_amount: "",
+    max_amount: "",
+    currency_code: "GHS",
+    frequency: oneTime ? "one_time" : "monthly",
+    tax_treatment: category === "deduction" ? "post_tax" : category === "provident_fund" ? "tax_relief" : "taxable",
+    pensionable: category === "provident_fund",
+    proratable: category === "allowance",
+    proration_method: "calendar_days",
+    include_in_overtime_base: false,
+    affects_gross_pay: category !== "deduction",
+    employer_component: false,
+    scope_type: "individual",
+    scope_value: "",
+    employee_id: "",
+    taxable: category !== "deduction" && category !== "provident_fund",
+    recurring: !oneTime,
+    end_period: "",
+    source_period: category === "backpay" ? currentPeriod() : "",
+    reason_code: category === "backpay" ? "PAY_CORRECTION" : "",
+    payment_method: "with_payroll",
+    pay_date: "",
+    arrears_months: category === "backpay" ? "1" : "0",
+    unit_of_measure: "amount",
+    rounding_rule: "nearest_0_01",
+    priority: "100",
+    statutory_code: "",
+    jurisdiction_code: "GH",
+    payslip_label: "",
+    display_on_payslip: true,
+    ytd_cap: "",
+    period_cap: "",
+    contribution_tier: "",
+    formula_expression: "",
+    eligibility_notes: "",
+    gl_debit_account: "",
+    gl_credit_account: "",
+    cost_center: "",
+    project_code: "",
+    external_reference: "",
+    approval_status: "approved",
+    override_reason: "",
+    notes: "",
+  }
 }
 
 function parseCsvLine(line: string) {
@@ -110,19 +133,34 @@ function employeeName(employee: Employee) {
   return `${employee.first_name || ""} ${employee.last_name || ""}`.trim()
 }
 
+function SkeletonBlock({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded-md bg-slate-200/80 ${className}`} />
+}
+
 export default function PayrollComponentsPage() {
   const [category, setCategory] = useState<Category>("allowance")
   const [payPeriod, setPayPeriod] = useState(currentPeriod)
-  const [data, setData] = useState<any>({ assignments: [], employees: [], subsidiaries: [], period: { status: "open" } })
-  const [form, setForm] = useState(initialForm)
+  const [data, setData] = useState<any>({
+    assignments: [],
+    employees: [],
+    subsidiaries: [],
+    definitions: [],
+    imports: [],
+    runs: [],
+    period: { status: "open" },
+    database_ready: true,
+  })
+  const [form, setForm] = useState(() => baseForm("allowance"))
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [savingDefinition, setSavingDefinition] = useState(false)
   const [periodBusy, setPeriodBusy] = useState(false)
   const [backpayRunning, setBackpayRunning] = useState(false)
   const [csvEmployeeIds, setCsvEmployeeIds] = useState<string[]>([])
   const [csvRows, setCsvRows] = useState<Record<string, string>[]>([])
   const [csvFile, setCsvFile] = useState<{ name: string; size: number } | null>(null)
   const [csvErrors, setCsvErrors] = useState<Array<{ row: number; employee_id?: string; errors: string[] }>>([])
+  const [templateDownloaded, setTemplateDownloaded] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const closed = data.period?.status === "closed"
 
@@ -137,12 +175,15 @@ export default function PayrollComponentsPage() {
       if (!res.ok) {
         setData((current: any) => ({
           ...current,
+          assignments: [],
+          definitions: current.definitions || [],
           database_ready: json.setup_required ? false : current.database_ready,
           database_warnings: [json.error].filter(Boolean),
         }))
         throw new Error(json.error || "Could not load payroll assignments")
       }
       setData(json)
+      if (json.catalogue_seeded) toast.success("Standard pay-component catalogue loaded from database")
     } catch (error: any) {
       toast.error(error.message)
     } finally {
@@ -154,6 +195,15 @@ export default function PayrollComponentsPage() {
     void load()
   }, [load])
 
+  useEffect(() => {
+    setForm(baseForm(category))
+    setCsvEmployeeIds([])
+    setCsvRows([])
+    setCsvFile(null)
+    setCsvErrors([])
+    setTemplateDownloaded(false)
+  }, [category])
+
   const scopeOptions = useMemo(() => {
     if (form.scope_type === "subsidiary") {
       return (data.subsidiaries || []).map((row: any) => ({ value: row.id, label: row.name }))
@@ -164,9 +214,23 @@ export default function PayrollComponentsPage() {
       .map((value) => ({ value: String(value), label: String(value) }))
   }, [data.employees, data.subsidiaries, form.scope_type])
 
+  const separateBackpayCount = useMemo(
+    () =>
+      (data.assignments || []).filter(
+        (row: any) =>
+          row.category === "backpay" &&
+          (row.payment_method === "separate_run" || row.backpay_treatment === "separate_run") &&
+          row.approval_status === "approved",
+      ).length,
+    [data.assignments],
+  )
+
   async function saveAssignment() {
     setSaving(true)
     try {
+      if (form.scope_type === "csv" && !templateDownloaded && !csvFile) {
+        throw new Error("Download the CSV template first, complete it, then upload")
+      }
       const payload = {
         ...form,
         category,
@@ -188,7 +252,7 @@ export default function PayrollComponentsPage() {
         throw new Error(json.error || "Assignment failed")
       }
       toast.success(`${json.assigned} employee${json.assigned === 1 ? "" : "s"} assigned`)
-      setForm(initialForm)
+      setForm(baseForm(category))
       setCsvEmployeeIds([])
       setCsvRows([])
       setCsvFile(null)
@@ -198,6 +262,26 @@ export default function PayrollComponentsPage() {
       toast.error(error.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function saveDefinition() {
+    setSavingDefinition(true)
+    try {
+      const res = await fetch("/api/payroll/components", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, category, record_type: "definition" }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Could not save catalogue item")
+      toast.success("Component saved to catalogue")
+      await load()
+    } catch (error: any) {
+      toast.error(error.message)
+    } finally {
+      setSavingDefinition(false)
     }
   }
 
@@ -230,7 +314,7 @@ export default function PayrollComponentsPage() {
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || `Could not ${action} period`)
-      toast.success(action === "close" ? "Period closed and audit snapshots created" : "Period reopened")
+      toast.success(json.message || (action === "close" ? "Period closed and snapshots created" : "Period reopened"))
       await load()
     } catch (error: any) {
       toast.error(error.message)
@@ -251,6 +335,7 @@ export default function PayrollComponentsPage() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Backpay run failed")
       toast.success(`${json.employee_count} employee backpay run sent for approval`)
+      await load()
     } catch (error: any) {
       toast.error(error.message)
     } finally {
@@ -260,6 +345,9 @@ export default function PayrollComponentsPage() {
 
   async function readCsv(file?: File) {
     if (!file) return
+    if (!templateDownloaded) {
+      toast.message("Tip: download the controlled template first so every enterprise field is present")
+    }
     const text = await file.text()
     const lines = text.split(/\r?\n/).filter((line) => line.trim() && !line.trim().startsWith("#"))
     const headers = parseCsvLine(lines.shift() || "").map((h) => h.trim().toLowerCase())
@@ -284,11 +372,11 @@ export default function PayrollComponentsPage() {
   function applyDefinition(id: string) {
     const definition = (data.definitions || []).find((row: any) => row.id === id)
     if (!definition) {
-      setForm({ ...initialForm, component_definition_id: "" })
+      setForm(baseForm(category))
       return
     }
     setForm({
-      ...form,
+      ...baseForm(category),
       component_definition_id: definition.id,
       code: definition.code || "",
       name: definition.name || "",
@@ -299,34 +387,50 @@ export default function PayrollComponentsPage() {
       percentage: String(definition.default_percentage || ""),
       rate: String(definition.default_rate || ""),
       currency_code: definition.currency_code || "GHS",
-      frequency: definition.frequency || "monthly",
+      frequency: definition.frequency || baseForm(category).frequency,
       recurring: definition.frequency !== "one_time",
       tax_treatment: definition.tax_treatment || "taxable",
       taxable: definition.tax_treatment === "taxable",
       pensionable: Boolean(definition.pensionable),
       proratable: Boolean(definition.proratable),
       include_in_overtime_base: Boolean(definition.include_in_overtime_base),
+      affects_gross_pay: definition.affects_gross_pay !== false,
+      employer_component: Boolean(definition.employer_component),
       min_amount: definition.min_amount == null ? "" : String(definition.min_amount),
       max_amount: definition.max_amount == null ? "" : String(definition.max_amount),
       gl_debit_account: definition.gl_debit_account || "",
       gl_credit_account: definition.gl_credit_account || "",
       cost_center: definition.cost_center || "",
+      unit_of_measure: definition.unit_of_measure || "amount",
+      rounding_rule: definition.rounding_rule || "nearest_0_01",
+      priority: String(definition.priority || definition.display_order || 100),
+      statutory_code: definition.statutory_code || "",
+      jurisdiction_code: definition.jurisdiction_code || "GH",
+      payslip_label: definition.payslip_label || definition.name || "",
+      display_on_payslip: definition.display_on_payslip !== false,
+      ytd_cap: definition.ytd_cap == null ? "" : String(definition.ytd_cap),
+      period_cap: definition.period_cap == null ? "" : String(definition.period_cap),
+      contribution_tier: definition.contribution_tier || "",
+      formula_expression: definition.formula_expression || "",
+      eligibility_notes: definition.eligibility_notes || "",
     })
   }
 
   const activeCategory = CATEGORIES.find((item) => item.key === category)!
   const ActiveIcon = activeCategory.icon
+  const templateHref = `/api/payroll/components/template?category=${category}&pay_period=${payPeriod}`
 
   return (
-    <div className="min-h-screen space-y-6 bg-gradient-to-br from-slate-50 via-white to-indigo-50/50 p-4 md:p-6">
-      <div className="flex flex-col gap-4 rounded-2xl bg-slate-950 p-6 text-white shadow-xl md:flex-row md:items-center md:justify-between">
+    <div className="min-h-screen space-y-6 bg-[radial-gradient(circle_at_top_left,_#ecfdf5,_transparent_35%),linear-gradient(180deg,#f8fafc_0%,#eef2ff_100%)] p-4 md:p-6">
+      <div className="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-950 p-6 text-white shadow-xl md:flex-row md:items-center md:justify-between">
         <div>
-          <div className="mb-2 flex items-center gap-2 text-sm text-indigo-200">
-            <Banknote className="h-4 w-4" /> Payroll configuration
+          <div className="mb-2 flex items-center gap-2 text-sm text-teal-200">
+            <Banknote className="h-4 w-4" /> Enterprise payroll configuration
           </div>
-          <h1 className="text-2xl font-bold md:text-3xl">Pay components</h1>
-          <p className="mt-1 max-w-2xl text-sm text-slate-300">
-            Assign earnings and deductions individually, by CSV, or by organisation group. Employee cards update automatically.
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Pay components</h1>
+          <p className="mt-1 max-w-3xl text-sm text-slate-300">
+            Catalogue-driven earnings and deductions with effective dating, tax treatment, employer shares, GL coding,
+            CSV bulk assign, period locks, and off-cycle backpay — aligned with modern payroll systems.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2 rounded-xl bg-white/10 p-3">
@@ -334,9 +438,13 @@ export default function PayrollComponentsPage() {
             <Label htmlFor="period" className="text-xs text-slate-300">Payroll period</Label>
             <Input id="period" type="month" value={payPeriod} onChange={(e) => setPayPeriod(e.target.value)} className="mt-1 bg-white text-slate-950" />
           </div>
+          <Button variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20" onClick={() => void load()} disabled={loading}>
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+            Reload DB
+          </Button>
           <Button
             variant={closed ? "outline" : "destructive"}
-            disabled={periodBusy}
+            disabled={periodBusy || loading}
             onClick={() => updatePeriod(closed ? "reopen" : "close")}
           >
             {periodBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lock className="mr-2 h-4 w-4" />}
@@ -351,11 +459,14 @@ export default function PayrollComponentsPage() {
             key={key}
             onClick={() => setCategory(key)}
             className={`rounded-xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-              category === key ? "border-indigo-400 bg-white ring-2 ring-indigo-100" : "border-slate-200 bg-white/80"
+              category === key ? "border-teal-500 bg-white ring-2 ring-teal-100" : "border-slate-200 bg-white/90"
             }`}
           >
             <span className={`mb-3 inline-flex rounded-lg bg-gradient-to-br ${color} p-2 text-white`}><Icon className="h-5 w-5" /></span>
             <span className="block font-semibold text-slate-900">{label}</span>
+            <span className="mt-1 block text-xs text-slate-500">
+              {loading ? "…" : `${(data.assignments || []).filter((row: any) => row.category === key || category === key).length} active`}
+            </span>
           </button>
         ))}
       </div>
@@ -365,31 +476,68 @@ export default function PayrollComponentsPage() {
           <CardContent className="p-4">
             <p className="font-semibold text-red-950">Payroll database setup is incomplete</p>
             <p className="mt-1 text-sm text-red-800">
-              Apply migrations 20260820170000 and 20260820210000. Entries cannot be safely stored until all component, period and import tables are available.
+              Run <code className="rounded bg-red-100 px-1">scripts/20260820_payroll_and_attendance_complete.sql</code> in
+              Supabase SQL Editor (or <code className="rounded bg-red-100 px-1">npm run db:migrate:payroll</code>), then reload.
             </p>
           </CardContent>
         </Card>
       )}
 
+      {(data.database_warnings || []).length > 0 && data.database_ready !== false && (
+        <Card className="border-amber-300 bg-amber-50">
+          <CardContent className="p-4 text-sm text-amber-900">
+            {(data.database_warnings || []).map((warning: string) => <p key={warning}>{warning}</p>)}
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="border-teal-200 bg-white/95 shadow-md">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base"><Download className="h-4 w-4 text-teal-700" /> CSV template (download before upload)</CardTitle>
+          <CardDescription>
+            Download the controlled template for <strong>{activeCategory.label}</strong> / {payPeriod}. It includes every
+            active employee ID and all enterprise fields. Complete it offline, then assign via Bulk CSV.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button asChild variant="default" className="bg-teal-700 hover:bg-teal-800" onClick={() => setTemplateDownloaded(true)}>
+            <a href={templateHref}><Download className="mr-2 h-4 w-4" /> Download {category.replace("_", " ")} CSV template</a>
+          </Button>
+          <Button variant="outline" onClick={() => { setForm({ ...form, scope_type: "csv" }); setTemplateDownloaded(true) }}>
+            Then upload completed file
+          </Button>
+          {templateDownloaded && <span className="self-center text-xs font-medium text-teal-700">Template downloaded — ready for upload</span>}
+        </CardContent>
+      </Card>
+
       <div className="grid gap-3 md:grid-cols-4">
-        {[
-          ["Active assignments", (data.assignments || []).filter((row: any) => row.status === "active").length],
-          ["Component codes", (data.definitions || []).length],
-          ["Employees available", (data.employees || []).length],
-          ["Recent imports", (data.imports || []).length],
-        ].map(([label, value]) => (
-          <Card key={String(label)} className="border-slate-200 bg-white/90">
-            <CardContent className="p-4"><p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold text-slate-950">{value}</p></CardContent>
-          </Card>
-        ))}
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} className="border-slate-200 bg-white/90"><CardContent className="space-y-3 p-4"><SkeletonBlock className="h-3 w-24" /><SkeletonBlock className="h-8 w-16" /></CardContent></Card>
+          ))
+        ) : (
+          [
+            ["Active assignments", (data.assignments || []).length],
+            ["Catalogue codes", (data.definitions || []).length],
+            ["Employees available", (data.employees || []).length],
+            ["Period status", closed ? "Closed" : "Open"],
+          ].map(([label, value]) => (
+            <Card key={String(label)} className="border-slate-200 bg-white/90">
+              <CardContent className="p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+                <p className="mt-1 text-2xl font-bold text-slate-950">{value}</p>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       {closed && (
         <Card className="border-amber-300 bg-amber-50">
           <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="font-semibold text-amber-950">{payPeriod} is closed</p>
-              <p className="text-sm text-amber-800">Entries are locked. Download the exact category snapshots used for audit.</p>
+              <p className="font-semibold text-amber-950">{payPeriod} is closed and locked</p>
+              <p className="text-sm text-amber-800">Download immutable category snapshots used for audit and reconciliation.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {[...CATEGORIES.map((c) => c.key), "payroll"].map((key) => (
@@ -404,154 +552,319 @@ export default function PayrollComponentsPage() {
         </Card>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[500px_1fr]">
+      <div className="grid gap-6 xl:grid-cols-[560px_1fr]">
         <Card className="h-fit border-0 shadow-lg">
           <CardHeader className={`rounded-t-xl bg-gradient-to-r ${activeCategory.color} text-white`}>
-            <CardTitle className="flex items-center gap-2"><ActiveIcon className="h-5 w-5" /> Add {activeCategory.label}</CardTitle>
-            <CardDescription className="text-white/80">Changes save directly to the tenant payroll database.</CardDescription>
+            <CardTitle className="flex items-center gap-2"><ActiveIcon className="h-5 w-5" /> Configure {activeCategory.label}</CardTitle>
+            <CardDescription className="text-white/85">All fields persist to the tenant payroll database.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 p-5">
-            <div>
-              <Label>Component catalogue</Label>
-              <Select value={form.component_definition_id || "custom"} onValueChange={(value) => applyDefinition(value === "custom" ? "" : value)}>
-                <SelectTrigger><SelectValue placeholder="Select an existing payroll code" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="custom">Create a new component code</SelectItem>
-                  {(data.definitions || []).map((definition: any) => (
-                    <SelectItem key={definition.id} value={definition.id}>{definition.code} — {definition.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="mt-1 text-xs text-muted-foreground">Catalogue values load from the database and can be overridden for this assignment.</p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Code</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="e.g. TRANS" /></div>
-              <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Transport" /></div>
-            </div>
-            <div><Label>Description</Label><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Purpose and payroll policy for this component" /></div>
-            <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Calculation</Label>
-              <Select value={form.calculation_type} onValueChange={(value) => setForm({ ...form, calculation_type: value })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="amount">Fixed amount</SelectItem><SelectItem value="percentage">Percentage</SelectItem><SelectItem value="rate_x_quantity">Rate × quantity</SelectItem></SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Calculation basis</Label>
-              <Select value={form.calculation_basis} onValueChange={(value) => setForm({ ...form, calculation_basis: value })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="basic_salary">Basic salary</SelectItem><SelectItem value="gross_pay">Gross pay</SelectItem><SelectItem value="taxable_pay">Taxable pay</SelectItem><SelectItem value="fixed">Fixed value</SelectItem><SelectItem value="custom">Custom basis</SelectItem></SelectContent>
-              </Select>
-            </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {form.calculation_type === "amount" && <div><Label>Employee amount</Label><Input type="number" min="0" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>}
-              {form.calculation_type === "percentage" && <div><Label>Employee percentage</Label><Input type="number" min="0" step="0.01" value={form.percentage} onChange={(e) => setForm({ ...form, percentage: e.target.value })} /></div>}
-              {form.calculation_type === "rate_x_quantity" && <>
-                <div><Label>Rate</Label><Input type="number" min="0" step="0.01" value={form.rate} onChange={(e) => setForm({ ...form, rate: e.target.value })} /></div>
-                <div><Label>Quantity / units</Label><Input type="number" min="0" step="0.01" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} /></div>
-              </>}
-              <div><Label>Currency</Label><Input maxLength={3} value={form.currency_code} onChange={(e) => setForm({ ...form, currency_code: e.target.value.toUpperCase() })} /></div>
-            </div>
-            <div>
-              <Label>Assign to</Label>
-              <Select value={form.scope_type} onValueChange={(value) => { setForm({ ...form, scope_type: value, scope_value: "", employee_id: "" }); setCsvEmployeeIds([]) }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="individual">Individual employee</SelectItem>
-                  <SelectItem value="csv">Bulk CSV upload</SelectItem>
-                  <SelectItem value="department">Department</SelectItem>
-                  <SelectItem value="location">Location</SelectItem>
-                  <SelectItem value="division">Division</SelectItem>
-                  <SelectItem value="subsidiary">Subsidiary</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {form.scope_type === "individual" && (
-              <Select value={form.employee_id} onValueChange={(value) => setForm({ ...form, employee_id: value })}>
-                <SelectTrigger><SelectValue placeholder="Choose employee" /></SelectTrigger>
-                <SelectContent>{(data.employees || []).map((employee: Employee) => <SelectItem key={employee.id} value={employee.id}>{employee.employee_id} — {employeeName(employee)}</SelectItem>)}</SelectContent>
-              </Select>
-            )}
-            {form.scope_type === "csv" && (
-              <div className="space-y-3 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div><p className="text-sm font-semibold text-indigo-950">1. Download the controlled template</p><p className="text-xs text-indigo-700">It includes active employee IDs and every supported payroll field.</p></div>
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={`/api/payroll/components/template?category=${category}&pay_period=${payPeriod}`}>
-                      <Download className="mr-1.5 h-4 w-4" /> Download CSV
-                    </a>
-                  </Button>
-                </div>
-                <div className="border-t border-indigo-200 pt-3 text-center">
-                  <p className="mb-2 text-sm font-semibold text-indigo-950">2. Complete and upload</p>
-                <input ref={fileRef} className="hidden" type="file" accept=".csv,text/csv" onChange={(e) => void readCsv(e.target.files?.[0])} />
-                <Upload className="mx-auto mb-2 h-6 w-6 text-indigo-600" />
-                <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>Choose CSV</Button>
-                  <p className="mt-2 text-xs text-slate-600">
-                    {csvFile ? `${csvFile.name} · ${csvRows.length} rows · ${csvEmployeeIds.length} employees matched` : "Upload only the completed template"}
+            {loading ? (
+              <div className="space-y-3">
+                <SkeletonBlock className="h-10 w-full" />
+                <SkeletonBlock className="h-10 w-full" />
+                <SkeletonBlock className="h-24 w-full" />
+                <SkeletonBlock className="h-40 w-full" />
+              </div>
+            ) : (
+              <>
+                <div>
+                  <Label>Component catalogue (from database)</Label>
+                  <Select value={form.component_definition_id || "custom"} onValueChange={(value) => applyDefinition(value === "custom" ? "" : value)}>
+                    <SelectTrigger><SelectValue placeholder="Select a wage type / earning code" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="custom">Create a new component code</SelectItem>
+                      {(data.definitions || []).map((definition: any) => (
+                        <SelectItem key={definition.id} value={definition.id}>{definition.code} — {definition.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {(data.definitions || []).length} active codes loaded{data.catalogue_seeded ? " (standard pack seeded)" : ""}.
                   </p>
                 </div>
-                {csvErrors.length > 0 && <div className="max-h-36 overflow-auto rounded-md bg-red-50 p-2 text-left text-xs text-red-800">
-                  {csvErrors.slice(0, 20).map((error) => <p key={`${error.row}-${error.employee_id}`}>Row {error.row} ({error.employee_id || "blank"}): {error.errors.join("; ")}</p>)}
-                </div>}
-              </div>
-            )}
-            {scopeOptions.length > 0 && (
-              <Select value={form.scope_value} onValueChange={(value) => setForm({ ...form, scope_value: value })}>
-                <SelectTrigger><SelectValue placeholder={`Choose ${form.scope_type}`} /></SelectTrigger>
-              <SelectContent>{scopeOptions.map((option: { value: string; label: string }) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
-              </Select>
-            )}
-            {category === "backpay" && (
-              <div className="grid grid-cols-2 gap-3 rounded-lg border border-sky-200 bg-sky-50 p-3">
-                <div><Label>Source period</Label><Input type="month" value={form.source_period} onChange={(e) => setForm({ ...form, source_period: e.target.value })} /></div>
-                <div><Label>Reason</Label><Select value={form.reason_code} onValueChange={(value) => setForm({ ...form, reason_code: value })}><SelectTrigger><SelectValue placeholder="Choose reason" /></SelectTrigger><SelectContent><SelectItem value="PAY_CORRECTION">Pay correction</SelectItem><SelectItem value="LATE_INCREASE">Late salary increase</SelectItem><SelectItem value="MISSED_EARNING">Missed earning</SelectItem><SelectItem value="PROMOTION">Promotion adjustment</SelectItem><SelectItem value="OTHER">Other</SelectItem></SelectContent></Select></div>
-                <div><Label>Payroll treatment</Label><Select value={form.payment_method} onValueChange={(value) => setForm({ ...form, payment_method: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="with_payroll">Include in regular payroll</SelectItem><SelectItem value="separate_run">Separate off-cycle run</SelectItem></SelectContent></Select></div>
-                <div><Label>Pay date</Label><Input type="date" value={form.pay_date} onChange={(e) => setForm({ ...form, pay_date: e.target.value })} /></div>
-              </div>
-            )}
 
-            <details open className="rounded-lg border bg-white">
-              <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">Tax, frequency and effective dating</summary>
-              <div className="grid grid-cols-2 gap-3 border-t p-4">
-                <div><Label>Frequency</Label><Select value={form.frequency} onValueChange={(value) => setForm({ ...form, frequency: value, recurring: value !== "one_time" })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="one_time">One time</SelectItem><SelectItem value="monthly">Monthly</SelectItem><SelectItem value="quarterly">Quarterly</SelectItem><SelectItem value="annual">Annual</SelectItem><SelectItem value="per_payroll">Every payroll</SelectItem></SelectContent></Select></div>
-                <div><Label>Tax treatment</Label><Select value={form.tax_treatment} onValueChange={(value) => setForm({ ...form, tax_treatment: value, taxable: value === "taxable" })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="taxable">Taxable</SelectItem><SelectItem value="non_taxable">Non-taxable</SelectItem><SelectItem value="tax_relief">Tax relief</SelectItem><SelectItem value="post_tax">Post-tax deduction</SelectItem></SelectContent></Select></div>
-                <div><Label>End period (optional)</Label><Input type="month" value={form.end_period} onChange={(e) => setForm({ ...form, end_period: e.target.value })} /></div>
-                <div><Label>Proration method</Label><Select value={form.proration_method} onValueChange={(value) => setForm({ ...form, proration_method: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="calendar_days">Calendar days</SelectItem><SelectItem value="working_days">Working days</SelectItem><SelectItem value="none">No proration</SelectItem></SelectContent></Select></div>
-                {[["pensionable", "Pensionable"], ["proratable", "Proratable"], ["include_in_overtime_base", "Include in overtime base"]] .map(([key, label]) => (
-                  <div key={key} className="flex items-center justify-between rounded-md bg-slate-50 p-2"><Label>{label}</Label><Switch checked={Boolean((form as any)[key])} onCheckedChange={(checked) => setForm({ ...form, [key]: checked })} /></div>
-                ))}
-              </div>
-            </details>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label>Code *</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="e.g. TRANS" /></div>
+                  <div><Label>Name *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Transport Allowance" /></div>
+                </div>
+                <div><Label>Payslip label</Label><Input value={form.payslip_label} onChange={(e) => setForm({ ...form, payslip_label: e.target.value })} placeholder="Shown on employee payslip" /></div>
+                <div><Label>Description / policy</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Business purpose, eligibility, and payroll policy notes" /></div>
 
-            <details className="rounded-lg border bg-white">
-              <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">Employer contribution and limits</summary>
-              <div className="grid grid-cols-2 gap-3 border-t p-4">
-                <div><Label>Employer amount</Label><Input type="number" value={form.employer_amount} onChange={(e) => setForm({ ...form, employer_amount: e.target.value })} /></div>
-                <div><Label>Employer %</Label><Input type="number" value={form.employer_percentage} onChange={(e) => setForm({ ...form, employer_percentage: e.target.value })} /></div>
-                <div><Label>Minimum amount</Label><Input type="number" value={form.min_amount} onChange={(e) => setForm({ ...form, min_amount: e.target.value })} /></div>
-                <div><Label>Maximum amount</Label><Input type="number" value={form.max_amount} onChange={(e) => setForm({ ...form, max_amount: e.target.value })} /></div>
-              </div>
-            </details>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Calculation type</Label>
+                    <Select value={form.calculation_type} onValueChange={(value) => setForm({ ...form, calculation_type: value })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="amount">Fixed amount</SelectItem>
+                        <SelectItem value="percentage">Percentage of basis</SelectItem>
+                        <SelectItem value="rate_x_quantity">Rate × quantity</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Calculation basis</Label>
+                    <Select value={form.calculation_basis} onValueChange={(value) => setForm({ ...form, calculation_basis: value })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="basic_salary">Basic salary</SelectItem>
+                        <SelectItem value="gross_pay">Gross pay</SelectItem>
+                        <SelectItem value="taxable_pay">Taxable pay</SelectItem>
+                        <SelectItem value="fixed">Fixed value</SelectItem>
+                        <SelectItem value="custom">Custom / formula</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
-            <details className="rounded-lg border bg-white">
-              <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">Accounting and audit</summary>
-              <div className="grid grid-cols-2 gap-3 border-t p-4">
-                <div><Label>GL debit account</Label><Input value={form.gl_debit_account} onChange={(e) => setForm({ ...form, gl_debit_account: e.target.value })} /></div>
-                <div><Label>GL credit account</Label><Input value={form.gl_credit_account} onChange={(e) => setForm({ ...form, gl_credit_account: e.target.value })} /></div>
-                <div><Label>Cost center</Label><Input value={form.cost_center} onChange={(e) => setForm({ ...form, cost_center: e.target.value })} /></div>
-                <div><Label>Project code</Label><Input value={form.project_code} onChange={(e) => setForm({ ...form, project_code: e.target.value })} /></div>
-                <div><Label>External reference</Label><Input value={form.external_reference} onChange={(e) => setForm({ ...form, external_reference: e.target.value })} /></div>
-                <div><Label>Approval status</Label><Select value={form.approval_status} onValueChange={(value) => setForm({ ...form, approval_status: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="approved">Approved</SelectItem><SelectItem value="pending">Pending approval</SelectItem><SelectItem value="draft">Draft</SelectItem></SelectContent></Select></div>
-                <div className="col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
-              </div>
-            </details>
-            <Button className="w-full bg-slate-950 hover:bg-slate-800" disabled={closed || saving} onClick={saveAssignment}>
-              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BadgePercent className="mr-2 h-4 w-4" />}
-              {closed ? "Period locked" : `Assign ${activeCategory.label}`}
-            </Button>
+                <div className="grid grid-cols-2 gap-3">
+                  {form.calculation_type === "amount" && <div><Label>Employee amount</Label><Input type="number" min="0" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>}
+                  {form.calculation_type === "percentage" && <div><Label>Employee %</Label><Input type="number" min="0" step="0.01" value={form.percentage} onChange={(e) => setForm({ ...form, percentage: e.target.value })} /></div>}
+                  {form.calculation_type === "rate_x_quantity" && (
+                    <>
+                      <div><Label>Rate</Label><Input type="number" min="0" step="0.01" value={form.rate} onChange={(e) => setForm({ ...form, rate: e.target.value })} /></div>
+                      <div><Label>Quantity / units</Label><Input type="number" min="0" step="0.01" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} /></div>
+                    </>
+                  )}
+                  <div><Label>Currency</Label><Input maxLength={3} value={form.currency_code} onChange={(e) => setForm({ ...form, currency_code: e.target.value.toUpperCase() })} /></div>
+                  <div><Label>Unit of measure</Label>
+                    <Select value={form.unit_of_measure} onValueChange={(value) => setForm({ ...form, unit_of_measure: value })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="amount">Amount</SelectItem>
+                        <SelectItem value="hours">Hours</SelectItem>
+                        <SelectItem value="days">Days</SelectItem>
+                        <SelectItem value="units">Units</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Assign to</Label>
+                  <Select value={form.scope_type} onValueChange={(value) => { setForm({ ...form, scope_type: value, scope_value: "", employee_id: "" }); setCsvEmployeeIds([]) }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="individual">Individual employee</SelectItem>
+                      <SelectItem value="csv">Bulk CSV upload</SelectItem>
+                      <SelectItem value="department">Department</SelectItem>
+                      <SelectItem value="location">Location</SelectItem>
+                      <SelectItem value="division">Division</SelectItem>
+                      <SelectItem value="subsidiary">Subsidiary</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {form.scope_type === "individual" && (
+                  <Select value={form.employee_id} onValueChange={(value) => setForm({ ...form, employee_id: value })}>
+                    <SelectTrigger><SelectValue placeholder="Choose employee" /></SelectTrigger>
+                    <SelectContent>
+                      {(data.employees || []).map((employee: Employee) => (
+                        <SelectItem key={employee.id} value={employee.id}>{employee.employee_id} — {employeeName(employee)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {form.scope_type === "csv" && (
+                  <div className="space-y-3 rounded-lg border border-teal-200 bg-teal-50/70 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-teal-950">1. Download template</p>
+                        <p className="text-xs text-teal-800">Includes employee IDs and all supported fields.</p>
+                      </div>
+                      <Button variant="outline" size="sm" asChild onClick={() => setTemplateDownloaded(true)}>
+                        <a href={templateHref}><Download className="mr-1.5 h-4 w-4" /> Download</a>
+                      </Button>
+                    </div>
+                    <div className="border-t border-teal-200 pt-3 text-center">
+                      <p className="mb-2 text-sm font-semibold text-teal-950">2. Upload completed file</p>
+                      <input ref={fileRef} className="hidden" type="file" accept=".csv,text/csv" onChange={(e) => void readCsv(e.target.files?.[0])} />
+                      <Upload className="mx-auto mb-2 h-6 w-6 text-teal-700" />
+                      <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>Choose CSV</Button>
+                      <p className="mt-2 text-xs text-slate-600">
+                        {csvFile ? `${csvFile.name} · ${csvRows.length} rows · ${csvEmployeeIds.length} matched` : "Upload only the completed template"}
+                      </p>
+                    </div>
+                    {csvErrors.length > 0 && (
+                      <div className="max-h-36 overflow-auto rounded-md bg-red-50 p-2 text-left text-xs text-red-800">
+                        {csvErrors.slice(0, 20).map((error) => (
+                          <p key={`${error.row}-${error.employee_id}`}>Row {error.row} ({error.employee_id || "blank"}): {error.errors.join("; ")}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {scopeOptions.length > 0 && (
+                  <Select value={form.scope_value} onValueChange={(value) => setForm({ ...form, scope_value: value })}>
+                    <SelectTrigger><SelectValue placeholder={`Choose ${form.scope_type}`} /></SelectTrigger>
+                    <SelectContent>
+                      {scopeOptions.map((option: { value: string; label: string }) => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {category === "backpay" && (
+                  <div className="grid grid-cols-2 gap-3 rounded-lg border border-sky-200 bg-sky-50 p-3">
+                    <div><Label>Source period</Label><Input type="month" value={form.source_period} onChange={(e) => setForm({ ...form, source_period: e.target.value })} /></div>
+                    <div>
+                      <Label>Reason</Label>
+                      <Select value={form.reason_code} onValueChange={(value) => setForm({ ...form, reason_code: value })}>
+                        <SelectTrigger><SelectValue placeholder="Choose reason" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="PAY_CORRECTION">Pay correction</SelectItem>
+                          <SelectItem value="LATE_INCREASE">Late salary increase</SelectItem>
+                          <SelectItem value="MISSED_EARNING">Missed earning</SelectItem>
+                          <SelectItem value="PROMOTION">Promotion adjustment</SelectItem>
+                          <SelectItem value="OTHER">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Payroll treatment</Label>
+                      <Select value={form.payment_method} onValueChange={(value) => setForm({ ...form, payment_method: value })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="with_payroll">Include in regular payroll (default)</SelectItem>
+                          <SelectItem value="separate_run">Separate off-cycle run</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div><Label>Pay date</Label><Input type="date" value={form.pay_date} onChange={(e) => setForm({ ...form, pay_date: e.target.value })} /></div>
+                    <div><Label>Arrears months</Label><Input type="number" min="0" value={form.arrears_months} onChange={(e) => setForm({ ...form, arrears_months: e.target.value })} /></div>
+                    <div className="col-span-2 text-xs text-sky-900">
+                      Default is include-in-period. Choose separate run, then use “Create separate backpay run”.
+                      {separateBackpayCount ? ` ${separateBackpayCount} approved separate-run entries ready.` : ""}
+                    </div>
+                  </div>
+                )}
+
+                <details open className="rounded-lg border bg-white">
+                  <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">Tax, frequency and effective dating</summary>
+                  <div className="grid grid-cols-2 gap-3 border-t p-4">
+                    <div>
+                      <Label>Frequency</Label>
+                      <Select value={form.frequency} onValueChange={(value) => setForm({ ...form, frequency: value, recurring: value !== "one_time" })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="one_time">One time</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                          <SelectItem value="quarterly">Quarterly</SelectItem>
+                          <SelectItem value="annual">Annual</SelectItem>
+                          <SelectItem value="per_payroll">Every payroll</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Tax treatment</Label>
+                      <Select value={form.tax_treatment} onValueChange={(value) => setForm({ ...form, tax_treatment: value, taxable: value === "taxable" })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="taxable">Taxable</SelectItem>
+                          <SelectItem value="non_taxable">Non-taxable</SelectItem>
+                          <SelectItem value="tax_relief">Tax relief</SelectItem>
+                          <SelectItem value="post_tax">Post-tax deduction</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div><Label>End period</Label><Input type="month" value={form.end_period} onChange={(e) => setForm({ ...form, end_period: e.target.value })} /></div>
+                    <div>
+                      <Label>Proration method</Label>
+                      <Select value={form.proration_method} onValueChange={(value) => setForm({ ...form, proration_method: value })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="calendar_days">Calendar days</SelectItem>
+                          <SelectItem value="working_days">Working days</SelectItem>
+                          <SelectItem value="none">No proration</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Rounding</Label>
+                      <Select value={form.rounding_rule} onValueChange={(value) => setForm({ ...form, rounding_rule: value })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="nearest_0_01">Nearest 0.01</SelectItem>
+                          <SelectItem value="round_up">Round up</SelectItem>
+                          <SelectItem value="round_down">Round down</SelectItem>
+                          <SelectItem value="bankers">Banker’s rounding</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div><Label>Priority / sequence</Label><Input type="number" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} /></div>
+                    {([
+                      ["pensionable", "Pensionable"],
+                      ["proratable", "Proratable"],
+                      ["include_in_overtime_base", "Include in OT base"],
+                      ["affects_gross_pay", "Affects gross pay"],
+                      ["employer_component", "Employer component"],
+                      ["display_on_payslip", "Show on payslip"],
+                    ] as const).map(([key, label]) => (
+                      <div key={key} className="flex items-center justify-between rounded-md bg-slate-50 p-2">
+                        <Label>{label}</Label>
+                        <Switch checked={Boolean((form as any)[key])} onCheckedChange={(checked) => setForm({ ...form, [key]: checked })} />
+                      </div>
+                    ))}
+                  </div>
+                </details>
+
+                <details className="rounded-lg border bg-white">
+                  <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">Employer share, caps and tiers</summary>
+                  <div className="grid grid-cols-2 gap-3 border-t p-4">
+                    <div><Label>Employer amount</Label><Input type="number" value={form.employer_amount} onChange={(e) => setForm({ ...form, employer_amount: e.target.value })} /></div>
+                    <div><Label>Employer %</Label><Input type="number" value={form.employer_percentage} onChange={(e) => setForm({ ...form, employer_percentage: e.target.value })} /></div>
+                    <div><Label>Minimum amount</Label><Input type="number" value={form.min_amount} onChange={(e) => setForm({ ...form, min_amount: e.target.value })} /></div>
+                    <div><Label>Maximum amount</Label><Input type="number" value={form.max_amount} onChange={(e) => setForm({ ...form, max_amount: e.target.value })} /></div>
+                    <div><Label>Period cap</Label><Input type="number" value={form.period_cap} onChange={(e) => setForm({ ...form, period_cap: e.target.value })} /></div>
+                    <div><Label>YTD cap</Label><Input type="number" value={form.ytd_cap} onChange={(e) => setForm({ ...form, ytd_cap: e.target.value })} /></div>
+                    <div><Label>Contribution tier</Label><Input value={form.contribution_tier} onChange={(e) => setForm({ ...form, contribution_tier: e.target.value })} placeholder="employee / employer / tier3" /></div>
+                    <div><Label>Formula expression</Label><Input value={form.formula_expression} onChange={(e) => setForm({ ...form, formula_expression: e.target.value })} placeholder="Optional custom formula" /></div>
+                  </div>
+                </details>
+
+                <details className="rounded-lg border bg-white">
+                  <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">Accounting, statutory and audit</summary>
+                  <div className="grid grid-cols-2 gap-3 border-t p-4">
+                    <div><Label>GL debit</Label><Input value={form.gl_debit_account} onChange={(e) => setForm({ ...form, gl_debit_account: e.target.value })} /></div>
+                    <div><Label>GL credit</Label><Input value={form.gl_credit_account} onChange={(e) => setForm({ ...form, gl_credit_account: e.target.value })} /></div>
+                    <div><Label>Cost center</Label><Input value={form.cost_center} onChange={(e) => setForm({ ...form, cost_center: e.target.value })} /></div>
+                    <div><Label>Project code</Label><Input value={form.project_code} onChange={(e) => setForm({ ...form, project_code: e.target.value })} /></div>
+                    <div><Label>Statutory code</Label><Input value={form.statutory_code} onChange={(e) => setForm({ ...form, statutory_code: e.target.value })} /></div>
+                    <div><Label>Jurisdiction</Label><Input value={form.jurisdiction_code} onChange={(e) => setForm({ ...form, jurisdiction_code: e.target.value })} /></div>
+                    <div><Label>External reference</Label><Input value={form.external_reference} onChange={(e) => setForm({ ...form, external_reference: e.target.value })} /></div>
+                    <div>
+                      <Label>Approval status</Label>
+                      <Select value={form.approval_status} onValueChange={(value) => setForm({ ...form, approval_status: value })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="approved">Approved</SelectItem>
+                          <SelectItem value="pending">Pending approval</SelectItem>
+                          <SelectItem value="draft">Draft</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-2"><Label>Eligibility notes</Label><Input value={form.eligibility_notes} onChange={(e) => setForm({ ...form, eligibility_notes: e.target.value })} /></div>
+                    <div className="col-span-2"><Label>Override reason</Label><Input value={form.override_reason} onChange={(e) => setForm({ ...form, override_reason: e.target.value })} /></div>
+                    <div className="col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+                  </div>
+                </details>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button variant="outline" disabled={savingDefinition || !form.code || !form.name} onClick={() => void saveDefinition()}>
+                    {savingDefinition ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BookOpen className="mr-2 h-4 w-4" />}
+                    Save to catalogue
+                  </Button>
+                  <Button className="bg-slate-950 hover:bg-slate-800" disabled={closed || saving} onClick={() => void saveAssignment()}>
+                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BadgePercent className="mr-2 h-4 w-4" />}
+                    {closed ? "Period locked" : `Assign ${activeCategory.label}`}
+                  </Button>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -560,37 +873,91 @@ export default function PayrollComponentsPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <CardTitle>{activeCategory.label} for {payPeriod}</CardTitle>
-                <CardDescription>Effective employee assignments. Group and CSV batches are expanded into auditable individual records.</CardDescription>
+                <CardDescription>Live assignments from <code>payroll_component_assignments</code>. Group/CSV batches expand to individual audit rows.</CardDescription>
               </div>
               {category === "backpay" && (
-                <Button onClick={runSeparateBackpay} disabled={closed || backpayRunning}>
+                <Button onClick={() => void runSeparateBackpay()} disabled={closed || backpayRunning || separateBackpayCount === 0}>
                   {backpayRunning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Create separate backpay run
+                  Create separate backpay run ({separateBackpayCount})
                 </Button>
               )}
             </div>
           </CardHeader>
           <CardContent className="p-0">
             {loading ? (
-              <div className="flex items-center justify-center p-16 text-muted-foreground"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading assignments</div>
+              <div className="space-y-3 p-6">
+                <SkeletonBlock className="h-10 w-full" />
+                <SkeletonBlock className="h-10 w-full" />
+                <SkeletonBlock className="h-10 w-full" />
+                <div className="flex items-center justify-center gap-2 pt-4 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading assignments from database…
+                </div>
+              </div>
             ) : !(data.assignments || []).length ? (
-              <div className="p-16 text-center text-sm text-muted-foreground">No {activeCategory.label.toLowerCase()} assigned for this period.</div>
+              <div className="p-16 text-center text-sm text-muted-foreground">
+                No {activeCategory.label.toLowerCase()} assigned for this period yet. Pick a catalogue code or download the CSV template to begin.
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader><TableRow><TableHead>Employee</TableHead><TableHead>Component</TableHead><TableHead>Value</TableHead><TableHead>Tax / frequency</TableHead><TableHead>Effective</TableHead><TableHead>Source</TableHead><TableHead>Status</TableHead><TableHead className="w-12" /></TableRow></TableHeader>
-                  <TableBody>{data.assignments.map((row: any) => (
-                    <TableRow key={row.id}>
-                      <TableCell><p className="font-medium">{employeeName(row.employee || {})}</p><p className="text-xs text-muted-foreground">{row.employee?.employee_id}</p></TableCell>
-                      <TableCell><p className="font-medium">{row.name}</p><p className="text-xs text-muted-foreground">{row.code}</p></TableCell>
-                      <TableCell className="font-medium">{row.calculation_type === "percentage" ? `${row.percentage}% of ${String(row.calculation_basis || "basic salary").replaceAll("_", " ")}` : row.calculation_type === "rate_x_quantity" ? `${row.currency_code || "GHS"} ${Number(row.rate).toLocaleString()} × ${row.quantity}` : `${row.currency_code || "GHS"} ${Number(row.amount).toLocaleString()}`}</TableCell>
-                      <TableCell><p className="capitalize">{String(row.tax_treatment || (row.taxable ? "taxable" : "non taxable")).replaceAll("_", " ")}</p><p className="text-xs capitalize text-muted-foreground">{row.frequency || (row.recurring ? "monthly" : "one time")}</p></TableCell>
-                      <TableCell><p>{row.effective_period}</p><p className="text-xs text-muted-foreground">{row.end_period ? `to ${row.end_period}` : "No end date"}</p></TableCell>
-                      <TableCell className="capitalize">{row.source_scope_type.replace("_", " ")}</TableCell>
-                      <TableCell><span className={`rounded-full px-2 py-1 text-xs font-medium ${row.status === "active" ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>{row.approval_status || row.status}</span></TableCell>
-                      <TableCell><Button size="icon" variant="ghost" disabled={closed || row.status !== "active"} onClick={() => void removeAssignment(row.id)}><Trash2 className="h-4 w-4 text-rose-600" /></Button></TableCell>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Component</TableHead>
+                      <TableHead>Value</TableHead>
+                      <TableHead>Tax / frequency</TableHead>
+                      <TableHead>Effective</TableHead>
+                      <TableHead>Treatment</TableHead>
+                      <TableHead>Source</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="w-12" />
                     </TableRow>
-                  ))}</TableBody>
+                  </TableHeader>
+                  <TableBody>
+                    {data.assignments.map((row: any) => (
+                      <TableRow key={row.id}>
+                        <TableCell>
+                          <p className="font-medium">{employeeName(row.employee || {})}</p>
+                          <p className="text-xs text-muted-foreground">{row.employee?.employee_id}</p>
+                        </TableCell>
+                        <TableCell>
+                          <p className="font-medium">{row.payslip_label || row.name}</p>
+                          <p className="text-xs text-muted-foreground">{row.code}{row.priority != null ? ` · #${row.priority}` : ""}</p>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {row.calculation_type === "percentage"
+                            ? `${row.percentage}% of ${String(row.calculation_basis || "basic salary").replaceAll("_", " ")}`
+                            : row.calculation_type === "rate_x_quantity"
+                              ? `${row.currency_code || "GHS"} ${Number(row.rate).toLocaleString()} × ${row.quantity}`
+                              : `${row.currency_code || "GHS"} ${Number(row.amount).toLocaleString()}`}
+                        </TableCell>
+                        <TableCell>
+                          <p className="capitalize">{String(row.tax_treatment || (row.taxable ? "taxable" : "non taxable")).replaceAll("_", " ")}</p>
+                          <p className="text-xs capitalize text-muted-foreground">{row.frequency || (row.recurring ? "monthly" : "one time")}</p>
+                        </TableCell>
+                        <TableCell>
+                          <p>{row.effective_period}</p>
+                          <p className="text-xs text-muted-foreground">{row.end_period ? `to ${row.end_period}` : "Open-ended"}</p>
+                        </TableCell>
+                        <TableCell className="text-xs capitalize">
+                          {row.category === "backpay"
+                            ? String(row.payment_method || row.backpay_treatment || "with_payroll").replaceAll("_", " ")
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="capitalize">{String(row.source_scope_type || "").replaceAll("_", " ")}</TableCell>
+                        <TableCell>
+                          <span className={`rounded-full px-2 py-1 text-xs font-medium ${row.status === "active" ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>
+                            {row.approval_status || row.status}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Button size="icon" variant="ghost" disabled={closed || row.status !== "active"} onClick={() => void removeAssignment(row.id)}>
+                            <Trash2 className="h-4 w-4 text-rose-600" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
                 </Table>
               </div>
             )}

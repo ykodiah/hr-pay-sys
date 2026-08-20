@@ -61,11 +61,16 @@ export default function ResetPasswordPage() {
 
     setIsLoading(true)
     try {
-      const { error: updateError } = await createClient().auth.updateUser({ password })
+      const supabase = createClient()
+      const { error: updateError } = await supabase.auth.updateUser({
+        password,
+        data: { must_change_password: false },
+      })
       if (updateError) {
         setError(updateError.message.toLowerCase().includes("expired") ? "This reset link has expired. Request a new one." : "We could not update your password. Request a new link and try again.")
         return
       }
+      await fetch("/api/auth/finalize-password-reset", { method: "POST", credentials: "include" }).catch(() => undefined)
       setCompleted(true)
       window.setTimeout(() => router.push("/auth/login?password_updated=1"), 1200)
     } catch {

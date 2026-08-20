@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import {
   requirePortalSession,
   isPortalError,
   portalJsonError,
   logPortalActivity,
 } from "@/lib/self-service/portal-session"
-import { createClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -127,98 +125,33 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json().catch(() => ({}))
-    const current = String(body.current_password || "")
-    const next = String(body.new_password || "")
-    const confirm = String(body.confirm_password || "")
+    const email = session.user.email || session.account?.login_email
+    if (!email) return NextResponse.json({ error: "No login email on file" }, { status: 400 })
 
-    if (!current || !next || !confirm) {
-      return NextResponse.json({ error: "Complete all password fields" }, { status: 400 })
-    }
-    if (next !== confirm) {
-      return NextResponse.json({ error: "New passwords do not match" }, { status: 400 })
-    }
     const { data: policy } = await session.db
       .from("access_control_settings")
       .select("password_min_length, password_require_uppercase, password_require_lowercase, password_require_numbers, password_require_special")
       .eq("company_id", session.companyId)
       .maybeSingle()
 
-    const minLength = Math.max(8, Number(policy?.password_min_length || 8))
-    if (next.length < minLength) {
-      return NextResponse.json(
-        { error: `Your new password must be at least ${minLength} characters` },
-        { status: 400 },
-      )
-    }
-    if (policy?.password_require_lowercase !== false && !/[a-z]/.test(next)) {
-      return NextResponse.json({ error: "Use at least one lowercase letter" }, { status: 400 })
-    }
-    if (policy?.password_require_uppercase !== false && !/[A-Z]/.test(next)) {
-      return NextResponse.json({ error: "Use at least one uppercase letter" }, { status: 400 })
-    }
-    if (policy?.password_require_numbers !== false && !/[0-9]/.test(next)) {
-      return NextResponse.json({ error: "Use at least one number" }, { status: 400 })
-    }
-    if (policy?.password_require_special === true && !/[^A-Za-z0-9]/.test(next)) {
-      return NextResponse.json({ error: "Use at least one special character" }, { status: 400 })
-    }
-    if (next === current) {
-      return NextResponse.json({ error: "Choose a password you have not used before" }, { status: 400 })
-    }
-
-    const email = session.user.email || session.account?.login_email
-    if (!email) return NextResponse.json({ error: "No login email on file" }, { status: 400 })
-
-    // Verify in an isolated client so the server-side sign-in does not replace
-    // or invalidate the employee's browser session cookies.
-    const verifier = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { auth: { persistSession: false, autoRefreshToken: false } },
-    )
-    const { error: verifyError } = await verifier.auth.signInWithPassword({
-      email,
-      password: current,
-    })
-    if (verifyError) {
-      return NextResponse.json({ error: "Your current password is incorrect" }, { status: 400 })
-    }
-
-    const authenticated = await createClient()
-    const { data: sessionData, error: sessionError } = await authenticated.auth.getUser()
-    if (sessionError || sessionData.user?.id !== session.user.id) {
-      return NextResponse.json({ error: "Your session expired. Sign in again and retry." }, { status: 401 })
-    }
-    const { error: updateError } = await authenticated.auth.updateUser({
-      password: next,
-      data: {
-        ...(session.user.user_metadata || {}),
-        must_change_password: false,
+    const { changeAuthenticatedPassword } = await import("@/lib/auth/change-password")
+    const result = await changeAuthenticatedPassword(
+      {
+        email,
+        userId: session.user.id,
+        currentPassword: String(body.current_password || ""),
+        newPassword: String(body.new_password || ""),
+        confirmPassword: String(body.confirm_password || ""),
+        userMetadata: session.user.user_metadata,
+        companyId: session.companyId,
+        employeeId: session.employeeId,
+        clearPortalFlag: true,
       },
-    })
-    if (updateError) {
-      const message = updateError.message.toLowerCase()
-      const safeMessage = message.includes("password") || message.includes("weak")
-        ? "The new password does not meet the account password policy"
-        : "The password could not be updated. Try again or contact HR."
-      return NextResponse.json({ error: safeMessage }, { status: 400 })
-    }
-
-    const accountUpdate: Record<string, string | boolean> = {
-      must_change_password: false,
-      status: "active",
-      updated_at: new Date().toISOString(),
-    }
-    if (session.account?.status === "invited") accountUpdate.activated_at = new Date().toISOString()
-
-    await session.db
-      .from("employee_portal_accounts")
-      .update(accountUpdate)
-      .eq("employee_id", session.employeeId)
-      .eq("company_id", session.companyId)
+      policy,
+    )
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status })
 
     await logPortalActivity(session, "password_changed")
-
     return NextResponse.json({ success: true, message: "Password updated" })
   } catch (err) {
     return portalJsonError(err, "Failed to change password")

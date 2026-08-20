@@ -56,16 +56,20 @@ export async function POST(req: NextRequest) {
       .eq("category", "backpay")
       .eq("status", "active")
       .eq("approval_status", "approved")
-      .eq("payment_method", "separate_run")
       .lte("effective_period", period)
       .or(`end_period.is.null,end_period.gte.${period}`)
     if (assignmentError) throw assignmentError
-    if (!assignments?.length) {
+    const separate = (assignments || []).filter(
+      (row: any) =>
+        row.payment_method === "separate_run" ||
+        row.backpay_treatment === "separate_run",
+    )
+    if (!separate.length) {
       return NextResponse.json({ error: "No approved separate-run backpay entries exist for this period" }, { status: 409 })
     }
 
     const grouped = new Map<string, { employee: any; assignments: any[]; basic: number; amount: number }>()
-    for (const assignment of assignments) {
+    for (const assignment of separate) {
       const employee = Array.isArray(assignment.employee) ? assignment.employee[0] : assignment.employee
       if (!employee?.id) continue
       const financial = Array.isArray(employee.employee_financial)
@@ -100,7 +104,7 @@ export async function POST(req: NextRequest) {
       return { ...entry, tax }
     })
 
-    const assignmentIds = assignments.map((row: any) => row.id)
+    const assignmentIds = separate.map((row: any) => row.id)
     const { data: run, error: runError } = await service
       .from("payroll_runs")
       .insert({
@@ -193,7 +197,7 @@ export async function POST(req: NextRequest) {
       success: true,
       run,
       employee_count: calculated.length,
-      assignment_count: assignments.length,
+      assignment_count: separate.length,
       totals,
       message: "Backpay run created and sent for approval",
     })

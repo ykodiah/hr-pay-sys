@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { isUnresolvedTenant, resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
+import { definitionRowsForCompany } from "@/lib/payroll/component-catalogue"
 
 const CATEGORIES = new Set(["allowance", "deduction", "provident_fund", "bonus", "backpay"])
 const SCOPES = new Set(["individual", "department", "location", "division", "subsidiary", "csv"])
@@ -113,8 +114,57 @@ function assignmentPayload(input: any, employeeId: string, context: {
     approval_status: input.approval_status || "approved",
     approved_by: input.approval_status === "approved" || !input.approval_status ? context.userId : null,
     approved_at: input.approval_status === "approved" || !input.approval_status ? new Date().toISOString() : null,
+    unit_of_measure: input.unit_of_measure || "amount",
+    rounding_rule: input.rounding_rule || "nearest_0_01",
+    priority: Number(input.priority || 100),
+    statutory_code: input.statutory_code || null,
+    jurisdiction_code: input.jurisdiction_code || "GH",
+    payslip_label: input.payslip_label || null,
+    display_on_payslip: bool(input.display_on_payslip, true),
+    ytd_cap: input.ytd_cap === "" || input.ytd_cap == null ? null : number(input.ytd_cap),
+    period_cap: input.period_cap === "" || input.period_cap == null ? null : number(input.period_cap),
+    contribution_tier: input.contribution_tier || null,
+    formula_expression: input.formula_expression || null,
+    eligibility_notes: input.eligibility_notes || null,
+    arrears_months: Number(input.arrears_months || 0),
+    override_reason: input.override_reason || null,
+    affects_gross_pay: bool(input.affects_gross_pay, true),
+    employer_component: bool(input.employer_component),
     created_by: context.userId,
+    updated_at: new Date().toISOString(),
   }
+}
+
+async function ensureCatalogue(service: any, companyId: string, userId: string | null) {
+  const { count, error } = await service
+    .from("payroll_component_definitions")
+    .select("id", { count: "exact", head: true })
+    .eq("company_id", companyId)
+  if (error) return { seeded: false, error: error.message, definitions: [] as any[] }
+  if ((count || 0) > 0) {
+    const { data } = await service
+      .from("payroll_component_definitions")
+      .select("*")
+      .eq("company_id", companyId)
+      .eq("active", true)
+      .order("display_order")
+      .order("name")
+    return { seeded: false, error: null as string | null, definitions: data || [] }
+  }
+  const rows = definitionRowsForCompany(companyId, userId)
+  const { error: insertError } = await service.from("payroll_component_definitions").upsert(rows, {
+    onConflict: "company_id,category,code",
+    ignoreDuplicates: true,
+  })
+  if (insertError) return { seeded: false, error: insertError.message, definitions: [] as any[] }
+  const { data } = await service
+    .from("payroll_component_definitions")
+    .select("*")
+    .eq("company_id", companyId)
+    .eq("active", true)
+    .order("display_order")
+    .order("name")
+  return { seeded: true, error: null as string | null, definitions: data || [] }
 }
 
 export async function GET(req: NextRequest) {
@@ -122,7 +172,7 @@ export async function GET(req: NextRequest) {
     const ctx = await resolveTenantContext(req)
     if (ctx instanceof NextResponse) return ctx
     if (isUnresolvedTenant(ctx)) return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
-    const { companyId, service } = ctx
+    const { companyId, userId, service } = ctx
     const params = new URL(req.url).searchParams
     const period = params.get("pay_period") || new Date().toISOString().slice(0, 7)
     const category = params.get("category")
@@ -130,16 +180,31 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "pay_period must use YYYY-MM" }, { status: 400 })
     }
 
+    // Ensure the period row exists so the UI always reflects DB-backed open/closed state.
+    await service.from("payroll_periods").upsert(
+      {
+        company_id: companyId,
+        pay_period: period,
+        status: "open",
+        opened_by: userId,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "company_id,pay_period", ignoreDuplicates: true },
+    )
+
     let assignmentsQuery = service
       .from("payroll_component_assignments")
       .select("*, employee:employees(id, employee_id, first_name, last_name, department, location, division, subsidiary_id)")
       .eq("company_id", companyId)
+      .eq("status", "active")
       .lte("effective_period", period)
       .or(`end_period.is.null,end_period.gte.${period}`)
       .order("created_at", { ascending: false })
     if (category && CATEGORIES.has(category)) assignmentsQuery = assignmentsQuery.eq("category", category)
 
-    const [assignmentRes, employeeRes, subsidiaryRes, periodRes, definitionRes, importRes] = await Promise.all([
+    const catalogue = await ensureCatalogue(service, companyId, userId)
+
+    const [assignmentRes, employeeRes, subsidiaryRes, periodRes, importRes, runRes] = await Promise.all([
       assignmentsQuery,
       service
         .from("employees")
@@ -155,43 +220,54 @@ export async function GET(req: NextRequest) {
         .eq("pay_period", period)
         .maybeSingle(),
       service
-        .from("payroll_component_definitions")
-        .select("*")
-        .eq("company_id", companyId)
-        .eq("active", true)
-        .order("display_order")
-        .order("name"),
-      service
         .from("payroll_component_import_batches")
         .select("id, category, pay_period, file_name, status, total_rows, valid_rows, invalid_rows, imported_rows, created_at")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false })
         .limit(10),
+      service
+        .from("payroll_runs")
+        .select("id, status, run_type, pay_period_start, total_net_pay, employee_count, created_at")
+        .eq("company_id", companyId)
+        .eq("pay_period_start", `${period}-01`)
+        .order("created_at", { ascending: false })
+        .limit(5),
     ])
     if (assignmentRes.error) {
       const missingSchema = /does not exist|schema cache|relation|payroll_component/i.test(assignmentRes.error.message || "")
       return NextResponse.json(
         {
           error: missingSchema
-            ? "Payroll component database migration is not installed"
+            ? "Payroll component database migration is not installed. Run scripts/20260820_payroll_and_attendance_complete.sql"
             : assignmentRes.error.message,
           setup_required: missingSchema,
-          migration: "20260820170000 and 20260820210000",
+          migration: "20260820164500 through 20260820195000",
         },
         { status: missingSchema ? 503 : 500 },
       )
     }
     if (employeeRes.error) throw employeeRes.error
 
+    const definitions = (catalogue.definitions || []).filter((row: any) => !category || row.category === category)
+    const assignments = [...(assignmentRes.data || [])].sort(
+      (a: any, b: any) => Number(a.priority || 100) - Number(b.priority || 100),
+    )
     return NextResponse.json({
-      assignments: assignmentRes.data || [],
+      assignments,
       employees: employeeRes.data || [],
       subsidiaries: subsidiaryRes.data || [],
-      definitions: (definitionRes.data || []).filter((row: any) => !category || row.category === category),
+      definitions,
       imports: importRes.data || [],
+      runs: runRes.data || [],
       period: periodRes.data || { pay_period: period, status: "open" },
-      database_ready: !definitionRes.error && !periodRes.error,
-      database_warnings: [definitionRes.error?.message, periodRes.error?.message, importRes.error?.message].filter(Boolean),
+      catalogue_seeded: catalogue.seeded,
+      database_ready: !catalogue.error && !periodRes.error,
+      database_warnings: [
+        catalogue.error,
+        periodRes.error?.message,
+        importRes.error?.message,
+        runRes.error?.message,
+      ].filter(Boolean),
     })
   } catch (error) {
     return jsonError(error, "Failed to load payroll components")
@@ -349,7 +425,7 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      const { data, error } = await service.from("payroll_component_assignments").insert(payload).select()
+      const { data, error } = await insertAssignments(service, payload)
       if (error) throw error
       await service
         .from("payroll_component_import_batches")
@@ -421,13 +497,28 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       )
     }
-    const { data, error } = await service.from("payroll_component_assignments").insert(payload).select()
+    const { data, error } = await insertAssignments(service, payload)
     if (error) throw error
 
     return NextResponse.json({ success: true, assigned: data?.length || 0, batch_id: batchId, assignments: data })
   } catch (error) {
     return jsonError(error, "Failed to create payroll assignment")
   }
+}
+
+async function insertAssignments(service: any, payload: any[]) {
+  const first = await service.from("payroll_component_assignments").insert(payload).select()
+  if (!first.error) return first
+  const message = String(first.error.message || "")
+  const columnMatch = message.match(/column ["']?([a-z0-9_]+)["']? .*does not exist/i)
+  if (!columnMatch) return first
+  const missing = columnMatch[1]
+  const trimmed = payload.map((row) => {
+    const copy = { ...row }
+    delete copy[missing]
+    return copy
+  })
+  return service.from("payroll_component_assignments").insert(trimmed).select()
 }
 
 export async function DELETE(req: NextRequest) {

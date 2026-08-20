@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { requireApiUser } from "@/lib/auth/api-user"
+import { changeAuthenticatedPassword } from "@/lib/auth/change-password"
 import { isUnresolvedTenant, resolveTenantContext } from "@/lib/settings/resolve-tenant"
-import { createClient } from "@/lib/supabase/server"
 
 export const dynamic = "force-dynamic"
 
 async function context(req: NextRequest) {
   const user = await requireApiUser()
-  if (!user || user.isDemo) return { response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) }
+  if (!user) return { response: NextResponse.json({ error: "Unauthorized. Sign in again." }, { status: 401 }) }
+  if (user.isDemo) {
+    return {
+      response: NextResponse.json(
+        { error: "Password cannot be changed in demo mode. Sign in with your real administrator account." },
+        { status: 400 },
+      ),
+    }
+  }
   const tenant = await resolveTenantContext(req)
   if (tenant instanceof NextResponse) return { response: tenant }
   if (isUnresolvedTenant(tenant)) {
@@ -65,7 +72,6 @@ export async function GET(req: NextRequest) {
     employee?.full_name ||
     `${employee?.first_name || ""} ${employee?.last_name || ""}`.trim() ||
     user.email
-  const linked = Boolean(employee?.id)
   return NextResponse.json({
     profile: {
       ...profile,
@@ -79,7 +85,7 @@ export async function GET(req: NextRequest) {
       employee_code: employee?.employee_id || null,
       department: employee?.department || null,
     },
-    can_access_employee_portal: linked,
+    can_access_employee_portal: Boolean(employee?.id),
   })
 }
 
@@ -106,9 +112,13 @@ export async function PATCH(req: NextRequest) {
     .select("*")
     .single()
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  await tenant.service.auth.admin.updateUserById(user.id, {
-    user_metadata: { ...(user.user_metadata || {}), full_name: payload.display_name },
-  })
+  try {
+    await tenant.service.auth.admin.updateUserById(user.id, {
+      user_metadata: { ...(user.user_metadata || {}), full_name: payload.display_name },
+    })
+  } catch {
+    // Profile row is already saved.
+  }
   return NextResponse.json({ success: true, profile: data })
 }
 
@@ -117,47 +127,27 @@ export async function POST(req: NextRequest) {
   if ("response" in resolved) return resolved.response
   const { user, tenant } = resolved
   const body = await req.json().catch(() => ({}))
-  const current = String(body.current_password || "")
-  const next = String(body.new_password || "")
-  const confirm = String(body.confirm_password || "")
-  if (!user.email || !current || !next || !confirm) return NextResponse.json({ error: "Complete all password fields" }, { status: 400 })
-  if (next !== confirm) return NextResponse.json({ error: "New passwords do not match" }, { status: 400 })
+  if (!user.email) return NextResponse.json({ error: "No login email on file" }, { status: 400 })
+
   const { data: policy } = await tenant.service
     .from("access_control_settings")
     .select("password_min_length, password_require_uppercase, password_require_lowercase, password_require_numbers, password_require_special")
     .eq("company_id", tenant.companyId)
     .maybeSingle()
-  const minLength = Math.max(8, Number(policy?.password_min_length || 8))
-  if (next.length < minLength) return NextResponse.json({ error: `New password must be at least ${minLength} characters` }, { status: 400 })
-  if (policy?.password_require_lowercase !== false && !/[a-z]/.test(next)) return NextResponse.json({ error: "Use at least one lowercase letter" }, { status: 400 })
-  if (policy?.password_require_uppercase !== false && !/[A-Z]/.test(next)) return NextResponse.json({ error: "Use at least one uppercase letter" }, { status: 400 })
-  if (policy?.password_require_numbers !== false && !/[0-9]/.test(next)) return NextResponse.json({ error: "Use at least one number" }, { status: 400 })
-  if (policy?.password_require_special === true && !/[^A-Za-z0-9]/.test(next)) return NextResponse.json({ error: "Use at least one special character" }, { status: 400 })
-  if (current === next) return NextResponse.json({ error: "Choose a different password" }, { status: 400 })
 
-  const verifier = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } },
+  const result = await changeAuthenticatedPassword(
+    {
+      email: user.email,
+      userId: user.id,
+      currentPassword: String(body.current_password || ""),
+      newPassword: String(body.new_password || ""),
+      confirmPassword: String(body.confirm_password || ""),
+      userMetadata: user.user_metadata,
+      companyId: tenant.companyId,
+      clearPortalFlag: true,
+    },
+    policy,
   )
-  const { error: verifyError } = await verifier.auth.signInWithPassword({ email: user.email, password: current })
-  if (verifyError) return NextResponse.json({ error: "Current password is incorrect" }, { status: 400 })
-  // Update through the authenticated cookie client. This keeps the browser
-  // session valid and does not depend on service-role Auth Admin permissions.
-  const authenticated = await createClient()
-  const { data: sessionData, error: sessionError } = await authenticated.auth.getUser()
-  if (sessionError || sessionData.user?.id !== user.id) {
-    return NextResponse.json({ error: "Your session expired. Sign in again and retry." }, { status: 401 })
-  }
-  const { error } = await authenticated.auth.updateUser({
-    password: next,
-    data: { ...(user.user_metadata || {}), must_change_password: false },
-  })
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  await tenant.service
-    .from("employee_portal_accounts")
-    .update({ must_change_password: false, status: "active", updated_at: new Date().toISOString() })
-    .eq("user_id", user.id)
-    .eq("company_id", tenant.companyId)
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status })
   return NextResponse.json({ success: true, message: "Password updated" })
 }

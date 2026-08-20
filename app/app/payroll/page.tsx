@@ -391,7 +391,12 @@ function sumRows(rows: WorksheetRow[]) {
 }
 
 function ensureDemoSessionCookie() {
+  // Never force a synthetic demo cookie on real Supabase deployments.
+  // Doing so breaks password change and tenant APIs when getUser times out.
   if (typeof document === "undefined") return
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    if (process.env.NEXT_PUBLIC_ENABLE_SYNTHETIC_DEMO !== "true") return
+  }
   if (!document.cookie.includes("demo-session=active")) {
     document.cookie = "demo-session=active; path=/; max-age=86400; SameSite=Lax"
   }

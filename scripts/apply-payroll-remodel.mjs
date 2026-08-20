@@ -19,6 +19,7 @@ const migrations = [
   "supabase/migrations/20260820170000_payroll_components_and_periods.sql",
   "supabase/migrations/20260820190000_employee_portal_attendance_geo.sql",
   "supabase/migrations/20260820210000_payroll_components_enterprise_hardening.sql",
+  "supabase/migrations/20260820220000_payroll_components_complete_schema.sql",
 ]
 
 const client = new pg.Client({
