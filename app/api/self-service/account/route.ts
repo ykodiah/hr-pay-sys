@@ -6,6 +6,7 @@ import {
   portalJsonError,
   logPortalActivity,
 } from "@/lib/self-service/portal-session"
+import { createClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -183,9 +184,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Your current password is incorrect" }, { status: 400 })
     }
 
-    const { error: updateError } = await session.db.auth.admin.updateUserById(session.user.id, {
+    const authenticated = await createClient()
+    const { data: sessionData, error: sessionError } = await authenticated.auth.getUser()
+    if (sessionError || sessionData.user?.id !== session.user.id) {
+      return NextResponse.json({ error: "Your session expired. Sign in again and retry." }, { status: 401 })
+    }
+    const { error: updateError } = await authenticated.auth.updateUser({
       password: next,
-      user_metadata: {
+      data: {
         ...(session.user.user_metadata || {}),
         must_change_password: false,
       },

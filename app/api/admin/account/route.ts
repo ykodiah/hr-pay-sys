@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { requireApiUser } from "@/lib/auth/api-user"
 import { isUnresolvedTenant, resolveTenantContext } from "@/lib/settings/resolve-tenant"
+import { createClient } from "@/lib/supabase/server"
 
 export const dynamic = "force-dynamic"
 
@@ -141,7 +142,22 @@ export async function POST(req: NextRequest) {
   )
   const { error: verifyError } = await verifier.auth.signInWithPassword({ email: user.email, password: current })
   if (verifyError) return NextResponse.json({ error: "Current password is incorrect" }, { status: 400 })
-  const { error } = await tenant.service.auth.admin.updateUserById(user.id, { password: next })
+  // Update through the authenticated cookie client. This keeps the browser
+  // session valid and does not depend on service-role Auth Admin permissions.
+  const authenticated = await createClient()
+  const { data: sessionData, error: sessionError } = await authenticated.auth.getUser()
+  if (sessionError || sessionData.user?.id !== user.id) {
+    return NextResponse.json({ error: "Your session expired. Sign in again and retry." }, { status: 401 })
+  }
+  const { error } = await authenticated.auth.updateUser({
+    password: next,
+    data: { ...(user.user_metadata || {}), must_change_password: false },
+  })
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  await tenant.service
+    .from("employee_portal_accounts")
+    .update({ must_change_password: false, status: "active", updated_at: new Date().toISOString() })
+    .eq("user_id", user.id)
+    .eq("company_id", tenant.companyId)
   return NextResponse.json({ success: true, message: "Password updated" })
 }

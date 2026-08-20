@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
       .single()
     if (periodError) throw periodError
 
-    const [{ data: components }, { data: items }] = await Promise.all([
+    const [componentResult, itemResult] = await Promise.all([
       service
         .from("payroll_component_assignments")
         .select("*, employee:employees(employee_id, first_name, last_name, department, location, division, subsidiary_id, employee_financial(monthly_salary))")
@@ -149,6 +149,10 @@ export async function POST(req: NextRequest) {
         .eq("company_id", companyId)
         .eq("payroll_run_id", run.id),
     ])
+    if (componentResult.error) throw componentResult.error
+    if (itemResult.error) throw itemResult.error
+    const components = componentResult.data
+    const items = itemResult.data
 
     const snapshots = COMPONENT_CATEGORIES.map((category) => {
       const rows = (components || [])
@@ -162,7 +166,9 @@ export async function POST(req: NextRequest) {
           const appliedAmount =
             row.calculation_type === "percentage"
               ? Math.round((basic * Number(row.percentage || 0)) / 100 * 100) / 100
-              : Number(row.amount || 0)
+              : row.calculation_type === "rate_x_quantity"
+                ? Math.round(Number(row.rate || 0) * Number(row.quantity || 0) * 100) / 100
+                : Number(row.amount || 0)
           return { ...row, applied_amount: appliedAmount }
         })
       return {
@@ -173,6 +179,7 @@ export async function POST(req: NextRequest) {
         row_count: rows.length,
         total_amount: rows.reduce((sum: number, row: any) => sum + Number(row.applied_amount || 0), 0),
         data: rows,
+        generated_by: userId,
       }
     })
     snapshots.push({
@@ -183,6 +190,7 @@ export async function POST(req: NextRequest) {
       row_count: items?.length || 0,
       total_amount: (items || []).reduce((sum: number, row: any) => sum + Number(row.net_pay || 0), 0),
       data: items || [],
+      generated_by: userId,
     })
     const { error: snapshotError } = await service
       .from("payroll_period_snapshots")

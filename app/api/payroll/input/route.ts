@@ -94,9 +94,10 @@ export async function GET(request: NextRequest) {
       empIds.length
         ? supabase
             .from("payroll_component_assignments")
-            .select("employee_id, category, calculation_type, amount, percentage, backpay_treatment, status")
+            .select("employee_id, category, calculation_type, amount, percentage, rate, quantity, min_amount, max_amount, backpay_treatment, payment_method, approval_status, status")
             .eq("company_id", companyId)
             .eq("status", "active")
+            .eq("approval_status", "approved")
             .lte("effective_period", payPeriod)
             .or(`end_period.is.null,end_period.gte.${payPeriod}`)
             .in("employee_id", empIds)
@@ -156,14 +157,17 @@ export async function GET(request: NextRequest) {
       const componentAmount = (category: string, predicate?: (row: any) => boolean) =>
         componentRows
           .filter((row: any) => row.category === category && (!predicate || predicate(row)))
-          .reduce(
-            (sum: number, row: any) =>
-              sum +
-              (row.calculation_type === "percentage"
+          .reduce((sum: number, row: any) => {
+            let value =
+              row.calculation_type === "percentage"
                 ? (basic * Number(row.percentage || 0)) / 100
-                : Number(row.amount || 0)),
-            0,
-          )
+                : row.calculation_type === "rate_x_quantity"
+                  ? Number(row.rate || 0) * Number(row.quantity || 0)
+                  : Number(row.amount || 0)
+            if (row.min_amount != null) value = Math.max(value, Number(row.min_amount))
+            if (row.max_amount != null) value = Math.min(value, Number(row.max_amount))
+            return sum + value
+          }, 0)
       const cardAllow =
         sumCompLines(cardAllowByEmp.get(emp.id), basic, asOf) + componentAmount("allowance")
       const cardDed =
@@ -173,11 +177,11 @@ export async function GET(request: NextRequest) {
       const componentBonus = componentAmount("bonus")
       const componentBackpay = componentAmount(
         "backpay",
-        (row: any) => row.backpay_treatment !== "separate_run",
+        (row: any) => row.payment_method !== "separate_run" && row.backpay_treatment !== "separate_run",
       )
       const separateBackpay = componentAmount(
         "backpay",
-        (row: any) => row.backpay_treatment === "separate_run",
+        (row: any) => row.payment_method === "separate_run" || row.backpay_treatment === "separate_run",
       )
 
       return {
