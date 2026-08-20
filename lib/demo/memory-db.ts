@@ -406,10 +406,22 @@ type Filter =
   | { type: "lt"; col: string; val: unknown }
   | { type: "ilike"; col: string; val: unknown }
   | { type: "like"; col: string; val: unknown }
+  | { type: "or"; clauses: Array<{ col: string; operator: "eq" | "ilike"; val: unknown }> }
 
 function applyFilters(rows: DemoRow[], filters: Filter[]): DemoRow[] {
   return rows.filter((row) =>
     filters.every((f) => {
+      if (f.type === "or") {
+        return f.clauses.some((clause) => {
+          const value = row[clause.col]
+          if (clause.operator === "eq") return String(value ?? "") === String(clause.val ?? "")
+          const pattern = String(clause.val ?? "")
+            .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+            .replace(/%/g, ".*")
+            .replace(/_/g, ".")
+          return new RegExp(`^${pattern}$`, "i").test(String(value ?? ""))
+        })
+      }
       const v = row[f.col]
       switch (f.type) {
         case "eq":
@@ -675,6 +687,22 @@ export function createMemoryQueryBuilder(table: string) {
     },
     ilike(col: string, val: unknown) {
       state.filters.push({ type: "ilike", col, val })
+      return builder
+    },
+    or(expression: string) {
+      const clauses = String(expression || "")
+        .split(",")
+        .map((clause) => {
+          const [col, operator, ...rest] = clause.split(".")
+          if (!col || (operator !== "eq" && operator !== "ilike")) return null
+          return { col, operator, val: rest.join(".") } as {
+            col: string
+            operator: "eq" | "ilike"
+            val: unknown
+          }
+        })
+        .filter(Boolean) as Array<{ col: string; operator: "eq" | "ilike"; val: unknown }>
+      if (clauses.length) state.filters.push({ type: "or", clauses })
       return builder
     },
     is(col: string, val: unknown) {

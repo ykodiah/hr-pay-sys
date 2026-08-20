@@ -57,6 +57,10 @@ export default function LoginPage() {
 
     try {
       const supabase = createClient()
+      if ((supabase as any).__isMock) {
+        enterDemoMode(userType, demoEmail, fullName)
+        return
+      }
 
       // Prefer a real Supabase Auth session when demo users exist
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -131,6 +135,15 @@ export default function LoginPage() {
 
     try {
       const supabase = createClient()
+      if (
+        (supabase as any).__isMock &&
+        (email === DEMO_ADMIN_EMAIL || email === DEMO_EMPLOYEE_EMAIL) &&
+        password === DEMO_PASSWORD
+      ) {
+        const userType = email === DEMO_ADMIN_EMAIL ? "admin" : "employee"
+        enterDemoMode(userType, email, userType === "admin" ? "Admin User" : "Demo Employee")
+        return
+      }
 
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
