@@ -27,6 +27,10 @@ export const metadata: Metadata = {
     "workforce analytics Ghana",
   ],
   formatDetection: { email: false, address: false, telephone: false },
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+  },
   openGraph: {
     type: "website",
     locale: "en_GH",

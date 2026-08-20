@@ -42,9 +42,9 @@ export function SiteHeader() {
           <Link href="/get-started" className="group inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:-translate-y-0.5 hover:bg-emerald-700">
             Start free <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
           </Link>
-          <button aria-label="Open navigation menu" className="rounded-lg p-2 text-slate-600 lg:hidden">
+          <Link href="/features" aria-label="Browse product pages" className="rounded-lg p-2 text-slate-600 lg:hidden">
             <Menu className="h-5 w-5" />
-          </button>
+          </Link>
         </div>
       </div>
     </header>
