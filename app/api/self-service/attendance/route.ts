@@ -16,12 +16,112 @@ import {
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 
+const DEFAULT_SETTINGS = {
+  configured: false,
+  employee_gps_clock_enabled: true,
+  require_gps: true,
+  allow_web_clock: true,
+  biometric_enabled: false,
+  attendance_method_label: "GPS and biometric",
+}
+
 function today() {
   return new Date().toISOString().slice(0, 10)
 }
 
 function currentTime() {
   return new Date().toTimeString().slice(0, 5)
+}
+
+async function ensureAttendanceSettings(db: any, companyId: string) {
+  const { data, error } = await db
+    .from("company_attendance_settings")
+    .select("*")
+    .eq("company_id", companyId)
+    .maybeSingle()
+
+  if (error) {
+    // Missing table / schema lag should not hard-block portal clocking UI.
+    if (/does not exist|relation/i.test(error.message || "")) {
+      return { ...DEFAULT_SETTINGS, configured: false, schema_missing: true }
+    }
+    throw new Error(error.message)
+  }
+
+  if (data) {
+    return {
+      ...DEFAULT_SETTINGS,
+      ...data,
+      configured: true,
+      employee_gps_clock_enabled: data.employee_gps_clock_enabled !== false,
+      allow_web_clock: data.allow_web_clock !== false,
+      require_gps: data.require_gps !== false,
+    }
+  }
+
+  const seed = {
+    company_id: companyId,
+    employee_gps_clock_enabled: true,
+    require_gps: true,
+    allow_web_clock: true,
+    biometric_enabled: false,
+    attendance_method_label: "GPS and biometric",
+    updated_at: new Date().toISOString(),
+  }
+  const { data: created, error: insertError } = await db
+    .from("company_attendance_settings")
+    .upsert(seed, { onConflict: "company_id" })
+    .select("*")
+    .maybeSingle()
+
+  if (insertError) {
+    console.warn("[v0] Could not seed company_attendance_settings", insertError.message)
+    return { ...DEFAULT_SETTINGS, configured: false }
+  }
+
+  return {
+    ...DEFAULT_SETTINGS,
+    ...(created || seed),
+    configured: true,
+  }
+}
+
+async function loadBiometricDevices(db: any, companyId: string) {
+  const primary = await db
+    .from("biometric_devices")
+    .select("id, name, device_type, type, is_active, last_sync_at, last_sync")
+    .eq("company_id", companyId)
+    .eq("is_active", true)
+
+  if (!primary.error) {
+    return (primary.data || []).map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      device_type: row.device_type || row.type || "biometric",
+      is_active: row.is_active !== false,
+      last_sync_at: row.last_sync_at || row.last_sync || null,
+    }))
+  }
+
+  // Older schemas only have type / last_sync
+  const fallback = await db
+    .from("biometric_devices")
+    .select("id, name, type, is_active, last_sync")
+    .eq("company_id", companyId)
+    .eq("is_active", true)
+
+  if (fallback.error) {
+    if (/does not exist|relation|column/i.test(fallback.error.message || "")) return []
+    throw new Error(fallback.error.message)
+  }
+
+  return (fallback.data || []).map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    device_type: row.type || "biometric",
+    is_active: row.is_active !== false,
+    last_sync_at: row.last_sync || null,
+  }))
 }
 
 export async function GET(req: NextRequest) {
@@ -33,7 +133,7 @@ export async function GET(req: NextRequest) {
     const from = `${year}-01-01`
     const to = `${year}-12-31`
 
-    const [recordsRes, settingsRes, devicesRes] = await Promise.all([
+    const [recordsRes, settings, devices] = await Promise.all([
       session.db
         .from("attendance_records")
         .select("*")
@@ -42,29 +142,33 @@ export async function GET(req: NextRequest) {
         .gte("date", from)
         .lte("date", to)
         .order("date", { ascending: false }),
-      session.db
-        .from("company_attendance_settings")
-        .select("*")
-        .eq("company_id", session.companyId)
-        .maybeSingle(),
-      session.db
-        .from("biometric_devices")
-        .select("id, name, device_type, is_active, last_sync_at")
-        .eq("company_id", session.companyId)
-        .eq("is_active", true),
+      ensureAttendanceSettings(session.db, session.companyId),
+      loadBiometricDevices(session.db, session.companyId),
     ])
 
-    if (recordsRes.error) throw new Error(recordsRes.error.message)
+    if (recordsRes.error) {
+      if (/does not exist|relation/i.test(recordsRes.error.message || "")) {
+        return NextResponse.json({
+          records: [],
+          current: null,
+          summary: { total_hours: 0, overtime_hours: 0 },
+          settings: {
+            ...settings,
+            biometric_enabled: Boolean(devices.length),
+            attendance_method_label: devices.length
+              ? "Biometric or imported attendance"
+              : settings.attendance_method_label,
+          },
+          devices,
+          year,
+          warning: "Attendance tables are not installed yet. Run the portal attendance migration.",
+        })
+      }
+      throw new Error(recordsRes.error.message)
+    }
+
     const records = recordsRes.data || []
     const current = records.find((row: any) => row.date === today()) || null
-    const settings = settingsRes.data || {
-      configured: false,
-      employee_gps_clock_enabled: false,
-      require_gps: false,
-      allow_web_clock: false,
-      biometric_enabled: Boolean(devicesRes.data?.length),
-      attendance_method_label: devicesRes.data?.length ? "Biometric or imported attendance" : "Attendance not configured",
-    }
 
     const summary = records.reduce(
       (acc: Record<string, number>, row: any) => {
@@ -81,8 +185,13 @@ export async function GET(req: NextRequest) {
       records,
       current,
       summary,
-      settings,
-      devices: devicesRes.data || [],
+      settings: {
+        ...settings,
+        biometric_enabled: Boolean(settings.biometric_enabled || devices.length),
+        attendance_method_label: settings.attendance_method_label ||
+          (devices.length ? "GPS and biometric" : "GPS clock"),
+      },
+      devices,
       year,
     })
   } catch (err) {
@@ -101,16 +210,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Choose clock in or clock out" }, { status: 400 })
     }
 
-    const { data: settings, error: settingsError } = await session.db
-      .from("company_attendance_settings")
-      .select("*")
-      .eq("company_id", session.companyId)
-      .maybeSingle()
-    if (settingsError) {
-      console.error("[v0] Attendance settings lookup failed", settingsError)
-      return NextResponse.json({ error: "Attendance settings are unavailable. Please try again." }, { status: 503 })
+    const settings = await ensureAttendanceSettings(session.db, session.companyId)
+    if (settings.schema_missing) {
+      return NextResponse.json(
+        {
+          error:
+            "Attendance schema is missing. Run scripts/20260820_payroll_and_attendance_complete.sql in Supabase, then try again.",
+        },
+        { status: 503 },
+      )
     }
-    if (!settings || settings.employee_gps_clock_enabled !== true || settings.allow_web_clock !== true) {
+    if (settings.employee_gps_clock_enabled !== true || settings.allow_web_clock !== true) {
       return NextResponse.json(
         { error: "Portal clocking is disabled. Your biometric or imported attendance will still appear here." },
         { status: 403 },

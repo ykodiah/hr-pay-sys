@@ -1,5 +1,89 @@
 -- Enterprise payroll component catalogue, assignments and import audit.
 -- Safe after 20260820170000_payroll_components_and_periods.sql.
+-- Creates base assignment table if a prior migration was rolled back.
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TABLE IF NOT EXISTS public.tenant_user_profiles (
+  user_id uuid NOT NULL,
+  company_id uuid NOT NULL,
+  employee_id uuid,
+  display_name varchar(180),
+  job_title varchar(180),
+  phone varchar(50),
+  avatar_url text,
+  role_label varchar(80) DEFAULT 'Administrator',
+  bio text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, company_id)
+);
+
+CREATE OR REPLACE FUNCTION public.auth_company_ids()
+RETURNS SETOF uuid
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT company_id FROM public.tenant_user_profiles WHERE user_id = auth.uid();
+$$;
+
+CREATE TABLE IF NOT EXISTS public.payroll_periods (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+  pay_period TEXT NOT NULL CHECK (pay_period ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+  payroll_run_id UUID REFERENCES public.payroll_runs(id) ON DELETE SET NULL,
+  opened_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  opened_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  closed_at TIMESTAMPTZ,
+  closed_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  close_notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (company_id, pay_period)
+);
+
+CREATE TABLE IF NOT EXISTS public.payroll_component_assignments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+  employee_id UUID NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
+  category TEXT NOT NULL CHECK (
+    category IN ('allowance', 'deduction', 'provident_fund', 'bonus', 'backpay')
+  ),
+  code TEXT NOT NULL,
+  name TEXT NOT NULL,
+  calculation_type TEXT NOT NULL DEFAULT 'amount',
+  amount NUMERIC(15,2) NOT NULL DEFAULT 0 CHECK (amount >= 0),
+  percentage NUMERIC(7,4) NOT NULL DEFAULT 0 CHECK (percentage >= 0),
+  taxable BOOLEAN NOT NULL DEFAULT true,
+  recurring BOOLEAN NOT NULL DEFAULT true,
+  effective_period TEXT NOT NULL CHECK (effective_period ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),
+  end_period TEXT CHECK (end_period IS NULL OR end_period ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),
+  backpay_treatment TEXT,
+  source_scope_type TEXT NOT NULL DEFAULT 'individual',
+  source_scope_value TEXT,
+  source_batch_id UUID NOT NULL DEFAULT gen_random_uuid(),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+  notes TEXT,
+  created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.payroll_period_snapshots (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+  payroll_period_id UUID NOT NULL REFERENCES public.payroll_periods(id) ON DELETE CASCADE,
+  pay_period TEXT NOT NULL,
+  category TEXT NOT NULL,
+  row_count INTEGER NOT NULL DEFAULT 0,
+  total_amount NUMERIC(15,2) NOT NULL DEFAULT 0,
+  data JSONB NOT NULL DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (payroll_period_id, category)
+);
 
 CREATE TABLE IF NOT EXISTS public.payroll_component_definitions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -314,16 +398,12 @@ ALTER TABLE public.payroll_period_audit ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS payroll_component_definitions_company_read ON public.payroll_component_definitions;
 CREATE POLICY payroll_component_definitions_company_read ON public.payroll_component_definitions
   FOR SELECT TO authenticated
-  USING (company_id IN (
-    SELECT company_id FROM public.tenant_user_profiles WHERE user_id = auth.uid()
-  ));
+  USING (company_id IN (SELECT public.auth_company_ids()));
 
 DROP POLICY IF EXISTS payroll_component_import_batches_company_read ON public.payroll_component_import_batches;
 CREATE POLICY payroll_component_import_batches_company_read ON public.payroll_component_import_batches
   FOR SELECT TO authenticated
-  USING (company_id IN (
-    SELECT company_id FROM public.tenant_user_profiles WHERE user_id = auth.uid()
-  ));
+  USING (company_id IN (SELECT public.auth_company_ids()));
 
 GRANT SELECT ON public.payroll_component_definitions TO authenticated;
 GRANT SELECT ON public.payroll_component_import_batches TO authenticated;
@@ -333,8 +413,6 @@ GRANT SELECT ON public.payroll_period_audit TO authenticated;
 DROP POLICY IF EXISTS payroll_period_audit_company_read ON public.payroll_period_audit;
 CREATE POLICY payroll_period_audit_company_read ON public.payroll_period_audit
   FOR SELECT TO authenticated
-  USING (company_id IN (
-    SELECT company_id FROM public.tenant_user_profiles WHERE user_id = auth.uid()
-  ));
+  USING (company_id IN (SELECT public.auth_company_ids()));
 
 NOTIFY pgrst, 'reload schema';

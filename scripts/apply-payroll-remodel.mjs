@@ -1,3 +1,9 @@
+#!/usr/bin/env node
+/**
+ * Apply payroll remodel + portal attendance schema migrations in order.
+ * Usage: DATABASE_URL=... npm run db:migrate:payroll
+ * Also accepts SUPABASE_DB_URL.
+ */
 import { readFile } from "node:fs/promises"
 import process from "node:process"
 import pg from "pg"
@@ -9,7 +15,9 @@ if (!connectionString) {
 }
 
 const migrations = [
+  "supabase/migrations/20260820164500_tenant_profiles_and_payroll_bootstrap.sql",
   "supabase/migrations/20260820170000_payroll_components_and_periods.sql",
+  "supabase/migrations/20260820190000_employee_portal_attendance_geo.sql",
   "supabase/migrations/20260820210000_payroll_components_enterprise_hardening.sql",
 ]
 
@@ -27,12 +35,14 @@ try {
     try {
       await client.query(sql)
       await client.query("COMMIT")
+      console.log(`  OK ${path}`)
     } catch (error) {
       await client.query("ROLLBACK")
+      console.error(`  FAILED ${path}`)
       throw error
     }
   }
-  console.log("Payroll remodel migrations applied successfully.")
+  console.log("Payroll + attendance schema migrations applied successfully.")
 } finally {
   await client.end().catch(() => undefined)
 }

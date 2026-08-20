@@ -1,6 +1,35 @@
 -- Payroll component management and immutable period controls.
 -- Group assignments are expanded to employees when created, preserving who was
 -- included even if the organisation structure changes later.
+-- Requires 20260820164500_tenant_profiles_and_payroll_bootstrap.sql (or equivalent).
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- Ensure tenant profile map exists even if bootstrap migration was skipped.
+CREATE TABLE IF NOT EXISTS public.tenant_user_profiles (
+  user_id uuid NOT NULL,
+  company_id uuid NOT NULL,
+  employee_id uuid,
+  display_name varchar(180),
+  job_title varchar(180),
+  phone varchar(50),
+  avatar_url text,
+  role_label varchar(80) DEFAULT 'Administrator',
+  bio text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, company_id)
+);
+
+CREATE OR REPLACE FUNCTION public.auth_company_ids()
+RETURNS SETOF uuid
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT company_id FROM public.tenant_user_profiles WHERE user_id = auth.uid();
+$$;
 
 CREATE TABLE IF NOT EXISTS public.payroll_periods (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -87,29 +116,17 @@ ALTER TABLE public.payroll_period_snapshots ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS payroll_periods_company_read ON public.payroll_periods;
 CREATE POLICY payroll_periods_company_read ON public.payroll_periods
   FOR SELECT TO authenticated
-  USING (
-    company_id IN (
-      SELECT company_id FROM public.tenant_user_profiles WHERE user_id = auth.uid()
-    )
-  );
+  USING (company_id IN (SELECT public.auth_company_ids()));
 
 DROP POLICY IF EXISTS payroll_components_company_read ON public.payroll_component_assignments;
 CREATE POLICY payroll_components_company_read ON public.payroll_component_assignments
   FOR SELECT TO authenticated
-  USING (
-    company_id IN (
-      SELECT company_id FROM public.tenant_user_profiles WHERE user_id = auth.uid()
-    )
-  );
+  USING (company_id IN (SELECT public.auth_company_ids()));
 
 DROP POLICY IF EXISTS payroll_snapshots_company_read ON public.payroll_period_snapshots;
 CREATE POLICY payroll_snapshots_company_read ON public.payroll_period_snapshots
   FOR SELECT TO authenticated
-  USING (
-    company_id IN (
-      SELECT company_id FROM public.tenant_user_profiles WHERE user_id = auth.uid()
-    )
-  );
+  USING (company_id IN (SELECT public.auth_company_ids()));
 
 GRANT SELECT ON public.payroll_periods TO authenticated;
 GRANT SELECT ON public.payroll_component_assignments TO authenticated;
