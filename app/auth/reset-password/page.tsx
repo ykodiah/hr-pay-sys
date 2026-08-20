@@ -27,11 +27,11 @@ export default function ResetPasswordPage() {
     const supabase = createClient()
     let active = true
 
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(({ data }: any) => {
       if (active) setReady(Boolean(data.session))
     })
 
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event: string, session: any) => {
       if (!active) return
       if (event === "PASSWORD_RECOVERY" || session) setReady(true)
     })

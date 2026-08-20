@@ -39,7 +39,7 @@ export async function requireApiUser(): Promise<ApiUser | null> {
 
   try {
     const client = await createClient()
-    const result = await withTimeout(client.auth.getUser(), 2500)
+    const result: any = await withTimeout(client.auth.getUser(), 2500)
     const user = result.data?.user
     if (user) {
       // Prefer real auth over a leftover demo cookie

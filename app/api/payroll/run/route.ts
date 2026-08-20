@@ -189,7 +189,7 @@ export async function POST(request: Request) {
 
       if (totalsRows && totalsRows.length > 0) {
         const totals = totalsRows.reduce(
-          (acc, r) => ({
+          (acc: { gross: number; deductions: number; net: number; employer_cost: number }, r: any) => ({
             gross:        acc.gross        + Number(r.gross_pay          ?? 0),
             deductions:   acc.deductions   + Number(r.total_deductions   ?? 0),
             net:          acc.net          + Number(r.net_pay            ?? 0),

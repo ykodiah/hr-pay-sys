@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
     if (itemResult.error) throw itemResult.error
     const components = componentResult.data
     const items = itemResult.data
-    const itemByEmployee = new Map((items || []).map((item: any) => [item.employee_id, item]))
+    const itemByEmployee = new Map<string, any>((items || []).map((item: any) => [item.employee_id, item]))
 
     const snapshots = COMPONENT_CATEGORIES.map((category) => {
       const rows = (components || [])

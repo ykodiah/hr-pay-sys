@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
+import { isUnresolvedTenant, resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
 import { issuePayrollRunPayslips } from "@/lib/services/payslip-service"
 import { resolveEmployeeForUser } from "@/lib/employees/resolve-employee"
 
@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const ctx = await resolveTenantContext(request, body.company_id)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     const { companyId, userId, demo, service: supabase } = ctx
 
     const { payroll_run_id, action, notes, rejection_reason } = body
@@ -320,6 +321,7 @@ export async function GET(request: NextRequest) {
   try {
     const ctx = await resolveTenantContext(request)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     const { companyId, service: supabase } = ctx
 
     const { searchParams } = new URL(request.url)
