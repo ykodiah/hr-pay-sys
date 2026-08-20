@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
+import { isUnresolvedTenant, resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
 
 const CATEGORIES = new Set(["allowance", "deduction", "provident_fund", "bonus", "backpay"])
 const SCOPES = new Set(["individual", "department", "location", "division", "subsidiary", "csv"])
@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
   try {
     const ctx = await resolveTenantContext(req)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     const { companyId, service } = ctx
     const params = new URL(req.url).searchParams
     const period = params.get("pay_period") || new Date().toISOString().slice(0, 7)
@@ -76,6 +77,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const ctx = await resolveTenantContext(req, body.company_id)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     const { companyId, userId, service } = ctx
 
     const category = String(body.category || "")
@@ -158,6 +160,7 @@ export async function DELETE(req: NextRequest) {
     const body = await req.json()
     const ctx = await resolveTenantContext(req, body.company_id)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     const { companyId, service } = ctx
     const { data: row } = await service
       .from("payroll_component_assignments")

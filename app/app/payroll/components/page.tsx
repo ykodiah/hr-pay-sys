@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   BadgePercent,
   Banknote,
-  CalendarLock,
   Download,
   Gift,
   Loader2,
+  Lock,
   MinusCircle,
   PiggyBank,
   Plus,
@@ -210,7 +210,7 @@ export default function PayrollComponentsPage() {
             disabled={periodBusy}
             onClick={() => updatePeriod(closed ? "reopen" : "close")}
           >
-            {periodBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarLock className="mr-2 h-4 w-4" />}
+            {periodBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lock className="mr-2 h-4 w-4" />}
             {closed ? "Reopen period" : "Close period"}
           </Button>
         </div>
@@ -305,7 +305,7 @@ export default function PayrollComponentsPage() {
             {scopeOptions.length > 0 && (
               <Select value={form.scope_value} onValueChange={(value) => setForm({ ...form, scope_value: value })}>
                 <SelectTrigger><SelectValue placeholder={`Choose ${form.scope_type}`} /></SelectTrigger>
-                <SelectContent>{scopeOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+              <SelectContent>{scopeOptions.map((option: { value: string; label: string }) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
               </Select>
             )}
             {category === "backpay" && (

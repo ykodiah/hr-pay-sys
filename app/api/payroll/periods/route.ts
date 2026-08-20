@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
+import { isUnresolvedTenant, resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
 
 const PERIOD_RE = /^\d{4}-(0[1-9]|1[0-2])$/
 const COMPONENT_CATEGORIES = ["allowance", "deduction", "provident_fund", "bonus", "backpay"] as const
@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
   try {
     const ctx = await resolveTenantContext(req)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     const { companyId, service } = ctx
     const params = new URL(req.url).searchParams
     const period = params.get("pay_period") || ""
@@ -70,6 +71,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const ctx = await resolveTenantContext(req, body.company_id)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     const { companyId, userId, service } = ctx
     const period = String(body.pay_period || "")
     const action = String(body.action || "")
@@ -136,7 +138,7 @@ export async function POST(req: NextRequest) {
     const [{ data: components }, { data: items }] = await Promise.all([
       service
         .from("payroll_component_assignments")
-        .select("*, employee:employees(employee_id, first_name, last_name, department, location, division, subsidiary_id), financial:employees(employee_financial(monthly_salary))")
+        .select("*, employee:employees(employee_id, first_name, last_name, department, location, division, subsidiary_id, employee_financial(monthly_salary))")
         .eq("company_id", companyId)
         .eq("status", "active")
         .lte("effective_period", period)
@@ -152,8 +154,11 @@ export async function POST(req: NextRequest) {
       const rows = (components || [])
         .filter((row: any) => row.category === category)
         .map((row: any) => {
-          const financial = Array.isArray(row.financial) ? row.financial[0] : row.financial
-          const basic = Number(financial?.employee_financial?.[0]?.monthly_salary || 0)
+          const employee = Array.isArray(row.employee) ? row.employee[0] : row.employee
+          const financial = Array.isArray(employee?.employee_financial)
+            ? employee.employee_financial[0]
+            : employee?.employee_financial
+          const basic = Number(financial?.monthly_salary || 0)
           const appliedAmount =
             row.calculation_type === "percentage"
               ? Math.round((basic * Number(row.percentage || 0)) / 100 * 100) / 100

@@ -51,7 +51,9 @@ export function generateToken(user: SuperadminUser, expiresIn: string = '24h'): 
     role: user.role,
     expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
   }
-  return jwt.sign(payload, SUPERADMIN_JWT_SECRET, { expiresIn })
+  return jwt.sign(payload, SUPERADMIN_JWT_SECRET, {
+    expiresIn: expiresIn as jwt.SignOptions['expiresIn'],
+  })
 }
 
 /**
