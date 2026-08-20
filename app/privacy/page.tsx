@@ -2,6 +2,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Shield, Lock, Eye, Users } from "lucide-react"
 import Link from "next/link"
+import type { Metadata } from "next"
+
+export const metadata: Metadata = {
+  title: "Privacy Policy | AkwaabaHRPay",
+  description: "Learn how AkwaabaHRPay collects, uses, stores and protects account, employee, payroll and platform usage information.",
+  alternates: { canonical: "/privacy" },
+  robots: { index: true, follow: true },
+}
 
 export default function PrivacyPage() {
   return (
@@ -53,7 +61,7 @@ export default function PrivacyPage() {
               Your privacy and data security are fundamental to our service. This policy explains how we collect, use,
               and protect your information.
             </p>
-            <p className="text-sm text-gray-500 mt-4">Last updated: January 2025</p>
+            <p className="text-sm text-gray-500 mt-4">Last updated: August 2026</p>
           </div>
         </div>
       </section>

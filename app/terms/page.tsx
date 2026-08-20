@@ -2,6 +2,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { FileText, Scale, Shield } from "lucide-react"
 import Link from "next/link"
+import type { Metadata } from "next"
+
+export const metadata: Metadata = {
+  title: "Terms of Service | AkwaabaHRPay",
+  description: "Terms governing access to and use of the AkwaabaHRPay HR and payroll platform, including accounts, subscriptions, data, acceptable use and service conditions.",
+  alternates: { canonical: "/terms" },
+  robots: { index: true, follow: true },
+}
 
 export default function TermsPage() {
   return (
@@ -53,7 +61,7 @@ export default function TermsPage() {
               These terms govern your use of AkwaabaHRPay's HR and payroll management platform. Please read them
               carefully.
             </p>
-            <p className="text-sm text-gray-500 mt-4">Last updated: January 2025</p>
+            <p className="text-sm text-gray-500 mt-4">Last updated: August 2026</p>
           </div>
         </div>
       </section>
