@@ -67,7 +67,7 @@ export default function ResetPasswordPage() {
         return
       }
       setCompleted(true)
-      window.setTimeout(() => router.push("/self-service"), 1200)
+      window.setTimeout(() => router.push("/auth/login?password_updated=1"), 1200)
     } catch {
       setError("We could not update your password. Request a new link and try again.")
     } finally {
@@ -90,7 +90,7 @@ export default function ResetPasswordPage() {
           {completed ? (
             <Alert>
               <CheckCircle2 className="h-4 w-4" />
-              <AlertDescription>Password updated. Taking you to your portal...</AlertDescription>
+              <AlertDescription>Password updated. Taking you to sign in...</AlertDescription>
             </Alert>
           ) : !ready ? (
             <div className="space-y-4">

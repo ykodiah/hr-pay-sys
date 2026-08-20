@@ -156,6 +156,149 @@ ALTER TABLE public.payroll_period_snapshots
   ADD COLUMN IF NOT EXISTS checksum TEXT,
   ADD COLUMN IF NOT EXISTS generated_by UUID REFERENCES auth.users(id) ON DELETE SET NULL;
 
+ALTER TABLE public.payroll_periods
+  ADD COLUMN IF NOT EXISTS reopened_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS reopened_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS reopen_reason TEXT;
+
+CREATE TABLE IF NOT EXISTS public.payroll_period_audit (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+  payroll_period_id UUID NOT NULL REFERENCES public.payroll_periods(id) ON DELETE CASCADE,
+  pay_period TEXT NOT NULL,
+  action TEXT NOT NULL CHECK (action IN ('opened', 'closed', 'reopened')),
+  actor_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  reason TEXT,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE OR REPLACE FUNCTION public.finalize_payroll_period(
+  p_company_id UUID,
+  p_pay_period TEXT,
+  p_payroll_run_id UUID,
+  p_actor_id UUID,
+  p_notes TEXT,
+  p_snapshots JSONB
+) RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_period_id UUID;
+  v_snapshot JSONB;
+BEGIN
+  INSERT INTO public.payroll_periods (
+    company_id, pay_period, status, payroll_run_id, opened_by, close_notes
+  ) VALUES (
+    p_company_id, p_pay_period, 'open', p_payroll_run_id, p_actor_id, p_notes
+  )
+  ON CONFLICT (company_id, pay_period) DO UPDATE
+    SET payroll_run_id = EXCLUDED.payroll_run_id,
+        close_notes = EXCLUDED.close_notes,
+        updated_at = now()
+  RETURNING id INTO v_period_id;
+
+  IF EXISTS (
+    SELECT 1 FROM public.payroll_periods
+    WHERE id = v_period_id AND status = 'closed'
+  ) THEN
+    RAISE EXCEPTION 'Payroll period % is already closed', p_pay_period;
+  END IF;
+
+  FOR v_snapshot IN SELECT value FROM jsonb_array_elements(p_snapshots)
+  LOOP
+    INSERT INTO public.payroll_period_snapshots (
+      company_id, payroll_period_id, pay_period, category, row_count,
+      total_amount, data, schema_version, generated_by
+    ) VALUES (
+      p_company_id,
+      v_period_id,
+      p_pay_period,
+      v_snapshot->>'category',
+      COALESCE((v_snapshot->>'row_count')::INTEGER, 0),
+      COALESCE((v_snapshot->>'total_amount')::NUMERIC, 0),
+      COALESCE(v_snapshot->'data', '[]'::jsonb),
+      2,
+      p_actor_id
+    )
+    ON CONFLICT (payroll_period_id, category) DO UPDATE
+      SET row_count = EXCLUDED.row_count,
+          total_amount = EXCLUDED.total_amount,
+          data = EXCLUDED.data,
+          schema_version = EXCLUDED.schema_version,
+          generated_by = EXCLUDED.generated_by,
+          created_at = now();
+  END LOOP;
+
+  UPDATE public.payroll_periods
+  SET status = 'closed',
+      payroll_run_id = p_payroll_run_id,
+      closed_at = now(),
+      closed_by = p_actor_id,
+      close_notes = p_notes,
+      updated_at = now()
+  WHERE id = v_period_id;
+
+  INSERT INTO public.payroll_period_audit (
+    company_id, payroll_period_id, pay_period, action, actor_id, reason,
+    metadata
+  ) VALUES (
+    p_company_id, v_period_id, p_pay_period, 'closed', p_actor_id, p_notes,
+    jsonb_build_object('payroll_run_id', p_payroll_run_id)
+  );
+
+  RETURN v_period_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.reopen_payroll_period(
+  p_company_id UUID,
+  p_pay_period TEXT,
+  p_actor_id UUID,
+  p_reason TEXT
+) RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_period_id UUID;
+BEGIN
+  UPDATE public.payroll_periods
+  SET status = 'open',
+      reopened_at = now(),
+      reopened_by = p_actor_id,
+      reopen_reason = p_reason,
+      updated_at = now()
+  WHERE company_id = p_company_id
+    AND pay_period = p_pay_period
+    AND status = 'closed'
+  RETURNING id INTO v_period_id;
+
+  IF v_period_id IS NULL THEN
+    RAISE EXCEPTION 'Closed payroll period % was not found', p_pay_period;
+  END IF;
+
+  INSERT INTO public.payroll_period_audit (
+    company_id, payroll_period_id, pay_period, action, actor_id, reason
+  ) VALUES (
+    p_company_id, v_period_id, p_pay_period, 'reopened', p_actor_id, p_reason
+  );
+  RETURN v_period_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.finalize_payroll_period(UUID, TEXT, UUID, UUID, TEXT, JSONB)
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.reopen_payroll_period(UUID, TEXT, UUID, TEXT)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.finalize_payroll_period(UUID, TEXT, UUID, UUID, TEXT, JSONB)
+  TO service_role;
+GRANT EXECUTE ON FUNCTION public.reopen_payroll_period(UUID, TEXT, UUID, TEXT)
+  TO service_role;
+
 CREATE INDEX IF NOT EXISTS idx_payroll_component_definitions_company
   ON public.payroll_component_definitions(company_id, category, active, display_order);
 CREATE INDEX IF NOT EXISTS idx_payroll_component_assignments_definition
@@ -166,6 +309,7 @@ CREATE INDEX IF NOT EXISTS idx_payroll_component_import_batches_company
 ALTER TABLE public.payroll_component_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payroll_component_import_batches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payroll_component_import_rows ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payroll_period_audit ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS payroll_component_definitions_company_read ON public.payroll_component_definitions;
 CREATE POLICY payroll_component_definitions_company_read ON public.payroll_component_definitions
@@ -184,5 +328,13 @@ CREATE POLICY payroll_component_import_batches_company_read ON public.payroll_co
 GRANT SELECT ON public.payroll_component_definitions TO authenticated;
 GRANT SELECT ON public.payroll_component_import_batches TO authenticated;
 GRANT SELECT ON public.payroll_component_import_rows TO authenticated;
+GRANT SELECT ON public.payroll_period_audit TO authenticated;
+
+DROP POLICY IF EXISTS payroll_period_audit_company_read ON public.payroll_period_audit;
+CREATE POLICY payroll_period_audit_company_read ON public.payroll_period_audit
+  FOR SELECT TO authenticated
+  USING (company_id IN (
+    SELECT company_id FROM public.tenant_user_profiles WHERE user_id = auth.uid()
+  ));
 
 NOTIFY pgrst, 'reload schema';

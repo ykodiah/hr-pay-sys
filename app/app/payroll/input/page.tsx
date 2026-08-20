@@ -43,6 +43,9 @@ type PayInputRow = {
     other_allowances: number
     card_allowances?: number
     card_deductions?: number
+    component_bonus?: number
+    component_backpay?: number
+    separate_backpay?: number
     tier2_applicable: boolean
     tier3_applicable: boolean
     provident_fund_rate?: number
@@ -96,6 +99,14 @@ function effectiveAllowances(row: PayInputRow) {
 /** Period other deductions + employee card deductions (same as Process Payroll). */
 function effectiveOtherDeductions(row: PayInputRow) {
   return Number(row.input.other_deductions ?? 0) + Number(row.master.card_deductions ?? 0)
+}
+
+function effectiveBonus(row: PayInputRow) {
+  return (
+    Number(row.input.bonus_amount ?? 0) +
+    Number(row.master.component_bonus ?? 0) +
+    Number(row.master.component_backpay ?? 0)
+  )
 }
 
 export default function PayInputsPage() {
@@ -219,7 +230,7 @@ export default function PayInputsPage() {
         monthly_basic: effectiveBasic(row),
         monthly_allowances: { other: effectiveAllowances(row) },
         monthly_overtime: row.input.overtime_amount,
-        monthly_bonus: row.input.bonus_amount,
+        monthly_bonus: effectiveBonus(row),
         tier2_applicable: row.input.tier2_applicable,
         tier3_applicable: row.input.tier3_applicable,
         tier3_employee_rate: row.input.tier3_employee_rate || undefined,

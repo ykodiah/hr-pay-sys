@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
+import { isUnresolvedTenant, resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
 import { sumCompLines } from "@/lib/payroll/employee-comp-extras"
 
 const ACTIVE_STATUSES = ["Active", "active", "ACTIVE"]
@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
   try {
     const ctx = await resolveTenantContext(request)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     const { companyId, service: supabase } = ctx
 
     const { searchParams } = new URL(request.url)
@@ -53,12 +54,12 @@ export async function GET(request: NextRequest) {
       if (fallback.error) {
         return NextResponse.json({ error: fallback.error.message }, { status: 500 })
       }
-      const empIdsFb = (fallback.data ?? []).map((e) => e.id)
+      const empIdsFb = (fallback.data ?? []).map((e: any) => e.id)
       const { data: financials } = empIdsFb.length
         ? await supabase.from("employee_financial").select("*").in("employee_id", empIdsFb)
         : { data: [] as any[] }
       const finByEmp = new Map((financials ?? []).map((f: any) => [f.employee_id, f]))
-      employees = (fallback.data ?? []).map((e) => ({
+      employees = (fallback.data ?? []).map((e: any) => ({
         ...e,
         financial: finByEmp.get(e.id) ?? null,
       }))
@@ -94,7 +95,7 @@ export async function GET(request: NextRequest) {
       empIds.length
         ? supabase
             .from("payroll_component_assignments")
-            .select("employee_id, category, calculation_type, amount, percentage, rate, quantity, min_amount, max_amount, backpay_treatment, payment_method, approval_status, status")
+            .select("employee_id, category, calculation_type, amount, percentage, rate, quantity, min_amount, max_amount, tax_treatment, backpay_treatment, payment_method, approval_status, status")
             .eq("company_id", companyId)
             .eq("status", "active")
             .eq("approval_status", "approved")
@@ -109,8 +110,8 @@ export async function GET(request: NextRequest) {
     if (loansRes.error) warnings.push(`loans: ${loansRes.error.message}`)
     if (componentRes.error) warnings.push(`payroll_components: ${componentRes.error.message}`)
 
-    const inputsByEmployee = new Map(
-      (inputsRes.data ?? []).map((row) => [row.employee_id, row]),
+    const inputsByEmployee = new Map<string, any>(
+      (inputsRes.data ?? []).map((row: any) => [row.employee_id, row]),
     )
     const { isLoanInPayPeriod } = await import("@/lib/payroll/loan-summary")
     const loansByEmployee = new Map<string, { payment: number; balance: number }>()
@@ -168,6 +169,10 @@ export async function GET(request: NextRequest) {
             if (row.max_amount != null) value = Math.min(value, Number(row.max_amount))
             return sum + value
           }, 0)
+      const nonTaxableAllowance = componentAmount(
+        "allowance",
+        (row: any) => row.tax_treatment === "non_taxable" || row.tax_treatment === "tax_relief",
+      )
       const cardAllow =
         sumCompLines(cardAllowByEmp.get(emp.id), basic, asOf) + componentAmount("allowance")
       const cardDed =
@@ -175,9 +180,20 @@ export async function GET(request: NextRequest) {
       const componentPf = componentAmount("provident_fund")
       const componentPfRate = basic > 0 ? (componentPf / basic) * 100 : 0
       const componentBonus = componentAmount("bonus")
+      const nonTaxableBonus = componentAmount(
+        "bonus",
+        (row: any) => row.tax_treatment === "non_taxable" || row.tax_treatment === "tax_relief",
+      )
       const componentBackpay = componentAmount(
         "backpay",
         (row: any) => row.payment_method !== "separate_run" && row.backpay_treatment !== "separate_run",
+      )
+      const nonTaxableBackpay = componentAmount(
+        "backpay",
+        (row: any) =>
+          row.payment_method !== "separate_run" &&
+          row.backpay_treatment !== "separate_run" &&
+          (row.tax_treatment === "non_taxable" || row.tax_treatment === "tax_relief"),
       )
       const separateBackpay = componentAmount(
         "backpay",
@@ -210,6 +226,8 @@ export async function GET(request: NextRequest) {
           card_deductions: cardDed,
           component_bonus: componentBonus,
           component_backpay: componentBackpay,
+          component_non_taxable_allowances: nonTaxableAllowance,
+          component_non_taxable_bonus: nonTaxableBonus + nonTaxableBackpay,
           separate_backpay: separateBackpay,
           tier2_applicable: Number(fin?.tier2_employee_contribution ?? 0) >= 0,
           tier3_applicable:
@@ -230,7 +248,7 @@ export async function GET(request: NextRequest) {
               uniform_allowance: input.uniform_allowance,
               other_allowances: input.other_allowances,
               overtime_amount: Number(input.overtime_amount ?? 0),
-              bonus_amount: Number(input.bonus_amount ?? 0) + componentBonus + componentBackpay,
+              bonus_amount: Number(input.bonus_amount ?? 0),
               loan_deduction: Number(input.loan_deduction ?? loan?.payment ?? 0),
               advance_deduction: Number(input.advance_deduction ?? 0),
               other_deductions: Number(input.other_deductions ?? 0),
@@ -258,7 +276,7 @@ export async function GET(request: NextRequest) {
               uniform_allowance: null,
               other_allowances: null,
               overtime_amount: 0,
-              bonus_amount: componentBonus + componentBackpay,
+              bonus_amount: 0,
               loan_deduction: loan?.payment ?? 0,
               advance_deduction: 0,
               other_deductions: 0,
@@ -303,6 +321,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const ctx = await resolveTenantContext(request, body.company_id)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     const { companyId: company_id, service: supabase } = ctx
 
     const { pay_period, pay_period_start, pay_period_end, rows } = body as {
@@ -319,12 +338,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: periodControl } = await supabase
+    const { data: periodControl, error: periodControlError } = await supabase
       .from("payroll_periods")
       .select("status")
       .eq("company_id", company_id)
       .eq("pay_period", pay_period)
       .maybeSingle()
+    if (periodControlError) {
+      return NextResponse.json(
+        { error: `Payroll period control unavailable: ${periodControlError.message}` },
+        { status: 503 },
+      )
+    }
     if (periodControl?.status === "closed") {
       return NextResponse.json(
         { error: `${pay_period} is closed. Pay inputs are locked.` },

@@ -68,6 +68,24 @@ export async function POST(request: NextRequest) {
         { status: 404 },
       )
     }
+    const controlledPeriod = run.pay_period_start ? String(run.pay_period_start).slice(0, 7) : null
+    if (controlledPeriod) {
+      const { data: periodControl, error: periodControlError } = await supabase
+        .from("payroll_periods")
+        .select("status")
+        .eq("company_id", companyId)
+        .eq("pay_period", controlledPeriod)
+        .maybeSingle()
+      if (periodControlError) {
+        return NextResponse.json(
+          { error: `Payroll period control unavailable: ${periodControlError.message}` },
+          { status: 503 },
+        )
+      }
+      if (periodControl?.status === "closed") {
+        return NextResponse.json({ error: `${controlledPeriod} is closed and immutable` }, { status: 409 })
+      }
+    }
 
     // Count employees on this run — never approve empty runs
     const { count: itemCount } = await supabase

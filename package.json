@@ -14,6 +14,7 @@
   "main": "next.config.mjs",
   "scripts": {
     "build": "next build",
+    "db:migrate:payroll": "node scripts/apply-payroll-remodel.mjs",
     "dev": "next dev",
     "lint": "next lint",
     "smoke": "bash scripts/smoke-tests.sh",

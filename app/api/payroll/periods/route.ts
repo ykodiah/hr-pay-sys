@@ -80,21 +80,23 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "reopen") {
-      const { data, error } = await service
+      if (!String(body.notes || "").trim()) {
+        return NextResponse.json({ error: "A reason is required to reopen a closed period" }, { status: 400 })
+      }
+      const { error } = await service.rpc("reopen_payroll_period", {
+        p_company_id: companyId,
+        p_pay_period: period,
+        p_actor_id: userId,
+        p_reason: String(body.notes).trim(),
+      })
+      if (error) throw error
+      const { data } = await service
         .from("payroll_periods")
-        .update({
-          status: "open",
-          closed_at: null,
-          closed_by: null,
-          close_notes: body.notes || null,
-          updated_at: new Date().toISOString(),
-        })
+        .select("*")
         .eq("company_id", companyId)
         .eq("pay_period", period)
-        .select()
-        .maybeSingle()
-      if (error) throw error
-      return NextResponse.json({ success: true, period: data || { pay_period: period, status: "open" } })
+        .single()
+      return NextResponse.json({ success: true, period: data })
     }
 
     const start = `${period}-01`
@@ -115,26 +117,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const now = new Date().toISOString()
-    const { data: payrollPeriod, error: periodError } = await service
-      .from("payroll_periods")
-      .upsert(
-        {
-          company_id: companyId,
-          pay_period: period,
-          status: "closed",
-          payroll_run_id: run.id,
-          closed_at: now,
-          closed_by: userId,
-          close_notes: body.notes || null,
-          updated_at: now,
-        },
-        { onConflict: "company_id,pay_period" },
-      )
-      .select()
-      .single()
-    if (periodError) throw periodError
-
     const [componentResult, itemResult] = await Promise.all([
       service
         .from("payroll_component_assignments")
@@ -153,6 +135,7 @@ export async function POST(req: NextRequest) {
     if (itemResult.error) throw itemResult.error
     const components = componentResult.data
     const items = itemResult.data
+    const itemByEmployee = new Map((items || []).map((item: any) => [item.employee_id, item]))
 
     const snapshots = COMPONENT_CATEGORIES.map((category) => {
       const rows = (components || [])
@@ -162,7 +145,7 @@ export async function POST(req: NextRequest) {
           const financial = Array.isArray(employee?.employee_financial)
             ? employee.employee_financial[0]
             : employee?.employee_financial
-          const basic = Number(financial?.monthly_salary || 0)
+          const basic = Number(itemByEmployee.get(row.employee_id)?.basic_salary ?? financial?.monthly_salary ?? 0)
           const appliedAmount =
             row.calculation_type === "percentage"
               ? Math.round((basic * Number(row.percentage || 0)) / 100 * 100) / 100
@@ -172,30 +155,34 @@ export async function POST(req: NextRequest) {
           return { ...row, applied_amount: appliedAmount }
         })
       return {
-        company_id: companyId,
-        payroll_period_id: payrollPeriod.id,
-        pay_period: period,
         category,
         row_count: rows.length,
         total_amount: rows.reduce((sum: number, row: any) => sum + Number(row.applied_amount || 0), 0),
         data: rows,
-        generated_by: userId,
       }
     })
     snapshots.push({
-      company_id: companyId,
-      payroll_period_id: payrollPeriod.id,
-      pay_period: period,
       category: "payroll" as any,
       row_count: items?.length || 0,
       total_amount: (items || []).reduce((sum: number, row: any) => sum + Number(row.net_pay || 0), 0),
       data: items || [],
-      generated_by: userId,
     })
-    const { error: snapshotError } = await service
-      .from("payroll_period_snapshots")
-      .upsert(snapshots, { onConflict: "payroll_period_id,category" })
-    if (snapshotError) throw snapshotError
+    const { error: finalizeError } = await service.rpc("finalize_payroll_period", {
+      p_company_id: companyId,
+      p_pay_period: period,
+      p_payroll_run_id: run.id,
+      p_actor_id: userId,
+      p_notes: body.notes || null,
+      p_snapshots: snapshots,
+    })
+    if (finalizeError) throw finalizeError
+    const { data: payrollPeriod, error: periodError } = await service
+      .from("payroll_periods")
+      .select("*")
+      .eq("company_id", companyId)
+      .eq("pay_period", period)
+      .single()
+    if (periodError) throw periodError
 
     return NextResponse.json({ success: true, period: payrollPeriod, snapshots: snapshots.length })
   } catch (error) {

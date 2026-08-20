@@ -33,12 +33,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "pay_period must use YYYY-MM" }, { status: 400 })
     }
 
-    const { data: periodControl } = await service
+    const { data: periodControl, error: periodControlError } = await service
       .from("payroll_periods")
       .select("status")
       .eq("company_id", companyId)
       .eq("pay_period", period)
       .maybeSingle()
+    if (periodControlError) {
+      return NextResponse.json(
+        { error: `Payroll period control unavailable: ${periodControlError.message}` },
+        { status: 503 },
+      )
+    }
     if (periodControl?.status === "closed") {
       return NextResponse.json({ error: `${period} is closed and cannot accept an off-cycle run` }, { status: 409 })
     }
@@ -79,7 +85,7 @@ export async function POST(req: NextRequest) {
       const tax = calculateGhanaTax(
         {
           monthly_basic: 0,
-          monthly_allowances: { backpay: entry.amount },
+          monthly_allowances: { other: entry.amount },
           monthly_overtime: 0,
           monthly_bonus: 0,
           tier2_applicable: false,

@@ -215,13 +215,18 @@ export default function PayrollComponentsPage() {
   }
 
   async function updatePeriod(action: "close" | "reopen") {
+    const notes =
+      action === "reopen"
+        ? window.prompt("Enter the audit reason for reopening this payroll period:")
+        : window.prompt("Optional close note for the payroll audit:")
+    if (action === "reopen" && !notes?.trim()) return
     setPeriodBusy(true)
     try {
       const res = await fetch("/api/payroll/periods", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pay_period: payPeriod, action }),
+        body: JSON.stringify({ pay_period: payPeriod, action, notes: notes?.trim() || null }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || `Could not ${action} period`)

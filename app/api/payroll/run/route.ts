@@ -88,6 +88,23 @@ export async function POST(request: Request) {
       )
     }
 
+    const controlledPeriod = String(pay_period_start || pay_period || "").slice(0, 7)
+    const { data: periodControl, error: periodControlError } = await supabase
+      .from("payroll_periods")
+      .select("status")
+      .eq("company_id", company_id)
+      .eq("pay_period", controlledPeriod)
+      .maybeSingle()
+    if (periodControlError) {
+      return NextResponse.json(
+        { error: `Payroll period control unavailable: ${periodControlError.message}` },
+        { status: 503 },
+      )
+    }
+    if (periodControl?.status === "closed") {
+      return NextResponse.json({ error: `${controlledPeriod} is closed and immutable` }, { status: 409 })
+    }
+
     // Upsert the payroll_runs row so payslips can FK-reference it
     const payrollRunPayload = {
       id:               payroll_run_id,

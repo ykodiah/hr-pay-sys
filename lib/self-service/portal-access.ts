@@ -235,7 +235,7 @@ export async function provisionPortalAccess(input: {
   if (method === "email") {
     inviteLink = await generatePortalLink(
       loginEmail,
-      `${origin}/auth/portal-activate`,
+      `${origin}/auth/reset-password`,
       "recovery",
     )
   }

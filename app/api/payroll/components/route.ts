@@ -10,12 +10,13 @@ const TAX_TREATMENTS = new Set(["taxable", "non_taxable", "tax_relief", "post_ta
 const PERIOD_RE = /^\d{4}-(0[1-9]|1[0-2])$/
 
 async function isClosed(service: any, companyId: string, period: string) {
-  const { data } = await service
+  const { data, error } = await service
     .from("payroll_periods")
     .select("status")
     .eq("company_id", companyId)
     .eq("pay_period", period)
     .maybeSingle()
+  if (error) throw new Error(`Payroll period control unavailable: ${error.message}`)
   return data?.status === "closed"
 }
 

@@ -21,6 +21,11 @@ function setDemoSessionCookie() {
   document.cookie = "demo-session=active; path=/; max-age=86400; SameSite=Lax"
 }
 
+function clearDemoSession() {
+  document.cookie = "demo-session=; path=/; max-age=0; SameSite=Lax"
+  localStorage.removeItem("demo_user")
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -60,15 +65,7 @@ export default function LoginPage() {
       })
 
       if (!authError && authData.user) {
-        setDemoSessionCookie()
-        localStorage.setItem(
-          "demo_user",
-          JSON.stringify({
-            email: demoEmail,
-            type: userType,
-            name: fullName,
-          }),
-        )
+        clearDemoSession()
         router.push(isAdmin ? "/app" : "/self-service")
         return
       }
@@ -160,6 +157,7 @@ export default function LoginPage() {
       }
 
       const authUser = data.user
+      clearDemoSession()
       let employee: any = null
 
       if (authUser?.email) {

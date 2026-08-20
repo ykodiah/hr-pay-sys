@@ -485,12 +485,18 @@ export async function POST(req: NextRequest) {
     if (!pay_period) {
       return NextResponse.json({ error: "pay_period is required" }, { status: 400 })
     }
-    const { data: periodControl } = await client
+    const { data: periodControl, error: periodControlError } = await client
       .from("payroll_periods")
       .select("status")
       .eq("company_id", company_id)
       .eq("pay_period", pay_period)
       .maybeSingle()
+    if (periodControlError) {
+      return NextResponse.json(
+        { error: `Payroll period control unavailable: ${periodControlError.message}` },
+        { status: 503 },
+      )
+    }
     if (periodControl?.status === "closed") {
       return NextResponse.json({ error: `${pay_period} is closed and cannot be processed again` }, { status: 409 })
     }

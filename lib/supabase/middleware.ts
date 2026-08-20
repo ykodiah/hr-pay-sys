@@ -82,11 +82,9 @@ export async function updateSession(request: NextRequest) {
   const isProtectedPath = pathname.startsWith("/app") || pathname.startsWith("/self-service")
   const isApiPath = pathname.startsWith("/api")
   const hasDemoSession = request.cookies.get("demo-session")?.value === "active"
-
-  // Demo session: never call Supabase auth (avoids hangs on Process/Export/Reports)
-  if (hasDemoSession) {
-    return NextResponse.next({ request })
-  }
+  const allowSyntheticDemo =
+    hasDemoSession &&
+    (!supabaseUrl || !supabaseAnonKey || process.env.NEXT_PUBLIC_ENABLE_SYNTHETIC_DEMO === "true")
 
   // API routes: do not block on auth refresh — route handlers enforce auth themselves
   if (isApiPath) {
@@ -94,6 +92,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (!supabaseUrl || !supabaseAnonKey) {
+    if (allowSyntheticDemo) return NextResponse.next({ request })
     if (isProtectedPath) {
       const url = request.nextUrl.clone()
       url.pathname = "/auth/login"
@@ -121,7 +120,7 @@ export async function updateSession(request: NextRequest) {
 
   const user = await getUserWithTimeout(supabase, 2500)
 
-  if (isProtectedPath && !user && !hasDemoSession) {
+  if (isProtectedPath && !user && !allowSyntheticDemo) {
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"
     return NextResponse.redirect(url)
