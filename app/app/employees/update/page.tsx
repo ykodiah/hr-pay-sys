@@ -383,7 +383,6 @@ export default function UpdateEmployeeDataPage() {
           effective_date: effectiveDate,
           patch: buildNonOrgPatch(form),
           financial: financialPayload(),
-          allowances,
           documents,
         }),
       })
@@ -537,7 +536,6 @@ export default function UpdateEmployeeDataPage() {
                   <TabsTrigger value="personal">Personal</TabsTrigger>
                   <TabsTrigger value="employment">Employment</TabsTrigger>
                   <TabsTrigger value="financial">Financial</TabsTrigger>
-                  <TabsTrigger value="allowances">Allowances</TabsTrigger>
                   <TabsTrigger value="documents">Documents</TabsTrigger>
                 </TabsList>
 
@@ -710,19 +708,20 @@ export default function UpdateEmployeeDataPage() {
                           onChange={(e) => setFin("ssnit_number", e.target.value)}
                         />
                       </div>
-                      <div>
-                        <Label className="text-xs">Provident fund rate %</Label>
-                        <Input
-                          type="number"
-                          value={financial.provident_fund_rate}
-                          onChange={(e) => setFin("provident_fund_rate", e.target.value)}
-                        />
+                      <div className="sm:col-span-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+                        <p className="text-sm font-medium text-indigo-950">Payroll components auto-populate</p>
+                        <p className="mt-1 text-xs text-indigo-800">
+                          Allowances, deductions and provident fund are managed in Payroll → Pay components, not on the employee card.
+                        </p>
+                        <Button asChild variant="outline" size="sm" className="mt-3">
+                          <Link href="/app/payroll/components">Open pay components</Link>
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
                 </TabsContent>
 
-                <TabsContent value="allowances" className="mt-4">
+                {false && <TabsContent value="allowances" className="mt-4">
                   <Card className="shadow-sm">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base">Allowances</CardTitle>
@@ -811,7 +810,7 @@ export default function UpdateEmployeeDataPage() {
                       </div>
                     </CardContent>
                   </Card>
-                </TabsContent>
+                </TabsContent>}
 
                 <TabsContent value="documents" className="mt-4">
                   <Card className="shadow-sm">

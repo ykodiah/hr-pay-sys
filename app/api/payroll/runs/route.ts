@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
+import { isUnresolvedTenant, resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
 
 function periodBounds(payPeriod: string) {
   const [y, m] = payPeriod.split("-").map(Number)
@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
   try {
     const ctx = await resolveTenantContext(req)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     const { companyId, service } = ctx
 
     const { searchParams } = new URL(req.url)
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
     const { data: runs, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    const runIds = (runs ?? []).map((r) => r.id)
+    const runIds = (runs ?? []).map((r: any) => r.id)
     const counts = new Map<string, number>()
 
     if (runIds.length > 0) {
@@ -61,7 +62,7 @@ export async function GET(req: NextRequest) {
         counts.set(item.payroll_run_id, (counts.get(item.payroll_run_id) ?? 0) + 1)
       }
 
-      const missing = runIds.filter((id) => !counts.has(id))
+      const missing = runIds.filter((id: string) => !counts.has(id))
       if (missing.length > 0) {
         const { data: slips } = await service
           .from("payslips")
@@ -75,11 +76,11 @@ export async function GET(req: NextRequest) {
     }
 
     const enriched = (runs ?? [])
-      .map((run) => ({
+      .map((run: any) => ({
         ...run,
         employee_count: counts.get(run.id) ?? 0,
       }))
-      .filter((run) => {
+      .filter((run: any) => {
         // Approvals "pending" should not surface empty / draft shells
         if (status === "pending") return Number(run.employee_count) > 0
         return true
@@ -102,6 +103,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const ctx = await resolveTenantContext(req, body.company_id)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     const { companyId, userId, service } = ctx
 
     const { pay_period, subsidiary_id, notes } = body as {
@@ -112,6 +114,21 @@ export async function POST(req: NextRequest) {
 
     if (!pay_period) {
       return NextResponse.json({ error: "pay_period is required" }, { status: 400 })
+    }
+    const { data: periodControl, error: periodControlError } = await service
+      .from("payroll_periods")
+      .select("status")
+      .eq("company_id", companyId)
+      .eq("pay_period", pay_period)
+      .maybeSingle()
+    if (periodControlError) {
+      return NextResponse.json(
+        { error: `Payroll period control unavailable: ${periodControlError.message}` },
+        { status: 503 },
+      )
+    }
+    if (periodControl?.status === "closed") {
+      return NextResponse.json({ error: `${pay_period} is closed and cannot accept a new payroll run` }, { status: 409 })
     }
 
     const bounds = periodBounds(pay_period)

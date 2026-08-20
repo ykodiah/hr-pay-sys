@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
+import { isUnresolvedTenant, resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
 import { issuePayrollRunPayslips } from "@/lib/services/payslip-service"
 import { resolveEmployeeForUser } from "@/lib/employees/resolve-employee"
 
@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const ctx = await resolveTenantContext(request, body.company_id)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     const { companyId, userId, demo, service: supabase } = ctx
 
     const { payroll_run_id, action, notes, rejection_reason } = body
@@ -67,6 +68,24 @@ export async function POST(request: NextRequest) {
         { error: runErr?.message || "Payroll run not found for this company" },
         { status: 404 },
       )
+    }
+    const controlledPeriod = run.pay_period_start ? String(run.pay_period_start).slice(0, 7) : null
+    if (controlledPeriod) {
+      const { data: periodControl, error: periodControlError } = await supabase
+        .from("payroll_periods")
+        .select("status")
+        .eq("company_id", companyId)
+        .eq("pay_period", controlledPeriod)
+        .maybeSingle()
+      if (periodControlError) {
+        return NextResponse.json(
+          { error: `Payroll period control unavailable: ${periodControlError.message}` },
+          { status: 503 },
+        )
+      }
+      if (periodControl?.status === "closed") {
+        return NextResponse.json({ error: `${controlledPeriod} is closed and immutable` }, { status: 409 })
+      }
     }
 
     // Count employees on this run — never approve empty runs
@@ -302,6 +321,7 @@ export async function GET(request: NextRequest) {
   try {
     const ctx = await resolveTenantContext(request)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     const { companyId, service: supabase } = ctx
 
     const { searchParams } = new URL(request.url)

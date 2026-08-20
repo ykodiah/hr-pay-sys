@@ -27,11 +27,11 @@ export default function ResetPasswordPage() {
     const supabase = createClient()
     let active = true
 
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(({ data }: any) => {
       if (active) setReady(Boolean(data.session))
     })
 
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event: string, session: any) => {
       if (!active) return
       if (event === "PASSWORD_RECOVERY" || session) setReady(true)
     })
@@ -61,13 +61,18 @@ export default function ResetPasswordPage() {
 
     setIsLoading(true)
     try {
-      const { error: updateError } = await createClient().auth.updateUser({ password })
+      const supabase = createClient()
+      const { error: updateError } = await supabase.auth.updateUser({
+        password,
+        data: { must_change_password: false },
+      })
       if (updateError) {
         setError(updateError.message.toLowerCase().includes("expired") ? "This reset link has expired. Request a new one." : "We could not update your password. Request a new link and try again.")
         return
       }
+      await fetch("/api/auth/finalize-password-reset", { method: "POST", credentials: "include" }).catch(() => undefined)
       setCompleted(true)
-      window.setTimeout(() => router.push("/self-service"), 1200)
+      window.setTimeout(() => router.push("/auth/login?password_updated=1"), 1200)
     } catch {
       setError("We could not update your password. Request a new link and try again.")
     } finally {
@@ -90,7 +95,7 @@ export default function ResetPasswordPage() {
           {completed ? (
             <Alert>
               <CheckCircle2 className="h-4 w-4" />
-              <AlertDescription>Password updated. Taking you to your portal...</AlertDescription>
+              <AlertDescription>Password updated. Taking you to sign in...</AlertDescription>
             </Alert>
           ) : !ready ? (
             <div className="space-y-4">

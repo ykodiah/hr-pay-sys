@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { resolveTenantContext } from "@/lib/settings/resolve-tenant"
+import { isUnresolvedTenant, resolveTenantContext } from "@/lib/settings/resolve-tenant"
 import { payrollCashDeductions } from "@/lib/payroll/cash-deductions"
 
 function n(v: unknown) {
@@ -155,17 +155,35 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}))
     const ctx = await resolveTenantContext(req, body.company_id)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     const { companyId, service: client } = ctx
 
     const runId = String(body.payroll_run_id || "").trim()
     if (runId) {
+      const { data: run } = await client
+        .from("payroll_runs")
+        .select("pay_period_start")
+        .eq("id", runId)
+        .eq("company_id", companyId)
+        .maybeSingle()
+      const period = run?.pay_period_start ? String(run.pay_period_start).slice(0, 7) : null
+      if (period) {
+        const { data: control, error: controlError } = await client
+          .from("payroll_periods")
+          .select("status")
+          .eq("company_id", companyId)
+          .eq("pay_period", period)
+          .maybeSingle()
+        if (controlError) return NextResponse.json({ error: `Payroll period control unavailable: ${controlError.message}` }, { status: 503 })
+        if (control?.status === "closed") return NextResponse.json({ error: `${period} is closed and immutable` }, { status: 409 })
+      }
       const result = await recomputeRun(client, runId)
       return NextResponse.json({ ok: true, company_id: companyId, results: [result] })
     }
 
     const { data: runs, error } = await client
       .from("payroll_runs")
-      .select("id")
+      .select("id, pay_period_start")
       .eq("company_id", companyId)
       .order("created_at", { ascending: false })
       .limit(200)
@@ -174,8 +192,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    const { data: closedPeriods, error: controlsError } = await client
+      .from("payroll_periods")
+      .select("pay_period")
+      .eq("company_id", companyId)
+      .eq("status", "closed")
+    if (controlsError) return NextResponse.json({ error: `Payroll period control unavailable: ${controlsError.message}` }, { status: 503 })
+    const closed = new Set((closedPeriods || []).map((row: any) => row.pay_period))
     const results = []
     for (const run of runs ?? []) {
+      if (run.pay_period_start && closed.has(String(run.pay_period_start).slice(0, 7))) continue
       results.push(await recomputeRun(client, run.id))
     }
 

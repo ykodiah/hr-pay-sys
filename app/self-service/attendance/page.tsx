@@ -125,10 +125,10 @@ export default function AttendancePage() {
           {gpsEnabled ? (
             <div className="flex gap-2">
               <Button onClick={() => clock("clock_in")} disabled={clocking || Boolean(current?.clock_in)}>
-                <LogIn className="mr-2 h-4 w-4" /> Clock in
+                <LogIn className="mr-2 h-4 w-4" /> {clocking ? "Locating…" : "Clock in"}
               </Button>
               <Button variant="outline" onClick={() => clock("clock_out")} disabled={clocking || !current?.clock_in || Boolean(current?.clock_out)}>
-                <LogOut className="mr-2 h-4 w-4" /> Clock out
+                <LogOut className="mr-2 h-4 w-4" /> {clocking ? "Locating…" : "Clock out"}
               </Button>
             </div>
           ) : (

@@ -51,7 +51,9 @@ export function generateToken(user: SuperadminUser, expiresIn: string = '24h'): 
     role: user.role,
     expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
   }
-  return jwt.sign(payload, SUPERADMIN_JWT_SECRET, { expiresIn })
+  return jwt.sign(payload, SUPERADMIN_JWT_SECRET, {
+    expiresIn: expiresIn as jwt.SignOptions['expiresIn'],
+  })
 }
 
 /**
@@ -91,7 +93,7 @@ export async function loginSuperadmin(
 
   try {
     // Auto-seed default admin when missing so first login always works.
-    const { ensureSeedSuperadmin, SEED_SUPERADMIN_EMAIL, SEED_SUPERADMIN_PASSWORD } = await import(
+    const { ensureSeedSuperadmin } = await import(
       '@/lib/superadmin/ensure-seed'
     )
     const seed = await ensureSeedSuperadmin(supabase)
@@ -107,33 +109,8 @@ export async function loginSuperadmin(
       .ilike('email', normalizedEmail)
       .maybeSingle()
 
-    // If still missing and credentials match seed defaults, create then retry.
-    if ((!user || error) &&
-      normalizedEmail === SEED_SUPERADMIN_EMAIL &&
-      plainPassword === SEED_SUPERADMIN_PASSWORD
-    ) {
-      const created = await ensureSeedSuperadmin(supabase, {
-        resetPassword: true,
-        email: SEED_SUPERADMIN_EMAIL,
-        password: SEED_SUPERADMIN_PASSWORD,
-      })
-      if (created.error) {
-        return { error: created.error }
-      }
-      const retry = await supabase
-        .from('superadmin_users')
-        .select('*')
-        .ilike('email', normalizedEmail)
-        .maybeSingle()
-      user = retry.data
-      error = retry.error
-    }
-
     if (error || !user) {
-      return {
-        error:
-          'Invalid email or password. Default seed: admin@akwaabahrpay.com / Demo@12345 (auto-created on first successful login).',
-      }
+      return { error: 'Invalid email or password' }
     }
 
     if (user.status !== 'active') {
@@ -141,31 +118,7 @@ export async function loginSuperadmin(
     }
 
     // Verify password
-    let passwordMatch = await verifyPassword(plainPassword, user.password_hash)
-
-    // Recover seed account when hash in DB is stale/wrong but user enters the known seed password.
-    if (
-      !passwordMatch &&
-      normalizedEmail === SEED_SUPERADMIN_EMAIL &&
-      plainPassword === SEED_SUPERADMIN_PASSWORD
-    ) {
-      const recovered = await ensureSeedSuperadmin(supabase, {
-        resetPassword: true,
-        email: SEED_SUPERADMIN_EMAIL,
-        password: SEED_SUPERADMIN_PASSWORD,
-      })
-      if (!recovered.error) {
-        const { data: refreshed } = await supabase
-          .from('superadmin_users')
-          .select('*')
-          .eq('id', user.id)
-          .maybeSingle()
-        if (refreshed) {
-          user = refreshed
-          passwordMatch = await verifyPassword(plainPassword, user.password_hash)
-        }
-      }
-    }
+    const passwordMatch = await verifyPassword(plainPassword, user.password_hash)
 
     if (!passwordMatch) {
       return { error: 'Invalid email or password' }

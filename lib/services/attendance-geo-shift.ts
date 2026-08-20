@@ -106,40 +106,47 @@ export async function resolveEmployeeShift(
   employeeId: string,
   dateIso: string,
 ): Promise<ShiftLike | null> {
-  const { data: assign } = await service
-    .from("employee_shift_assignments")
-    .select("shift_id, effective_from, effective_to, is_primary")
-    .eq("company_id", companyId)
-    .eq("employee_id", employeeId)
-    .lte("effective_from", dateIso)
-    .order("is_primary", { ascending: false })
-    .order("effective_from", { ascending: false })
-    .limit(10)
+  try {
+    const { data: assign, error: assignError } = await service
+      .from("employee_shift_assignments")
+      .select("shift_id, effective_from, effective_to, is_primary")
+      .eq("company_id", companyId)
+      .eq("employee_id", employeeId)
+      .lte("effective_from", dateIso)
+      .order("is_primary", { ascending: false })
+      .order("effective_from", { ascending: false })
+      .limit(10)
 
-  const row = (assign || []).find(
-    (a: any) => !a.effective_to || a.effective_to >= dateIso,
-  )
-  if (row?.shift_id) {
-    const { data: shift } = await service
+    if (!assignError) {
+      const row = (assign || []).find(
+        (a: any) => !a.effective_to || a.effective_to >= dateIso,
+      )
+      if (row?.shift_id) {
+        const { data: shift } = await service
+          .from("shifts")
+          .select("*")
+          .eq("id", row.shift_id)
+          .eq("company_id", companyId)
+          .maybeSingle()
+        if (shift) return shift
+      }
+    }
+
+    // Fallback: company default active shift
+    const { data: fallback, error: shiftError } = await service
       .from("shifts")
       .select("*")
-      .eq("id", row.shift_id)
       .eq("company_id", companyId)
+      .eq("is_active", true)
+      .order("created_at", { ascending: true })
+      .limit(1)
       .maybeSingle()
-    if (shift) return shift
+
+    if (shiftError && /does not exist|relation/i.test(shiftError.message || "")) return null
+    return fallback || null
+  } catch {
+    return null
   }
-
-  // Fallback: company default active shift
-  const { data: fallback } = await service
-    .from("shifts")
-    .select("*")
-    .eq("company_id", companyId)
-    .eq("is_active", true)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle()
-
-  return fallback || null
 }
 
 export async function findMatchingGeofence(
@@ -148,13 +155,13 @@ export async function findMatchingGeofence(
   lat: number,
   lng: number,
 ): Promise<{ geofence: any; distance: number; inside: boolean } | null> {
-  const { data: fences } = await service
+  const { data: fences, error } = await service
     .from("attendance_geofences")
     .select("*")
     .eq("company_id", companyId)
     .eq("is_active", true)
 
-  if (!fences?.length) return null
+  if (error || !fences?.length) return null
 
   let best: { geofence: any; distance: number; inside: boolean } | null = null
   for (const g of fences) {

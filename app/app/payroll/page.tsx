@@ -54,6 +54,11 @@ type PayInputApiRow = {
     other_allowances: number
     card_allowances?: number
     card_deductions?: number
+    component_bonus?: number
+    component_backpay?: number
+    component_non_taxable_allowances?: number
+    component_non_taxable_bonus?: number
+    separate_backpay?: number
     tier2_applicable: boolean
     tier3_applicable: boolean
   }
@@ -93,10 +98,12 @@ type WorksheetRow = {
   dateOfJoining: string | null
   basicSalary: number
   allowances: number
+  nonTaxableAllowances: number
   /** Human-readable allowance breakdown, e.g. "Transport 200.00; Housing 100.00" */
   allowanceTypes: string
   overtime: number
   bonus: number
+  nonTaxableBonus: number
   loan: number
   advance: number
   other: number
@@ -223,7 +230,10 @@ function mapApiRow(row: PayInputApiRow): WorksheetRow {
   const uniform = pick(row.input.uniform_allowance, row.master.uniform_allowance)
   const otherAllow = pick(row.input.other_allowances, row.master.other_allowances) + cardAllow
   const overtime = Number(row.input.overtime_amount ?? 0)
-  const bonus = Number(row.input.bonus_amount ?? 0)
+  const bonus =
+    Number(row.input.bonus_amount ?? 0) +
+    Number(row.master.component_bonus ?? 0) +
+    Number(row.master.component_backpay ?? 0)
   const loan = Number(row.input.loan_deduction ?? 0)
   const advance = Number(row.input.advance_deduction ?? 0)
   const other = Number(row.input.other_deductions ?? 0) + cardDed
@@ -238,6 +248,7 @@ function mapApiRow(row: PayInputApiRow): WorksheetRow {
     dateOfJoining: row.date_of_joining ?? null,
     basicSalary: basic,
     allowances,
+    nonTaxableAllowances: Number(row.master.component_non_taxable_allowances ?? 0),
     allowanceTypes: buildAllowanceTypes({
       transport,
       housing,
@@ -251,6 +262,7 @@ function mapApiRow(row: PayInputApiRow): WorksheetRow {
     }),
     overtime,
     bonus,
+    nonTaxableBonus: Number(row.master.component_non_taxable_bonus ?? 0),
     loan,
     advance,
     other,
@@ -282,9 +294,9 @@ function calculateRow(
   const tax = calculateGhanaTax(
     {
       monthly_basic: row.basicSalary,
-      monthly_allowances: { other: row.allowances },
+      monthly_allowances: { other: Math.max(0, row.allowances - row.nonTaxableAllowances) },
       monthly_overtime: row.overtime,
-      monthly_bonus: row.bonus,
+      monthly_bonus: Math.max(0, row.bonus - row.nonTaxableBonus),
       tier2_applicable: row.tier2,
       tier3_applicable: row.tier3,
       tier3_employee_rate: row.tier3Rate || undefined,
@@ -306,7 +318,13 @@ function calculateRow(
 
   return {
     ...row,
-    grossPay: round2(tax.monthly_gross + tax.monthly_overtime + tax.monthly_bonus),
+    grossPay: round2(
+      tax.monthly_gross +
+      tax.monthly_overtime +
+      tax.monthly_bonus +
+      row.nonTaxableAllowances +
+      row.nonTaxableBonus,
+    ),
     providentFund: round2(tax.monthly_tier3_employee),
     ssnitEmployee: round2(tax.monthly_ssnit_employee),
     tier2Employee: round2(tax.monthly_tier2_employee),
@@ -316,7 +334,7 @@ function calculateRow(
     bonusTax: round2(tax.monthly_bonus_tax),
     taxReliefTotal: round2((tax.annual_tax_reliefs || 0) / 12),
     totalDeductions: round2(tax.monthly_total_employee_deductions),
-    netPay: round2(tax.monthly_net_pay),
+    netPay: round2(tax.monthly_net_pay + row.nonTaxableAllowances + row.nonTaxableBonus),
     status: "Calculated",
   }
 }
@@ -373,7 +391,12 @@ function sumRows(rows: WorksheetRow[]) {
 }
 
 function ensureDemoSessionCookie() {
+  // Never force a synthetic demo cookie on real Supabase deployments.
+  // Doing so breaks password change and tenant APIs when getUser times out.
   if (typeof document === "undefined") return
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    if (process.env.NEXT_PUBLIC_ENABLE_SYNTHETIC_DEMO !== "true") return
+  }
   if (!document.cookie.includes("demo-session=active")) {
     document.cookie = "demo-session=active; path=/; max-age=86400; SameSite=Lax"
   }
@@ -1146,6 +1169,12 @@ export default function PayrollPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/app/payroll/components">
+              <DollarSign className="h-4 w-4 mr-2" />
+              Pay Components
+            </Link>
+          </Button>
           <Button variant="outline" asChild>
             <Link href="/app/payroll/input">
               <ClipboardList className="h-4 w-4 mr-2" />

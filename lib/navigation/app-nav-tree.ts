@@ -317,6 +317,7 @@ export const APP_NAV_FLAT_SECTIONS: AppNavFlatSection[] = [
   {
     title: "Payroll",
     items: [
+      { code: "payroll", name: "Pay Components", href: "/app/payroll/components" },
       { code: "payroll_input", name: "Pay Inputs", href: "/app/payroll/input" },
       { code: "payroll", name: "Process Payroll", href: "/app/payroll" },
       { code: "payroll_reports", name: "Ghana Reports", href: "/app/payroll/reports" },

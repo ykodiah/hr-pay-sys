@@ -21,7 +21,7 @@ export async function POST(
 
     const { data: run, error: runErr } = await client
       .from("payroll_runs")
-      .select("id, status")
+      .select("id, status, company_id, pay_period_start")
       .eq("id", id)
       .single()
     if (runErr || !run) {
@@ -32,6 +32,24 @@ export async function POST(
         { error: "Only approved payroll runs can be marked as paid" },
         { status: 400 },
       )
+    }
+    const controlledPeriod = run.pay_period_start ? String(run.pay_period_start).slice(0, 7) : null
+    if (controlledPeriod) {
+      const { data: periodControl, error: periodControlError } = await client
+        .from("payroll_periods")
+        .select("status")
+        .eq("company_id", run.company_id)
+        .eq("pay_period", controlledPeriod)
+        .maybeSingle()
+      if (periodControlError) {
+        return NextResponse.json(
+          { error: `Payroll period control unavailable: ${periodControlError.message}` },
+          { status: 503 },
+        )
+      }
+      if (periodControl?.status === "closed") {
+        return NextResponse.json({ error: `${controlledPeriod} is closed and immutable` }, { status: 409 })
+      }
     }
 
     const { data: updated, error } = await client

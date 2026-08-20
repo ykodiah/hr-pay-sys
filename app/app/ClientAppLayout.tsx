@@ -258,6 +258,7 @@ export default function ClientAppLayout({
           const subPageMap = {
             history: "History",
             input: "Pay Inputs",
+            components: "Pay Components",
             reports: "Reports",
             profile: "Profile",
             settings: "Settings",
@@ -394,6 +395,8 @@ export default function ClientAppLayout({
   const handleSignOut = async () => {
     await createClient().auth.signOut().catch(() => undefined)
     localStorage.removeItem("authToken")
+    localStorage.removeItem("demo_user")
+    document.cookie = "demo-session=; path=/; max-age=0; SameSite=Lax"
     sessionStorage.clear()
     window.location.href = "/login"
   }

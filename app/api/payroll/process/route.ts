@@ -13,7 +13,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { isMockSupabaseClient } from "@/lib/supabase/server"
-import { resolveTenantContext } from "@/lib/settings/resolve-tenant"
+import { isUnresolvedTenant, resolveTenantContext } from "@/lib/settings/resolve-tenant"
 import { createPayrollService } from "@/lib/services"
 import { expandCompLines } from "@/lib/payroll/employee-comp-extras"
 
@@ -467,6 +467,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const ctx = await resolveTenantContext(req, body.company_id)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     const { companyId: company_id, userId, demo, service: client } = ctx
     const user = { id: userId, isDemo: demo }
 
@@ -484,6 +485,21 @@ export async function POST(req: NextRequest) {
 
     if (!pay_period) {
       return NextResponse.json({ error: "pay_period is required" }, { status: 400 })
+    }
+    const { data: periodControl, error: periodControlError } = await client
+      .from("payroll_periods")
+      .select("status")
+      .eq("company_id", company_id)
+      .eq("pay_period", pay_period)
+      .maybeSingle()
+    if (periodControlError) {
+      return NextResponse.json(
+        { error: `Payroll period control unavailable: ${periodControlError.message}` },
+        { status: 503 },
+      )
+    }
+    if (periodControl?.status === "closed") {
+      return NextResponse.json({ error: `${pay_period} is closed and cannot be processed again` }, { status: 409 })
     }
 
     const bounds = periodBounds(pay_period)
@@ -585,7 +601,7 @@ export async function POST(req: NextRequest) {
     if (worksheetRows.length > 0) {
       // Fast path: persist the worksheet the user already calculated
       const result = await withTimeout(
-        persistRowsFromWorksheet(client, runId, company_id, pay_period, bounds, worksheetRows),
+        persistRowsFromWorksheet(client, runId!, company_id, pay_period, bounds, worksheetRows),
         isMockSupabaseClient(client) ? 10000 : 45000,
         "persist_worksheet",
       )
@@ -595,7 +611,7 @@ export async function POST(req: NextRequest) {
       // Legacy / API-only path (no worksheet rows supplied)
       const service = createPayrollService(true)
       const result = await withTimeout(
-        service.processPayrollRun(runId, company_id),
+        service.processPayrollRun(runId!, company_id),
         50000,
         "process_payroll_run",
       )

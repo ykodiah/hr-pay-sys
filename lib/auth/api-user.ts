@@ -39,7 +39,7 @@ export async function requireApiUser(): Promise<ApiUser | null> {
 
   try {
     const client = await createClient()
-    const result = await withTimeout(client.auth.getUser(), 2500)
+    const result: any = await withTimeout(client.auth.getUser(), 2500)
     const user = result.data?.user
     if (user) {
       // Prefer real auth over a leftover demo cookie
@@ -58,7 +58,11 @@ export async function requireApiUser(): Promise<ApiUser | null> {
     )
   }
 
-  if (demo) {
+  const syntheticDemoAllowed =
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_ENABLE_SYNTHETIC_DEMO === "true"
+  if (demo && syntheticDemoAllowed) {
     return { id: "demo-user", isDemo: true }
   }
 

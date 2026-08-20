@@ -860,6 +860,40 @@ export default function SettingsPage() {
   const [isExportingReport, setIsExportingReport] = useState(false)
   const [showAllLogsModal, setShowAllLogsModal] = useState(false)
   const [isLoadingAllLogs, setIsLoadingAllLogs] = useState(false)
+  const [accountPasswords, setAccountPasswords] = useState({ current: "", next: "", confirm: "" })
+  const [isChangingAccountPassword, setIsChangingAccountPassword] = useState(false)
+
+  const changeAccountPassword = async () => {
+    if (!accountPasswords.current || !accountPasswords.next || !accountPasswords.confirm) {
+      toast({ title: "Complete all password fields", variant: "destructive" })
+      return
+    }
+    setIsChangingAccountPassword(true)
+    try {
+      const response = await fetch("/api/admin/account", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          current_password: accountPasswords.current,
+          new_password: accountPasswords.next,
+          confirm_password: accountPasswords.confirm,
+        }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload.error || "Password update failed")
+      setAccountPasswords({ current: "", next: "", confirm: "" })
+      toast({ title: "Password updated", description: "Use the new password the next time you sign in." })
+    } catch (error) {
+      toast({
+        title: "Could not update password",
+        description: error instanceof Error ? error.message : "Try again",
+        variant: "destructive",
+      })
+    } finally {
+      setIsChangingAccountPassword(false)
+    }
+  }
 
   const [showPassword, setShowPassword] = useState(false)
   const [testConnectionStatus, setTestConnectionStatus] = useState<"idle" | "testing" | "success" | "error">("idle")
@@ -9370,6 +9404,39 @@ Format the response in a professional, actionable manner for HR decision-makers.
               <CardDescription>Manage security settings, backups, and audit logs</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div className="rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-slate-50 p-5">
+                <div className="mb-4">
+                  <h3 className="text-lg font-semibold">Administrator password</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Replace the default login password for your tenant administrator account.
+                  </p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div>
+                    <Label htmlFor="adminCurrentPassword">Current password</Label>
+                    <Input id="adminCurrentPassword" type="password" autoComplete="current-password"
+                      value={accountPasswords.current}
+                      onChange={(e) => setAccountPasswords((value) => ({ ...value, current: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label htmlFor="adminNewPassword">New password</Label>
+                    <Input id="adminNewPassword" type="password" autoComplete="new-password"
+                      value={accountPasswords.next}
+                      onChange={(e) => setAccountPasswords((value) => ({ ...value, next: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label htmlFor="adminConfirmPassword">Confirm password</Label>
+                    <Input id="adminConfirmPassword" type="password" autoComplete="new-password"
+                      value={accountPasswords.confirm}
+                      onChange={(e) => setAccountPasswords((value) => ({ ...value, confirm: e.target.value }))} />
+                  </div>
+                </div>
+                <Button className="mt-4" onClick={changeAccountPassword} disabled={isChangingAccountPassword}>
+                  {isChangingAccountPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Update password
+                </Button>
+              </div>
+
               {/* Security Policies */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Security Policies</h3>

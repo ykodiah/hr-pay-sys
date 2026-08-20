@@ -21,6 +21,11 @@ function setDemoSessionCookie() {
   document.cookie = "demo-session=active; path=/; max-age=86400; SameSite=Lax"
 }
 
+function clearDemoSession() {
+  document.cookie = "demo-session=; path=/; max-age=0; SameSite=Lax"
+  localStorage.removeItem("demo_user")
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -52,6 +57,10 @@ export default function LoginPage() {
 
     try {
       const supabase = createClient()
+      if ((supabase as any).__isMock) {
+        enterDemoMode(userType, demoEmail, fullName)
+        return
+      }
 
       // Prefer a real Supabase Auth session when demo users exist
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -60,15 +69,7 @@ export default function LoginPage() {
       })
 
       if (!authError && authData.user) {
-        setDemoSessionCookie()
-        localStorage.setItem(
-          "demo_user",
-          JSON.stringify({
-            email: demoEmail,
-            type: userType,
-            name: fullName,
-          }),
-        )
+        clearDemoSession()
         router.push(isAdmin ? "/app" : "/self-service")
         return
       }
@@ -134,6 +135,15 @@ export default function LoginPage() {
 
     try {
       const supabase = createClient()
+      if (
+        (supabase as any).__isMock &&
+        (email === DEMO_ADMIN_EMAIL || email === DEMO_EMPLOYEE_EMAIL) &&
+        password === DEMO_PASSWORD
+      ) {
+        const userType = email === DEMO_ADMIN_EMAIL ? "admin" : "employee"
+        enterDemoMode(userType, email, userType === "admin" ? "Admin User" : "Demo Employee")
+        return
+      }
 
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
@@ -160,6 +170,7 @@ export default function LoginPage() {
       }
 
       const authUser = data.user
+      clearDemoSession()
       let employee: any = null
 
       if (authUser?.email) {

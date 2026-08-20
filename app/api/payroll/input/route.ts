@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
+import { isUnresolvedTenant, resolveTenantContext, jsonError } from "@/lib/settings/resolve-tenant"
 import { sumCompLines } from "@/lib/payroll/employee-comp-extras"
 
 const ACTIVE_STATUSES = ["Active", "active", "ACTIVE"]
@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
   try {
     const ctx = await resolveTenantContext(request)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     const { companyId, service: supabase } = ctx
 
     const { searchParams } = new URL(request.url)
@@ -53,12 +54,12 @@ export async function GET(request: NextRequest) {
       if (fallback.error) {
         return NextResponse.json({ error: fallback.error.message }, { status: 500 })
       }
-      const empIdsFb = (fallback.data ?? []).map((e) => e.id)
+      const empIdsFb = (fallback.data ?? []).map((e: any) => e.id)
       const { data: financials } = empIdsFb.length
         ? await supabase.from("employee_financial").select("*").in("employee_id", empIdsFb)
         : { data: [] as any[] }
       const finByEmp = new Map((financials ?? []).map((f: any) => [f.employee_id, f]))
-      employees = (fallback.data ?? []).map((e) => ({
+      employees = (fallback.data ?? []).map((e: any) => ({
         ...e,
         financial: finByEmp.get(e.id) ?? null,
       }))
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest) {
 
     const empIds = employees.map((e) => e.id)
 
-    const [inputsRes, loansRes, allowRes, dedRes] = await Promise.all([
+    const [inputsRes, loansRes, allowRes, dedRes, componentRes] = await Promise.all([
       supabase
         .from("payroll_pay_inputs")
         .select("*")
@@ -91,14 +92,26 @@ export async function GET(request: NextRequest) {
             .eq("is_active", true)
             .in("employee_id", empIds)
         : Promise.resolve({ data: [] as any[], error: null }),
+      empIds.length
+        ? supabase
+            .from("payroll_component_assignments")
+            .select("employee_id, category, calculation_type, amount, percentage, rate, quantity, min_amount, max_amount, tax_treatment, backpay_treatment, payment_method, approval_status, status")
+            .eq("company_id", companyId)
+            .eq("status", "active")
+            .eq("approval_status", "approved")
+            .lte("effective_period", payPeriod)
+            .or(`end_period.is.null,end_period.gte.${payPeriod}`)
+            .in("employee_id", empIds)
+        : Promise.resolve({ data: [] as any[], error: null }),
     ])
 
     const warnings: string[] = []
     if (inputsRes.error) warnings.push(`pay_inputs: ${inputsRes.error.message}`)
     if (loansRes.error) warnings.push(`loans: ${loansRes.error.message}`)
+    if (componentRes.error) warnings.push(`payroll_components: ${componentRes.error.message}`)
 
-    const inputsByEmployee = new Map(
-      (inputsRes.data ?? []).map((row) => [row.employee_id, row]),
+    const inputsByEmployee = new Map<string, any>(
+      (inputsRes.data ?? []).map((row: any) => [row.employee_id, row]),
     )
     const { isLoanInPayPeriod } = await import("@/lib/payroll/loan-summary")
     const loansByEmployee = new Map<string, { payment: number; balance: number }>()
@@ -126,6 +139,12 @@ export async function GET(request: NextRequest) {
       list.push(row)
       cardDedByEmp.set(row.employee_id, list)
     }
+    const componentsByEmp = new Map<string, any[]>()
+    for (const row of componentRes.data ?? []) {
+      const list = componentsByEmp.get(row.employee_id) ?? []
+      list.push(row)
+      componentsByEmp.set(row.employee_id, list)
+    }
 
     // Mid-month of period for effective dating
     const asOf = `${payPeriod}-15`
@@ -135,8 +154,51 @@ export async function GET(request: NextRequest) {
       const input = inputsByEmployee.get(emp.id)
       const loan = loansByEmployee.get(emp.id)
       const basic = Number(fin?.monthly_salary ?? 0)
-      const cardAllow = sumCompLines(cardAllowByEmp.get(emp.id), basic, asOf)
-      const cardDed = sumCompLines(cardDedByEmp.get(emp.id), basic, asOf)
+      const componentRows = componentsByEmp.get(emp.id) ?? []
+      const componentAmount = (category: string, predicate?: (row: any) => boolean) =>
+        componentRows
+          .filter((row: any) => row.category === category && (!predicate || predicate(row)))
+          .reduce((sum: number, row: any) => {
+            let value =
+              row.calculation_type === "percentage"
+                ? (basic * Number(row.percentage || 0)) / 100
+                : row.calculation_type === "rate_x_quantity"
+                  ? Number(row.rate || 0) * Number(row.quantity || 0)
+                  : Number(row.amount || 0)
+            if (row.min_amount != null) value = Math.max(value, Number(row.min_amount))
+            if (row.max_amount != null) value = Math.min(value, Number(row.max_amount))
+            return sum + value
+          }, 0)
+      const nonTaxableAllowance = componentAmount(
+        "allowance",
+        (row: any) => row.tax_treatment === "non_taxable" || row.tax_treatment === "tax_relief",
+      )
+      const cardAllow =
+        sumCompLines(cardAllowByEmp.get(emp.id), basic, asOf) + componentAmount("allowance")
+      const cardDed =
+        sumCompLines(cardDedByEmp.get(emp.id), basic, asOf) + componentAmount("deduction")
+      const componentPf = componentAmount("provident_fund")
+      const componentPfRate = basic > 0 ? (componentPf / basic) * 100 : 0
+      const componentBonus = componentAmount("bonus")
+      const nonTaxableBonus = componentAmount(
+        "bonus",
+        (row: any) => row.tax_treatment === "non_taxable" || row.tax_treatment === "tax_relief",
+      )
+      const componentBackpay = componentAmount(
+        "backpay",
+        (row: any) => row.payment_method !== "separate_run" && row.backpay_treatment !== "separate_run",
+      )
+      const nonTaxableBackpay = componentAmount(
+        "backpay",
+        (row: any) =>
+          row.payment_method !== "separate_run" &&
+          row.backpay_treatment !== "separate_run" &&
+          (row.tax_treatment === "non_taxable" || row.tax_treatment === "tax_relief"),
+      )
+      const separateBackpay = componentAmount(
+        "backpay",
+        (row: any) => row.payment_method === "separate_run" || row.backpay_treatment === "separate_run",
+      )
 
       return {
         employee_id: emp.id,
@@ -162,12 +224,17 @@ export async function GET(request: NextRequest) {
           // Employee-module card comps (added at process + worksheet preview; not stored in pay_inputs)
           card_allowances: cardAllow,
           card_deductions: cardDed,
+          component_bonus: componentBonus,
+          component_backpay: componentBackpay,
+          component_non_taxable_allowances: nonTaxableAllowance,
+          component_non_taxable_bonus: nonTaxableBonus + nonTaxableBackpay,
+          separate_backpay: separateBackpay,
           tier2_applicable: Number(fin?.tier2_employee_contribution ?? 0) >= 0,
           tier3_applicable:
             Boolean(fin?.provident_fund_enrolled) ||
             Number(fin?.provident_fund_rate ?? 0) > 0 ||
             Number(fin?.tier3_contribution ?? 0) > 0,
-          provident_fund_rate: Number(fin?.provident_fund_rate ?? 0),
+          provident_fund_rate: componentPfRate || Number(fin?.provident_fund_rate ?? 0),
         },
         input: input
           ? {
@@ -188,9 +255,11 @@ export async function GET(request: NextRequest) {
               tier2_applicable: input.tier2_applicable ?? true,
               tier3_applicable:
                 input.tier3_applicable ??
-                (Boolean(fin?.provident_fund_enrolled) || Number(fin?.provident_fund_rate ?? 0) > 0),
+                (componentPf > 0 ||
+                  Boolean(fin?.provident_fund_enrolled) ||
+                  Number(fin?.provident_fund_rate ?? 0) > 0),
               tier3_employee_rate: Number(
-                input.tier3_employee_rate ?? fin?.provident_fund_rate ?? 0,
+                componentPfRate || input.tier3_employee_rate || fin?.provident_fund_rate || 0,
               ),
               apply_to_master: Boolean(input.apply_to_master),
               notes: input.notes ?? "",
@@ -213,10 +282,11 @@ export async function GET(request: NextRequest) {
               other_deductions: 0,
               tier2_applicable: true,
               tier3_applicable:
+                componentPf > 0 ||
                 Boolean(fin?.provident_fund_enrolled) ||
                 Number(fin?.provident_fund_rate ?? 0) > 0 ||
                 Number(fin?.tier3_contribution ?? 0) > 0,
-              tier3_employee_rate: Number(fin?.provident_fund_rate ?? 0),
+              tier3_employee_rate: componentPfRate || Number(fin?.provident_fund_rate ?? 0),
               apply_to_master: false,
               notes: "",
               status: "draft",
@@ -251,6 +321,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const ctx = await resolveTenantContext(request, body.company_id)
     if (ctx instanceof NextResponse) return ctx
+    if (isUnresolvedTenant(ctx)) return NextResponse.json({ error: "Company not resolved" }, { status: 400 })
     const { companyId: company_id, service: supabase } = ctx
 
     const { pay_period, pay_period_start, pay_period_end, rows } = body as {
@@ -264,6 +335,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "pay_period and rows are required" },
         { status: 400 },
+      )
+    }
+
+    const { data: periodControl, error: periodControlError } = await supabase
+      .from("payroll_periods")
+      .select("status")
+      .eq("company_id", company_id)
+      .eq("pay_period", pay_period)
+      .maybeSingle()
+    if (periodControlError) {
+      return NextResponse.json(
+        { error: `Payroll period control unavailable: ${periodControlError.message}` },
+        { status: 503 },
+      )
+    }
+    if (periodControl?.status === "closed") {
+      return NextResponse.json(
+        { error: `${pay_period} is closed. Pay inputs are locked.` },
+        { status: 409 },
       )
     }
 
