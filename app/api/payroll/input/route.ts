@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
 
     const empIds = employees.map((e) => e.id)
 
-    const [inputsRes, loansRes, allowRes, dedRes] = await Promise.all([
+    const [inputsRes, loansRes, allowRes, dedRes, componentRes] = await Promise.all([
       supabase
         .from("payroll_pay_inputs")
         .select("*")
@@ -91,11 +91,22 @@ export async function GET(request: NextRequest) {
             .eq("is_active", true)
             .in("employee_id", empIds)
         : Promise.resolve({ data: [] as any[], error: null }),
+      empIds.length
+        ? supabase
+            .from("payroll_component_assignments")
+            .select("employee_id, category, calculation_type, amount, percentage, backpay_treatment, status")
+            .eq("company_id", companyId)
+            .eq("status", "active")
+            .lte("effective_period", payPeriod)
+            .or(`end_period.is.null,end_period.gte.${payPeriod}`)
+            .in("employee_id", empIds)
+        : Promise.resolve({ data: [] as any[], error: null }),
     ])
 
     const warnings: string[] = []
     if (inputsRes.error) warnings.push(`pay_inputs: ${inputsRes.error.message}`)
     if (loansRes.error) warnings.push(`loans: ${loansRes.error.message}`)
+    if (componentRes.error) warnings.push(`payroll_components: ${componentRes.error.message}`)
 
     const inputsByEmployee = new Map(
       (inputsRes.data ?? []).map((row) => [row.employee_id, row]),
@@ -126,6 +137,12 @@ export async function GET(request: NextRequest) {
       list.push(row)
       cardDedByEmp.set(row.employee_id, list)
     }
+    const componentsByEmp = new Map<string, any[]>()
+    for (const row of componentRes.data ?? []) {
+      const list = componentsByEmp.get(row.employee_id) ?? []
+      list.push(row)
+      componentsByEmp.set(row.employee_id, list)
+    }
 
     // Mid-month of period for effective dating
     const asOf = `${payPeriod}-15`
@@ -135,8 +152,33 @@ export async function GET(request: NextRequest) {
       const input = inputsByEmployee.get(emp.id)
       const loan = loansByEmployee.get(emp.id)
       const basic = Number(fin?.monthly_salary ?? 0)
-      const cardAllow = sumCompLines(cardAllowByEmp.get(emp.id), basic, asOf)
-      const cardDed = sumCompLines(cardDedByEmp.get(emp.id), basic, asOf)
+      const componentRows = componentsByEmp.get(emp.id) ?? []
+      const componentAmount = (category: string, predicate?: (row: any) => boolean) =>
+        componentRows
+          .filter((row: any) => row.category === category && (!predicate || predicate(row)))
+          .reduce(
+            (sum: number, row: any) =>
+              sum +
+              (row.calculation_type === "percentage"
+                ? (basic * Number(row.percentage || 0)) / 100
+                : Number(row.amount || 0)),
+            0,
+          )
+      const cardAllow =
+        sumCompLines(cardAllowByEmp.get(emp.id), basic, asOf) + componentAmount("allowance")
+      const cardDed =
+        sumCompLines(cardDedByEmp.get(emp.id), basic, asOf) + componentAmount("deduction")
+      const componentPf = componentAmount("provident_fund")
+      const componentPfRate = basic > 0 ? (componentPf / basic) * 100 : 0
+      const componentBonus = componentAmount("bonus")
+      const componentBackpay = componentAmount(
+        "backpay",
+        (row: any) => row.backpay_treatment !== "separate_run",
+      )
+      const separateBackpay = componentAmount(
+        "backpay",
+        (row: any) => row.backpay_treatment === "separate_run",
+      )
 
       return {
         employee_id: emp.id,
@@ -162,12 +204,15 @@ export async function GET(request: NextRequest) {
           // Employee-module card comps (added at process + worksheet preview; not stored in pay_inputs)
           card_allowances: cardAllow,
           card_deductions: cardDed,
+          component_bonus: componentBonus,
+          component_backpay: componentBackpay,
+          separate_backpay: separateBackpay,
           tier2_applicable: Number(fin?.tier2_employee_contribution ?? 0) >= 0,
           tier3_applicable:
             Boolean(fin?.provident_fund_enrolled) ||
             Number(fin?.provident_fund_rate ?? 0) > 0 ||
             Number(fin?.tier3_contribution ?? 0) > 0,
-          provident_fund_rate: Number(fin?.provident_fund_rate ?? 0),
+          provident_fund_rate: componentPfRate || Number(fin?.provident_fund_rate ?? 0),
         },
         input: input
           ? {
@@ -181,16 +226,18 @@ export async function GET(request: NextRequest) {
               uniform_allowance: input.uniform_allowance,
               other_allowances: input.other_allowances,
               overtime_amount: Number(input.overtime_amount ?? 0),
-              bonus_amount: Number(input.bonus_amount ?? 0),
+              bonus_amount: Number(input.bonus_amount ?? 0) + componentBonus + componentBackpay,
               loan_deduction: Number(input.loan_deduction ?? loan?.payment ?? 0),
               advance_deduction: Number(input.advance_deduction ?? 0),
               other_deductions: Number(input.other_deductions ?? 0),
               tier2_applicable: input.tier2_applicable ?? true,
               tier3_applicable:
                 input.tier3_applicable ??
-                (Boolean(fin?.provident_fund_enrolled) || Number(fin?.provident_fund_rate ?? 0) > 0),
+                (componentPf > 0 ||
+                  Boolean(fin?.provident_fund_enrolled) ||
+                  Number(fin?.provident_fund_rate ?? 0) > 0),
               tier3_employee_rate: Number(
-                input.tier3_employee_rate ?? fin?.provident_fund_rate ?? 0,
+                componentPfRate || input.tier3_employee_rate || fin?.provident_fund_rate || 0,
               ),
               apply_to_master: Boolean(input.apply_to_master),
               notes: input.notes ?? "",
@@ -207,16 +254,17 @@ export async function GET(request: NextRequest) {
               uniform_allowance: null,
               other_allowances: null,
               overtime_amount: 0,
-              bonus_amount: 0,
+              bonus_amount: componentBonus + componentBackpay,
               loan_deduction: loan?.payment ?? 0,
               advance_deduction: 0,
               other_deductions: 0,
               tier2_applicable: true,
               tier3_applicable:
+                componentPf > 0 ||
                 Boolean(fin?.provident_fund_enrolled) ||
                 Number(fin?.provident_fund_rate ?? 0) > 0 ||
                 Number(fin?.tier3_contribution ?? 0) > 0,
-              tier3_employee_rate: Number(fin?.provident_fund_rate ?? 0),
+              tier3_employee_rate: componentPfRate || Number(fin?.provident_fund_rate ?? 0),
               apply_to_master: false,
               notes: "",
               status: "draft",
@@ -264,6 +312,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "pay_period and rows are required" },
         { status: 400 },
+      )
+    }
+
+    const { data: periodControl } = await supabase
+      .from("payroll_periods")
+      .select("status")
+      .eq("company_id", company_id)
+      .eq("pay_period", pay_period)
+      .maybeSingle()
+    if (periodControl?.status === "closed") {
+      return NextResponse.json(
+        { error: `${pay_period} is closed. Pay inputs are locked.` },
+        { status: 409 },
       )
     }
 

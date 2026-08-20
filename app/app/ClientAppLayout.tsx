@@ -258,6 +258,7 @@ export default function ClientAppLayout({
           const subPageMap = {
             history: "History",
             input: "Pay Inputs",
+            components: "Pay Components",
             reports: "Reports",
             profile: "Profile",
             settings: "Settings",

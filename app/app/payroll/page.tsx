@@ -1147,6 +1147,12 @@ export default function PayrollPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
+            <Link href="/app/payroll/components">
+              <DollarSign className="h-4 w-4 mr-2" />
+              Pay Components
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
             <Link href="/app/payroll/input">
               <ClipboardList className="h-4 w-4 mr-2" />
               Pay Inputs

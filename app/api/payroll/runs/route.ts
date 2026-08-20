@@ -113,6 +113,15 @@ export async function POST(req: NextRequest) {
     if (!pay_period) {
       return NextResponse.json({ error: "pay_period is required" }, { status: 400 })
     }
+    const { data: periodControl } = await service
+      .from("payroll_periods")
+      .select("status")
+      .eq("company_id", companyId)
+      .eq("pay_period", pay_period)
+      .maybeSingle()
+    if (periodControl?.status === "closed") {
+      return NextResponse.json({ error: `${pay_period} is closed and cannot accept a new payroll run` }, { status: 409 })
+    }
 
     const bounds = periodBounds(pay_period)
 

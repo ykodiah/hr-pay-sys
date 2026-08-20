@@ -4309,6 +4309,22 @@ function AddEmployeeForm({
               </div>
             </div>
 
+            <Card className="border-indigo-200 bg-indigo-50/60 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="font-semibold text-indigo-950">Payroll components are centrally managed</h3>
+                  <p className="text-sm text-indigo-800">
+                    Allowances, deductions and provident fund values auto-populate from Payroll → Pay components.
+                  </p>
+                </div>
+                <Button type="button" variant="outline" asChild>
+                  <a href="/app/payroll/components">Open pay components</a>
+                </Button>
+              </div>
+            </Card>
+
+            {false && (<>
+            {/* Legacy employee-level payroll inputs retained only for historical source compatibility. */}
             {/* Provident Fund / Tier 3 */}
             <div className="space-y-4 rounded-lg border border-blue-100 bg-blue-50/40 p-4">
               <div>
@@ -4843,6 +4859,7 @@ function AddEmployeeForm({
                 </div>
               )}
             </div>
+            </>)}
           </div>
         </TabsContent>
         <TabsContent value="documents" className="space-y-6 max-w-none">
