@@ -119,35 +119,103 @@ export async function getEmployeeTaxReliefs(
   const supabase = await createClient()
 
   // Prefer joined catalog fields; fall back to flat columns for schema drift.
-  const { data, error } = await supabase
+  let data: any[] | null = null
+  let error: any = null
+  ;({ data, error } = await supabase
     .from("employee_tax_reliefs")
     .select(
       `
       override_amount,
+      quantity,
       tax_relief:tax_reliefs (
         name,
         amount,
         annual_amount,
         gra_code,
         relief_code,
-        code
+        code,
+        relief_type,
+        percentage_rate,
+        unit_amount,
+        max_quantity
       )
     `
     )
     .eq("employee_id", employeeId)
     .eq("tax_year", taxYear)
-    .eq("is_active", true)
+    .eq("is_active", true))
+
+  if (error && /quantity|relief_type|percentage_rate|unit_amount|max_quantity|schema cache|column/i.test(String(error.message || ""))) {
+    ;({ data, error } = await supabase
+      .from("employee_tax_reliefs")
+      .select(
+        `
+        override_amount,
+        tax_relief:tax_reliefs (
+          name,
+          amount,
+          annual_amount,
+          gra_code,
+          relief_code,
+          code
+        )
+      `
+      )
+      .eq("employee_id", employeeId)
+      .eq("tax_year", taxYear)
+      .eq("is_active", true))
+  }
 
   if (error || !data) return []
 
   return data.map((row: any) => {
     const relief = Array.isArray(row.tax_relief) ? row.tax_relief[0] : row.tax_relief
+    const code = String(relief?.gra_code || relief?.relief_code || relief?.code || "").toUpperCase()
+    const name = String(relief?.name || "").toLowerCase()
+    let reliefType = String(relief?.relief_type || "fixed").toLowerCase()
+    if (reliefType === "fixed" && (code.includes("DIS") || name.includes("disability"))) {
+      reliefType = "percentage"
+    }
+    if (
+      code.includes("CER") ||
+      name.includes("child education") ||
+      code.includes("ADR") ||
+      name.includes("aged dependent") ||
+      name.includes("aged dependant")
+    ) {
+      reliefType = "per_unit"
+    }
+    const qty = Math.max(1, Number(row.quantity || 1))
+    const unit = Number(
+      relief?.unit_amount ?? relief?.annual_amount ?? relief?.amount ?? 0,
+    )
+    const percentageRate = Number(
+      relief?.percentage_rate ??
+        (reliefType === "percentage" ? relief?.amount ?? 25 : 0),
+    )
+    let annual = Number(row.override_amount)
+    if (!Number.isFinite(annual) || row.override_amount == null) {
+      if (reliefType === "percentage") {
+        annual = percentageRate || 25
+      } else if (reliefType === "per_unit") {
+        const maxQ =
+          code.includes("CER") || name.includes("child")
+            ? 3
+            : code.includes("ADR") || name.includes("aged")
+              ? 2
+              : Number(relief?.max_quantity || 1)
+        annual = unit * Math.min(qty, maxQ || qty)
+      } else {
+        annual = Number(relief?.annual_amount ?? relief?.amount ?? 0)
+      }
+    }
     return {
       relief_code: relief?.gra_code || relief?.relief_code || relief?.code || relief?.name || "",
       relief_name: relief?.name || "Tax relief",
-      annual_amount: Number(
-        row.override_amount ?? relief?.annual_amount ?? relief?.amount ?? 0,
-      ),
+      annual_amount: annual,
+      relief_type: reliefType,
+      percentage_rate: reliefType === "percentage" ? percentageRate || 25 : undefined,
+      quantity: qty,
     }
   })
 }

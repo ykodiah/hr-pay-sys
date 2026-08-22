@@ -16,6 +16,10 @@ import { isMockSupabaseClient } from "@/lib/supabase/server"
 import { isUnresolvedTenant, resolveTenantContext } from "@/lib/settings/resolve-tenant"
 import { createPayrollService } from "@/lib/services"
 import { expandCompLines } from "@/lib/payroll/employee-comp-extras"
+import {
+  allocateLoanDeduction,
+  isLoanInPayPeriod,
+} from "@/lib/payroll/loan-summary"
 
 type ProcessRow = {
   employeeId: string
@@ -182,7 +186,7 @@ async function persistRowsFromWorksheet(
   // Pre-fetch employee financial data + employee info for snapshot enrichment
   const empIds = rows.map((r) => r.employeeId).filter(Boolean)
   const asOf = bounds.pay_period_end || `${payPeriod}-15`
-  const [finRes, empRes, subRes, coRes, allowRes, dedRes, componentRes] = await Promise.all([
+  const [finRes, empRes, subRes, coRes, allowRes, dedRes, componentRes, loanRes] = await Promise.all([
     empIds.length
       ? client.from("employee_financial").select("employee_id, transport_allowance, housing_allowance, medical_allowance, meal_allowance, communication_allowance, uniform_allowance, other_allowances, bank_name, bank_account_number, ssnit_number").in("employee_id", empIds)
       : { data: [] as any[] },
@@ -216,6 +220,17 @@ async function persistRowsFromWorksheet(
           .or(`end_period.is.null,end_period.gte.${payPeriod}`)
           .in("employee_id", empIds)
       : { data: [] as any[] },
+    empIds.length
+      ? client
+          .from("employee_loans")
+          .select(
+            "id, employee_id, loan_type, monthly_payment, monthly_installment, remaining_balance, amount_paid, expected_total_payment, total_interest, principal, status, auto_deduct, start_date, approved_at, disbursed_at, end_date, created_at",
+          )
+          .eq("company_id", companyId)
+          .in("employee_id", empIds)
+          .in("status", ["active", "approved", "disbursed"])
+          .order("created_at", { ascending: true })
+      : { data: [] as any[] },
   ])
   const finByEmp = new Map<string, any>()
   for (const f of finRes.data ?? []) finByEmp.set(f.employee_id, f)
@@ -242,6 +257,12 @@ async function persistRowsFromWorksheet(
     const list = componentsByEmp.get(row.employee_id) ?? []
     list.push(row)
     componentsByEmp.set(row.employee_id, list)
+  }
+  const loansByEmp = new Map<string, any[]>()
+  for (const row of loanRes.data ?? []) {
+    const list = loansByEmp.get(row.employee_id) ?? []
+    list.push(row)
+    loansByEmp.set(row.employee_id, list)
   }
 
   const componentLineValue = (row: any, basic: number) => {
@@ -406,6 +427,42 @@ async function persistRowsFromWorksheet(
           : []),
       ]
 
+      // Provisional per-loan breakdown so draft payslips show This-month amounts
+      const activeLoans = (loansByEmp.get(row.employeeId) ?? []).filter(
+        (l: any) => l.auto_deduct !== false && isLoanInPayPeriod(l, payPeriod),
+      )
+      const loanAllocation = loan > 0.009 ? allocateLoanDeduction(activeLoans, loan) : []
+      const loanSummaryLines = loanAllocation.map((a) => {
+        const loanRow = activeLoans.find((l: any) => String(l.id) === a.loanId)
+        const opening = n(
+          loanRow?.remaining_balance ??
+            Math.max(
+              0,
+              n(loanRow?.expected_total_payment || n(loanRow?.principal) + n(loanRow?.total_interest)) -
+                n(loanRow?.amount_paid),
+            ),
+        )
+        return {
+          loan_id: a.loanId,
+          loan_type: String(loanRow?.loan_type || "Loan"),
+          opening_balance: opening,
+          this_month: a.amount,
+          closing_balance: n(Math.max(0, opening - a.amount)),
+        }
+      })
+      // Still list in-period loans with 0 this_month so the summary table is complete
+      for (const l of activeLoans) {
+        if (loanSummaryLines.some((s) => s.loan_id === String(l.id))) continue
+        const opening = n(l.remaining_balance)
+        loanSummaryLines.push({
+          loan_id: String(l.id),
+          loan_type: String(l.loan_type || "Loan"),
+          opening_balance: opening,
+          this_month: 0,
+          closing_balance: opening,
+        })
+      }
+
       // Build only the columns that actually exist in payroll_items table
       // Do NOT pass id — let Postgres gen_random_uuid() generate a valid UUID
       const itemPayload: Record<string, any> = {
@@ -516,6 +573,7 @@ async function persistRowsFromWorksheet(
         other_deductions: other,
         total_deductions: totalDeductions,
         net_pay: net,
+        loan_summary_lines: loanSummaryLines,
         status: "draft",
         updated_at: new Date().toISOString(),
       }
@@ -553,6 +611,38 @@ async function persistRowsFromWorksheet(
       updated_at: new Date().toISOString(),
     })
     .eq("id", runId)
+
+  // Prefer latest run slips on the employee portal for this period
+  try {
+    await client.rpc("akwaaba_supersede_prior_payslips", {
+      p_company_id: companyId,
+      p_pay_period: payPeriod,
+      p_keep_run_id: runId,
+    })
+  } catch {
+    // Fallback without RPC: mark older same-period slips superseded
+    const { data: keepSlips } = await client
+      .from("payslips")
+      .select("id, employee_id")
+      .eq("company_id", companyId)
+      .eq("payroll_run_id", runId)
+      .eq("pay_period", payPeriod)
+    for (const slip of keepSlips ?? []) {
+      await client
+        .from("payslips")
+        .update({
+          status: "superseded",
+          superseded_by: slip.id,
+          superseded_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("company_id", companyId)
+        .eq("employee_id", slip.employee_id)
+        .eq("pay_period", payPeriod)
+        .neq("payroll_run_id", runId)
+        .in("status", ["draft", "issued", "viewed"])
+    }
+  }
 
   return { processed, errors, employeeErrors }
 }
@@ -797,6 +887,30 @@ export async function POST(req: NextRequest) {
     if (nextStatus === "pending") runUpdate.approval_stage = "pending"
 
     await client.from("payroll_runs").update(runUpdate).eq("id", runId)
+
+    // Sync latest slips to employee portal: supersede prior period slips and issue this run
+    if (processed > 0) {
+      const issuedAt = new Date().toISOString()
+      try {
+        await client.rpc("akwaaba_supersede_prior_payslips", {
+          p_company_id: company_id,
+          p_pay_period: pay_period,
+          p_keep_run_id: runId,
+        })
+      } catch {
+        // ignore — persist path may already have superseded
+      }
+      await client
+        .from("payslips")
+        .update({
+          status: "issued",
+          issued_at: issuedAt,
+          updated_at: issuedAt,
+        })
+        .eq("payroll_run_id", runId)
+        .eq("company_id", company_id)
+        .in("status", ["draft"])
+    }
 
     await client
       .from("payroll_pay_inputs")

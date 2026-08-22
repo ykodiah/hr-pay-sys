@@ -264,7 +264,9 @@ export async function GET(request: NextRequest) {
           meal_allowance: Number(fin?.meal_allowance ?? 0),
           communication_allowance: Number(fin?.communication_allowance ?? 0),
           uniform_allowance: Number(fin?.uniform_allowance ?? 0),
-          other_allowances: Number(fin?.other_allowances ?? 0),
+          other_allowances:
+            // Pay components are source of truth — avoid double-counting master "other"
+            componentAmount("allowance") > 0 ? 0 : Number(fin?.other_allowances ?? 0),
           // Employee-module card comps (added at process + worksheet preview; not stored in pay_inputs)
           card_allowances: cardAllow,
           card_deductions: cardDed,
@@ -274,11 +276,16 @@ export async function GET(request: NextRequest) {
           component_non_taxable_bonus: nonTaxableBonus + nonTaxableBackpay,
           separate_backpay: separateBackpay,
           component_lines: componentLines,
+          components_source_of_truth: true,
+          has_component_allowances: componentAmount("allowance") > 0,
+          has_component_pf: componentPf > 0,
           tier2_applicable: Number(fin?.tier2_employee_contribution ?? 0) >= 0,
           tier3_applicable:
+            componentPf > 0 ||
             Boolean(fin?.provident_fund_enrolled) ||
             Number(fin?.provident_fund_rate ?? 0) > 0 ||
             Number(fin?.tier3_contribution ?? 0) > 0,
+          // Component PF rate wins over employee financial rate
           provident_fund_rate: componentPfRate || Number(fin?.provident_fund_rate ?? 0),
         },
         input: input
@@ -291,7 +298,9 @@ export async function GET(request: NextRequest) {
               meal_allowance: input.meal_allowance,
               communication_allowance: input.communication_allowance,
               uniform_allowance: input.uniform_allowance,
-              other_allowances: input.other_allowances,
+              // When allowance components exist, ignore pay-input other to prevent conflict
+              other_allowances:
+                componentAmount("allowance") > 0 ? null : input.other_allowances,
               overtime_amount: Number(input.overtime_amount ?? 0),
               bonus_amount: Number(input.bonus_amount ?? 0),
               loan_deduction: resolveLoanDeduction(input.loan_deduction, loan?.payment ?? 0),
@@ -299,12 +308,16 @@ export async function GET(request: NextRequest) {
               other_deductions: Number(input.other_deductions ?? 0),
               tier2_applicable: input.tier2_applicable ?? true,
               tier3_applicable:
-                input.tier3_applicable ??
-                (componentPf > 0 ||
-                  Boolean(fin?.provident_fund_enrolled) ||
-                  Number(fin?.provident_fund_rate ?? 0) > 0),
+                componentPf > 0
+                  ? true
+                  : input.tier3_applicable ??
+                    (Boolean(fin?.provident_fund_enrolled) ||
+                      Number(fin?.provident_fund_rate ?? 0) > 0),
               tier3_employee_rate: Number(
-                componentPfRate || input.tier3_employee_rate || fin?.provident_fund_rate || 0,
+                componentPfRate ||
+                  (componentPf > 0 ? 0 : input.tier3_employee_rate) ||
+                  (componentPf > 0 ? 0 : fin?.provident_fund_rate) ||
+                  0,
               ),
               apply_to_master: Boolean(input.apply_to_master),
               notes: input.notes ?? "",

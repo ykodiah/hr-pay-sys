@@ -229,6 +229,10 @@ class GRAApiService {
         lastUpdated: now,
         graCode: 'GRA-CER',
         maxAmount: 1800,
+        reliefType: 'per_unit',
+        unitAmount: 600,
+        maxQuantity: 3,
+        quantityLabel: 'Children',
         conditions: [
           'Maximum of three children',
           'Child attending a recognized registered educational institution in Ghana',
@@ -242,7 +246,7 @@ class GRAApiService {
         id: 'gra-disability',
         name: 'Disability Relief',
         description:
-          'Granted to persons who prove to the Commissioner-General that they are disabled and receive income from business or employment. Relief is 25% of that income (amount stored as 25 for percentage application).',
+          'Granted to persons who prove to the Commissioner-General that they are disabled and receive income from business or employment. Relief is 25% of that income (GRA).',
         amount: 25,
         currency: 'GHS',
         category: 'Disability',
@@ -251,6 +255,9 @@ class GRAApiService {
         lastUpdated: now,
         graCode: 'GRA-DIS',
         maxAmount: 25,
+        reliefType: 'percentage',
+        percentageRate: 25,
+        maxQuantity: 1,
         conditions: [
           'Must satisfy the Commissioner-General that the person is disabled',
           'Applies only to income from business or employment',
@@ -288,6 +295,10 @@ class GRAApiService {
         lastUpdated: now,
         graCode: 'GRA-ADR',
         maxAmount: 2000,
+        reliefType: 'per_unit',
+        unitAmount: 1000,
+        maxQuantity: 2,
+        quantityLabel: 'Dependents',
         conditions: [
           'Relative must be 60 years or older',
           'Maximum of two relatives',

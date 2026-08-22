@@ -462,8 +462,10 @@ export class PayrollService extends BaseService {
           const cardAllowTotal = sumCompLines(cardAllowByEmp.get(emp.id), monthlyBasic, asOf) + componentAllowTotal
           const cardDedTotal = sumCompLines(cardDedByEmp.get(emp.id), monthlyBasic, asOf) + componentDedTotal
 
-          // Period override for other_allowances replaces master; card allowances always add
-          const masterOther = pick(period?.other_allowances, fin.other_allowances)
+          // Period override for other_allowances replaces master; card/component allowances always add.
+          // When allowance components exist they are SoT — do not also pull master other.
+          const masterOther =
+            componentAllowTotal > 0 ? 0 : pick(period?.other_allowances, fin.other_allowances)
           const periodOtherDed = Number(period?.other_deductions ?? 0)
           const leaveAllowance = Number(period?.leave_allowance ?? 0)
           const namedAllowLines = componentRows

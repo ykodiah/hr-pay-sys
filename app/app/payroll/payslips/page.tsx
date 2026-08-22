@@ -200,12 +200,21 @@ function PayslipPreview({
     : []
   const loanSummaryRows =
     storedSummary.length > 0
-      ? storedSummary.map((r: any) => ({
-          loan_type: String(r.loan_type || "Loan"),
-          opening_balance: Number(r.opening_balance || 0),
-          this_month: Number(r.this_month || 0),
-          closing_balance: Number(r.closing_balance || 0),
-        }))
+      ? buildPayslipLoanSummaryRows(
+          (storedSummary as any[]).map((r: any) => ({
+            id: r.loan_id,
+            loan_type: r.loan_type,
+            remaining_balance: Number(r.closing_balance || 0),
+            this_month_paid: Number(r.this_month || 0),
+          })),
+          (storedSummary as any[]).map((r: any) => ({
+            loan_id: String(r.loan_id || ""),
+            amount: Number(r.this_month || 0),
+            balance_before: Number(r.opening_balance || 0),
+            balance_after: Number(r.closing_balance || 0),
+          })),
+          { loanDeductionTotal: Number(normalized.loan_deduction || 0) },
+        )
       : buildPayslipLoanSummaryRows(
           loanList as any[],
           (loanList as any[]).map((l) => ({
@@ -215,6 +224,7 @@ function PayslipPreview({
               Number(l.remaining_balance || 0) + Number(l.this_month_paid || 0),
             balance_after: Number(l.remaining_balance || 0),
           })),
+          { loanDeductionTotal: Number(normalized.loan_deduction || 0) },
         )
   const hasLoan = loanSummaryRows.length > 0 || normalized.loan_deduction > 0
   const loanTotals = loanSummaryRows.reduce(

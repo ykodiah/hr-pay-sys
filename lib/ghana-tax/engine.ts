@@ -57,7 +57,13 @@ export interface TaxRates {
 export interface TaxReliefItem {
   relief_code: string
   relief_name: string
+  /** Annual fixed amount (already quantity-adjusted for per_unit reliefs). */
   annual_amount: number
+  /** fixed | percentage | per_unit */
+  relief_type?: "fixed" | "percentage" | "per_unit" | string
+  /** For percentage reliefs (e.g. Disability 25). */
+  percentage_rate?: number
+  quantity?: number
 }
 
 export interface OtherDeductionsInput {
@@ -421,7 +427,16 @@ export function calculateGhanaTax(
     : 0
 
   const annualTaxReliefs = round2(
-    (input.annual_tax_reliefs ?? []).reduce((sum, r) => sum + (r.annual_amount ?? 0), 0),
+    (input.annual_tax_reliefs ?? []).reduce((sum, r) => {
+      const type = String(r.relief_type || "fixed").toLowerCase()
+      if (type === "percentage") {
+        // GRA Disability: 25% of employment/business income (monthly gross × 12)
+        const rate = Number(r.percentage_rate ?? r.annual_amount ?? 0)
+        if (rate <= 0) return sum
+        return sum + monthlyGross * 12 * (rate / 100)
+      }
+      return sum + (r.annual_amount ?? 0)
+    }, 0),
   )
   const monthlyTaxReliefs = round2(annualTaxReliefs / 12)
 

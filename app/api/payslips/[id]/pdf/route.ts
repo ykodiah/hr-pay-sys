@@ -108,10 +108,25 @@ export async function GET(
     const earnings = buildPayslipEarningsLines(data as any).map((e) => [e.label, e.amount] as [string, number])
     const deductions = buildPayslipDeductionLines(data as any).map((d) => [d.label, d.amount] as [string, number])
 
-    const loanSummary =
+    const loanSummary = buildPayslipLoanSummaryRows(
       Array.isArray((data as any).loan_summary_lines) && (data as any).loan_summary_lines.length
-        ? (data as any).loan_summary_lines
-        : buildPayslipLoanSummaryRows(loans, payments)
+        ? (data as any).loan_summary_lines.map((r: any) => ({
+            id: r.loan_id,
+            loan_type: r.loan_type,
+            remaining_balance: Number(r.closing_balance || 0),
+            this_month_paid: Number(r.this_month || 0),
+          }))
+        : loans,
+      Array.isArray((data as any).loan_summary_lines) && (data as any).loan_summary_lines.length
+        ? (data as any).loan_summary_lines.map((r: any) => ({
+            loan_id: String(r.loan_id || ""),
+            amount: Number(r.this_month || 0),
+            balance_before: Number(r.opening_balance || 0),
+            balance_after: Number(r.closing_balance || 0),
+          }))
+        : payments,
+      { loanDeductionTotal: Number(data.loan_deduction || 0) },
+    )
     const hasLoan = loanSummary.length > 0 || Number(data.loan_deduction) > 0
     const loanTotals = loanSummary.reduce(
       (acc, r) => ({

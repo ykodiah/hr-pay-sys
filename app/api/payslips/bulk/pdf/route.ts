@@ -46,11 +46,29 @@ function renderOneSlip(slip: PayslipRow & { loan?: any }, company: any): string 
   const earnings = buildPayslipEarningsLines(slip as any).map((e) => [e.label, e.amount] as [string, number])
   const deductions = buildPayslipDeductionLines(slip as any).map((d) => [d.label, d.amount] as [string, number])
 
-  const loanSummary = Array.isArray((slip as any).loan_summary_lines) && (slip as any).loan_summary_lines.length
-    ? (slip as any).loan_summary_lines
-    : buildPayslipLoanSummaryRows(
-        Array.isArray(slip.loans) ? slip.loans : slip.loan ? [slip.loan] : [],
-      )
+  const loanSummary = buildPayslipLoanSummaryRows(
+    Array.isArray((slip as any).loan_summary_lines) && (slip as any).loan_summary_lines.length
+      ? (slip as any).loan_summary_lines.map((r: any) => ({
+          id: r.loan_id,
+          loan_type: r.loan_type,
+          remaining_balance: Number(r.closing_balance || 0),
+          this_month_paid: Number(r.this_month || 0),
+        }))
+      : Array.isArray(slip.loans)
+        ? slip.loans
+        : slip.loan
+          ? [slip.loan]
+          : [],
+    Array.isArray((slip as any).loan_summary_lines) && (slip as any).loan_summary_lines.length
+      ? (slip as any).loan_summary_lines.map((r: any) => ({
+          loan_id: String(r.loan_id || ""),
+          amount: Number(r.this_month || 0),
+          balance_before: Number(r.opening_balance || 0),
+          balance_after: Number(r.closing_balance || 0),
+        }))
+      : [],
+    { loanDeductionTotal: Number(slip.loan_deduction || 0) },
+  )
   const hasLoan = loanSummary.length > 0 || Number(slip.loan_deduction) > 0
   const loanTotals = loanSummary.reduce(
     (acc: any, r: any) => ({
@@ -239,10 +257,25 @@ export async function GET(request: NextRequest) {
             paidIds.has(l.id) ||
             (["active", "approved"].includes(String(l.status)) && isLoanInPayPeriod(l, period)),
         )
-        const summary =
+        const summary = buildPayslipLoanSummaryRows(
           Array.isArray((s as any).loan_summary_lines) && (s as any).loan_summary_lines.length
-            ? (s as any).loan_summary_lines
-            : buildPayslipLoanSummaryRows(empLoans, periodPayments)
+            ? (s as any).loan_summary_lines.map((r: any) => ({
+                id: r.loan_id,
+                loan_type: r.loan_type,
+                remaining_balance: Number(r.closing_balance || 0),
+                this_month_paid: Number(r.this_month || 0),
+              }))
+            : empLoans,
+          Array.isArray((s as any).loan_summary_lines) && (s as any).loan_summary_lines.length
+            ? (s as any).loan_summary_lines.map((r: any) => ({
+                loan_id: String(r.loan_id || ""),
+                amount: Number(r.this_month || 0),
+                balance_before: Number(r.opening_balance || 0),
+                balance_after: Number(r.closing_balance || 0),
+              }))
+            : periodPayments,
+          { loanDeductionTotal: Number(s.loan_deduction || 0) },
+        )
         return renderOneSlip(
           { ...s, loans: empLoans, loan: empLoans[0] || null, loan_summary_lines: summary } as any,
           company,

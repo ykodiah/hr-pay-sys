@@ -51,7 +51,7 @@ export async function POST(
         .select("*")
         .eq("employee_id", slip.employee_id)
         .eq("company_id", slip.company_id)
-        .in("status", ["active", "approved", "completed"])
+        .in("status", ["active", "approved", "disbursed", "completed"])
         .order("created_at", { ascending: true }),
       client
         .from("payroll_loan_payments")
@@ -69,7 +69,9 @@ export async function POST(
       return isLoanInPayPeriod(l, period)
     })
 
-    const summary = buildPayslipLoanSummaryRows(loans, payments)
+    const summary = buildPayslipLoanSummaryRows(loans, payments, {
+      loanDeductionTotal: loanDeduction,
+    })
 
     await client
       .from("payslips")
@@ -83,7 +85,8 @@ export async function POST(
       loans: loans.map((l) => ({
         ...l,
         this_month_paid: Number(
-          payments.filter((p) => p.loan_id === l.id).reduce((s, p) => s + Number(p.amount || 0), 0),
+          summary.find((s) => s.loan_id === l.id)?.this_month ||
+            payments.filter((p) => p.loan_id === l.id).reduce((s, p) => s + Number(p.amount || 0), 0),
         ),
       })),
       payments,

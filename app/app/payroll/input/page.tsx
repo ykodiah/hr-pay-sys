@@ -313,8 +313,12 @@ export default function PayInputsPage() {
             <h1 className="text-2xl font-semibold tracking-tight">Pay Inputs</h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            Period overrides feed Process Payroll. Preview PAYE/net now includes tax reliefs, Tier 3/PF,
-            and card deductions — Tier 2 is report-only.
+            Period overrides for overtime, loans, and one-off amounts. Active{" "}
+            <Link href="/app/payroll/components" className="underline underline-offset-2">
+              Pay Components
+            </Link>{" "}
+            are the source of truth for allowances, bonuses, backpay, deductions, and provident fund —
+            those amounts are merged in automatically and are not duplicated from master “other”.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

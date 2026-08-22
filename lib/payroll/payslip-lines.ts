@@ -37,7 +37,8 @@ function isPfLike(row: StoredLine): boolean {
     row.category === "provident_fund" ||
     row.category === "pf" ||
     /^PF(_|$)/i.test(row.code || "") ||
-    /provident|tier\s*3/i.test(row.label)
+    /^TIER\s*3/i.test(row.code || "") ||
+    /\bpf\b|provident|tier\s*3/i.test(row.label)
   )
 }
 
@@ -105,15 +106,10 @@ export function buildPayslipDeductionLines(slip: Record<string, any>): PayslipMo
     { label: "Advance Deduction", amount: n(slip.advance_deduction) },
   ].filter((d) => d.amount > 0)
 
-  // Prefer named PF assignment labels over a single Tier 3 bulk line
+  // Pay components are source of truth for PF — show named lines only (no bulk residual)
   if (namedPf.length) {
     for (const row of namedPf) {
       lines.push({ label: row.label, amount: row.amount })
-    }
-    const namedPfTotal = namedPf.reduce((sum, row) => sum + row.amount, 0)
-    const residualPf = Math.max(0, n(slip.tier3_employee) - namedPfTotal)
-    if (residualPf > 0.009) {
-      lines.push({ label: "Tier 3 / Provident Fund", amount: residualPf })
     }
   } else if (n(slip.tier3_employee) > 0) {
     lines.push({ label: "Tier 3 / Provident Fund", amount: n(slip.tier3_employee) })
@@ -140,6 +136,7 @@ export function buildPayslipDeductionLines(slip: Record<string, any>): PayslipMo
 
 export {
   buildPayslipLoanSummaryRows,
+  allocateLoanDeduction,
   isLoanInPayPeriod,
   toPayPeriod,
   type PayslipLoanSummaryRow,

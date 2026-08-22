@@ -21,7 +21,48 @@ function isMissingRelation(error: any) {
 }
 
 function mapCatalogRow(r: any) {
-  const annual = Number(r.annual_amount ?? r.amount ?? 0)
+  const code = String(r.gra_code || r.relief_code || r.code || "").toUpperCase()
+  const name = String(r.name || r.relief_name || "").toLowerCase()
+  let reliefType = String(r.relief_type || "fixed").toLowerCase()
+  let maxQuantity = r.max_quantity != null ? Number(r.max_quantity) : null
+  let quantityLabel = r.quantity_label || null
+  let percentageRate = r.percentage_rate != null ? Number(r.percentage_rate) : null
+  let unitAmount = r.unit_amount != null ? Number(r.unit_amount) : null
+
+  // Normalize GRA defaults when DB rows predate schema columns
+  if (
+    reliefType === "fixed" &&
+    (code.includes("DIS") || name.includes("disability"))
+  ) {
+    reliefType = "percentage"
+    percentageRate = percentageRate ?? (Number(r.amount ?? r.annual_amount ?? 25) || 25)
+  }
+  if (
+    code.includes("CER") ||
+    name.includes("child education") ||
+    name.includes("child edu")
+  ) {
+    reliefType = "per_unit"
+    unitAmount = unitAmount ?? (Number(r.amount ?? r.annual_amount ?? 600) || 600)
+    maxQuantity = maxQuantity ?? 3
+    quantityLabel = quantityLabel || "Children"
+  }
+  if (
+    code.includes("ADR") ||
+    name.includes("aged dependent") ||
+    name.includes("aged dependant")
+  ) {
+    reliefType = "per_unit"
+    unitAmount = unitAmount ?? (Number(r.amount ?? r.annual_amount ?? 1000) || 1000)
+    maxQuantity = maxQuantity ?? 2
+    quantityLabel = quantityLabel || "Dependents"
+  }
+
+  const annual = Number(
+    reliefType === "percentage"
+      ? percentageRate ?? r.amount ?? 25
+      : unitAmount ?? r.annual_amount ?? r.amount ?? 0,
+  )
   return {
     id: r.id,
     name: r.name || r.relief_name || "Untitled relief",
@@ -33,14 +74,30 @@ function mapCatalogRow(r: any) {
     graCode: r.gra_code || r.relief_code || r.code || "",
     isActive: r.is_active !== false,
     effectiveDate: r.effective_date || null,
+    reliefType,
+    percentageRate,
+    unitAmount: unitAmount ?? annual,
+    maxQuantity,
+    quantityLabel,
   }
 }
 
 function mapAssignment(row: any, relief?: any, employee?: any) {
   const catalog = relief || row.tax_relief || {}
-  const annual = Number(
-    row.override_amount ?? catalog.annual_amount ?? catalog.amount ?? 0,
-  )
+  const mapped = mapCatalogRow(catalog)
+  const qty = Math.max(1, Number(row.quantity || 1))
+  const maxQ = mapped.maxQuantity || 1
+  const clampedQty = Math.min(qty, maxQ)
+  let annual = Number(row.override_amount)
+  if (!Number.isFinite(annual) || row.override_amount == null) {
+    if (mapped.reliefType === "percentage") {
+      annual = Number(mapped.percentageRate || mapped.annualAmount || 25)
+    } else if (mapped.reliefType === "per_unit") {
+      annual = Number(mapped.unitAmount || mapped.annualAmount || 0) * clampedQty
+    } else {
+      annual = Number(catalog.annual_amount ?? catalog.amount ?? 0)
+    }
+  }
   return {
     id: row.id,
     companyId: row.company_id,
@@ -48,6 +105,12 @@ function mapAssignment(row: any, relief?: any, employee?: any) {
     taxReliefId: row.tax_relief_id,
     taxYear: Number(row.tax_year),
     overrideAmount: row.override_amount != null ? Number(row.override_amount) : null,
+    quantity: clampedQty,
+    maxQuantity: mapped.maxQuantity,
+    quantityLabel: mapped.quantityLabel,
+    reliefType: mapped.reliefType,
+    percentageRate: mapped.percentageRate,
+    unitAmount: mapped.unitAmount,
     annualAmount: annual,
     isActive: row.is_active !== false,
     documentUrl: row.document_url || null,
@@ -73,11 +136,14 @@ function mapAssignment(row: any, relief?: any, employee?: any) {
 
 /** Engine shape for payroll calc */
 function toEngineItem(row: any, relief?: any) {
-  const catalog = relief || row.tax_relief || {}
+  const mapped = mapAssignment(row, relief)
   return {
-    relief_code: catalog.gra_code || catalog.relief_code || catalog.code || catalog.name || "",
-    relief_name: catalog.name || catalog.relief_name || "Tax relief",
-    annual_amount: Number(row.override_amount ?? catalog.annual_amount ?? catalog.amount ?? 0),
+    relief_code: mapped.reliefCode || mapped.reliefName || "",
+    relief_name: mapped.reliefName || "Tax relief",
+    annual_amount: mapped.annualAmount,
+    relief_type: mapped.reliefType,
+    percentage_rate: mapped.percentageRate ?? undefined,
+    quantity: mapped.quantity,
   }
 }
 
@@ -488,16 +554,32 @@ export async function POST(req: NextRequest) {
           ? Number(body.override_amount)
           : null
 
+      const quantities: Record<string, number> =
+        body.quantities && typeof body.quantities === "object" ? body.quantities : {}
+
+      // Load catalog meta for max quantity clamps
+      const { data: reliefMeta } = await service
+        .from("tax_reliefs")
+        .select("id, max_quantity, relief_type, gra_code, relief_code, code, name, relief_name")
+        .eq("company_id", companyId)
+        .in("id", [...validReliefIds])
+      const metaById = new Map((reliefMeta || []).map((r: any) => [r.id, mapCatalogRow(r)]))
+
       const rows = []
       for (const emp of validEmployees) {
         for (const reliefId of taxReliefIds) {
           if (!validReliefIds.has(reliefId)) continue
+          const meta = metaById.get(reliefId)
+          const maxQ = Number(meta?.maxQuantity || 1)
+          const rawQty = Number(quantities[reliefId] ?? body.quantity ?? 1)
+          const quantity = Math.max(1, Math.min(Number.isFinite(rawQty) ? rawQty : 1, maxQ || 1))
           rows.push({
             company_id: companyId,
             employee_id: emp.id,
             tax_relief_id: reliefId,
             tax_year: taxYear,
             override_amount: Number.isFinite(overrideAmount as number) ? overrideAmount : null,
+            quantity,
             is_active: true,
             notes: body.notes || null,
             assigned_by: userId && String(userId).length > 20 ? userId : null,
@@ -513,6 +595,15 @@ export async function POST(req: NextRequest) {
         .from("employee_tax_reliefs")
         .upsert(rows, { onConflict: "company_id,employee_id,tax_relief_id,tax_year" })
         .select("id"))
+
+      // Older DBs may lack quantity — retry without it
+      if (error && /quantity|schema cache|column/i.test(String(error.message || ""))) {
+        const stripped = rows.map(({ quantity: _q, ...rest }) => rest)
+        ;({ data: upserted, error } = await service
+          .from("employee_tax_reliefs")
+          .upsert(stripped, { onConflict: "company_id,employee_id,tax_relief_id,tax_year" })
+          .select("id"))
+      }
 
       // Fallback when unique constraint is missing: update-then-insert per row
       if (error && /no unique|on conflict|conflict target/i.test(String(error.message || ""))) {

@@ -49,6 +49,11 @@ type CatalogRelief = {
   currency: string
   category: string
   graCode: string
+  reliefType?: string
+  percentageRate?: number | null
+  unitAmount?: number | null
+  maxQuantity?: number | null
+  quantityLabel?: string | null
 }
 
 type Assignment = {
@@ -86,6 +91,18 @@ function money(n: number) {
   })}`
 }
 
+function formatReliefAmount(r: CatalogRelief) {
+  if (String(r.reliefType || "").toLowerCase() === "percentage") {
+    return `${Number(r.percentageRate ?? r.annualAmount ?? 25)}% of employment income`
+  }
+  if (String(r.reliefType || "").toLowerCase() === "per_unit") {
+    const unit = Number(r.unitAmount ?? r.annualAmount ?? 0)
+    const maxQ = Number(r.maxQuantity || 1)
+    return `${money(unit)} each (max ${maxQ})`
+  }
+  return `${money(r.annualAmount)}/yr`
+}
+
 function yearOptions() {
   const y = new Date().getFullYear()
   return [y + 1, y, y - 1, y - 2, y - 3]
@@ -107,6 +124,7 @@ export default function PayrollTaxReliefsPage() {
   const [showAssign, setShowAssign] = useState(false)
   const [assignEmployeeId, setAssignEmployeeId] = useState("")
   const [assignReliefIds, setAssignReliefIds] = useState<string[]>([])
+  const [assignQuantities, setAssignQuantities] = useState<Record<string, number>>({})
   const [assignOverride, setAssignOverride] = useState("")
   const [assignNotes, setAssignNotes] = useState("")
 
@@ -212,7 +230,14 @@ export default function PayrollTaxReliefsPage() {
   }, [employees, bulkSearch])
 
   const toggleRelief = (id: string, list: string[], setList: (v: string[]) => void) => {
-    setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id])
+    const next = list.includes(id) ? list.filter((x) => x !== id) : [...list, id]
+    setList(next)
+    if (!list.includes(id)) {
+      const relief = catalog.find((r) => r.id === id)
+      if (relief && Number(relief.maxQuantity || 1) > 1) {
+        setAssignQuantities((prev) => ({ ...prev, [id]: prev[id] || 1 }))
+      }
+    }
   }
 
   const handleAssign = async () => {
@@ -223,6 +248,22 @@ export default function PayrollTaxReliefsPage() {
         variant: "destructive",
       })
       return
+    }
+    // Validate quantities for per-unit reliefs
+    for (const id of assignReliefIds) {
+      const relief = catalog.find((r) => r.id === id)
+      const maxQ = Number(relief?.maxQuantity || 1)
+      if (maxQ > 1) {
+        const q = Number(assignQuantities[id] || 1)
+        if (!Number.isFinite(q) || q < 1 || q > maxQ) {
+          toast({
+            title: "Invalid quantity",
+            description: `${relief?.name || "Relief"} requires a quantity between 1 and ${maxQ}.`,
+            variant: "destructive",
+          })
+          return
+        }
+      }
     }
     setSaving(true)
     try {
@@ -236,6 +277,7 @@ export default function PayrollTaxReliefsPage() {
           tax_year: taxYear,
           employee_id: assignEmployeeId,
           tax_relief_ids: assignReliefIds,
+          quantities: assignQuantities,
           override_amount: assignOverride === "" ? null : Number(assignOverride),
           notes: assignNotes,
         }),
@@ -249,6 +291,7 @@ export default function PayrollTaxReliefsPage() {
       setShowAssign(false)
       setAssignEmployeeId("")
       setAssignReliefIds([])
+      setAssignQuantities({})
       setAssignOverride("")
       setAssignNotes("")
       await loadReliefs(companyId, taxYear)
@@ -684,21 +727,46 @@ export default function PayrollTaxReliefsPage() {
             </div>
             <div>
               <Label>Reliefs</Label>
-              <div className="mt-2 max-h-48 overflow-y-auto space-y-2 rounded border p-3">
-                {catalog.map((r) => (
-                  <label key={r.id} className="flex items-start gap-2 text-sm cursor-pointer">
-                    <Checkbox
-                      checked={assignReliefIds.includes(r.id)}
-                      onCheckedChange={() =>
-                        toggleRelief(r.id, assignReliefIds, setAssignReliefIds)
-                      }
-                    />
-                    <span>
-                      <span className="font-medium">{r.name}</span>
-                      <span className="text-muted-foreground"> · {money(r.annualAmount)}/yr</span>
-                    </span>
-                  </label>
-                ))}
+              <div className="mt-2 max-h-64 overflow-y-auto space-y-2 rounded border p-3">
+                {catalog.map((r) => {
+                  const checked = assignReliefIds.includes(r.id)
+                  const maxQ = Number(r.maxQuantity || 1)
+                  const needsQty = checked && maxQ > 1
+                  return (
+                    <div key={r.id} className="space-y-1.5">
+                      <label className="flex items-start gap-2 text-sm cursor-pointer">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={() =>
+                            toggleRelief(r.id, assignReliefIds, setAssignReliefIds)
+                          }
+                        />
+                        <span>
+                          <span className="font-medium">{r.name}</span>
+                          <span className="text-muted-foreground"> · {formatReliefAmount(r)}</span>
+                        </span>
+                      </label>
+                      {needsQty && (
+                        <div className="ml-6 flex items-center gap-2">
+                          <Label className="text-xs text-muted-foreground whitespace-nowrap">
+                            {r.quantityLabel || "Quantity"} (max {maxQ})
+                          </Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={maxQ}
+                            className="h-8 w-20"
+                            value={assignQuantities[r.id] ?? 1}
+                            onChange={(e) => {
+                              const v = Math.max(1, Math.min(maxQ, Number(e.target.value) || 1))
+                              setAssignQuantities((prev) => ({ ...prev, [r.id]: v }))
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
             <div>
@@ -753,7 +821,7 @@ export default function PayrollTaxReliefsPage() {
                       onCheckedChange={() => toggleRelief(r.id, bulkReliefIds, setBulkReliefIds)}
                     />
                     <span>
-                      {r.name} · {money(r.annualAmount)}/yr
+                      {r.name} · {formatReliefAmount(r)}
                     </span>
                   </label>
                 ))}
