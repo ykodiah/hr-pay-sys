@@ -3,6 +3,21 @@ import type { PayrollRun, PayrollItem, CreatePayrollRunInput, UpdatePayrollRunIn
 import { calculateEmployeeTax, getTaxRates } from "@/lib/ghana-tax/tax-config-service"
 import type { EmployeePayInput, TaxCalculationResult } from "@/lib/ghana-tax/engine"
 import { expandCompLines, sumCompLines } from "@/lib/payroll/employee-comp-extras"
+import { isLoanInPayPeriod } from "@/lib/payroll/loan-summary"
+
+const SYSTEM_DEDUCTION_CODES = new Set(["LOAN", "ADVANCE", "SAL_ADV", "STAFF_LOAN"])
+
+function componentAssignmentValue(row: any, basic: number) {
+  let value =
+    row.calculation_type === "percentage"
+      ? (basic * Number(row.percentage || 0)) / 100
+      : row.calculation_type === "rate_x_quantity"
+        ? Number(row.rate || 0) * Number(row.quantity || 0)
+        : Number(row.amount || 0)
+  if (row.min_amount != null) value = Math.max(value, Number(row.min_amount))
+  if (row.max_amount != null) value = Math.min(value, Number(row.max_amount))
+  return value
+}
 
 export class PayrollService extends BaseService {
   async getPayrollRuns(
@@ -315,8 +330,8 @@ export class PayrollService extends BaseService {
         ? String(run.pay_period_start).slice(0, 7)
         : new Date().toISOString().slice(0, 7)
 
-      // Parallel fetch: employees + period pay inputs + loans + card allowances/deductions
-      const [empRes, inputsRes, loansRes, allowRes, dedRes] = await Promise.all([
+      // Parallel fetch: employees + period pay inputs + loans + card allowances/deductions + pay components
+      const [empRes, inputsRes, loansRes, allowRes, dedRes, componentRes] = await Promise.all([
         client
           .from("employees")
           .select(
@@ -340,7 +355,7 @@ export class PayrollService extends BaseService {
           .eq("pay_period", payPeriod),
         client
           .from("employee_loans")
-          .select("employee_id, monthly_payment, monthly_installment, remaining_balance, status, auto_deduct")
+          .select("employee_id, monthly_payment, monthly_installment, remaining_balance, status, auto_deduct, start_date, approved_at, disbursed_at, created_at, end_date")
           .eq("company_id", companyId)
           .in("status", ["active", "approved"]),
         client
@@ -351,6 +366,14 @@ export class PayrollService extends BaseService {
           .from("employee_deductions")
           .select("employee_id, amount, percentage, calculation_type, effective_date, end_date, is_active, recurring, code, description")
           .eq("is_active", true),
+        client
+          .from("payroll_component_assignments")
+          .select("employee_id, category, code, name, payslip_label, calculation_type, amount, percentage, rate, quantity, min_amount, max_amount, tax_treatment, backpay_treatment, payment_method, approval_status, status, employer_component")
+          .eq("company_id", companyId)
+          .eq("status", "active")
+          .eq("approval_status", "approved")
+          .lte("effective_period", payPeriod)
+          .or(`end_period.is.null,end_period.gte.${payPeriod}`),
       ])
 
       if (empRes.error) throw empRes.error
@@ -362,6 +385,7 @@ export class PayrollService extends BaseService {
       const loansByEmployee = new Map<string, number>()
       for (const loan of loansRes.data ?? []) {
         if (loan.auto_deduct === false) continue
+        if (!isLoanInPayPeriod(loan, payPeriod)) continue
         const prev = loansByEmployee.get(loan.employee_id) ?? 0
         const charge = Number(loan.monthly_payment ?? loan.monthly_installment ?? 0)
         loansByEmployee.set(loan.employee_id, prev + charge)
@@ -375,9 +399,16 @@ export class PayrollService extends BaseService {
       }
       const cardDedByEmp = new Map<string, any[]>()
       for (const row of dedRes.data ?? []) {
+        if (SYSTEM_DEDUCTION_CODES.has(String(row.code || "").toUpperCase())) continue
         const list = cardDedByEmp.get(row.employee_id) ?? []
         list.push(row)
         cardDedByEmp.set(row.employee_id, list)
+      }
+      const componentsByEmp = new Map<string, any[]>()
+      for (const row of componentRes.data ?? []) {
+        const list = componentsByEmp.get(row.employee_id) ?? []
+        list.push(row)
+        componentsByEmp.set(row.employee_id, list)
       }
 
       const asOf = run?.pay_period_end
@@ -395,15 +426,41 @@ export class PayrollService extends BaseService {
             continue
           }
 
-          const period = inputsByEmployee.get(emp.id)
+          const period = inputsByEmployee.get(emp.id) as any
           const pick = (override: unknown, master: unknown) =>
             override != null && override !== "" ? Number(override) : Number(master ?? 0)
 
           const monthlyBasic = pick(period?.basic_salary, fin.monthly_salary)
+          const componentRows = (componentsByEmp.get(emp.id) ?? []).filter((row: any) => {
+            if (row.category === "backpay" && (row.payment_method === "separate_run" || row.backpay_treatment === "separate_run")) {
+              return false
+            }
+            if (
+              row.category === "deduction" &&
+              SYSTEM_DEDUCTION_CODES.has(String(row.code || "").toUpperCase())
+            ) {
+              return false
+            }
+            return true
+          })
+          const componentAllowTotal = componentRows
+            .filter((row: any) => row.category === "allowance")
+            .reduce((sum: number, row: any) => sum + componentAssignmentValue(row, monthlyBasic), 0)
+          const componentDedTotal = componentRows
+            .filter((row: any) => row.category === "deduction")
+            .reduce((sum: number, row: any) => sum + componentAssignmentValue(row, monthlyBasic), 0)
+          const componentBonus = componentRows
+            .filter((row: any) => row.category === "bonus" || row.category === "backpay")
+            .reduce((sum: number, row: any) => sum + componentAssignmentValue(row, monthlyBasic), 0)
+          const componentPf = componentRows
+            .filter((row: any) => row.category === "provident_fund" && !row.employer_component)
+            .reduce((sum: number, row: any) => sum + componentAssignmentValue(row, monthlyBasic), 0)
+          const componentPfRate = monthlyBasic > 0 ? (componentPf / monthlyBasic) * 100 : 0
+
           const cardAllowLines = expandCompLines(cardAllowByEmp.get(emp.id), monthlyBasic, asOf, "Allowance")
           const cardDedLines = expandCompLines(cardDedByEmp.get(emp.id), monthlyBasic, asOf, "Deduction")
-          const cardAllowTotal = sumCompLines(cardAllowByEmp.get(emp.id), monthlyBasic, asOf)
-          const cardDedTotal = sumCompLines(cardDedByEmp.get(emp.id), monthlyBasic, asOf)
+          const cardAllowTotal = sumCompLines(cardAllowByEmp.get(emp.id), monthlyBasic, asOf) + componentAllowTotal
+          const cardDedTotal = sumCompLines(cardDedByEmp.get(emp.id), monthlyBasic, asOf) + componentDedTotal
 
           // Period override for other_allowances replaces master; card allowances always add
           const masterOther = pick(period?.other_allowances, fin.other_allowances)
@@ -411,6 +468,13 @@ export class PayrollService extends BaseService {
           const leaveAllowance = Number(period?.leave_allowance ?? 0)
           const allowanceLines = [
             ...cardAllowLines,
+            ...componentRows
+              .filter((row: any) => row.category === "allowance")
+              .map((row: any) => ({
+                label: row.payslip_label || row.name || row.code || "Allowance",
+                code: row.code || "ALLOW",
+                amount: componentAssignmentValue(row, monthlyBasic),
+              })),
             ...(masterOther > 0 ? [{ label: "Other Allowances", code: "OTHER", amount: masterOther }] : []),
             ...(leaveAllowance > 0
               ? [{ label: "Leave Allowance", code: "LEAVE_ALLOW", amount: leaveAllowance }]
@@ -418,10 +482,24 @@ export class PayrollService extends BaseService {
           ]
           const deductionLines = [
             ...cardDedLines,
+            ...componentRows
+              .filter((row: any) => row.category === "deduction")
+              .map((row: any) => ({
+                label: row.payslip_label || row.name || row.code || "Deduction",
+                code: row.code || "DED",
+                amount: componentAssignmentValue(row, monthlyBasic),
+              })),
             ...(periodOtherDed > 0
               ? [{ label: "Other Deductions", code: "OTHER", amount: periodOtherDed }]
               : []),
           ]
+
+          const liveLoan = Number(loansByEmployee.get(emp.id) ?? 0)
+          const savedLoan = period?.loan_deduction
+          const resolvedLoan =
+            savedLoan != null && savedLoan !== "" && Number(savedLoan) > 0
+              ? Number(savedLoan)
+              : liveLoan
 
           const input: EmployeePayInput = {
             monthly_basic: monthlyBasic,
@@ -437,22 +515,22 @@ export class PayrollService extends BaseService {
             monthly_overtime: Number(period?.overtime_amount ?? 0),
             // Leave allowance (one-time) rides with bonus for PAYE; unpaid leave folds into other deductions
             monthly_bonus:
-              Number(period?.bonus_amount ?? 0) + Number(period?.leave_allowance ?? 0),
+              Number(period?.bonus_amount ?? 0) + Number(period?.leave_allowance ?? 0) + componentBonus,
             tier2_applicable: period?.tier2_applicable ?? true,
             tier3_applicable:
               period?.tier3_applicable ??
-              (Boolean(fin.provident_fund_enrolled) ||
+              (componentPf > 0 ||
+                Boolean(fin.provident_fund_enrolled) ||
                 Number(fin.provident_fund_rate ?? 0) > 0 ||
                 Number(fin.tier3_contribution ?? 0) > 0),
             tier3_employee_rate: Number(
-              period?.tier3_employee_rate ??
-                fin.provident_fund_rate ??
+              componentPfRate ||
+                period?.tier3_employee_rate ||
+                fin.provident_fund_rate ||
                 0,
             ),
             other_deductions: {
-              loan:
-                Number(period?.loan_deduction ?? 0) ||
-                Number(loansByEmployee.get(emp.id) ?? 0),
+              loan: resolvedLoan,
               advance: Number(period?.advance_deduction ?? 0),
               other: periodOtherDed + cardDedTotal,
             },

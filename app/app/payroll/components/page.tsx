@@ -26,6 +26,7 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 
 const CATEGORIES = [
   { key: "allowance", label: "Allowances", icon: Plus, color: "from-teal-600 to-emerald-700" },
@@ -44,6 +45,8 @@ type Employee = {
   department?: string
   location?: string
   division?: string
+  position?: string
+  job_title?: string
   subsidiary_id?: string
 }
 
@@ -77,6 +80,7 @@ function baseForm(category: Category = "allowance") {
     employer_component: false,
     scope_type: "individual",
     scope_value: "",
+    scope_values: [] as string[],
     employee_id: "",
     taxable: category !== "deduction" && category !== "provident_fund",
     recurring: !oneTime,
@@ -149,6 +153,13 @@ export default function PayrollComponentsPage() {
     runs: [],
     period: { status: "open" },
     database_ready: true,
+    category_counts: {
+      allowance: 0,
+      deduction: 0,
+      provident_fund: 0,
+      bonus: 0,
+      backpay: 0,
+    },
   })
   const [form, setForm] = useState(() => baseForm("allowance"))
   const [loading, setLoading] = useState(true)
@@ -208,11 +219,27 @@ export default function PayrollComponentsPage() {
     if (form.scope_type === "subsidiary") {
       return (data.subsidiaries || []).map((row: any) => ({ value: row.id, label: row.name }))
     }
+    if (form.scope_type === "job_title") {
+      return [...new Set((data.employees || []).map((row: any) => row.position || row.job_title).filter(Boolean))]
+        .sort()
+        .map((value) => ({ value: String(value), label: String(value) }))
+    }
     if (!["department", "location", "division"].includes(form.scope_type)) return []
     return [...new Set((data.employees || []).map((row: any) => row[form.scope_type]).filter(Boolean))]
       .sort()
       .map((value) => ({ value: String(value), label: String(value) }))
   }, [data.employees, data.subsidiaries, form.scope_type])
+
+  const selectedScopeValues = useMemo(() => {
+    if (Array.isArray(form.scope_values) && form.scope_values.length) return form.scope_values
+    return form.scope_value ? [form.scope_value] : []
+  }, [form.scope_value, form.scope_values])
+
+  function toggleScopeValue(value: string) {
+    const current = selectedScopeValues
+    const next = current.includes(value) ? current.filter((item) => item !== value) : [...current, value]
+    setForm({ ...form, scope_values: next, scope_value: next.join("|") })
+  }
 
   const separateBackpayCount = useMemo(
     () =>
@@ -235,6 +262,8 @@ export default function PayrollComponentsPage() {
         ...form,
         category,
         effective_period: payPeriod,
+        scope_values: selectedScopeValues,
+        scope_value: selectedScopeValues.join("|"),
         employee_ids: form.scope_type === "csv" ? csvEmployeeIds : undefined,
         rows: form.scope_type === "csv" ? csvRows : undefined,
         file_name: csvFile?.name,
@@ -440,7 +469,7 @@ export default function PayrollComponentsPage() {
           </div>
           <Button variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20" onClick={() => void load()} disabled={loading}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-            Reload DB
+            Refresh
           </Button>
           <Button
             variant={closed ? "outline" : "destructive"}
@@ -453,22 +482,25 @@ export default function PayrollComponentsPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {CATEGORIES.map(({ key, label, icon: Icon, color }) => (
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+        {CATEGORIES.map(({ key, label, icon: Icon, color }) => {
+          const activeCount = Number(data.category_counts?.[key] ?? 0)
+          return (
           <button
             key={key}
             onClick={() => setCategory(key)}
-            className={`rounded-xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+            className={`rounded-lg border px-3 py-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
               category === key ? "border-teal-500 bg-white ring-2 ring-teal-100" : "border-slate-200 bg-white/90"
             }`}
           >
-            <span className={`mb-3 inline-flex rounded-lg bg-gradient-to-br ${color} p-2 text-white`}><Icon className="h-5 w-5" /></span>
-            <span className="block font-semibold text-slate-900">{label}</span>
-            <span className="mt-1 block text-xs text-slate-500">
-              {loading ? "…" : `${(data.assignments || []).filter((row: any) => row.category === key || category === key).length} active`}
+            <span className={`mb-2 inline-flex rounded-md bg-gradient-to-br ${color} p-1.5 text-white`}><Icon className="h-4 w-4" /></span>
+            <span className="block text-sm font-semibold text-slate-900">{label}</span>
+            <span className="mt-0.5 block text-[11px] text-slate-500">
+              {loading ? "…" : `${activeCount} active`}
             </span>
           </button>
-        ))}
+          )
+        })}
       </div>
 
       {!loading && data.database_ready === false && (
@@ -556,7 +588,13 @@ export default function PayrollComponentsPage() {
         <Card className="h-fit border-0 shadow-lg">
           <CardHeader className={`rounded-t-xl bg-gradient-to-r ${activeCategory.color} text-white`}>
             <CardTitle className="flex items-center gap-2"><ActiveIcon className="h-5 w-5" /> Configure {activeCategory.label}</CardTitle>
-            <CardDescription className="text-white/85">All fields persist to the tenant payroll database.</CardDescription>
+            <CardDescription className="text-white/85">
+              {category === "allowance" && "Configure taxable/non-taxable earnings, proration and payslip labels."}
+              {category === "deduction" && "Configure employee deductions such as welfare, union and garnishment (loans remain on the Loans module)."}
+              {category === "provident_fund" && "Configure employee/employer PF and Tier 3 contribution rates."}
+              {category === "bonus" && "Configure one-time or periodic bonuses and commission awards."}
+              {category === "backpay" && "Configure retroactive corrections with source period and payroll treatment."}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 p-5">
             {loading ? (
@@ -641,13 +679,43 @@ export default function PayrollComponentsPage() {
                   </div>
                 </div>
 
+                {category === "provident_fund" && (
+                  <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div>
+                      <Label>Contribution tier</Label>
+                      <Select value={form.contribution_tier || "employee"} onValueChange={(value) => setForm({ ...form, contribution_tier: value })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="employee">Employee</SelectItem>
+                          <SelectItem value="employer">Employer</SelectItem>
+                          <SelectItem value="tier3">Tier 3</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Statutory code</Label>
+                      <Input value={form.statutory_code} onChange={(e) => setForm({ ...form, statutory_code: e.target.value })} placeholder="PF-EE / TIER3" />
+                    </div>
+                  </div>
+                )}
+
+                {(category === "bonus" || category === "allowance") && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                    {category === "bonus"
+                      ? "Bonus defaults to one-time payment. Change frequency only when the award repeats."
+                      : "Allowances default to monthly recurring earnings and can be prorated for mid-period joiners."}
+                  </div>
+                )}
+
                 <div>
                   <Label>Assign to</Label>
-                  <Select value={form.scope_type} onValueChange={(value) => { setForm({ ...form, scope_type: value, scope_value: "", employee_id: "" }); setCsvEmployeeIds([]) }}>
+                  <Select value={form.scope_type} onValueChange={(value) => { setForm({ ...form, scope_type: value, scope_value: "", scope_values: [], employee_id: "" }); setCsvEmployeeIds([]) }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="all_employees">All Employees</SelectItem>
                       <SelectItem value="individual">Individual employee</SelectItem>
                       <SelectItem value="csv">Bulk CSV upload</SelectItem>
+                      <SelectItem value="job_title">Job Title</SelectItem>
                       <SelectItem value="department">Department</SelectItem>
                       <SelectItem value="location">Location</SelectItem>
                       <SelectItem value="division">Division</SelectItem>
@@ -655,6 +723,12 @@ export default function PayrollComponentsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {form.scope_type === "all_employees" && (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+                    This will assign <strong>{activeCategory.label}</strong> to all {(data.employees || []).length} active employees for {payPeriod}.
+                  </div>
+                )}
 
                 {form.scope_type === "individual" && (
                   <Select value={form.employee_id} onValueChange={(value) => setForm({ ...form, employee_id: value })}>
@@ -698,14 +772,23 @@ export default function PayrollComponentsPage() {
                 )}
 
                 {scopeOptions.length > 0 && (
-                  <Select value={form.scope_value} onValueChange={(value) => setForm({ ...form, scope_value: value })}>
-                    <SelectTrigger><SelectValue placeholder={`Choose ${form.scope_type}`} /></SelectTrigger>
-                    <SelectContent>
-                      {scopeOptions.map((option: { value: string; label: string }) => (
-                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <Label className="capitalize">Choose {form.scope_type === "job_title" ? "job title" : form.scope_type.replaceAll("_", " ")} (multi-select)</Label>
+                      <span className="text-xs text-slate-500">{selectedScopeValues.length} selected</span>
+                    </div>
+                    <div className="max-h-44 space-y-2 overflow-y-auto pr-1">
+                      {scopeOptions.map((option: { value: string; label: string }) => {
+                        const checked = selectedScopeValues.includes(option.value)
+                        return (
+                          <label key={option.value} className="flex cursor-pointer items-center gap-2 rounded-md bg-white px-2 py-1.5 text-sm hover:bg-teal-50">
+                            <Checkbox checked={checked} onCheckedChange={() => toggleScopeValue(option.value)} />
+                            <span>{option.label}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
                 )}
 
                 {category === "backpay" && (
@@ -796,14 +879,17 @@ export default function PayrollComponentsPage() {
                       </Select>
                     </div>
                     <div><Label>Priority / sequence</Label><Input type="number" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} /></div>
-                    {([
-                      ["pensionable", "Pensionable"],
-                      ["proratable", "Proratable"],
-                      ["include_in_overtime_base", "Include in OT base"],
-                      ["affects_gross_pay", "Affects gross pay"],
-                      ["employer_component", "Employer component"],
-                      ["display_on_payslip", "Show on payslip"],
-                    ] as const).map(([key, label]) => (
+                    {(
+                      category === "allowance"
+                        ? ([["pensionable", "Pensionable"], ["proratable", "Proratable"], ["include_in_overtime_base", "Include in OT base"], ["affects_gross_pay", "Affects gross pay"], ["display_on_payslip", "Show on payslip"]] as const)
+                        : category === "deduction"
+                          ? ([["affects_gross_pay", "Affects gross pay"], ["display_on_payslip", "Show on payslip"]] as const)
+                          : category === "provident_fund"
+                            ? ([["pensionable", "Pensionable"], ["employer_component", "Employer component"], ["display_on_payslip", "Show on payslip"]] as const)
+                            : category === "bonus"
+                              ? ([["affects_gross_pay", "Affects gross pay"], ["display_on_payslip", "Show on payslip"]] as const)
+                              : ([["affects_gross_pay", "Affects gross pay"], ["display_on_payslip", "Show on payslip"]] as const)
+                    ).map(([key, label]) => (
                       <div key={key} className="flex items-center justify-between rounded-md bg-slate-50 p-2">
                         <Label>{label}</Label>
                         <Switch checked={Boolean((form as any)[key])} onCheckedChange={(checked) => setForm({ ...form, [key]: checked })} />
@@ -811,49 +897,7 @@ export default function PayrollComponentsPage() {
                     ))}
                   </div>
                 </details>
-
-                <details className="rounded-lg border bg-white">
-                  <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">Employer share, caps and tiers</summary>
-                  <div className="grid grid-cols-2 gap-3 border-t p-4">
-                    <div><Label>Employer amount</Label><Input type="number" value={form.employer_amount} onChange={(e) => setForm({ ...form, employer_amount: e.target.value })} /></div>
-                    <div><Label>Employer %</Label><Input type="number" value={form.employer_percentage} onChange={(e) => setForm({ ...form, employer_percentage: e.target.value })} /></div>
-                    <div><Label>Minimum amount</Label><Input type="number" value={form.min_amount} onChange={(e) => setForm({ ...form, min_amount: e.target.value })} /></div>
-                    <div><Label>Maximum amount</Label><Input type="number" value={form.max_amount} onChange={(e) => setForm({ ...form, max_amount: e.target.value })} /></div>
-                    <div><Label>Period cap</Label><Input type="number" value={form.period_cap} onChange={(e) => setForm({ ...form, period_cap: e.target.value })} /></div>
-                    <div><Label>YTD cap</Label><Input type="number" value={form.ytd_cap} onChange={(e) => setForm({ ...form, ytd_cap: e.target.value })} /></div>
-                    <div><Label>Contribution tier</Label><Input value={form.contribution_tier} onChange={(e) => setForm({ ...form, contribution_tier: e.target.value })} placeholder="employee / employer / tier3" /></div>
-                    <div><Label>Formula expression</Label><Input value={form.formula_expression} onChange={(e) => setForm({ ...form, formula_expression: e.target.value })} placeholder="Optional custom formula" /></div>
-                  </div>
-                </details>
-
-                <details className="rounded-lg border bg-white">
-                  <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">Accounting, statutory and audit</summary>
-                  <div className="grid grid-cols-2 gap-3 border-t p-4">
-                    <div><Label>GL debit</Label><Input value={form.gl_debit_account} onChange={(e) => setForm({ ...form, gl_debit_account: e.target.value })} /></div>
-                    <div><Label>GL credit</Label><Input value={form.gl_credit_account} onChange={(e) => setForm({ ...form, gl_credit_account: e.target.value })} /></div>
-                    <div><Label>Cost center</Label><Input value={form.cost_center} onChange={(e) => setForm({ ...form, cost_center: e.target.value })} /></div>
-                    <div><Label>Project code</Label><Input value={form.project_code} onChange={(e) => setForm({ ...form, project_code: e.target.value })} /></div>
-                    <div><Label>Statutory code</Label><Input value={form.statutory_code} onChange={(e) => setForm({ ...form, statutory_code: e.target.value })} /></div>
-                    <div><Label>Jurisdiction</Label><Input value={form.jurisdiction_code} onChange={(e) => setForm({ ...form, jurisdiction_code: e.target.value })} /></div>
-                    <div><Label>External reference</Label><Input value={form.external_reference} onChange={(e) => setForm({ ...form, external_reference: e.target.value })} /></div>
-                    <div>
-                      <Label>Approval status</Label>
-                      <Select value={form.approval_status} onValueChange={(value) => setForm({ ...form, approval_status: value })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="approved">Approved</SelectItem>
-                          <SelectItem value="pending">Pending approval</SelectItem>
-                          <SelectItem value="draft">Draft</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="col-span-2"><Label>Eligibility notes</Label><Input value={form.eligibility_notes} onChange={(e) => setForm({ ...form, eligibility_notes: e.target.value })} /></div>
-                    <div className="col-span-2"><Label>Override reason</Label><Input value={form.override_reason} onChange={(e) => setForm({ ...form, override_reason: e.target.value })} /></div>
-                    <div className="col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
-                  </div>
-                </details>
-
-                <div className="grid gap-2 sm:grid-cols-2">
+<div className="grid gap-2 sm:grid-cols-2">
                   <Button variant="outline" disabled={savingDefinition || !form.code || !form.name} onClick={() => void saveDefinition()}>
                     {savingDefinition ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BookOpen className="mr-2 h-4 w-4" />}
                     Save to catalogue
@@ -873,7 +917,7 @@ export default function PayrollComponentsPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <CardTitle>{activeCategory.label} for {payPeriod}</CardTitle>
-                <CardDescription>Live assignments from <code>payroll_component_assignments</code>. Group/CSV batches expand to individual audit rows.</CardDescription>
+                <CardDescription>Active assignments for this category and payroll period. Group and CSV batches expand to individual employee rows.</CardDescription>
               </div>
               {category === "backpay" && (
                 <Button onClick={() => void runSeparateBackpay()} disabled={closed || backpayRunning || separateBackpayCount === 0}>

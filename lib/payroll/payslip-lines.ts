@@ -12,13 +12,23 @@ function asLines(raw: unknown): PayslipMoneyLine[] {
     .map((row) => ({
       label: String((row as any)?.label || (row as any)?.name || (row as any)?.description || "").trim(),
       amount: n((row as any)?.amount ?? (row as any)?.val),
+      category: String((row as any)?.category || "").toLowerCase(),
+      code: String((row as any)?.code || "").toUpperCase(),
     }))
     .filter((row) => row.label && row.amount > 0)
 }
 
-/** Earnings lines: standard named allowances + any issued allowance cards. */
+/** Earnings lines: standard named allowances + issued component lines (never bulk-only). */
 export function buildPayslipEarningsLines(slip: Record<string, any>): PayslipMoneyLine[] {
   const stored = asLines(slip.allowance_lines ?? slip.earnings_lines)
+  const namedBonus = stored.filter(
+    (row: any) =>
+      row.category === "bonus" ||
+      row.category === "backpay" ||
+      /bonus|backpay|commission|13th/i.test(row.label),
+  )
+  const namedAllow = stored.filter((row: any) => !namedBonus.includes(row))
+
   const standard: PayslipMoneyLine[] = [
     { label: "Basic Salary", amount: n(slip.basic_salary) },
     { label: "Transport Allowance", amount: n(slip.transport_allowance) },
@@ -28,20 +38,29 @@ export function buildPayslipEarningsLines(slip: Record<string, any>): PayslipMon
     { label: "Communication Allowance", amount: n(slip.communication_allowance) },
     { label: "Uniform Allowance", amount: n(slip.uniform_allowance) },
     { label: "Overtime", amount: n(slip.overtime_pay) },
-    { label: "Bonus", amount: n(slip.bonus_pay) },
   ].filter((e) => e.amount > 0)
 
-  // Prefer explicit issued lines when present; otherwise show master other_allowances
-  if (stored.length) {
-    return [...standard, ...stored]
+  // Prefer explicit component names; only fall back to bulk Bonus / Other when needed
+  const lines = [...standard, ...namedAllow]
+
+  const namedBonusTotal = namedBonus.reduce((sum, row) => sum + row.amount, 0)
+  if (namedBonus.length) {
+    lines.push(...namedBonus)
+    const residualBonus = Math.max(0, n(slip.bonus_pay) - namedBonusTotal)
+    if (residualBonus > 0.009) lines.push({ label: "Bonus", amount: residualBonus })
+  } else if (n(slip.bonus_pay) > 0) {
+    lines.push({ label: "Bonus", amount: n(slip.bonus_pay) })
   }
 
-  const other = n(slip.other_allowances)
-  if (other > 0) standard.push({ label: "Other Allowances", amount: other })
-  return standard
+  if (!namedAllow.length) {
+    const other = n(slip.other_allowances)
+    if (other > 0) lines.push({ label: "Other Allowances", amount: other })
+  }
+
+  return lines
 }
 
-/** Deduction lines: statutory + loan/advance + named other deduction cards. */
+/** Deduction lines: statutory + loan/advance + named component deductions. */
 export function buildPayslipDeductionLines(slip: Record<string, any>): PayslipMoneyLine[] {
   const stored = asLines(slip.deduction_lines)
   const standard: PayslipMoneyLine[] = [
@@ -53,7 +72,11 @@ export function buildPayslipDeductionLines(slip: Record<string, any>): PayslipMo
   ].filter((d) => d.amount > 0)
 
   if (stored.length) {
-    return [...standard, ...stored]
+    // Avoid duplicating loan/advance if a named LOAN/ADVANCE component somehow appears
+    const filtered = stored.filter(
+      (row: any) => !["LOAN", "ADVANCE", "SAL_ADV", "STAFF_LOAN"].includes(row.code),
+    )
+    return [...standard, ...filtered]
   }
 
   const other = n(slip.other_deductions)

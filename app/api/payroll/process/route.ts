@@ -182,7 +182,7 @@ async function persistRowsFromWorksheet(
   // Pre-fetch employee financial data + employee info for snapshot enrichment
   const empIds = rows.map((r) => r.employeeId).filter(Boolean)
   const asOf = bounds.pay_period_end || `${payPeriod}-15`
-  const [finRes, empRes, subRes, coRes, allowRes, dedRes] = await Promise.all([
+  const [finRes, empRes, subRes, coRes, allowRes, dedRes, componentRes] = await Promise.all([
     empIds.length
       ? client.from("employee_financial").select("employee_id, transport_allowance, housing_allowance, medical_allowance, meal_allowance, communication_allowance, uniform_allowance, other_allowances, bank_name, bank_account_number, ssnit_number").in("employee_id", empIds)
       : { data: [] as any[] },
@@ -205,6 +205,17 @@ async function persistRowsFromWorksheet(
           .eq("is_active", true)
           .in("employee_id", empIds)
       : { data: [] as any[] },
+    empIds.length
+      ? client
+          .from("payroll_component_assignments")
+          .select("employee_id, category, code, name, payslip_label, calculation_type, amount, percentage, rate, quantity, min_amount, max_amount, tax_treatment, backpay_treatment, payment_method, approval_status, status, employer_component")
+          .eq("company_id", companyId)
+          .eq("status", "active")
+          .eq("approval_status", "approved")
+          .lte("effective_period", payPeriod)
+          .or(`end_period.is.null,end_period.gte.${payPeriod}`)
+          .in("employee_id", empIds)
+      : { data: [] as any[] },
   ])
   const finByEmp = new Map<string, any>()
   for (const f of finRes.data ?? []) finByEmp.set(f.employee_id, f)
@@ -221,9 +232,28 @@ async function persistRowsFromWorksheet(
   }
   const cardDedByEmp = new Map<string, any[]>()
   for (const row of dedRes.data ?? []) {
+    if (["LOAN", "ADVANCE", "SAL_ADV", "STAFF_LOAN"].includes(String(row.code || "").toUpperCase())) continue
     const list = cardDedByEmp.get(row.employee_id) ?? []
     list.push(row)
     cardDedByEmp.set(row.employee_id, list)
+  }
+  const componentsByEmp = new Map<string, any[]>()
+  for (const row of componentRes.data ?? []) {
+    const list = componentsByEmp.get(row.employee_id) ?? []
+    list.push(row)
+    componentsByEmp.set(row.employee_id, list)
+  }
+
+  const componentLineValue = (row: any, basic: number) => {
+    let value =
+      row.calculation_type === "percentage"
+        ? (basic * Number(row.percentage || 0)) / 100
+        : row.calculation_type === "rate_x_quantity"
+          ? Number(row.rate || 0) * Number(row.quantity || 0)
+          : Number(row.amount || 0)
+    if (row.min_amount != null) value = Math.max(value, Number(row.min_amount))
+    if (row.max_amount != null) value = Math.min(value, Number(row.max_amount))
+    return n(value)
   }
 
   for (const row of rows) {
@@ -296,18 +326,83 @@ async function persistRowsFromWorksheet(
 
       const cardAllowLines = expandCompLines(cardAllowByEmp.get(row.employeeId), basic, asOf, "Allowance")
       const cardDedLines = expandCompLines(cardDedByEmp.get(row.employeeId), basic, asOf, "Deduction")
+      const componentRows = (componentsByEmp.get(row.employeeId) ?? []).filter((item: any) => {
+        if (item.employer_component) return false
+        if (item.category === "backpay" && (item.payment_method === "separate_run" || item.backpay_treatment === "separate_run")) {
+          return false
+        }
+        if (
+          item.category === "deduction" &&
+          ["LOAN", "ADVANCE", "SAL_ADV", "STAFF_LOAN"].includes(String(item.code || "").toUpperCase())
+        ) {
+          return false
+        }
+        return true
+      })
+      const namedComponentAllowLines = componentRows
+        .filter((item: any) => item.category === "allowance")
+        .map((item: any) => ({
+          label: String(item.payslip_label || item.name || item.code || "Allowance"),
+          code: item.code || "ALLOW",
+          amount: componentLineValue(item, basic),
+          category: "allowance",
+        }))
+        .filter((item: any) => item.amount > 0)
+      const namedComponentBonusLines = componentRows
+        .filter((item: any) => item.category === "bonus" || item.category === "backpay")
+        .map((item: any) => ({
+          label: String(item.payslip_label || item.name || item.code || "Bonus"),
+          code: item.code || "BONUS",
+          amount: componentLineValue(item, basic),
+          category: item.category,
+        }))
+        .filter((item: any) => item.amount > 0)
+      const namedComponentDedLines = componentRows
+        .filter((item: any) => item.category === "deduction")
+        .map((item: any) => ({
+          label: String(item.payslip_label || item.name || item.code || "Deduction"),
+          code: item.code || "DED",
+          amount: componentLineValue(item, basic),
+          category: "deduction",
+        }))
+        .filter((item: any) => item.amount > 0)
+      const namedComponentPfLines = componentRows
+        .filter((item: any) => item.category === "provident_fund")
+        .map((item: any) => ({
+          label: String(item.payslip_label || item.name || item.code || "Provident Fund"),
+          code: item.code || "PF",
+          amount: componentLineValue(item, basic),
+          category: "provident_fund",
+        }))
+        .filter((item: any) => item.amount > 0)
+
+      const namedAllowTotal = namedComponentAllowLines.reduce((s: number, l: any) => s + l.amount, 0)
+      const namedBonusTotal = namedComponentBonusLines.reduce((s: number, l: any) => s + l.amount, 0)
+      const namedDedTotal = namedComponentDedLines.reduce((s: number, l: any) => s + l.amount, 0)
       const cardDedTotal = cardDedLines.reduce((s, l) => s + l.amount, 0)
+
+      // Prefer named component lines on the payslip; keep residual master/other only when needed
+      const residualOtherAllow = Math.max(0, n(splitOther - namedAllowTotal))
+      const residualBonus = Math.max(0, n(bonus - namedBonusTotal))
+      const residualOtherDed = Math.max(0, n(other - cardDedTotal - namedDedTotal))
+
       const allowanceLines = [
         ...cardAllowLines,
-        ...(masterOther > 0.009
-          ? [{ label: "Other Allowances", code: "OTHER", amount: masterOther }]
+        ...namedComponentAllowLines,
+        ...namedComponentBonusLines,
+        ...(residualOtherAllow > 0.009
+          ? [{ label: "Other Allowances", code: "OTHER", amount: residualOtherAllow, category: "allowance" }]
+          : []),
+        ...(residualBonus > 0.009
+          ? [{ label: "Bonus", code: "BONUS", amount: residualBonus, category: "bonus" }]
           : []),
       ]
-      const residualOtherDed = Math.max(0, n(other - cardDedTotal))
       const deductionLines = [
         ...cardDedLines,
+        ...namedComponentDedLines,
+        ...namedComponentPfLines.filter((line: any) => line.code !== "PF_ER"),
         ...(residualOtherDed > 0.009
-          ? [{ label: "Other Deductions", code: "OTHER", amount: residualOtherDed }]
+          ? [{ label: "Other Deductions", code: "OTHER", amount: residualOtherDed, category: "deduction" }]
           : []),
       ]
 

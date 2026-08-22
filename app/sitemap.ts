@@ -5,7 +5,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://akwaabahr.com"
   const pages = [
     ["", 1, "weekly"], ["/features", 0.9, "weekly"], ["/features/security", 0.8, "monthly"], ["/solutions", 0.9, "weekly"],
-    ["/blog", 0.8, "weekly"], ["/about", 0.7, "monthly"], ["/contact", 0.7, "monthly"],
+    ["/industries", 0.85, "weekly"], ["/faq", 0.85, "weekly"], ["/blog", 0.8, "weekly"], ["/about", 0.7, "monthly"], ["/contact", 0.7, "monthly"],
     ["/privacy", 0.4, "yearly"], ["/terms", 0.4, "yearly"],
   ] as const
   return [

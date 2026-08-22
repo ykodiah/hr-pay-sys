@@ -3,7 +3,16 @@ import { isUnresolvedTenant, resolveTenantContext, jsonError } from "@/lib/setti
 import { definitionRowsForCompany } from "@/lib/payroll/component-catalogue"
 
 const CATEGORIES = new Set(["allowance", "deduction", "provident_fund", "bonus", "backpay"])
-const SCOPES = new Set(["individual", "department", "location", "division", "subsidiary", "csv"])
+const SCOPES = new Set([
+  "individual",
+  "all_employees",
+  "job_title",
+  "department",
+  "location",
+  "division",
+  "subsidiary",
+  "csv",
+])
 const CALCULATION_TYPES = new Set(["amount", "percentage", "rate_x_quantity"])
 const CALCULATION_BASES = new Set(["basic_salary", "gross_pay", "taxable_pay", "fixed", "custom"])
 const FREQUENCIES = new Set(["one_time", "monthly", "quarterly", "annual", "per_payroll"])
@@ -23,7 +32,17 @@ async function isClosed(service: any, companyId: string, period: string) {
 
 function valueForScope(employee: any, scope: string) {
   if (scope === "subsidiary") return employee.subsidiary_id
+  if (scope === "job_title") return employee.position || employee.job_title
   return employee[scope]
+}
+
+function parseScopeValues(body: any) {
+  if (Array.isArray(body.scope_values)) {
+    return body.scope_values.map(String).map((value: string) => value.trim()).filter(Boolean)
+  }
+  const raw = String(body.scope_value || "").trim()
+  if (!raw) return [] as string[]
+  return raw.split("|").map((value) => value.trim()).filter(Boolean)
 }
 
 function bool(value: unknown, fallback = false) {
@@ -104,6 +123,10 @@ function assignmentPayload(input: any, employeeId: string, context: {
         : null,
     source_scope_type: context.scopeType,
     source_scope_value: context.scopeValue || null,
+    source_scope_values: String(context.scopeValue || "")
+      .split("|")
+      .map((value) => value.trim())
+      .filter(Boolean),
     source_batch_id: context.batchId,
     gl_debit_account: input.gl_debit_account || null,
     gl_credit_account: input.gl_credit_account || null,
@@ -204,11 +227,11 @@ export async function GET(req: NextRequest) {
 
     const catalogue = await ensureCatalogue(service, companyId, userId)
 
-    const [assignmentRes, employeeRes, subsidiaryRes, periodRes, importRes, runRes] = await Promise.all([
+    const [assignmentRes, employeeRes, subsidiaryRes, periodRes, importRes, runRes, countRes] = await Promise.all([
       assignmentsQuery,
       service
         .from("employees")
-        .select("id, employee_id, first_name, last_name, department, location, division, subsidiary_id, status")
+        .select("id, employee_id, first_name, last_name, department, location, division, position, job_title, subsidiary_id, status")
         .eq("company_id", companyId)
         .in("status", ["Active", "active", "ACTIVE"])
         .order("first_name"),
@@ -232,6 +255,13 @@ export async function GET(req: NextRequest) {
         .eq("pay_period_start", `${period}-01`)
         .order("created_at", { ascending: false })
         .limit(5),
+      service
+        .from("payroll_component_assignments")
+        .select("category")
+        .eq("company_id", companyId)
+        .eq("status", "active")
+        .lte("effective_period", period)
+        .or(`end_period.is.null,end_period.gte.${period}`),
     ])
     if (assignmentRes.error) {
       const missingSchema = /does not exist|schema cache|relation|payroll_component/i.test(assignmentRes.error.message || "")
@@ -252,6 +282,17 @@ export async function GET(req: NextRequest) {
     const assignments = [...(assignmentRes.data || [])].sort(
       (a: any, b: any) => Number(a.priority || 100) - Number(b.priority || 100),
     )
+    const category_counts: Record<string, number> = {
+      allowance: 0,
+      deduction: 0,
+      provident_fund: 0,
+      bonus: 0,
+      backpay: 0,
+    }
+    for (const row of countRes.data || []) {
+      const key = String(row.category || "")
+      if (key in category_counts) category_counts[key] += 1
+    }
     return NextResponse.json({
       assignments,
       employees: employeeRes.data || [],
@@ -260,6 +301,7 @@ export async function GET(req: NextRequest) {
       imports: importRes.data || [],
       runs: runRes.data || [],
       period: periodRes.data || { pay_period: period, status: "open" },
+      category_counts,
       catalogue_seeded: catalogue.seeded,
       database_ready: !catalogue.error && !periodRes.error,
       database_warnings: [
@@ -267,6 +309,7 @@ export async function GET(req: NextRequest) {
         periodRes.error?.message,
         importRes.error?.message,
         runRes.error?.message,
+        countRes.error?.message,
       ].filter(Boolean),
     })
   } catch (error) {
@@ -357,12 +400,13 @@ export async function POST(req: NextRequest) {
         : []
     const { data: employees, error: employeeError } = await service
       .from("employees")
-      .select("id, employee_id, department, location, division, subsidiary_id, status")
+      .select("id, employee_id, department, location, division, position, job_title, subsidiary_id, status")
       .eq("company_id", companyId)
       .in("status", ["Active", "active", "ACTIVE"])
     if (employeeError) throw employeeError
 
-    const scopeValue = String(body.scope_value || "")
+    const scopeValues = parseScopeValues(body)
+    const scopeValue = scopeValues.join("|") || String(body.scope_value || "")
     const batchId = crypto.randomUUID()
     const context = { companyId, userId, category, period, scopeType, scopeValue, batchId }
     const csvRows = Array.isArray(body.rows) ? body.rows : []
@@ -447,10 +491,16 @@ export async function POST(req: NextRequest) {
 
     const selected = (employees || []).filter((employee: any) => {
       if (scopeType === "individual" || scopeType === "csv") return requestedIds.includes(employee.id)
-      return String(valueForScope(employee, scopeType) || "") === scopeValue
+      if (scopeType === "all_employees") return true
+      const employeeValue = String(valueForScope(employee, scopeType) || "")
+      if (!scopeValues.length) return false
+      return scopeValues.includes(employeeValue)
     })
     if (!selected.length) {
       return NextResponse.json({ error: "No active employees matched this assignment" }, { status: 400 })
+    }
+    if (["department", "location", "division", "subsidiary", "job_title"].includes(scopeType) && !scopeValues.length) {
+      return NextResponse.json({ error: `Select at least one ${scopeType.replaceAll("_", " ")}` }, { status: 400 })
     }
 
     let componentDefinitionId = body.component_definition_id || null

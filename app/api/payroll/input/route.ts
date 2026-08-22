@@ -11,6 +11,29 @@ import { isUnresolvedTenant, resolveTenantContext, jsonError } from "@/lib/setti
 import { sumCompLines } from "@/lib/payroll/employee-comp-extras"
 
 const ACTIVE_STATUSES = ["Active", "active", "ACTIVE"]
+const SYSTEM_DEDUCTION_CODES = new Set(["LOAN", "ADVANCE", "SAL_ADV", "STAFF_LOAN"])
+
+function resolveLoanDeduction(saved: unknown, livePayment: number) {
+  const live = Number(livePayment || 0)
+  if (saved == null || saved === "") return live
+  const override = Number(saved)
+  if (!Number.isFinite(override)) return live
+  // Explicit positive override wins; saved 0 must not hide live scheduled loans
+  if (override > 0) return override
+  return live
+}
+
+function componentValue(row: any, basic: number) {
+  let value =
+    row.calculation_type === "percentage"
+      ? (basic * Number(row.percentage || 0)) / 100
+      : row.calculation_type === "rate_x_quantity"
+        ? Number(row.rate || 0) * Number(row.quantity || 0)
+        : Number(row.amount || 0)
+  if (row.min_amount != null) value = Math.max(value, Number(row.min_amount))
+  if (row.max_amount != null) value = Math.min(value, Number(row.max_amount))
+  return value
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -95,7 +118,7 @@ export async function GET(request: NextRequest) {
       empIds.length
         ? supabase
             .from("payroll_component_assignments")
-            .select("employee_id, category, calculation_type, amount, percentage, rate, quantity, min_amount, max_amount, tax_treatment, backpay_treatment, payment_method, approval_status, status")
+            .select("employee_id, category, code, name, payslip_label, calculation_type, amount, percentage, rate, quantity, min_amount, max_amount, tax_treatment, backpay_treatment, payment_method, approval_status, status")
             .eq("company_id", companyId)
             .eq("status", "active")
             .eq("approval_status", "approved")
@@ -157,18 +180,18 @@ export async function GET(request: NextRequest) {
       const componentRows = componentsByEmp.get(emp.id) ?? []
       const componentAmount = (category: string, predicate?: (row: any) => boolean) =>
         componentRows
-          .filter((row: any) => row.category === category && (!predicate || predicate(row)))
-          .reduce((sum: number, row: any) => {
-            let value =
-              row.calculation_type === "percentage"
-                ? (basic * Number(row.percentage || 0)) / 100
-                : row.calculation_type === "rate_x_quantity"
-                  ? Number(row.rate || 0) * Number(row.quantity || 0)
-                  : Number(row.amount || 0)
-            if (row.min_amount != null) value = Math.max(value, Number(row.min_amount))
-            if (row.max_amount != null) value = Math.min(value, Number(row.max_amount))
-            return sum + value
-          }, 0)
+          .filter((row: any) => {
+            if (row.category !== category) return false
+            // Loans/advances are owned by the Loans module — never fold into "other deductions"
+            if (
+              category === "deduction" &&
+              SYSTEM_DEDUCTION_CODES.has(String(row.code || "").toUpperCase())
+            ) {
+              return false
+            }
+            return !predicate || predicate(row)
+          })
+          .reduce((sum: number, row: any) => sum + componentValue(row, basic), 0)
       const nonTaxableAllowance = componentAmount(
         "allowance",
         (row: any) => row.tax_treatment === "non_taxable" || row.tax_treatment === "tax_relief",
@@ -199,6 +222,27 @@ export async function GET(request: NextRequest) {
         "backpay",
         (row: any) => row.payment_method === "separate_run" || row.backpay_treatment === "separate_run",
       )
+      const componentLines = componentRows
+        .filter((row: any) => {
+          if (row.employer_component) return false
+          if (row.category === "backpay" && (row.payment_method === "separate_run" || row.backpay_treatment === "separate_run")) {
+            return false
+          }
+          if (
+            row.category === "deduction" &&
+            SYSTEM_DEDUCTION_CODES.has(String(row.code || "").toUpperCase())
+          ) {
+            return false
+          }
+          return true
+        })
+        .map((row: any) => ({
+          category: row.category,
+          code: row.code,
+          label: row.payslip_label || row.name || row.code,
+          amount: componentValue(row, basic),
+        }))
+        .filter((row: any) => row.amount > 0)
 
       return {
         employee_id: emp.id,
@@ -229,6 +273,7 @@ export async function GET(request: NextRequest) {
           component_non_taxable_allowances: nonTaxableAllowance,
           component_non_taxable_bonus: nonTaxableBonus + nonTaxableBackpay,
           separate_backpay: separateBackpay,
+          component_lines: componentLines,
           tier2_applicable: Number(fin?.tier2_employee_contribution ?? 0) >= 0,
           tier3_applicable:
             Boolean(fin?.provident_fund_enrolled) ||
@@ -249,7 +294,7 @@ export async function GET(request: NextRequest) {
               other_allowances: input.other_allowances,
               overtime_amount: Number(input.overtime_amount ?? 0),
               bonus_amount: Number(input.bonus_amount ?? 0),
-              loan_deduction: Number(input.loan_deduction ?? loan?.payment ?? 0),
+              loan_deduction: resolveLoanDeduction(input.loan_deduction, loan?.payment ?? 0),
               advance_deduction: Number(input.advance_deduction ?? 0),
               other_deductions: Number(input.other_deductions ?? 0),
               tier2_applicable: input.tier2_applicable ?? true,
@@ -277,7 +322,7 @@ export async function GET(request: NextRequest) {
               other_allowances: null,
               overtime_amount: 0,
               bonus_amount: 0,
-              loan_deduction: loan?.payment ?? 0,
+              loan_deduction: resolveLoanDeduction(null, loan?.payment ?? 0),
               advance_deduction: 0,
               other_deductions: 0,
               tier2_applicable: true,

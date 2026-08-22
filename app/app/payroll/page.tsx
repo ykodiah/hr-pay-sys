@@ -59,8 +59,10 @@ type PayInputApiRow = {
     component_non_taxable_allowances?: number
     component_non_taxable_bonus?: number
     separate_backpay?: number
+    component_lines?: Array<{ category: string; code?: string; label: string; amount: number }>
     tier2_applicable: boolean
     tier3_applicable: boolean
+    provident_fund_rate?: number
   }
   input: {
     basic_salary: number | null
@@ -161,12 +163,18 @@ function buildAllowanceTypes(parts: {
   )
 }
 
-function buildDeductionTypes(loan: number, advance: number, other: number) {
+function buildDeductionTypes(
+  loan: number,
+  advance: number,
+  other: number,
+  named: Array<{ label: string; amount: number }> = [],
+) {
   return (
     [
       formatMoneyPart("Loan", loan),
       formatMoneyPart("Advance", advance),
-      formatMoneyPart("Other", other),
+      ...named.map((row) => formatMoneyPart(row.label, row.amount)),
+      named.length ? null : formatMoneyPart("Other", other),
     ]
       .filter(Boolean)
       .join("; ") || "—"
@@ -238,6 +246,13 @@ function mapApiRow(row: PayInputApiRow): WorksheetRow {
   const advance = Number(row.input.advance_deduction ?? 0)
   const other = Number(row.input.other_deductions ?? 0) + cardDed
   const allowances = transport + housing + medical + meal + communication + uniform + otherAllow
+  const componentLines = row.master.component_lines || []
+  const namedAllowLines = componentLines.filter((line) =>
+    ["allowance", "bonus", "backpay"].includes(String(line.category)),
+  )
+  const namedDedLines = componentLines.filter((line) =>
+    ["deduction", "provident_fund"].includes(String(line.category)),
+  )
 
   return {
     employeeId: row.employee_id,
@@ -249,24 +264,38 @@ function mapApiRow(row: PayInputApiRow): WorksheetRow {
     basicSalary: basic,
     allowances,
     nonTaxableAllowances: Number(row.master.component_non_taxable_allowances ?? 0),
-    allowanceTypes: buildAllowanceTypes({
-      transport,
-      housing,
-      medical,
-      meal,
-      communication,
-      uniform,
-      other: otherAllow,
-      overtime,
-      bonus,
-    }),
+    allowanceTypes:
+      [
+        buildAllowanceTypes({
+          transport,
+          housing,
+          medical,
+          meal,
+          communication,
+          uniform,
+          other: Math.max(0, otherAllow - namedAllowLines.filter((l) => l.category === "allowance").reduce((s, l) => s + Number(l.amount || 0), 0)),
+          overtime,
+          bonus: Math.max(
+            0,
+            bonus - namedAllowLines.filter((l) => l.category === "bonus" || l.category === "backpay").reduce((s, l) => s + Number(l.amount || 0), 0),
+          ),
+        }),
+        ...namedAllowLines.map((line) => formatMoneyPart(line.label, Number(line.amount || 0))),
+      ]
+        .filter(Boolean)
+        .join("; ") || "—",
     overtime,
     bonus,
     nonTaxableBonus: Number(row.master.component_non_taxable_bonus ?? 0),
     loan,
     advance,
     other,
-    deductionTypes: buildDeductionTypes(loan, advance, other),
+    deductionTypes: buildDeductionTypes(
+      loan,
+      advance,
+      Math.max(0, other - namedDedLines.reduce((s, l) => s + Number(l.amount || 0), 0)),
+      namedDedLines.map((line) => ({ label: line.label, amount: Number(line.amount || 0) })),
+    ),
     tier2: row.input.tier2_applicable !== false,
     tier3: Boolean(row.input.tier3_applicable),
     tier3Rate: Number(row.input.tier3_employee_rate ?? 0),
