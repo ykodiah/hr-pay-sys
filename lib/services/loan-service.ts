@@ -1072,7 +1072,7 @@ export async function ensurePayslipLoanPayments(input: {
     )
     .eq("company_id", input.companyId)
     .eq("employee_id", input.employeeId)
-    .in("status", ["active", "approved"])
+    .in("status", ["active", "approved", "disbursed"])
     .order("created_at", { ascending: true })
 
   if (error) throw new Error(error.message)
@@ -1216,7 +1216,7 @@ export async function applyEmployeePayrollLoanDeduction(input: {
     )
     .eq("company_id", input.companyId)
     .eq("employee_id", input.employeeId)
-    .in("status", ["active", "approved"])
+    .in("status", ["active", "approved", "disbursed"])
     .order("created_at", { ascending: true })
 
   if (error) throw new Error(error.message)
