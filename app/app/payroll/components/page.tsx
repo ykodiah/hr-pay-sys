@@ -82,6 +82,7 @@ function baseForm(category: Category = "allowance") {
     scope_value: "",
     scope_values: [] as string[],
     employee_id: "",
+    employee_ids: [] as string[],
     taxable: category !== "deduction" && category !== "provident_fund",
     recurring: !oneTime,
     end_period: "",
@@ -264,7 +265,7 @@ export default function PayrollComponentsPage() {
         effective_period: payPeriod,
         scope_values: selectedScopeValues,
         scope_value: selectedScopeValues.join("|"),
-        employee_ids: form.scope_type === "csv" ? csvEmployeeIds : undefined,
+        employee_ids: form.scope_type === "csv" ? csvEmployeeIds : form.scope_type === "individual" ? form.employee_ids : undefined,
         rows: form.scope_type === "csv" ? csvRows : undefined,
         file_name: csvFile?.name,
         file_size_bytes: csvFile?.size,
@@ -731,14 +732,24 @@ export default function PayrollComponentsPage() {
                 )}
 
                 {form.scope_type === "individual" && (
-                  <Select value={form.employee_id} onValueChange={(value) => setForm({ ...form, employee_id: value })}>
-                    <SelectTrigger><SelectValue placeholder="Choose employee" /></SelectTrigger>
-                    <SelectContent>
-                      {(data.employees || []).map((employee: Employee) => (
-                        <SelectItem key={employee.id} value={employee.id}>{employee.employee_id} — {employeeName(employee)}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <Label>Choose employees ({form.employee_ids.length} selected)</Label>
+                    <div className="flex max-h-56 flex-col gap-2 overflow-y-auto">
+                      {(data.employees || []).map((employee: Employee) => {
+                        const checked = form.employee_ids.includes(employee.id)
+                        return (
+                          <label key={employee.id} className="flex cursor-pointer items-center gap-2 rounded-md p-2 hover:bg-background">
+                            <Checkbox checked={checked} onCheckedChange={(value) => {
+                              const next = value ? [...form.employee_ids, employee.id] : form.employee_ids.filter((id: string) => id !== employee.id)
+                              setForm({ ...form, employee_ids: next, employee_id: next[0] || "" })
+                            }} />
+                            <span className="text-sm">{employee.employee_id} — {employeeName(employee)}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Select one or more active employees.</p>
+                  </div>
                 )}
 
                 {form.scope_type === "csv" && (

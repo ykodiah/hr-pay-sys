@@ -393,11 +393,13 @@ export async function POST(req: NextRequest) {
       { onConflict: "company_id,pay_period", ignoreDuplicates: true },
     )
     if (periodError) throw periodError
-    const requestedIds = Array.isArray(body.employee_ids)
-      ? body.employee_ids.map(String).filter(Boolean)
-      : body.employee_id
-        ? [String(body.employee_id)]
-        : []
+    const requestedIds = Array.from(new Set(
+      Array.isArray(body.employee_ids)
+        ? body.employee_ids.map(String).map((id: string) => id.trim()).filter(Boolean)
+        : body.employee_id
+          ? [String(body.employee_id).trim()]
+          : [],
+    ))
     const { data: employees, error: employeeError } = await service
       .from("employees")
       .select("id, employee_id, department, location, division, position, job_title, subsidiary_id, status")

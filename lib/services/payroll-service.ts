@@ -443,8 +443,11 @@ export class PayrollService extends BaseService {
             }
             return true
           })
-          const componentAllowTotal = componentRows
-            .filter((row: any) => row.category === "allowance")
+          const componentAllowRows = componentRows.filter((row: any) => row.category === "allowance")
+          const componentAllowTotal = componentAllowRows
+            .reduce((sum: number, row: any) => sum + componentAssignmentValue(row, monthlyBasic), 0)
+          const componentTaxableAllowTotal = componentAllowRows
+            .filter((row: any) => row.tax_treatment === "taxable" || (row.tax_treatment == null && row.taxable !== false))
             .reduce((sum: number, row: any) => sum + componentAssignmentValue(row, monthlyBasic), 0)
           const componentDedTotal = componentRows
             .filter((row: any) => row.category === "deduction")
@@ -543,6 +546,14 @@ export class PayrollService extends BaseService {
               uniform: pick(period?.uniform_allowance, fin.uniform_allowance),
               other: masterOther + cardAllowTotal,
             },
+            monthly_taxable_allowances: Object.values({
+              transport: pick(period?.transport_allowance, fin.transport_allowance),
+              housing: pick(period?.housing_allowance, fin.housing_allowance),
+              medical: pick(period?.medical_allowance, fin.medical_allowance),
+              meal: pick(period?.meal_allowance, fin.meal_allowance),
+              communication: pick(period?.communication_allowance, fin.communication_allowance),
+              uniform: pick(period?.uniform_allowance, fin.uniform_allowance),
+            }).reduce((sum: number, value) => sum + Number(value || 0), 0) + masterOther + cardAllowTotal - componentAllowTotal + componentTaxableAllowTotal,
             monthly_overtime: Number(period?.overtime_amount ?? 0),
             // Leave allowance (one-time) rides with bonus for PAYE; unpaid leave folds into other deductions
             monthly_bonus:

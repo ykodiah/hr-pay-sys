@@ -83,6 +83,8 @@ export interface EmployeePayInput {
     uniform?: number
     other?: number
   }
+  /** Optional taxable portion of allowances. Defaults to all allowances for compatibility. */
+  monthly_taxable_allowances?: number
   /** Overtime earnings for the period — taxed at marginal PAYE rate */
   monthly_overtime?: number
   /** Bonus — 5% final WHT when within GRA bonus rules */
@@ -384,6 +386,9 @@ export function calculateGhanaTax(
       (monthlyAllowancesBreakdown.other ?? 0),
   )
   const monthlyGross = round2(input.monthly_basic + monthlyAllowancesTotal)
+  const monthlyTaxableAllowances = round2(
+    Math.max(0, input.monthly_taxable_allowances ?? monthlyAllowancesTotal),
+  )
   const annualGross = round2(monthlyGross * 12)
   const monthlyOvertime = round2(input.monthly_overtime ?? 0)
   const monthlyBonus = round2(input.monthly_bonus ?? 0)
@@ -445,7 +450,7 @@ export function calculateGhanaTax(
   const monthlyTaxableIncome = round2(
     Math.max(
       0,
-      monthlyGross - monthlyPensionEmployee - monthlyTier3Employee - monthlyTaxReliefs,
+      input.monthly_basic + monthlyTaxableAllowances - monthlyPensionEmployee - monthlyTier3Employee - monthlyTaxReliefs,
     ),
   )
   const annualTaxableIncome = round2(monthlyTaxableIncome * 12)

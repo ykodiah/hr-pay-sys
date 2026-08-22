@@ -96,6 +96,26 @@ describe("Act 766 SSNIT / Tier 2", () => {
   })
 })
 
+describe("Taxable components and bonus WHT", () => {
+  it("includes taxable allowances but excludes non-taxable allowances from PAYE income", () => {
+    const result = calculateGhanaTax(
+      { monthly_basic: 4000, monthly_allowances: { other: 1000 }, monthly_taxable_allowances: 400 },
+      DEFAULT_TAX_RATES,
+    )
+    expect(result.monthly_gross).toBe(5000)
+    expect(result.monthly_taxable_income).toBeCloseTo(4180, 2)
+  })
+
+  it("withholds 5% on bonuses and back-pay represented as bonus earnings", () => {
+    const result = calculateGhanaTax(
+      { monthly_basic: 4000, monthly_allowances: {}, monthly_bonus: 1000 },
+      DEFAULT_TAX_RATES,
+    )
+    expect(result.monthly_bonus_tax).toBe(50)
+    expect(result.monthly_total_paye_withheld).toBeCloseTo(result.monthly_paye_tax + 50, 2)
+  })
+})
+
 describe("Overtime tax and other deductions", () => {
   it("taxes overtime at marginal PAYE and includes it in total PAYE withheld", () => {
     const base = calculateGhanaTax(
