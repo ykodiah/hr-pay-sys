@@ -91,7 +91,7 @@ export async function GET(
         .order("created_at", { ascending: true }),
       client
         .from("payroll_loan_payments")
-        .select("loan_id, amount, balance_before, balance_after, payslip_id, pay_period")
+        .select("loan_id, amount, balance_before, balance_after, payslip_id, pay_period, payment_date")
         .eq("employee_id", data.employee_id)
         .eq("company_id", data.company_id)
         .or(`payslip_id.eq.${data.id},pay_period.eq.${period}`),

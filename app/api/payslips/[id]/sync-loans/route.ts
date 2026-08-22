@@ -55,7 +55,7 @@ export async function POST(
         .order("created_at", { ascending: true }),
       client
         .from("payroll_loan_payments")
-        .select("loan_id, amount, balance_before, balance_after, payslip_id, pay_period, payroll_run_id")
+        .select("loan_id, amount, balance_before, balance_after, payslip_id, pay_period, payroll_run_id, payment_date")
         .eq("employee_id", slip.employee_id)
         .eq("company_id", slip.company_id)
         .eq("payslip_id", slip.id),

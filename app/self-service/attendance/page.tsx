@@ -1,9 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { Clock3, Fingerprint, LocateFixed, LogIn, LogOut, Timer } from "lucide-react"
+import { Clock3, Fingerprint, LocateFixed, LogIn, LogOut, MapPin, Timer } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
@@ -29,6 +31,9 @@ type AttendanceResponse = {
 export default function AttendancePage() {
   const [year, setYear] = useState(String(new Date().getFullYear()))
   const [clocking, setClocking] = useState(false)
+  const [manualLat, setManualLat] = useState("")
+  const [manualLng, setManualLng] = useState("")
+  const [coords, setCoords] = useState<{ lat: number; lng: number; accuracy: number } | null>(null)
   const { data, error, isLoading, mutate } = useSWR<AttendanceResponse>(
     `/api/self-service/attendance?year=${year}`,
     fetcher,
@@ -36,19 +41,13 @@ export default function AttendancePage() {
 
   async function clock(action: "clock_in" | "clock_out") {
     if (clocking) return
-    if (!navigator.geolocation) {
-      toast.error("This browser does not support location services")
-      return
-    }
-
-    setClocking(true)
-    const submit = async (position: GeolocationPosition) => {
+    const submit = async (latitude: number, longitude: number, accuracy: number) => {
       try {
         await postJson("/api/self-service/attendance", {
           action,
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
+          latitude,
+          longitude,
+          accuracy,
           device_info: { platform: navigator.platform, user_agent: navigator.userAgent },
         })
         toast.success(action === "clock_in" ? "Clocked in successfully" : "Clocked out successfully")
@@ -60,8 +59,30 @@ export default function AttendancePage() {
       }
     }
 
+    if (coords) {
+      setClocking(true)
+      await submit(coords.lat, coords.lng, coords.accuracy)
+      return
+    }
+    const lat = Number(manualLat)
+    const lng = Number(manualLng)
+    if (Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      setClocking(true)
+      await submit(lat, lng, 25)
+      return
+    }
+    if (!navigator.geolocation) {
+      toast.error("Enter the approved latitude and longitude to mark attendance")
+      return
+    }
+    setClocking(true)
     navigator.geolocation.getCurrentPosition(
-      submit,
+      (position) => {
+        setCoords({ lat: position.coords.latitude, lng: position.coords.longitude, accuracy: position.coords.accuracy })
+        setManualLat(String(position.coords.latitude))
+        setManualLng(String(position.coords.longitude))
+        void submit(position.coords.latitude, position.coords.longitude, position.coords.accuracy)
+      },
       (geoError) => {
         toast.error(
           geoError.code === geoError.PERMISSION_DENIED
@@ -111,16 +132,28 @@ export default function AttendancePage() {
             Today&apos;s clock
           </CardTitle>
           <CardDescription>
-            {data.settings.attendance_method_label || "GPS clock"}
+            Marking attendance for {new Date().toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })}.
+            {data.settings.attendance_method_label || " GPS clock"}
             {data.devices.length ? ` · ${data.devices.length} active biometric device(s) also sync here` : ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap gap-6 text-sm">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap gap-6 text-sm">
             <div><span className="text-muted-foreground">Clock in</span><p className="font-semibold">{current?.clock_in || "—"}</p></div>
             <div><span className="text-muted-foreground">Clock out</span><p className="font-semibold">{current?.clock_out || "—"}</p></div>
             <div><span className="text-muted-foreground">Method</span><p className="font-semibold capitalize">{String(current?.source || current?.clock_in_method || "Not marked").replace(/_/g, " ")}</p></div>
             <div><span className="text-muted-foreground">Status</span><div className="mt-1"><StatusBadge status={current?.status || "not marked"} /></div></div>
+            </div>
+            <div className="flex flex-col gap-2 rounded-md border bg-background p-3 text-sm">
+              <div className="flex items-center gap-2 font-medium"><MapPin className="size-4" /> Approved location coordinates</div>
+              <p className="text-xs text-muted-foreground">Allow GPS or enter the approved coordinates below. The server applies the configured geofence before marking attendance.</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div><Label htmlFor="portal-latitude">Latitude</Label><Input id="portal-latitude" inputMode="decimal" value={manualLat} onChange={(e) => { setManualLat(e.target.value); setCoords(null) }} placeholder="5.603700" /></div>
+                <div><Label htmlFor="portal-longitude">Longitude</Label><Input id="portal-longitude" inputMode="decimal" value={manualLng} onChange={(e) => { setManualLng(e.target.value); setCoords(null) }} placeholder="-0.187000" /></div>
+              </div>
+              {coords ? <p className="text-xs text-muted-foreground">Current position: {coords.lat.toFixed(6)}, {coords.lng.toFixed(6)} (±{Math.round(coords.accuracy)}m)</p> : null}
+            </div>
           </div>
           {gpsEnabled ? (
             <div className="flex gap-2">

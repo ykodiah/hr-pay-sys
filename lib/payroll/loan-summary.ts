@@ -11,6 +11,7 @@ export type PayslipLoanPayment = {
   payslip_id?: string | null
   pay_period?: string | null
   payroll_run_id?: string | null
+  payment_date?: string | null
 }
 
 export type PayslipLoanSummaryRow = {
@@ -158,7 +159,9 @@ export function buildPayslipLoanSummaryRows(
   }
 
   let rows = (loans || []).map((l) => {
-    const paymentRows = byLoan.get(String(l.id)) ?? []
+    const paymentRows = (byLoan.get(String(l.id)) ?? []).sort((a, b) =>
+      String(a.payment_date || a.pay_period || "").localeCompare(String(b.payment_date || b.pay_period || "")),
+    )
     const thisMonth = round2(
       paymentRows.reduce((s, r) => s + n(r.amount), 0) || n(l.this_month_paid),
     )
