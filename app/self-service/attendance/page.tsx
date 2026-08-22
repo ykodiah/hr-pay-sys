@@ -39,6 +39,46 @@ export default function AttendancePage() {
     fetcher,
   )
 
+  async function captureGPS() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      toast.error("This browser does not provide location services. Enter the approved coordinates instead.")
+      return
+    }
+    setClocking(true)
+    try {
+      const permission = await (navigator.permissions?.query
+        ? navigator.permissions.query({ name: "geolocation" as PermissionName })
+        : Promise.resolve(null))
+      if (permission?.state === "denied") {
+        throw new Error("Location permission is blocked for this site. Open iPhone Settings > Privacy & Security > Location Services, allow Safari, then reload this page.")
+      }
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 30000,
+          maximumAge: 0,
+        })
+      })
+      const { latitude, longitude, accuracy } = position.coords
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || (latitude === 0 && longitude === 0)) {
+        throw new Error("Your device returned an invalid location. Turn on Location Services and try again.")
+      }
+      setCoords({ lat: latitude, lng: longitude, accuracy })
+      setManualLat(latitude.toFixed(6))
+      setManualLng(longitude.toFixed(6))
+      toast.success(`GPS captured: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} (±${Math.round(accuracy)}m)`)
+    } catch (error: any) {
+      const code = error?.code
+      toast.error(code === 1 || /permission|blocked/i.test(error?.message)
+        ? "Location is blocked. Allow this site and Safari to use Location Services, then tap Capture GPS again."
+        : code === 3
+          ? "Location timed out. Turn on GPS, move outdoors, and tap Capture GPS again."
+          : error?.message || "Could not capture GPS. Enter approved coordinates manually.")
+    } finally {
+      setClocking(false)
+    }
+  }
+
   async function clock(action: "clock_in" | "clock_out") {
     if (clocking) return
     const submit = async (latitude: number, longitude: number, accuracy: number) => {
@@ -59,42 +99,18 @@ export default function AttendancePage() {
       }
     }
 
-    if (coords) {
-      setClocking(true)
-      await submit(coords.lat, coords.lng, coords.accuracy)
-      return
-    }
-    const lat = Number(manualLat)
-    const lng = Number(manualLng)
-    if (Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-      setClocking(true)
-      await submit(lat, lng, 25)
-      return
-    }
-    if (!navigator.geolocation) {
-      toast.error("Enter the approved latitude and longitude to mark attendance")
+    const active = coords || (() => {
+      const lat = Number(manualLat)
+      const lng = Number(manualLng)
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180 || (lat === 0 && lng === 0)) return null
+      return { lat, lng, accuracy: 25 }
+    })()
+    if (!active) {
+      toast.error("Tap Capture GPS first, or enter valid approved coordinates before clocking in.")
       return
     }
     setClocking(true)
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setCoords({ lat: position.coords.latitude, lng: position.coords.longitude, accuracy: position.coords.accuracy })
-        setManualLat(String(position.coords.latitude))
-        setManualLng(String(position.coords.longitude))
-        void submit(position.coords.latitude, position.coords.longitude, position.coords.accuracy)
-      },
-      (geoError) => {
-        toast.error(
-          geoError.code === geoError.PERMISSION_DENIED
-            ? "Allow location access in your browser settings, then try again"
-            : geoError.code === geoError.TIMEOUT
-              ? "Location lookup timed out. Move near a window and try again"
-              : "Your location could not be determined",
-        )
-        setClocking(false)
-      },
-      { enableHighAccuracy: true, timeout: 30000, maximumAge: 60000 },
-    )
+    await submit(active.lat, active.lng, active.accuracy)
   }
 
   if (isLoading) return <LoadingBlock label="Loading attendance" />
@@ -148,6 +164,13 @@ export default function AttendancePage() {
             <div className="flex flex-col gap-2 rounded-md border bg-background p-3 text-sm">
               <div className="flex items-center gap-2 font-medium"><MapPin className="size-4" /> Approved location coordinates</div>
               <p className="text-xs text-muted-foreground">Allow GPS or enter the approved coordinates below. The server applies the configured geofence before marking attendance.</p>
+              <p className="text-xs text-muted-foreground">If access was denied, open Safari website settings and set Location to Allow; also enable iPhone Settings &gt; Privacy &amp; Security &gt; Location Services for Safari. Reload, then tap Capture GPS.</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" onClick={captureGPS} disabled={clocking}>
+                  <MapPin className="mr-2 h-4 w-4" /> {clocking ? "Capturing GPS…" : "Capture GPS"}
+                </Button>
+                <span className="text-xs text-muted-foreground">Tap this button to request device location permission.</span>
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 <div><Label htmlFor="portal-latitude">Latitude</Label><Input id="portal-latitude" inputMode="decimal" value={manualLat} onChange={(e) => { setManualLat(e.target.value); setCoords(null) }} placeholder="5.603700" /></div>
                 <div><Label htmlFor="portal-longitude">Longitude</Label><Input id="portal-longitude" inputMode="decimal" value={manualLng} onChange={(e) => { setManualLng(e.target.value); setCoords(null) }} placeholder="-0.187000" /></div>
