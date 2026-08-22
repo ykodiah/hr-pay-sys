@@ -15,9 +15,17 @@ import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { Printer } from "lucide-react"
 import type { PayslipRow } from "@/lib/services/payslip-service"
+import {
+  buildPayslipDeductionLines,
+  buildPayslipEarningsLines,
+} from "@/lib/payroll/payslip-lines"
 
 interface Props {
-  payslip: PayslipRow
+  payslip: PayslipRow & {
+    allowance_lines?: unknown
+    deduction_lines?: unknown
+    uniform_allowance?: number
+  }
   showPrintButton?: boolean
 }
 
@@ -28,30 +36,14 @@ const fmtLabel = (n: number | string | null | undefined) =>
   Number(n ?? 0).toLocaleString("en-GH", { minimumFractionDigits: 2 })
 
 export function PayslipDocument({ payslip: p, showPrintButton = true }: Props) {
-  const allowanceRows = [
-    p.transport_allowance > 0     ? { name: "Transport Allowance",      amount: Number(p.transport_allowance) }     : null,
-    p.housing_allowance > 0       ? { name: "Housing Allowance",        amount: Number(p.housing_allowance) }       : null,
-    p.medical_allowance > 0       ? { name: "Medical Allowance",        amount: Number(p.medical_allowance) }       : null,
-    p.meal_allowance > 0          ? { name: "Meal Allowance",           amount: Number(p.meal_allowance) }          : null,
-    p.communication_allowance > 0 ? { name: "Communication Allowance",  amount: Number(p.communication_allowance) } : null,
-    p.other_allowances > 0        ? { name: "Other Allowances",         amount: Number(p.other_allowances) }        : null,
-  ].filter(Boolean) as { name: string; amount: number }[]
-
-  const deductionRows = [
-    { name: "SSNIT Employee (5.5%)",  amount: Number(p.ssnit_employee) },
-    p.tier3_employee > 0  ? { name: "Tier 3 / Provident Fund", amount: Number(p.tier3_employee) } : null,
-    { name: "PAYE / Income Tax",       amount: Number(p.paye_tax) },
-    p.loan_deduction > 0  ? { name: "Loan Deduction",        amount: Number(p.loan_deduction) }   : null,
-    p.advance_deduction > 0 ? { name: "Advance Recovery",   amount: Number(p.advance_deduction) } : null,
-    p.other_deductions > 0  ? { name: "Other Deductions",   amount: Number(p.other_deductions) }  : null,
-  ].filter(Boolean) as { name: string; amount: number }[]
-
-  const earningsAll = [
-    { name: "BASIC SALARY", amount: Number(p.basic_salary) },
-    ...allowanceRows,
-    ...(Number(p.overtime_pay) > 0 ? [{ name: "Overtime Pay",  amount: Number(p.overtime_pay) }] : []),
-    ...(Number(p.bonus_pay) > 0    ? [{ name: "Bonus Pay",     amount: Number(p.bonus_pay) }]    : []),
-  ]
+  const earningsAll = buildPayslipEarningsLines(p as any).map((e) => ({
+    name: e.label,
+    amount: e.amount,
+  }))
+  const deductionRows = buildPayslipDeductionLines(p as any).map((d) => ({
+    name: d.label,
+    amount: d.amount,
+  }))
 
   const maxRows = Math.max(earningsAll.length, deductionRows.length)
   const earningsPadded    = [...earningsAll,    ...Array(Math.max(0, maxRows - earningsAll.length)).fill(null)]

@@ -37,6 +37,10 @@ import {
   ErrorBlock,
   EmptyState,
 } from "@/components/self-service/portal-ui"
+import {
+  buildPayslipDeductionLines,
+  buildPayslipEarningsLines,
+} from "@/lib/payroll/payslip-lines"
 
 function Row({
   label,
@@ -117,8 +121,8 @@ export default function PayslipsPage() {
 
   const printPayslip = () => window.print()
 
-  const allowanceLines = Array.isArray(selected?.allowance_lines) ? selected.allowance_lines : []
-  const deductionLines = Array.isArray(selected?.deduction_lines) ? selected.deduction_lines : []
+  const earningsLines = selected ? buildPayslipEarningsLines(selected) : []
+  const deductionLines = selected ? buildPayslipDeductionLines(selected) : []
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
@@ -242,30 +246,9 @@ export default function PayslipsPage() {
                 <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Earnings
                 </h3>
-                <Row label="Basic salary" value={Number(selected.basic_salary || 0)} />
-                {allowanceLines.length > 0
-                  ? allowanceLines.map((line: any, i: number) => (
-                      <Row
-                        key={i}
-                        label={line.label || line.name || "Allowance"}
-                        value={Number(line.amount || 0)}
-                      />
-                    ))
-                  : (
-                      <>
-                        <Row label="Transport allowance" value={Number(selected.transport_allowance || 0)} />
-                        <Row label="Housing allowance" value={Number(selected.housing_allowance || 0)} />
-                        <Row label="Medical allowance" value={Number(selected.medical_allowance || 0)} />
-                        <Row label="Meal allowance" value={Number(selected.meal_allowance || 0)} />
-                        <Row
-                          label="Communication allowance"
-                          value={Number(selected.communication_allowance || 0)}
-                        />
-                        <Row label="Other allowances" value={Number(selected.other_allowances || 0)} />
-                      </>
-                    )}
-                <Row label="Overtime" value={Number(selected.overtime_pay || 0)} />
-                <Row label="Bonus" value={Number(selected.bonus_pay || 0)} />
+                {earningsLines.map((line, i) => (
+                  <Row key={`e-${i}`} label={line.label} value={line.amount} />
+                ))}
                 <Separator className="my-2" />
                 <Row label="Gross pay" value={Number(selected.gross_pay || 0)} strong />
               </div>
@@ -274,20 +257,9 @@ export default function PayslipsPage() {
                 <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Deductions
                 </h3>
-                <Row label="SSNIT (employee)" value={Number(selected.ssnit_employee || 0)} negative />
-                <Row label="Tier 3" value={Number(selected.tier3_employee || 0)} negative />
-                <Row label="PAYE tax" value={Number(selected.paye_tax || 0)} negative />
-                <Row label="Loan repayment" value={Number(selected.loan_deduction || 0)} negative />
-                <Row label="Salary advance" value={Number(selected.advance_deduction || 0)} negative />
-                {deductionLines.map((line: any, i: number) => (
-                  <Row
-                    key={i}
-                    label={line.label || line.name || "Deduction"}
-                    value={Number(line.amount || 0)}
-                    negative
-                  />
+                {deductionLines.map((line, i) => (
+                  <Row key={`d-${i}`} label={line.label} value={line.amount} negative />
                 ))}
-                <Row label="Other deductions" value={Number(selected.other_deductions || 0)} negative />
                 <Separator className="my-2" />
                 <Row
                   label="Total deductions"

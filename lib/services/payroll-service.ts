@@ -466,31 +466,60 @@ export class PayrollService extends BaseService {
           const masterOther = pick(period?.other_allowances, fin.other_allowances)
           const periodOtherDed = Number(period?.other_deductions ?? 0)
           const leaveAllowance = Number(period?.leave_allowance ?? 0)
+          const namedAllowLines = componentRows
+            .filter((row: any) => row.category === "allowance")
+            .map((row: any) => ({
+              label: row.payslip_label || row.name || row.code || "Allowance",
+              code: row.code || "ALLOW",
+              amount: componentAssignmentValue(row, monthlyBasic),
+              category: "allowance",
+            }))
+            .filter((row: any) => row.amount > 0)
+          const namedBonusLines = componentRows
+            .filter((row: any) => row.category === "bonus" || row.category === "backpay")
+            .map((row: any) => ({
+              label: row.payslip_label || row.name || row.code || "Bonus",
+              code: row.code || "BONUS",
+              amount: componentAssignmentValue(row, monthlyBasic),
+              category: row.category,
+            }))
+            .filter((row: any) => row.amount > 0)
+          const namedDedLines = componentRows
+            .filter((row: any) => row.category === "deduction")
+            .map((row: any) => ({
+              label: row.payslip_label || row.name || row.code || "Deduction",
+              code: row.code || "DED",
+              amount: componentAssignmentValue(row, monthlyBasic),
+              category: "deduction",
+            }))
+            .filter((row: any) => row.amount > 0)
+          const namedPfLines = componentRows
+            .filter((row: any) => row.category === "provident_fund" && !row.employer_component)
+            .map((row: any) => ({
+              label: row.payslip_label || row.name || row.code || "Provident Fund",
+              code: row.code || "PF",
+              amount: componentAssignmentValue(row, monthlyBasic),
+              category: "provident_fund",
+            }))
+            .filter((row: any) => row.amount > 0)
+
           const allowanceLines = [
-            ...cardAllowLines,
-            ...componentRows
-              .filter((row: any) => row.category === "allowance")
-              .map((row: any) => ({
-                label: row.payslip_label || row.name || row.code || "Allowance",
-                code: row.code || "ALLOW",
-                amount: componentAssignmentValue(row, monthlyBasic),
-              })),
-            ...(masterOther > 0 ? [{ label: "Other Allowances", code: "OTHER", amount: masterOther }] : []),
+            ...cardAllowLines.map((line) => ({ ...line, category: "allowance" })),
+            ...namedAllowLines,
+            ...namedBonusLines,
+            ...(masterOther > 0
+              ? [{ label: "Other Allowances", code: "OTHER", amount: masterOther, category: "allowance" }]
+              : []),
             ...(leaveAllowance > 0
-              ? [{ label: "Leave Allowance", code: "LEAVE_ALLOW", amount: leaveAllowance }]
+              ? [{ label: "Leave Allowance", code: "LEAVE_ALLOW", amount: leaveAllowance, category: "allowance" }]
               : []),
           ]
           const deductionLines = [
-            ...cardDedLines,
-            ...componentRows
-              .filter((row: any) => row.category === "deduction")
-              .map((row: any) => ({
-                label: row.payslip_label || row.name || row.code || "Deduction",
-                code: row.code || "DED",
-                amount: componentAssignmentValue(row, monthlyBasic),
-              })),
+            ...cardDedLines.map((line) => ({ ...line, category: "deduction" })),
+            ...namedDedLines,
+            ...namedPfLines,
             ...(periodOtherDed > 0
-              ? [{ label: "Other Deductions", code: "OTHER", amount: periodOtherDed }]
+              ? [{ label: "Other Deductions", code: "OTHER", amount: periodOtherDed, category: "deduction" }]
               : []),
           ]
 

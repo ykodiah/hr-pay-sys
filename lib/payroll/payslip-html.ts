@@ -1,5 +1,10 @@
 /** Printable HTML for payslips and payroll registers (browser Save as PDF). */
 
+import {
+  buildPayslipDeductionLines,
+  buildPayslipEarningsLines,
+} from "@/lib/payroll/payslip-lines"
+
 function money(n: number | null | undefined) {
   return `GHS ${Number(n || 0).toLocaleString("en-GH", {
     minimumFractionDigits: 2,
@@ -20,6 +25,12 @@ export function renderPayslipHtml(slip: any, opts?: { autoPrint?: boolean }) {
   const name = slip.snapshot_employee_name || "Employee"
   const company = slip.snapshot_company_name || "Company"
   const period = slip.pay_period || ""
+  const earningsRows = buildPayslipEarningsLines(slip)
+    .map((e) => `<tr><td>${esc(e.label)}</td><td class="right">${money(e.amount)}</td></tr>`)
+    .join("")
+  const deductionRows = buildPayslipDeductionLines(slip)
+    .map((d) => `<tr><td>${esc(d.label)}</td><td class="right">${money(d.amount)}</td></tr>`)
+    .join("")
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/>
 <title>Payslip - ${esc(name)} - ${esc(period)}</title>
@@ -49,27 +60,14 @@ export function renderPayslipHtml(slip: any, opts?: { autoPrint?: boolean }) {
   <table>
     <thead><tr><th>Earnings</th><th class="right">Amount</th></tr></thead>
     <tbody>
-      <tr><td>Basic Salary</td><td class="right">${money(slip.basic_salary)}</td></tr>
-      <tr><td>Transport Allowance</td><td class="right">${money(slip.transport_allowance)}</td></tr>
-      <tr><td>Housing Allowance</td><td class="right">${money(slip.housing_allowance)}</td></tr>
-      <tr><td>Medical Allowance</td><td class="right">${money(slip.medical_allowance)}</td></tr>
-      <tr><td>Meal Allowance</td><td class="right">${money(slip.meal_allowance)}</td></tr>
-      <tr><td>Communication Allowance</td><td class="right">${money(slip.communication_allowance)}</td></tr>
-      <tr><td>Other Allowances</td><td class="right">${money(slip.other_allowances)}</td></tr>
-      <tr><td>Overtime</td><td class="right">${money(slip.overtime_pay)}</td></tr>
-      <tr><td>Bonus</td><td class="right">${money(slip.bonus_pay)}</td></tr>
+      ${earningsRows}
       <tr class="total"><td>Gross Pay</td><td class="right">${money(slip.gross_pay)}</td></tr>
     </tbody>
   </table>
   <table>
     <thead><tr><th>Deductions</th><th class="right">Amount</th></tr></thead>
     <tbody>
-      <tr><td>SSNIT (Employee)</td><td class="right">${money(slip.ssnit_employee)}</td></tr>
-      <tr><td>Tier 3 / PF (Employee)</td><td class="right">${money(slip.tier3_employee)}</td></tr>
-      <tr><td>PAYE Tax</td><td class="right">${money(slip.paye_tax)}</td></tr>
-      <tr><td>Loan</td><td class="right">${money(slip.loan_deduction)}</td></tr>
-      <tr><td>Advance</td><td class="right">${money(slip.advance_deduction)}</td></tr>
-      <tr><td>Other Deductions</td><td class="right">${money(slip.other_deductions)}</td></tr>
+      ${deductionRows}
       <tr class="total"><td>Total Deductions</td><td class="right">${money(slip.total_deductions)}</td></tr>
       <tr class="total"><td>Net Pay</td><td class="right">${money(slip.net_pay)}</td></tr>
     </tbody>
