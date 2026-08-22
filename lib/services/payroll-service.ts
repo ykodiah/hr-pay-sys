@@ -357,7 +357,7 @@ export class PayrollService extends BaseService {
           .from("employee_loans")
           .select("employee_id, monthly_payment, monthly_installment, remaining_balance, status, auto_deduct, start_date, approved_at, disbursed_at, created_at, end_date")
           .eq("company_id", companyId)
-          .in("status", ["active", "approved"]),
+          .in("status", ["active", "approved", "disbursed"]),
         client
           .from("employee_allowances")
           .select("employee_id, amount, percentage, calculation_type, effective_date, end_date, is_active, recurring, code, description")
